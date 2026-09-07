@@ -15,6 +15,11 @@ PATTERN = re.compile(
     r"input=(?P<input>\d+)us update=(?P<update>\d+)us "
     r"acquire=(?P<acquire>\d+)us render=(?P<render>\d+)us "
     r"submit=(?P<submit>\d+)us release=(?P<release>\d+)us")
+COUNTER_PATTERN = re.compile(
+    r"frame=(?P<frame>\d+) dropped=(?P<dropped>\d+) busy=(?P<busy>\d+) "
+    r"superseded=(?P<superseded>\d+) errors=(?P<errors>\d+).*?"
+    r"inflight=(?P<inflight>\d+)/(?P<peak_inflight>\d+)"
+    r"(?: heap=(?P<heap>\d+) psram=(?P<psram>\d+))?")
 
 
 def percentile(values: list[float], fraction: float) -> float:
@@ -35,6 +40,24 @@ def summarize(text: str) -> dict[str, object]:
             "p50": round(percentile(values, .50), 2),
             "p95": round(percentile(values, .95), 2),
         }
+    counters = [match.groupdict() for match in COUNTER_PATTERN.finditer(text)]
+    if counters:
+        latest = counters[-1]
+        for key in ("frame", "dropped", "busy", "superseded", "errors",
+                    "inflight", "peak_inflight"):
+            result[key] = int(latest[key])
+        for key in ("heap", "psram"):
+            values = [int(value[key]) for value in counters if value[key] is not None]
+            result[f"min_{key}_bytes"] = min(values) if values else None
+    else:
+        for key in ("frame", "dropped", "busy", "superseded", "errors",
+                    "inflight", "peak_inflight"):
+            result[key] = 0
+        result["min_heap_bytes"] = None
+        result["min_psram_bytes"] = None
+    result["accepted"] = bool(samples) and 29.5 <= result["logic"]["mean"] <= 30.5 \
+        and result["acquire"]["p95"] <= 1000 and result["errors"] == 0 \
+        and result["display"]["mean"] >= 24.0
     return result
 
 
