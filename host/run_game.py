@@ -409,7 +409,9 @@ class ReloadableHostRuntime:
         if stamp == self.stamp: return
         try:
             prepare = self.project / "assets_src/prepare_sprites.py"
-            if prepare.is_file(): subprocess.run([str(prepare)], check=True, capture_output=True)
+            if prepare.is_file():
+                subprocess.run([sys.executable, str(prepare)], check=True,
+                               capture_output=True)
             manifest = self.project / "assets_src/game_assets.json"
             if manifest.is_file():
                 packer = Path(__file__).resolve().parents[1] / "tools/pack_game_assets.py"
@@ -610,7 +612,7 @@ const held=new Set(), pointers=new Map(), img=document.querySelector('#screen'),
 let busy=false, phase='start',paused=false;
 function key(e,down){const k=e.key.toLowerCase();if(['arrowleft','arrowright',' ','a','d','p','enter'].includes(k))e.preventDefault();
  if(down&&!held.has(k)&&k==='p')control(paused?'resume':'pause');
- if(down&&!held.has(k)&&k==='enter')control('reset'); down?held.add(k):held.delete(k);sendInput()}
+ if(down&&!held.has(k)&&k==='enter')control('continue'); down?held.add(k):held.delete(k);sendInput()}
 addEventListener('keydown',e=>key(e,true));addEventListener('keyup',e=>key(e,false));
 function pointer(e,down){e.preventDefault();const r=img.getBoundingClientRect();
  const p={x:(e.clientX-r.left)*480/r.width,y:(e.clientY-r.top)*480/r.height};down?pointers.set(e.pointerId,p):pointers.delete(e.pointerId)}
@@ -688,6 +690,8 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                     with runtime.lock:
                         if hasattr(runtime, "control"): runtime.control(3)
                         else: runtime.step(False,False,False,restart=True)
+                elif command == "continue":
+                    with runtime.lock: runtime.step(False,False,False,restart=True)
                 elif command.startswith("speed:"):
                     speed=float(command.split(":",1)[1])
                     if speed in (.25,.5,1.0,2.0): simulation["speed"] = speed
