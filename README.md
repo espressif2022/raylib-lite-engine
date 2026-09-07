@@ -5,7 +5,8 @@ GSP 只承担 480×480 RGB565 Canvas 提交、镜像和展示。
 
 完整的分层、项目结构、帧生命周期和部署约束见
 [`docs/game-platform.md`](../docs/game-platform.md)。新项目通过
-`cmake/mosaico_game_sdk.cmake` 声明 `RAYLIB`、`AUDIO`、`TILEMAP` 能力，
+`cmake/mosaico_game_sdk.cmake` 声明 `RAYLIB`、`AUDIO`、`TILEMAP`、`SCENE`、
+`UI`、`FX`、`SAVE` 能力，
 不要复制维护 `EXTRA_COMPONENT_DIRS`。
 组件职责、API 所有权与生命周期约定见
 [`components/README.md`](components/README.md)。
@@ -19,6 +20,10 @@ GSP 只承担 480×480 RGB565 Canvas 提交、镜像和展示。
 - `mosaico_game_audio`：8 路 SFX、1 路循环 BGM、PCM16/IMA-ADPCM 解码、饱和混音及 underrun/voice stealing 统计。
 - `mosaico_raylib_fast`：`LoadTexture`、`DrawTexture*` 和基础 Raylib 绘制兼容层。
 - `mosaico_raylib_port`：PSRAM framebuffer 到 GSP Canvas 的非阻塞提交。
+- `mosaico_game_scene`：最多 8 层的场景栈及 enter/exit/pause/resume/event/update/render 生命周期。
+- `mosaico_game_ui`：固定容量 panel/label/button retained tree，支持两个 track ID 指针和方向/确认动作。
+- `mosaico_game_fx`：无热路径分配的 Tween、四类 easing 和固定粒子池。
+- `mosaico_game_save`：带 schema version、payload length、CRC32、显式迁移和延迟合并写的 NVS blob。
 
 设备运行时不会解析 PNG、JSON、TMJ 或 WAV。构建工具
 `tools/pack_game_assets.py` 根据 `mosaico-game-assets/v1` 的

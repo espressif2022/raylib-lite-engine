@@ -18,6 +18,10 @@ paths and the Raylib dependency in one place.
 | `mosaico_game_audio` | clip loading, mixing, codec output | game music policy |
 | `mosaico_game_input` | translating device input into game events | board driver ownership |
 | `mosaico_game_debug` | runtime statistics logging | production telemetry transport |
+| `mosaico_game_scene` | fixed-capacity scene stack and lifecycle dispatch | game-specific scene policy |
+| `mosaico_game_ui` | fixed retained panel/label/button tree and two tracked pointers | menus, layout engines, or board input |
+| `mosaico_game_fx` | fixed-capacity tweens, easing, and particle pools | heap allocation or rendering policy |
+| `mosaico_game_save` | versioned, CRC-protected, debounced save blobs | game schema or migration policy |
 
 ## Public API rules
 
