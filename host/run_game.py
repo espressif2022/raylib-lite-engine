@@ -304,12 +304,14 @@ def _rgb_png_bytes(pixels: bytearray, width: int = 480, height: int = 480) -> by
             chunk(b"IDAT", zlib.compress(rows, 3)) + chunk(b"IEND", b""))
 
 def _rgb565_png_bytes(framebuffer: object, width: int, height: int) -> bytes:
-    pixels = bytearray(width * height * 3)
-    for index, value in enumerate(framebuffer):
-        pixels[index*3] = ((value >> 11) & 31) * 255 // 31
-        pixels[index*3+1] = ((value >> 5) & 63) * 255 // 63
-        pixels[index*3+2] = (value & 31) * 255 // 31
-    return _rgb_png_bytes(pixels, width, height)
+    # Pillow's raw decoder performs the RGB565 expansion in native code. The
+    # previous Python pixel loop cost 120-200 ms for a 480x480 frame and held
+    # the simulation lock long enough to stall the fixed 30 Hz game clock.
+    pixels = ctypes.string_at(ctypes.addressof(framebuffer), width * height * 2)
+    image = Image.frombytes("RGB", (width, height), pixels, "raw", "BGR;16")
+    output = io.BytesIO()
+    image.save(output, format="PNG", compress_level=1)
+    return output.getvalue()
 
 class GenericHostRuntime:
     """Versioned project-owned C adapter; Python never mirrors game structs."""
@@ -599,7 +601,7 @@ def serve_sky_preview(listen: str, port: int, runtime: SkyRuntime) -> None:
 <title>Sky Hop simulator</title><style>
 body{margin:0;background:#07111c;color:#dff;font:14px system-ui;display:grid;place-items:center;min-height:100vh}
 main{position:relative;padding:16px;background:#0c2030;border:1px solid #299fad;border-radius:16px;box-shadow:0 18px 80px #000}
-img{width:min(82vh,94vw,480px);display:block;image-rendering:pixelated;touch-action:none}
+img{width:480px;height:480px;max-width:calc(100vw - 34px);max-height:calc(100vh - 170px);object-fit:contain;display:block;image-rendering:pixelated;touch-action:none}
 #state{margin-top:10px;color:#9ee;white-space:pre-wrap}.hint{color:#fff;margin-top:8px}.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}button,select{background:#17364b;color:#dff;border:1px solid #299fad;border-radius:6px;padding:6px 10px}
 </style></head><body><main><div class=tools><button id=pause>Pause</button><button id=step>Step</button><button id=reset>Reset</button><button id=shot>Screenshot</button><button id=record>Record</button><select id=speed><option>.25</option><option>.5</option><option selected>1</option><option>2</option></select></div><img id=screen tabindex=0 draggable=false><div id=state></div>
 <div class=hint>Keyboard: A/D or ←/→, Space jump, P pause, Enter continue · Touch: bottom controls</div></main>
@@ -622,11 +624,11 @@ async function sendInput(){let left=held.has('a')||held.has('arrowleft'),right=h
 async function control(command){await fetch('/api/v1/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command})})}
 async function tick(){if(busy)return;busy=true;
  try{const res=await fetch('/api/v1/frame');const meta=JSON.parse(res.headers.get('X-Mosaico-State'));const blob=await res.blob();
- phase=meta.phase;const old=img.src;img.src=URL.createObjectURL(blob);if(old.startsWith('blob:'))URL.revokeObjectURL(old);
+ phase=meta.phase;const old=img.src,url=URL.createObjectURL(blob);img.onload=()=>{if(old.startsWith('blob:'))URL.revokeObjectURL(old);img.onload=null};img.src=url;
  paused=meta.simulation.paused;state.textContent=`Logic ${meta.simulation.logic_fps.toFixed(1)} Hz  Frame ${meta.simulation.frame_ms.toFixed(1)} ms\nLevel ${meta.level}/${meta.levels}  Score ${meta.score}  Life ${meta.lives}  phase ${meta.phase}  ${meta.state_hash}`}
  finally{busy=false}}
 pause.onclick=()=>control(paused?'resume':'pause');step.onclick=()=>control('step');reset.onclick=()=>control('reset');speed.onchange=()=>control('speed:'+speed.value);shot.onclick=()=>{const a=document.createElement('a');a.href=img.src;a.download='sky-hop.png';a.click()};record.onclick=()=>control('record');
-setInterval(tick,50);tick();
+let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()}requestAnimationFrame(animate)}requestAnimationFrame(animate);
 </script></body></html>""".encode("utf-8")
     class Handler(BaseHTTPRequestHandler):
         def metadata(self) -> dict[str, object]:
