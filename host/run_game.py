@@ -11,12 +11,16 @@ from __future__ import annotations
 import argparse
 import ctypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import io
 import json
 from pathlib import Path
 import struct
 import subprocess
 import tempfile
+import threading
 import zlib
+
+from PIL import Image, ImageDraw, ImageFont
 
 
 MAX_BULLETS = 64
@@ -24,6 +28,8 @@ MAX_ENEMIES = 32
 TOWER_MAX_ENEMIES = 48
 TOWER_MAX_PROJECTILES = 64
 TOWER_PAD_COUNT = 9
+SKY_MAX_COINS = 10
+SKY_MAX_ENEMIES = 4
 
 class Actor(ctypes.Structure):
     _fields_ = [("x", ctypes.c_float), ("y", ctypes.c_float),
@@ -83,6 +89,33 @@ class HostEvent(ctypes.Structure):
                 ("x", ctypes.c_int16), ("y", ctypes.c_int16)]
 
 EVENT_TYPES = {"tap": 1, "pause": 2, "resume": 3, "step": 4, "reset": 5}
+
+class SkyCoin(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_float), ("y", ctypes.c_float),
+                ("collected", ctypes.c_bool)]
+
+class SkyEnemy(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_float), ("y", ctypes.c_float),
+                ("left", ctypes.c_float), ("right", ctypes.c_float),
+                ("speed", ctypes.c_float), ("active", ctypes.c_bool)]
+
+class SkyGame(ctypes.Structure):
+    _fields_ = [("phase", ctypes.c_int),
+                ("player_x", ctypes.c_float), ("player_y", ctypes.c_float),
+                ("velocity_x", ctypes.c_float), ("velocity_y", ctypes.c_float),
+                ("camera_x", ctypes.c_float),
+                ("move_left", ctypes.c_bool), ("move_right", ctypes.c_bool),
+                ("jump_held", ctypes.c_bool), ("grounded", ctypes.c_bool),
+                ("tick", ctypes.c_uint32), ("phase_tick", ctypes.c_uint32),
+                ("score", ctypes.c_uint16), ("lives", ctypes.c_uint8),
+                ("level", ctypes.c_uint8), ("coin_count", ctypes.c_uint8),
+                ("enemy_count", ctypes.c_uint8),
+                ("coins", SkyCoin * SKY_MAX_COINS),
+                ("enemies", SkyEnemy * SKY_MAX_ENEMIES)]
+
+class SkyBlock(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_float), ("y", ctypes.c_float),
+                ("width", ctypes.c_float), ("height", ctypes.c_float)]
 
 def load_replay(path: Path | None) -> list[dict[str, int | str]]:
     if path is None:
@@ -248,6 +281,209 @@ def run_tower(source: Path, directory: Path, frames: int, output: Path,
             "state_hash": f"{result.state_hash:08x}",
             "frame": str(output)}
 
+def _rgb_png_bytes(pixels: bytearray, width: int = 480, height: int = 480) -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return (struct.pack(">I", len(data)) + kind + data +
+                struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff))
+    rows = b"".join(b"\0" + pixels[y*width*3:(y+1)*width*3]
+                    for y in range(height))
+    return (b"\x89PNG\r\n\x1a\n" +
+            chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) +
+            chunk(b"IDAT", zlib.compress(rows, 3)) + chunk(b"IEND", b""))
+
+class SkyRuntime:
+    def __init__(self, source: Path, directory: Path) -> None:
+        self.library = directory / "sky_game.so"
+        subprocess.run(["cc", "-shared", "-fPIC", "-O2", "-std=c11", "-Wall",
+                        "-Wextra", "-Werror", str(source), "-o", str(self.library)],
+                       check=True)
+        self.api = ctypes.CDLL(str(self.library))
+        self.api.platform_game_reset.argtypes = [ctypes.POINTER(SkyGame)]
+        self.api.platform_game_set_action.argtypes = [ctypes.POINTER(SkyGame),
+                                                       ctypes.c_int, ctypes.c_bool]
+        self.api.platform_game_update.argtypes = [ctypes.POINTER(SkyGame)]
+        self.api.platform_game_blocks.argtypes = [ctypes.POINTER(SkyGame),
+                                                   ctypes.POINTER(ctypes.c_size_t)]
+        self.api.platform_game_blocks.restype = ctypes.POINTER(SkyBlock)
+        self.api.platform_game_finish_x.argtypes = [ctypes.POINTER(SkyGame)]
+        self.api.platform_game_finish_x.restype = ctypes.c_float
+        self.api.platform_game_state_hash.argtypes = [ctypes.POINTER(SkyGame)]
+        self.api.platform_game_state_hash.restype = ctypes.c_uint32
+        self.game = SkyGame()
+        self.api.platform_game_reset(ctypes.byref(self.game))
+        atlas_path = source.parents[1] / "assets_src" / "sky_hop_atlas.png"
+        self.atlas = Image.open(atlas_path).convert("RGBA")
+        self.sprites = [self.atlas.crop(((i % 4) * 64, (i // 4) * 64,
+                                        (i % 4 + 1) * 64, (i // 4 + 1) * 64))
+                        for i in range(8)]
+        self.frames = 0
+        self.lock = threading.Lock()
+
+    def step(self, left: bool, right: bool, jump: bool,
+             restart: bool = False, pause: bool = False) -> None:
+        if self.game.phase in (0, 3, 4, 5) and (left or right or jump):
+            restart = True
+        if restart:
+            self.api.platform_game_set_action(ctypes.byref(self.game), 4, True)
+        if pause:
+            self.api.platform_game_set_action(ctypes.byref(self.game), 3, True)
+        self.api.platform_game_set_action(ctypes.byref(self.game), 0, left)
+        self.api.platform_game_set_action(ctypes.byref(self.game), 1, right)
+        self.api.platform_game_set_action(ctypes.byref(self.game), 2, jump)
+        self.api.platform_game_update(ctypes.byref(self.game))
+        self.frames += 1
+
+    def metadata(self) -> dict[str, object]:
+        phase_names = ("start", "playing", "paused", "level_clear", "won", "game_over")
+        phase = self.game.phase
+        return {"frames": self.frames, "level": self.game.level + 1,
+                "levels": 3, "score": self.game.score, "lives": self.game.lives,
+                "phase": phase_names[phase] if 0 <= phase < len(phase_names) else "unknown",
+                "state_hash": f"{self.api.platform_game_state_hash(ctypes.byref(self.game)):08x}"}
+
+    def frame(self) -> bytes:
+        game = self.game
+        camera = int(game.camera_x)
+        image = Image.new("RGB", (480, 480), (92, 190, 236))
+        draw = ImageDraw.Draw(image)
+        draw.rectangle((0, 300, 479, 479), fill=(170, 224, 245))
+        for index in range(8):
+            cloud_x = index * 210 - (camera // 3) % 210
+            cloud_y = 155 + index % 2 * 28
+            draw.rectangle((cloud_x, cloud_y, cloud_x+104, cloud_y+17), fill=(235,248,250))
+            draw.rectangle((cloud_x+20, cloud_y-12, cloud_x+81, cloud_y+17), fill=(235,248,250))
+        resampling = getattr(Image, "Resampling", Image).NEAREST
+        def sprite(index: int, x: float, y: float, width: int, height: int,
+                   flip: bool = False) -> None:
+            value = self.sprites[index].resize((width, height), resampling)
+            if flip:
+                transpose = getattr(Image, "Transpose", Image)
+                value = value.transpose(transpose.FLIP_LEFT_RIGHT)
+            image.paste(value, (int(x), int(y)), value)
+        count = ctypes.c_size_t()
+        blocks = self.api.platform_game_blocks(ctypes.byref(game), ctypes.byref(count))
+        for index in range(count.value):
+            block = blocks[index]
+            x, y = int(block.x)-camera, int(block.y)
+            for tile_x in range(x, x + int(block.width), 48):
+                sprite(5, tile_x, y-2, 50, 50)
+            if block.y >= 390:
+                draw.rectangle((x, y+48, x+int(block.width), y+89), fill=(111,73,45))
+        for index in range(game.coin_count):
+            coin = game.coins[index]
+            if not coin.collected:
+                pulse = 25 + ((game.tick // 5 + index) % 3) * 2
+                sprite(4, int(coin.x)-camera-pulse/2, int(coin.y)-pulse/2, pulse, pulse)
+        for index in range(game.enemy_count):
+            enemy = game.enemies[index]
+            if enemy.active:
+                sprite(3, int(enemy.x)-camera-7, int(enemy.y)-12, 44, 44, enemy.speed < 0)
+        finish = int(self.api.platform_game_finish_x(ctypes.byref(game))) - camera
+        if finish < 500:
+            sprite(6, finish-12, 292, 70, 98)
+        hero = 2 if not game.grounded else (game.tick // 5) % 2 if (game.move_left or game.move_right) else 0
+        sprite(hero, int(game.player_x)-camera-14, int(game.player_y)-22, 58, 64,
+               game.velocity_x < 0)
+        try:
+            font20 = ImageFont.truetype("DejaVuSansMono.ttf", 20)
+            font16 = ImageFont.truetype("DejaVuSansMono.ttf", 16)
+            font38 = ImageFont.truetype("DejaVuSansMono.ttf", 38)
+        except OSError:
+            font20 = font16 = font38 = ImageFont.load_default()
+        draw.rectangle((0,0,479,41), fill=(22,42,68))
+        draw.text((14,9), f"SCORE {game.score:04d}", font=font20, fill="white")
+        draw.text((181,10), f"L{game.level+1}/3", font=font16, fill=(129,224,171))
+        draw.text((250,12), f"BEST {game.score:04d}", font=font16, fill=(255,220,80))
+        draw.text((365,9), f"LIFE {game.lives}", font=font20, fill="white")
+        draw.rectangle((438,4,474,36), fill=(52,77,104))
+        draw.rectangle((449,11,453,29), fill="white"); draw.rectangle((459,11,463,29), fill="white")
+        controls = ((8,408,146,472,(25,43,65),"LEFT"),
+                    (154,408,292,472,(25,43,65),"RIGHT"),
+                    (300,408,472,472,(226,95,63),"JUMP"))
+        for x0,y0,x1,y1,color,label in controls:
+            draw.rectangle((x0,y0,x1,y1), fill=color)
+            box = draw.textbbox((0,0), label, font=font20)
+            draw.text(((x0+x1-(box[2]-box[0]))//2, 427), label, font=font20, fill="white")
+        if game.phase != 1:
+            titles = {0:"SKY HOP", 2:"PAUSED", 3:"LEVEL CLEAR!", 4:"ALL CLEAR!", 5:"TRY AGAIN"}
+            prompts = {0:"CLICK OR PRESS A KEY", 2:"CLICK OR PRESS P", 3:"CLICK FOR NEXT LEVEL",
+                       4:"CLICK TO PLAY AGAIN", 5:"CLICK TO TRY AGAIN"}
+            draw.rectangle((42,120,438,310), fill=(20,39,65))
+            title = titles.get(game.phase, "SKY HOP")
+            box = draw.textbbox((0,0), title, font=font38)
+            draw.text(((480-(box[2]-box[0]))//2,155), title, font=font38, fill=(255,220,80))
+            prompt = prompts.get(game.phase, "CLICK TO START")
+            box = draw.textbbox((0,0), prompt, font=font16)
+            draw.text(((480-(box[2]-box[0]))//2,255), prompt, font=font16, fill=(129,224,171))
+        output = io.BytesIO()
+        image.save(output, format="PNG", compress_level=3)
+        return output.getvalue()
+
+def run_sky(source: Path, directory: Path, frames: int, output: Path) -> dict[str, object]:
+    runtime = SkyRuntime(source, directory)
+    runtime.step(False, False, False, restart=True)
+    for index in range(max(0, frames)):
+        runtime.step(False, True, index % 55 < 8)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_bytes(runtime.frame())
+    return {**runtime.metadata(), "frame": str(output)}
+
+def serve_sky_preview(listen: str, port: int, runtime: SkyRuntime) -> None:
+    page = """<!doctype html><html><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Sky Hop simulator</title><style>
+body{margin:0;background:#07111c;color:#dff;font:14px system-ui;display:grid;place-items:center;min-height:100vh}
+main{position:relative;padding:16px;background:#0c2030;border:1px solid #299fad;border-radius:16px;box-shadow:0 18px 80px #000}
+img{width:min(82vh,94vw,480px);display:block;image-rendering:pixelated;touch-action:none}
+#state{margin-top:10px;color:#9ee;white-space:pre-wrap}.hint{color:#fff;margin-top:8px}
+</style></head><body><main><img id=screen tabindex=0 draggable=false><div id=state></div>
+<div class=hint>Keyboard: A/D or ←/→, Space jump, P pause, Enter continue · Touch: bottom controls</div></main>
+<script>
+const held=new Set(), pointers=new Map(), img=document.querySelector('#screen'), state=document.querySelector('#state');
+let pulse=false, busy=false, phase='start';
+function key(e,down){const k=e.key.toLowerCase();if(['arrowleft','arrowright',' ','a','d','p','enter'].includes(k))e.preventDefault();
+ if(down&&!held.has(k)&&(k==='p'||k==='enter'))pulse=k;
+ if(down&&phase!=='playing'&&phase!=='paused')pulse='enter'; down?held.add(k):held.delete(k)}
+addEventListener('keydown',e=>key(e,true));addEventListener('keyup',e=>key(e,false));
+function pointer(e,down){e.preventDefault();const r=img.getBoundingClientRect();
+ const p={x:(e.clientX-r.left)*480/r.width,y:(e.clientY-r.top)*480/r.height};down?pointers.set(e.pointerId,p):pointers.delete(e.pointerId)}
+img.onpointerdown=e=>{img.focus();if(phase==='paused')pulse='p';else if(phase!=='playing')pulse='enter';img.setPointerCapture(e.pointerId);pointer(e,true)};
+img.onpointermove=e=>{if(pointers.has(e.pointerId))pointer(e,true)};
+img.onpointerup=img.onpointercancel=e=>pointer(e,false);
+addEventListener('blur',()=>{held.clear();pointers.clear()});
+async function tick(){if(busy)return;busy=true;let left=held.has('a')||held.has('arrowleft'),right=held.has('d')||held.has('arrowright'),jump=held.has(' ');
+ for(const p of pointers.values())if(p.y>=360){left|=p.x<150;right|=p.x>=150&&p.x<300;jump|=p.x>=300}
+ const q=new URLSearchParams({left:+left,right:+right,jump:+jump,restart:+(pulse==='enter'),pause:+(pulse==='p')});pulse=false;
+ try{const res=await fetch('/frame?'+q);const meta=JSON.parse(res.headers.get('X-Mosaico-State'));const blob=await res.blob();
+ phase=meta.phase;const old=img.src;img.src=URL.createObjectURL(blob);if(old.startsWith('blob:'))URL.revokeObjectURL(old);
+ state.textContent=`Level ${meta.level}/${meta.levels}  Score ${meta.score}  Life ${meta.lives}  ${meta.phase}  ${meta.state_hash}`}
+ finally{busy=false}}
+setInterval(tick,33);tick();
+</script></body></html>""".encode("utf-8")
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            if self.path.startswith("/frame"):
+                from urllib.parse import parse_qs, urlparse
+                values = parse_qs(urlparse(self.path).query)
+                flag = lambda name: values.get(name, ["0"])[0] == "1"
+                with runtime.lock:
+                    runtime.step(flag("left"), flag("right"), flag("jump"),
+                                 flag("restart"), flag("pause"))
+                    body, metadata = runtime.frame(), runtime.metadata()
+                content_type = "image/png"
+            else:
+                body, metadata, content_type = page, runtime.metadata(), "text/html; charset=utf-8"
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Mosaico-State", json.dumps(metadata, separators=(",", ":")))
+            self.end_headers(); self.wfile.write(body)
+        def log_message(self, fmt: str, *args: object) -> None:
+            return
+    print(json.dumps({"preview_url": f"http://{listen}:{port}/", **runtime.metadata()}), flush=True)
+    ThreadingHTTPServer((listen, port), Handler).serve_forever()
+
 def serve_preview(listen: str, port: int, frame: Path,
                   metadata: dict[str, object]) -> None:
     page = f"""<!doctype html><html><head><meta charset=utf-8>
@@ -286,10 +522,23 @@ def main() -> int:
     args = parser.parse_args()
     shooter_source = args.project / "main" / "shooter_game.c"
     tower_source = args.project / "main" / "tower_game.c"
-    if not shooter_source.is_file() and not tower_source.is_file():
+    sky_source = args.project / "main" / "platform_game.c"
+    if not shooter_source.is_file() and not tower_source.is_file() and not sky_source.is_file():
         parser.error("project does not expose a supported host game model")
     with tempfile.TemporaryDirectory(prefix="mosaico-game-") as directory:
         output = args.project / "build-host" / "frame.png"
+        if sky_source.is_file():
+            if args.headless:
+                result = run_sky(sky_source, Path(directory), args.frames, output)
+                if args.state_output:
+                    args.state_output.parent.mkdir(parents=True, exist_ok=True)
+                    args.state_output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n",
+                                                 encoding="utf-8")
+                print(json.dumps(result))
+            else:
+                serve_sky_preview(args.listen, args.port,
+                                  SkyRuntime(sky_source, Path(directory)))
+            return 0
         if tower_source.is_file():
             replay = load_replay(args.replay)
             result = run_tower(tower_source, Path(directory), args.frames, output,

@@ -5,9 +5,10 @@ function(mosaico_game_sdk_configure_gsp_compiler)
     if(DEFINED GSPC_EXECUTABLE OR DEFINED ENV{GSPC_EXECUTABLE})
         return()
     endif()
+    find_program(_mosaico_cargo NAMES cargo)
     get_filename_component(_workspace_gspc
         "${MOSAICO_GAME_SDK_ROOT}/../../../esp-gsp/ci/gspc-dev" ABSOLUTE)
-    if(EXISTS "${_workspace_gspc}")
+    if(_mosaico_cargo AND EXISTS "${_workspace_gspc}")
         set(GSPC_EXECUTABLE "${_workspace_gspc}" CACHE FILEPATH
             "Standalone ESP-GSP scene compiler")
     endif()
