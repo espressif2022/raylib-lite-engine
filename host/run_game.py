@@ -18,6 +18,7 @@ import struct
 import subprocess
 import tempfile
 import threading
+import time
 import zlib
 
 from PIL import Image, ImageDraw, ImageFont
@@ -116,6 +117,17 @@ class SkyGame(ctypes.Structure):
 class SkyBlock(ctypes.Structure):
     _fields_ = [("x", ctypes.c_float), ("y", ctypes.c_float),
                 ("width", ctypes.c_float), ("height", ctypes.c_float)]
+
+class HostGameDescriptor(ctypes.Structure):
+    _fields_ = [("abi_version", ctypes.c_uint32), ("game_id", ctypes.c_char_p),
+                ("title", ctypes.c_char_p), ("width", ctypes.c_uint16),
+                ("height", ctypes.c_uint16), ("tick_hz", ctypes.c_uint16),
+                ("max_pointers", ctypes.c_uint16)]
+
+class HostGameInput(ctypes.Structure):
+    _fields_ = [("type", ctypes.c_uint32), ("code", ctypes.c_int32),
+                ("x", ctypes.c_int32), ("y", ctypes.c_int32),
+                ("track_id", ctypes.c_int32), ("pressed", ctypes.c_bool)]
 
 def load_replay(path: Path | None) -> list[dict[str, int | str]]:
     if path is None:
@@ -291,6 +303,132 @@ def _rgb_png_bytes(pixels: bytearray, width: int = 480, height: int = 480) -> by
             chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) +
             chunk(b"IDAT", zlib.compress(rows, 3)) + chunk(b"IEND", b""))
 
+def _rgb565_png_bytes(framebuffer: object, width: int, height: int) -> bytes:
+    pixels = bytearray(width * height * 3)
+    for index, value in enumerate(framebuffer):
+        pixels[index*3] = ((value >> 11) & 31) * 255 // 31
+        pixels[index*3+1] = ((value >> 5) & 63) * 255 // 63
+        pixels[index*3+2] = (value & 31) * 255 // 31
+    return _rgb_png_bytes(pixels, width, height)
+
+class GenericHostRuntime:
+    """Versioned project-owned C adapter; Python never mirrors game structs."""
+    def __init__(self, project: Path, directory: Path, generation: int = 0) -> None:
+        repository = Path(__file__).resolve().parents[2]
+        adapter = project / "main/host_adapter.c"
+        library = directory / f"host_game_{generation}.so"
+        sources = [adapter, project / "main/platform_game.c",
+                   repository / "game_sdk/host/host_asset_runtime.c",
+                   repository / "game_sdk/components/mosaico_game_2d/mosaico_game_2d.c"]
+        includes = [repository / "game_sdk/host/include", repository / "game_sdk/host",
+                    repository / "game_sdk/components/mosaico_game_assets/include",
+                    repository / "game_sdk/components/mosaico_game_2d/include",
+                    project / "main", project / "assets/generated",
+                    project / "managed_components/georgik__raylib/include",
+                    project / "managed_components/georgik__raylib/raylib/src"]
+        if not (includes[-1] / "raylib.h").is_file():
+            raise RuntimeError("host preview needs project dependencies; run 'game build' first")
+        command = ["cc", "-shared", "-fPIC", "-O2", "-std=c11", "-Wall",
+                   "-Wextra", "-Werror", *(str(path) for path in sources)]
+        for include in includes: command.extend(("-I", str(include)))
+        command.extend(("-lm", "-o", str(library)))
+        subprocess.run(command, check=True, capture_output=True, text=True)
+        self.api = ctypes.CDLL(str(library))
+        self.api.mosaico_host_game_v1.restype = ctypes.POINTER(HostGameDescriptor)
+        descriptor = self.api.mosaico_host_game_v1().contents
+        if descriptor.abi_version != 1:
+            raise RuntimeError(f"unsupported host game ABI {descriptor.abi_version}")
+        self.descriptor = descriptor
+        self.api.mosaico_host_game_create_v1.argtypes = [ctypes.c_char_p]
+        self.api.mosaico_host_game_create_v1.restype = ctypes.c_void_p
+        self.api.mosaico_host_game_input_v1.argtypes = [ctypes.c_void_p,
+                                                        ctypes.POINTER(HostGameInput)]
+        self.api.mosaico_host_game_update_v1.argtypes = [ctypes.c_void_p]
+        self.api.mosaico_host_game_render_rgb565_v1.argtypes = [ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_uint16), ctypes.c_size_t]
+        self.api.mosaico_host_game_state_json_v1.argtypes = [ctypes.c_void_p,
+            ctypes.c_char_p, ctypes.c_size_t]
+        self.context = self.api.mosaico_host_game_create_v1(
+            str(project / "assets/generated").encode())
+        if not self.context: raise RuntimeError("host adapter create failed")
+        self.framebuffer = (ctypes.c_uint16 * (descriptor.width * descriptor.height))()
+        self.frames = 0
+        self.lock = threading.Lock()
+
+    def _input(self, kind: int, code: int, pressed: bool = True,
+               x: int = 0, y: int = 0, track_id: int = 0) -> None:
+        value = HostGameInput(kind, code, x, y, track_id, pressed)
+        self.api.mosaico_host_game_input_v1(self.context, ctypes.byref(value))
+
+    def step(self, left: bool, right: bool, jump: bool,
+             restart: bool = False, pause: bool = False) -> None:
+        for code, pressed in ((0,left),(1,right),(2,jump)):
+            self._input(1, code, pressed)
+        if restart: self._input(1, 4)
+        if pause: self._input(1, 3)
+        self.api.mosaico_host_game_update_v1(self.context); self.frames += 1
+
+    def control(self, code: int) -> None: self._input(3, code)
+    def pointer(self, track_id: int, x: int, y: int, pressed: bool) -> None:
+        self._input(2, 0, pressed, x, y, track_id)
+    def metadata(self) -> dict[str, object]:
+        output = ctypes.create_string_buffer(2048)
+        if self.api.mosaico_host_game_state_json_v1(self.context, output, len(output)) < 0:
+            return {"error": "state unavailable"}
+        value = json.loads(output.value)
+        value.update({"frames": self.frames, "abi": 1,
+                      "game_id": self.descriptor.game_id.decode(),
+                      "title": self.descriptor.title.decode()})
+        return value
+    def frame(self) -> bytes:
+        status = self.api.mosaico_host_game_render_rgb565_v1(
+            self.context, self.framebuffer, self.descriptor.width)
+        if status: raise RuntimeError(f"host render failed: {status}")
+        return _rgb565_png_bytes(self.framebuffer, self.descriptor.width,
+                                 self.descriptor.height)
+
+class ReloadableHostRuntime:
+    def __init__(self, project: Path, directory: Path) -> None:
+        self.project, self.directory = project, directory
+        self.current = GenericHostRuntime(project, directory)
+        self.lock = threading.RLock()
+        self.generation = 0
+        self.reload_error = ""
+        self.stamp = self._stamp()
+
+    def _watched(self) -> list[Path]:
+        return [*self.project.joinpath("main").glob("*.[ch]"),
+                *self.project.joinpath("assets_src").glob("*.png"),
+                *self.project.joinpath("assets_src").glob("*.json")]
+    def _stamp(self) -> int:
+        return max((path.stat().st_mtime_ns for path in self._watched()), default=0)
+    def _reload(self) -> None:
+        stamp = self._stamp()
+        if stamp == self.stamp: return
+        try:
+            prepare = self.project / "assets_src/prepare_sprites.py"
+            if prepare.is_file(): subprocess.run([str(prepare)], check=True, capture_output=True)
+            manifest = self.project / "assets_src/game_assets.json"
+            if manifest.is_file():
+                packer = Path(__file__).resolve().parents[1] / "tools/pack_game_assets.py"
+                subprocess.run([str(packer), "--source", str(manifest.parent),
+                    "--output", str(self.project / "assets/generated")], check=True,
+                    capture_output=True)
+            self.generation += 1
+            self.current = GenericHostRuntime(self.project, self.directory, self.generation)
+            self.reload_error = ""
+        except (OSError, subprocess.CalledProcessError, RuntimeError) as error:
+            self.reload_error = str(error)
+        self.stamp = stamp
+    def step(self, *args: object, **kwargs: object) -> None:
+        self._reload(); self.current.step(*args, **kwargs)
+    def control(self, code: int) -> None: self.current.control(code)
+    def pointer(self, *args: object) -> None: self.current.pointer(*args)
+    def frame(self) -> bytes: return self.current.frame()
+    def metadata(self) -> dict[str, object]:
+        return {**self.current.metadata(), "reload_error": self.reload_error,
+                "reload_generation": self.generation}
+
 class SkyRuntime:
     def __init__(self, source: Path, directory: Path) -> None:
         self.library = directory / "sky_game.so"
@@ -428,57 +566,135 @@ def run_sky(source: Path, directory: Path, frames: int, output: Path) -> dict[st
     output.write_bytes(runtime.frame())
     return {**runtime.metadata(), "frame": str(output)}
 
+def run_generic(project: Path, directory: Path, frames: int,
+                output: Path) -> dict[str, object]:
+    runtime = GenericHostRuntime(project, directory)
+    runtime.step(False, False, False, restart=True)
+    for index in range(max(0, frames)):
+        runtime.step(False, True, index % 55 < 8)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_bytes(runtime.frame())
+    return {**runtime.metadata(), "frame": str(output)}
+
 def serve_sky_preview(listen: str, port: int, runtime: SkyRuntime) -> None:
+    simulation = {"paused": False, "speed": 1.0,
+                  "actions": {"left": False, "right": False, "jump": False},
+                  "pointers": {},
+                  "recording": False, "events": [], "started": time.monotonic(),
+                  "ticks": 0}
+    def simulation_loop() -> None:
+        deadline = time.monotonic()
+        while True:
+            if simulation["paused"]:
+                time.sleep(.01); deadline = time.monotonic(); continue
+            with runtime.lock:
+                actions = simulation["actions"]
+                runtime.step(actions["left"], actions["right"], actions["jump"])
+                simulation["ticks"] += 1
+            deadline += 1.0 / (30.0 * float(simulation["speed"]))
+            time.sleep(max(0.0, deadline - time.monotonic()))
+    threading.Thread(target=simulation_loop, daemon=True).start()
     page = """<!doctype html><html><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Sky Hop simulator</title><style>
 body{margin:0;background:#07111c;color:#dff;font:14px system-ui;display:grid;place-items:center;min-height:100vh}
 main{position:relative;padding:16px;background:#0c2030;border:1px solid #299fad;border-radius:16px;box-shadow:0 18px 80px #000}
 img{width:min(82vh,94vw,480px);display:block;image-rendering:pixelated;touch-action:none}
-#state{margin-top:10px;color:#9ee;white-space:pre-wrap}.hint{color:#fff;margin-top:8px}
-</style></head><body><main><img id=screen tabindex=0 draggable=false><div id=state></div>
+#state{margin-top:10px;color:#9ee;white-space:pre-wrap}.hint{color:#fff;margin-top:8px}.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}button,select{background:#17364b;color:#dff;border:1px solid #299fad;border-radius:6px;padding:6px 10px}
+</style></head><body><main><div class=tools><button id=pause>Pause</button><button id=step>Step</button><button id=reset>Reset</button><button id=shot>Screenshot</button><button id=record>Record</button><select id=speed><option>.25</option><option>.5</option><option selected>1</option><option>2</option></select></div><img id=screen tabindex=0 draggable=false><div id=state></div>
 <div class=hint>Keyboard: A/D or ←/→, Space jump, P pause, Enter continue · Touch: bottom controls</div></main>
 <script>
 const held=new Set(), pointers=new Map(), img=document.querySelector('#screen'), state=document.querySelector('#state');
-let pulse=false, busy=false, phase='start';
+let busy=false, phase='start',paused=false;
 function key(e,down){const k=e.key.toLowerCase();if(['arrowleft','arrowright',' ','a','d','p','enter'].includes(k))e.preventDefault();
- if(down&&!held.has(k)&&(k==='p'||k==='enter'))pulse=k;
- if(down&&phase!=='playing'&&phase!=='paused')pulse='enter'; down?held.add(k):held.delete(k)}
+ if(down&&!held.has(k)&&k==='p')control(paused?'resume':'pause');
+ if(down&&!held.has(k)&&k==='enter')control('reset'); down?held.add(k):held.delete(k);sendInput()}
 addEventListener('keydown',e=>key(e,true));addEventListener('keyup',e=>key(e,false));
 function pointer(e,down){e.preventDefault();const r=img.getBoundingClientRect();
  const p={x:(e.clientX-r.left)*480/r.width,y:(e.clientY-r.top)*480/r.height};down?pointers.set(e.pointerId,p):pointers.delete(e.pointerId)}
-img.onpointerdown=e=>{img.focus();if(phase==='paused')pulse='p';else if(phase!=='playing')pulse='enter';img.setPointerCapture(e.pointerId);pointer(e,true)};
-img.onpointermove=e=>{if(pointers.has(e.pointerId))pointer(e,true)};
-img.onpointerup=img.onpointercancel=e=>pointer(e,false);
+img.onpointerdown=e=>{img.focus();img.setPointerCapture(e.pointerId);pointer(e,true);sendInput()};
+img.onpointermove=e=>{if(pointers.has(e.pointerId)){pointer(e,true);sendInput()}};
+img.onpointerup=img.onpointercancel=e=>{pointer(e,false);sendInput()};
 addEventListener('blur',()=>{held.clear();pointers.clear()});
-async function tick(){if(busy)return;busy=true;let left=held.has('a')||held.has('arrowleft'),right=held.has('d')||held.has('arrowright'),jump=held.has(' ');
+async function sendInput(){let left=held.has('a')||held.has('arrowleft'),right=held.has('d')||held.has('arrowright'),jump=held.has(' ');
  for(const p of pointers.values())if(p.y>=360){left|=p.x<150;right|=p.x>=150&&p.x<300;jump|=p.x>=300}
- const q=new URLSearchParams({left:+left,right:+right,jump:+jump,restart:+(pulse==='enter'),pause:+(pulse==='p')});pulse=false;
- try{const res=await fetch('/frame?'+q);const meta=JSON.parse(res.headers.get('X-Mosaico-State'));const blob=await res.blob();
+ await fetch('/api/v1/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({left,right,jump,pointers:[...pointers].map(([track,p])=>({track,...p,pressed:true}))})})}
+async function control(command){await fetch('/api/v1/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command})})}
+async function tick(){if(busy)return;busy=true;
+ try{const res=await fetch('/api/v1/frame');const meta=JSON.parse(res.headers.get('X-Mosaico-State'));const blob=await res.blob();
  phase=meta.phase;const old=img.src;img.src=URL.createObjectURL(blob);if(old.startsWith('blob:'))URL.revokeObjectURL(old);
- state.textContent=`Level ${meta.level}/${meta.levels}  Score ${meta.score}  Life ${meta.lives}  ${meta.phase}  ${meta.state_hash}`}
+ paused=meta.simulation.paused;state.textContent=`Logic ${meta.simulation.logic_fps.toFixed(1)} Hz  Frame ${meta.simulation.frame_ms.toFixed(1)} ms\nLevel ${meta.level}/${meta.levels}  Score ${meta.score}  Life ${meta.lives}  phase ${meta.phase}  ${meta.state_hash}`}
  finally{busy=false}}
-setInterval(tick,33);tick();
+pause.onclick=()=>control(paused?'resume':'pause');step.onclick=()=>control('step');reset.onclick=()=>control('reset');speed.onchange=()=>control('speed:'+speed.value);shot.onclick=()=>{const a=document.createElement('a');a.href=img.src;a.download='sky-hop.png';a.click()};record.onclick=()=>control('record');
+setInterval(tick,50);tick();
 </script></body></html>""".encode("utf-8")
     class Handler(BaseHTTPRequestHandler):
+        def metadata(self) -> dict[str, object]:
+            elapsed = max(.001, time.monotonic() - float(simulation["started"]))
+            return {**runtime.metadata(), "simulation": {
+                "paused": simulation["paused"], "speed": simulation["speed"],
+                "logic_fps": simulation["ticks"] / elapsed,
+                "frame_ms": 1000.0 / 30.0, "recording": simulation["recording"]}}
         def do_GET(self) -> None:
-            if self.path.startswith("/frame"):
+            if self.path.startswith("/api/v1/frame") or self.path.startswith("/frame"):
                 from urllib.parse import parse_qs, urlparse
                 values = parse_qs(urlparse(self.path).query)
                 flag = lambda name: values.get(name, ["0"])[0] == "1"
                 with runtime.lock:
-                    runtime.step(flag("left"), flag("right"), flag("jump"),
-                                 flag("restart"), flag("pause"))
-                    body, metadata = runtime.frame(), runtime.metadata()
+                    body, metadata = runtime.frame(), self.metadata()
                 content_type = "image/png"
+            elif self.path.startswith("/api/v1/info"):
+                body = json.dumps({"abi": 1, "endpoints": ["info","state","frame","input","control"],
+                    "controls": ["pause","resume","step","reset","speed","record"]}).encode()
+                metadata, content_type = self.metadata(), "application/json"
+            elif self.path.startswith("/api/v1/state"):
+                metadata = self.metadata(); body = json.dumps(metadata).encode(); content_type="application/json"
             else:
-                body, metadata, content_type = page, runtime.metadata(), "text/html; charset=utf-8"
+                body, metadata, content_type = page, self.metadata(), "text/html; charset=utf-8"
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Mosaico-State", json.dumps(metadata, separators=(",", ":")))
             self.end_headers(); self.wfile.write(body)
+        def do_POST(self) -> None:
+            length = min(int(self.headers.get("Content-Length", "0")), 65536)
+            try: value = json.loads(self.rfile.read(length) or b"{}")
+            except (ValueError, TypeError): self.send_error(400); return
+            if self.path == "/api/v1/input":
+                simulation["actions"] = {key: bool(value.get(key, False))
+                    for key in ("left", "right", "jump")}
+                incoming = {int(item.get("track", 0)): item
+                            for item in value.get("pointers", [])[:2]}
+                if hasattr(runtime, "pointer"):
+                    with runtime.lock:
+                        for track, old in simulation["pointers"].items():
+                            if track not in incoming:
+                                runtime.pointer(track, int(old["x"]), int(old["y"]), False)
+                        for track, point in incoming.items():
+                            runtime.pointer(track, int(point["x"]), int(point["y"]), True)
+                simulation["pointers"] = incoming
+                if simulation["recording"]: simulation["events"].append(
+                    {"tick": simulation["ticks"], **simulation["actions"]})
+            elif self.path == "/api/v1/control":
+                command = str(value.get("command", ""))
+                if command == "pause": simulation["paused"] = True
+                elif command == "resume": simulation["paused"] = False
+                elif command == "step":
+                    with runtime.lock: runtime.step(False, False, False)
+                elif command == "reset":
+                    with runtime.lock:
+                        if hasattr(runtime, "control"): runtime.control(3)
+                        else: runtime.step(False,False,False,restart=True)
+                elif command.startswith("speed:"):
+                    speed=float(command.split(":",1)[1])
+                    if speed in (.25,.5,1.0,2.0): simulation["speed"] = speed
+                elif command == "record": simulation["recording"] = not simulation["recording"]
+                else: self.send_error(400); return
+            else: self.send_error(404); return
+            body=json.dumps(self.metadata()).encode();self.send_response(200)
+            self.send_header("Content-Type","application/json");self.send_header("Content-Length",str(len(body)))
+            self.end_headers();self.wfile.write(body)
         def log_message(self, fmt: str, *args: object) -> None:
             return
     print(json.dumps({"preview_url": f"http://{listen}:{port}/", **runtime.metadata()}), flush=True)
@@ -523,10 +739,28 @@ def main() -> int:
     shooter_source = args.project / "main" / "shooter_game.c"
     tower_source = args.project / "main" / "tower_game.c"
     sky_source = args.project / "main" / "platform_game.c"
+    generic_adapter = args.project / "main" / "host_adapter.c"
     if not shooter_source.is_file() and not tower_source.is_file() and not sky_source.is_file():
         parser.error("project does not expose a supported host game model")
     with tempfile.TemporaryDirectory(prefix="mosaico-game-") as directory:
         output = args.project / "build-host" / "frame.png"
+        if generic_adapter.is_file():
+            if args.headless:
+                runtime = GenericHostRuntime(args.project, Path(directory))
+                runtime.step(False, False, False, restart=True)
+                for index in range(max(0, args.frames)):
+                    runtime.step(False, True, index % 55 < 8)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_bytes(runtime.frame())
+                result = {**runtime.metadata(), "frame": str(output)}
+                if args.state_output:
+                    args.state_output.parent.mkdir(parents=True, exist_ok=True)
+                    args.state_output.write_text(json.dumps(result, indent=2, sort_keys=True)+"\n")
+                print(json.dumps(result))
+            else:
+                runtime = ReloadableHostRuntime(args.project, Path(directory))
+                serve_sky_preview(args.listen, args.port, runtime)
+            return 0
         if sky_source.is_file():
             if args.headless:
                 result = run_sky(sky_source, Path(directory), args.frames, output)
