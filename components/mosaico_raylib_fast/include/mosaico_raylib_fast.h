@@ -13,6 +13,7 @@ extern "C" {
 void MosaicoFastInitWindow(int width, int height, const char *title);
 bool MosaicoFastWindowShouldClose(void);
 void MosaicoFastBeginDrawing(void);
+bool MosaicoFastFrameAvailable(void);
 void MosaicoFastEndDrawing(void);
 void MosaicoFastBeginMode2D(Camera2D camera);
 void MosaicoFastEndMode2D(void);

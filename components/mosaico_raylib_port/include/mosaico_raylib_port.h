@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "esp_err.h"
 #include "esp_gsp.h"
+#include "mosaico_game.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,6 +17,8 @@ esp_err_t mosaico_raylib_port_copy_latest(uint16_t *out_pixels,
                                           size_t pixel_capacity);
 esp_err_t mosaico_raylib_port_begin_frame(uint16_t **out_pixels,
                                           size_t *out_stride_pixels);
+mosaico_game_frame_result_t mosaico_raylib_port_try_begin_frame(
+    uint16_t **out_pixels, size_t *out_stride_pixels);
 esp_err_t mosaico_raylib_port_present_frame(void);
 void mosaico_raylib_port_display_flush(const uint16_t *pixels, uint16_t x,
                                        uint16_t y, uint16_t width,

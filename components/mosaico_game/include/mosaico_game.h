@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define MOSAICO_GAME_API_VERSION 2U
+#define MOSAICO_GAME_API_VERSION 3U
 #define MOSAICO_GAME_WIDTH 480
 #define MOSAICO_GAME_HEIGHT 480
 #define MOSAICO_GAME_DEFAULT_FPS CONFIG_MOSAICO_GAME_DEFAULT_FPS
@@ -54,12 +54,29 @@ typedef struct {
     uint32_t frames;
     uint32_t dropped_frames;
     float fps;
+    float logic_fps;
+    float display_fps;
+    uint32_t input_us;
     uint32_t update_us;
+    uint32_t acquire_us;
     uint32_t render_us;
     uint32_t present_us;
+    uint32_t release_us;
+    uint32_t busy_frames;
+    uint32_t superseded_frames;
+    uint32_t display_errors;
+    uint32_t in_flight_frames;
+    uint32_t peak_in_flight_frames;
     size_t free_internal_bytes;
     size_t free_psram_bytes;
 } mosaico_game_stats_t;
+
+typedef enum {
+    MOSAICO_GAME_FRAME_ACCEPTED = 0,
+    MOSAICO_GAME_FRAME_BUSY,
+    MOSAICO_GAME_FRAME_SUPERSEDED,
+    MOSAICO_GAME_FRAME_DISPLAY_ERROR,
+} mosaico_game_frame_result_t;
 
 esp_err_t MosaicoGameInit(const mosaico_game_config_t *config);
 /* Register before esp_iris_start() so Recovery-first installs can verify the
@@ -72,6 +89,13 @@ void MosaicoGameGetStats(mosaico_game_stats_t *stats);
 void MosaicoGameRecordFrame(uint32_t update_us, uint32_t render_us,
                             uint32_t present_us, bool dropped);
 void MosaicoGameRecordTiming(uint32_t update_us, uint32_t render_us);
+void MosaicoGameRecordLogic(uint32_t input_us, uint32_t update_us);
+void MosaicoGameRecordRender(uint32_t acquire_us, uint32_t render_us,
+                             uint32_t present_us,
+                             mosaico_game_frame_result_t result,
+                             uint32_t in_flight_frames);
+void MosaicoGameRecordDisplayRelease(uint32_t release_us,
+                                     uint32_t in_flight_frames);
 const mosaico_game_config_t *MosaicoGameGetConfig(void);
 
 #ifdef __cplusplus

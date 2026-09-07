@@ -92,6 +92,8 @@ void MosaicoFastBeginDrawing(void)
                                MOSAICO_GAME_HEIGHT);
 }
 
+bool MosaicoFastFrameAvailable(void) { return s_pixels != NULL; }
+
 void MosaicoFastEndDrawing(void)
 {
     if (s_pixels) (void)mosaico_raylib_port_present_frame();

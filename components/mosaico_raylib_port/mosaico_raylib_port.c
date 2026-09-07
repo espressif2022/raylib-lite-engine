@@ -18,6 +18,7 @@
 typedef struct {
     uint16_t *pixels;
     atomic_bool borrowed;
+    int64_t submitted_us;
 } frame_slot_t;
 
 static const char *TAG = "mosaico_raylib";
@@ -28,11 +29,18 @@ static atomic_uint s_next;
 static uint16_t *s_latest;
 static SemaphoreHandle_t s_latest_mutex;
 static frame_slot_t *s_drawing_slot;
+static atomic_uint s_in_flight;
+static uint32_t s_acquire_us;
 
 static void release_frame(void *ctx)
 {
     frame_slot_t *slot = ctx;
+    uint32_t release_us = slot->submitted_us > 0
+        ? (uint32_t)(esp_timer_get_time() - slot->submitted_us) : 0;
     atomic_store_explicit(&slot->borrowed, false, memory_order_release);
+    uint32_t in_flight = atomic_fetch_sub_explicit(
+        &s_in_flight, 1U, memory_order_acq_rel) - 1U;
+    MosaicoGameRecordDisplayRelease(release_us, in_flight);
 }
 
 esp_err_t mosaico_raylib_port_init(esp_gsp_handle_t gsp, uint16_t canvas_bind)
@@ -52,6 +60,7 @@ esp_err_t mosaico_raylib_port_init(esp_gsp_handle_t gsp, uint16_t canvas_bind)
         atomic_init(&s_frames[i].borrowed, false);
     }
     atomic_init(&s_next, 0);
+    atomic_init(&s_in_flight, 0);
     /* The latest screenshot aliases one of the retained GSP frame slots.
      * Keeping a third full-screen copy cost 450 KiB and one PSRAM memcpy on
      * every frame. Access and slot rewrites are serialized by the mutex. */
@@ -90,31 +99,51 @@ void mosaico_raylib_port_deinit(void)
 esp_err_t mosaico_raylib_port_begin_frame(uint16_t **out_pixels,
                                           size_t *out_stride_pixels)
 {
-    if (!out_pixels || !out_stride_pixels) return ESP_ERR_INVALID_ARG;
+    mosaico_game_frame_result_t result = mosaico_raylib_port_try_begin_frame(
+        out_pixels, out_stride_pixels);
+    if (result == MOSAICO_GAME_FRAME_ACCEPTED) return ESP_OK;
+    return result == MOSAICO_GAME_FRAME_BUSY ? ESP_ERR_TIMEOUT : ESP_FAIL;
+}
+
+mosaico_game_frame_result_t mosaico_raylib_port_try_begin_frame(
+    uint16_t **out_pixels, size_t *out_stride_pixels)
+{
+    int64_t started = esp_timer_get_time();
+    if (!out_pixels || !out_stride_pixels)
+        return MOSAICO_GAME_FRAME_DISPLAY_ERROR;
     *out_pixels = NULL;
     *out_stride_pixels = 0;
     if (!s_gsp || !s_latest_mutex || s_drawing_slot) {
-        return ESP_ERR_INVALID_STATE;
+        return MOSAICO_GAME_FRAME_DISPLAY_ERROR;
+    }
+
+    if (xSemaphoreTake(s_latest_mutex, 0) != pdTRUE) {
+        MosaicoGameRecordRender((uint32_t)(esp_timer_get_time() - started), 0, 0,
+                                MOSAICO_GAME_FRAME_BUSY,
+                                atomic_load(&s_in_flight));
+        return MOSAICO_GAME_FRAME_BUSY;
     }
 
     unsigned first = atomic_fetch_add(&s_next, 1U) % FRAME_COUNT;
     for (unsigned attempt = 0; attempt < FRAME_COUNT; ++attempt) {
         frame_slot_t *slot = &s_frames[(first + attempt) % FRAME_COUNT];
+        if (slot->pixels == s_latest) continue;
         bool expected = false;
         if (!atomic_compare_exchange_strong(&slot->borrowed, &expected, true)) {
             continue;
         }
-        if (xSemaphoreTake(s_latest_mutex, pdMS_TO_TICKS(10)) != pdTRUE) {
-            atomic_store(&slot->borrowed, false);
-            return ESP_ERR_TIMEOUT;
-        }
         s_drawing_slot = slot;
         *out_pixels = slot->pixels;
         *out_stride_pixels = MOSAICO_GAME_WIDTH;
-        return ESP_OK;
+        xSemaphoreGive(s_latest_mutex);
+        s_acquire_us = (uint32_t)(esp_timer_get_time() - started);
+        return MOSAICO_GAME_FRAME_ACCEPTED;
     }
-    MosaicoGameRecordFrame(0, 0, 0, true);
-    return ESP_ERR_NOT_FOUND;
+    xSemaphoreGive(s_latest_mutex);
+    MosaicoGameRecordRender((uint32_t)(esp_timer_get_time() - started), 0, 0,
+                            MOSAICO_GAME_FRAME_BUSY,
+                            atomic_load(&s_in_flight));
+    return MOSAICO_GAME_FRAME_BUSY;
 }
 
 esp_err_t mosaico_raylib_port_present_frame(void)
@@ -122,18 +151,28 @@ esp_err_t mosaico_raylib_port_present_frame(void)
     frame_slot_t *slot = s_drawing_slot;
     if (!slot || !s_latest_mutex) return ESP_ERR_INVALID_STATE;
 
-    s_latest = slot->pixels;
     s_drawing_slot = NULL;
-    xSemaphoreGive(s_latest_mutex);
 
     int64_t started = esp_timer_get_time();
+    slot->submitted_us = started;
+    uint32_t in_flight = atomic_fetch_add(&s_in_flight, 1U) + 1U;
     esp_err_t err = esp_gsp_canvas_try_push(
         s_gsp, s_bind, slot->pixels,
         MOSAICO_GAME_WIDTH * sizeof(uint16_t), release_frame, slot);
-    bool dropped = err != ESP_OK;
-    if (dropped) atomic_store(&slot->borrowed, false);
-    MosaicoGameRecordFrame(0, 0,
-        (uint32_t)(esp_timer_get_time() - started), dropped);
+    uint32_t submit_us = (uint32_t)(esp_timer_get_time() - started);
+    mosaico_game_frame_result_t result = MOSAICO_GAME_FRAME_ACCEPTED;
+    if (err == ESP_OK) {
+        if (xSemaphoreTake(s_latest_mutex, 0) == pdTRUE) {
+            s_latest = slot->pixels;
+            xSemaphoreGive(s_latest_mutex);
+        }
+    } else {
+        in_flight = atomic_fetch_sub(&s_in_flight, 1U) - 1U;
+        atomic_store(&slot->borrowed, false);
+        result = err == ESP_ERR_TIMEOUT ? MOSAICO_GAME_FRAME_SUPERSEDED
+                                        : MOSAICO_GAME_FRAME_DISPLAY_ERROR;
+    }
+    MosaicoGameRecordRender(s_acquire_us, 0, submit_us, result, in_flight);
     return err;
 }
 
