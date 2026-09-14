@@ -2,8 +2,27 @@
 set(MOSAICO_GAME_SDK_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 
 function(mosaico_game_sdk_configure_gsp_compiler)
+    # IDF 6.2's GCC 16 diagnoses a bounded strncpy in managed mdns 1.13.0 as
+    # stringop-truncation. Keep all other default warnings fatal while the
+    # upstream managed component catches up with the toolchain.
+    add_compile_options(-Wno-error=stringop-truncation)
     if(DEFINED GSPC_EXECUTABLE OR DEFINED ENV{GSPC_EXECUTABLE})
         return()
+    endif()
+    find_program(_mosaico_python NAMES python3 python)
+    set(_mosaico_fetch_gspc
+        "${MOSAICO_GAME_SDK_ROOT}/../tools/gsp-sim/fetch_gspc.py")
+    if(_mosaico_python AND EXISTS "${_mosaico_fetch_gspc}")
+        execute_process(
+            COMMAND "${_mosaico_python}" "${_mosaico_fetch_gspc}"
+            OUTPUT_VARIABLE _mosaico_cached_gspc
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE _mosaico_gspc_result)
+        if(_mosaico_gspc_result EQUAL 0 AND EXISTS "${_mosaico_cached_gspc}")
+            set(GSPC_EXECUTABLE "${_mosaico_cached_gspc}" CACHE FILEPATH
+                "Standalone ESP-GSP scene compiler")
+            return()
+        endif()
     endif()
     find_program(_mosaico_cargo NAMES cargo)
     get_filename_component(_workspace_gspc
@@ -51,6 +70,8 @@ function(mosaico_game_sdk_add_components)
         list(APPEND EXTRA_COMPONENT_DIRS
             "${MOSAICO_GAME_SDK_ROOT}/components/${_component}")
     endforeach()
+    list(APPEND EXTRA_COMPONENT_DIRS
+        "${MOSAICO_GAME_SDK_ROOT}/../components/esp_mosaico_app_recovery")
     list(REMOVE_DUPLICATES EXTRA_COMPONENT_DIRS)
     set(EXTRA_COMPONENT_DIRS "${EXTRA_COMPONENT_DIRS}" PARENT_SCOPE)
 endfunction()

@@ -13,9 +13,17 @@ typedef struct __attribute__((packed)){uint32_t id;uint16_t x,y,width,height;int
 typedef struct{bool used;mosaico_asset_view_t asset;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;const uint8_t *alpha;} texture_slot_t;
 static texture_slot_t s_textures[M2D_MAX_TEXTURES];
 static uint16_t *s_target;static size_t s_stride;static int s_target_width,s_target_height;
+static int s_clip_x0,s_clip_y0,s_clip_x1,s_clip_y1;
 static MosaicoSpriteFrame s_frame_result;
 static texture_slot_t *texture_slot(Texture2D texture){if(!texture.id||texture.id>M2D_MAX_TEXTURES)return NULL;texture_slot_t *slot=&s_textures[texture.id-1];return slot->used?slot:NULL;}
-void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int height){s_target=pixels;s_stride=stride;s_target_width=width;s_target_height=height;}
+void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int height){s_target=pixels;s_stride=stride;s_target_width=width;s_target_height=height;s_clip_x0=0;s_clip_y0=0;s_clip_x1=width;s_clip_y1=height;}
+void mosaico_game_2d_set_clip(int x,int y,int width,int height){
+ s_clip_x0=x<0?0:x;s_clip_y0=y<0?0:y;
+ s_clip_x1=x+width>s_target_width?s_target_width:x+width;
+ s_clip_y1=y+height>s_target_height?s_target_height:y+height;
+ if(width<=0||height<=0||s_clip_x0>s_clip_x1||s_clip_y0>s_clip_y1)
+  s_clip_x1=s_clip_x0,s_clip_y1=s_clip_y0;
+}
 Texture2D Mosaico2DLoadTexture(const char *path){
  mosaico_asset_view_t asset={0};if(mosaico_game_asset_open(path,&asset)!=ESP_OK||asset.size<sizeof(atlas_header_t))return(Texture2D){0};
  const atlas_header_t *h=(const atlas_header_t*)asset.data;size_t fb=(size_t)h->frame_count*sizeof(atlas_frame_t),expected=sizeof(*h)+fb+h->rgb_bytes+h->alpha_bytes;
@@ -33,6 +41,10 @@ void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,V
  if(y0<0)y0=0;
  if(x1>s_target_width)x1=s_target_width;
  if(y1>s_target_height)y1=s_target_height;
+ if(x0<s_clip_x0)x0=s_clip_x0;
+ if(y0<s_clip_y0)y0=s_clip_y0;
+ if(x1>s_clip_x1)x1=s_clip_x1;
+ if(y1>s_clip_y1)y1=s_clip_y1;
  if(identity&&!fx&&!fy&&!s->alpha&&tint.r==255&&tint.g==255&&tint.b==255&&
     tint.a==255&&dw==(int)sw&&dh==(int)sh){
   int left=(int)(dest.x-origin.x),top=(int)(dest.y-origin.y);

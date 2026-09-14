@@ -36,25 +36,26 @@ GSP 只承担 480×480 RGB565 Canvas 提交、镜像和展示。
 ## 开发循环
 
 ```bash
-python mosaico.py game build --project projects/tower_defense
-python mosaico.py game run --project projects/tower_defense --headless
-python mosaico.py game run --project projects/tower_defense --headless \
-  --replay replay.json --state-output artifacts/state.json
-python mosaico.py game run --project projects/tower_defense
+python3 mosaico.py game build projects/raylib_shooter
+python3 mosaico.py game sim projects/raylib_shooter --headless
+python3 mosaico.py game sim projects/raylib_shooter --headless \
+  --scenario scenario.json --state-output artifacts/state.json
+python3 mosaico.py game sim projects/raylib_shooter
 python mosaico.py install --project projects/tower_defense
 ```
 
-回放文件按帧记录 `tap`、`pause`、`resume`、`step` 和 `reset`，例如：
+场景文件按帧记录 `action`、`pointer`、`tap`、`imu`、`pause`、`resume`、
+`step` 和 `reset`，例如：
 
 ```json
-{"events":[{"frame":0,"type":"tap","x":240,"y":220},{"frame":60,"type":"pause"},{"frame":61,"type":"step"}]}
+{"events":[{"frame":0,"type":"tap","x":240,"y":420},{"frame":30,"type":"imu","x":0.4,"y":-0.2,"z":1.0},{"frame":60,"type":"pause"},{"frame":61,"type":"step"}]}
 ```
 
 创建第三方项目时可选择简单射击模板，或包含 Atlas、Tilemap、音频和动画的资源化模板：
 
 ```bash
-python mosaico.py game new my_game
-python mosaico.py game new my_strategy_game --template tower-defense
+python3 mosaico.py game create my_game
+python3 mosaico.py game create games/my_strategy_game --template tower-defense
 ```
 
 交互预览默认监听 `127.0.0.1:8460`。需要局域网访问时显式传入

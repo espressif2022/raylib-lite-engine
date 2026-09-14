@@ -10,6 +10,7 @@ typedef enum {
     MOSAICO_HOST_INPUT_ACTION = 1,
     MOSAICO_HOST_INPUT_POINTER = 2,
     MOSAICO_HOST_INPUT_CONTROL = 3,
+    MOSAICO_HOST_INPUT_IMU = 4,
 } mosaico_host_input_type_t;
 
 typedef enum {
@@ -25,6 +26,9 @@ typedef struct {
     int32_t y;
     int32_t track_id;
     bool pressed;
+    float value_x;
+    float value_y;
+    float value_z;
 } mosaico_host_input_v1_t;
 
 typedef struct {

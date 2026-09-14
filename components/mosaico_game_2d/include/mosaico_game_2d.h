@@ -12,6 +12,7 @@ extern "C" {
 typedef struct { mosaico_asset_id_t id; Rectangle source; Vector2 pivot; } MosaicoSpriteFrame;
 typedef struct { Texture2D texture; const void *descriptor; uint16_t frame_count; } MosaicoAtlas;
 void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int height);
+void mosaico_game_2d_set_clip(int x,int y,int width,int height);
 MosaicoAtlas LoadMosaicoAtlas(const char *asset_path);
 const MosaicoSpriteFrame *MosaicoAtlasGetFrame(MosaicoAtlas atlas,mosaico_asset_id_t frame_id);
 esp_err_t mosaico_game_2d_atlas_get_frame(MosaicoAtlas atlas,
