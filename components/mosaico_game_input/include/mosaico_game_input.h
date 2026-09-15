@@ -14,6 +14,9 @@ bool mosaico_game_input_touch(int32_t track_id, int32_t x, int32_t y,
                               bool pressed, uint64_t timestamp_us);
 bool mosaico_game_input_button(int32_t button, bool pressed, uint64_t timestamp_us);
 bool mosaico_game_input_joystick(int32_t x, int32_t y, uint64_t timestamp_us);
+/* Acceleration is transported as milli-g in x/y/value. */
+bool mosaico_game_input_imu(float x_g, float y_g, float z_g,
+                            uint64_t timestamp_us);
 
 #ifdef __cplusplus
 }

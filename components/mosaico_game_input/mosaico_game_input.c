@@ -17,3 +17,9 @@ bool mosaico_game_input_joystick(int32_t x,int32_t y,uint64_t timestamp_us){
     mosaico_device_event_t e={.type=MOSAICO_DEVICE_EVENT_JOYSTICK,.x=x,.y=y,.timestamp_us=timestamp_us};
     return MosaicoGamePostDeviceEvent(&e);
 }
+bool mosaico_game_input_imu(float x_g,float y_g,float z_g,uint64_t timestamp_us){
+    mosaico_device_event_t e={.type=MOSAICO_DEVICE_EVENT_IMU,
+        .x=(int32_t)(x_g*1000.0f),.y=(int32_t)(y_g*1000.0f),
+        .value=(int32_t)(z_g*1000.0f),.timestamp_us=timestamp_us};
+    return MosaicoGamePostDeviceEvent(&e);
+}

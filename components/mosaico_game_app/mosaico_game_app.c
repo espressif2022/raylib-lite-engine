@@ -25,6 +25,20 @@ static const mosaico_game_app_config_t *s_config;
 static esp_lcd_touch_handle_t s_touch;
 static esp_gsp_handle_t s_gsp;
 
+static void imu_task(void *ctx)
+{
+    (void)ctx;
+    const TickType_t period = pdMS_TO_TICKS(
+        s_config->imu_sample_ms ? s_config->imu_sample_ms : 20);
+    TickType_t wake = xTaskGetTickCount();
+    while (true) {
+        float x = 0, y = 0, z = 0;
+        if (bsp_imu_get_accel(&x, &y, &z) == ESP_OK)
+            (void)mosaico_game_input_imu(x, y, z, esp_timer_get_time());
+        xTaskDelayUntil(&wake, period);
+    }
+}
+
 static void touch_task(void *ctx)
 {
     (void)ctx;
@@ -124,6 +138,13 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
     mosaico_action_reset();
     if (config->before_display) ESP_ERROR_CHECK(config->before_display());
     ESP_ERROR_CHECK(start_display());
+    if (config->enable_imu) {
+        bsp_imu_config_t imu = BSP_IMU_CONFIG_DEFAULT();
+        ESP_ERROR_CHECK(bsp_imu_init());
+        ESP_ERROR_CHECK(bsp_imu_start(&imu));
+        ESP_ERROR_CHECK(xTaskCreate(imu_task, "game_imu", 4096, NULL, 5, NULL) == pdPASS
+                        ? ESP_OK : ESP_ERR_NO_MEM);
+    }
     ESP_ERROR_CHECK(mosaico_raylib_port_init(s_gsp, config->canvas_bind));
     if (config->register_mirror) ESP_ERROR_CHECK(config->register_mirror());
     InitWindow(MOSAICO_GAME_WIDTH, MOSAICO_GAME_HEIGHT,
@@ -147,6 +168,9 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
                 MosaicoFastInjectPointer(0, event.x, event.y, event.pressed);
             else if (event.type == MOSAICO_DEVICE_EVENT_TOUCH)
                 MosaicoFastInjectPointer(event.value, event.x, event.y, event.pressed);
+            else if (event.type == MOSAICO_DEVICE_EVENT_IMU)
+                MosaicoFastInjectImu(event.x / 1000.0f, event.y / 1000.0f,
+                                     event.value / 1000.0f);
             mosaico_action_apply_event(&event);
             if (config->on_event) config->on_event(&event);
         }

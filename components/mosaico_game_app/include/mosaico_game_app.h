@@ -16,6 +16,8 @@ typedef struct {
     const char *window_title;
     uint16_t canvas_bind;
     uint8_t touch_points;
+    bool enable_imu;
+    uint16_t imu_sample_ms;
     int target_fps;
     uint16_t drawbuf_lines;
     uint8_t te_compose_buffers;
