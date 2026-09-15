@@ -9,14 +9,16 @@ paths and the Raylib dependency in one place.
 
 | Component | Owns | Must not own |
 | --- | --- | --- |
-| `mosaico_game` | runtime configuration, device-event queue, frame statistics | rendering, asset formats, game rules |
+| `mosaico_game` | runtime configuration, device-event queue, frame statistics | rendering, ESP-Iris, asset formats, game rules |
+| `mosaico_game_iris` | ESP-Iris system inventory registration | game loop or display startup |
+| `mosaico_game_app` | device boot, touch task, action mapping, and the shared Raylib game loop | project-specific gameplay or drawing |
 | `mosaico_raylib_port` | display handoff and Raylib platform lifecycle | game scenes or content |
 | `mosaico_raylib_fast` | RGB565 drawing implementation | board startup |
 | `mosaico_game_assets` | read-only asset partition lookup | source asset conversion |
 | `mosaico_game_2d` | textures, atlases, animation helpers | map rules or audio |
 | `mosaico_game_tilemap` | packed tile-map access and drawing | game-specific collision behavior |
 | `mosaico_game_audio` | clip loading, mixing, codec output | game music policy |
-| `mosaico_game_input` | translating device input into game events | board driver ownership |
+| `mosaico_game_input` | device-event posting and Action Mapper (zones, buttons, joystick/IMU) | board driver ownership |
 | `mosaico_game_debug` | runtime statistics logging | production telemetry transport |
 | `mosaico_game_scene` | fixed-capacity scene stack and lifecycle dispatch | game-specific scene policy |
 | `mosaico_game_ui` | fixed retained panel/label/button tree and two tracked pointers | menus, layout engines, or board input |
@@ -45,13 +47,12 @@ Reusable capacity and performance choices belong in component `Kconfig`
 files. Game-specific tuning belongs in the application's `sdkconfig.defaults`.
 Do not add a private `#define` for a value already exposed by Kconfig.
 
-Application startup order is:
+Raylib games call `mosaico_game_app_run()`. Startup order is:
 
-1. board and required services;
-2. `MosaicoGameInit()` and system inventory registration;
-3. ESP-Iris plus `iris_ota_support_start()`;
-4. asset, display, input, and audio initialization;
-5. the game loop.
+1. NVS, `mosaico_game_iris_register_inventory()`, and `iris_ota_support_start()`;
+2. board power, `MosaicoGameInit()`, and Action Mapper reset;
+3. project `before_display` (assets, zones), display, Raylib port, first frame;
+4. `esp_iris_mark_healthy()`, project `after_healthy`, then the shared loop.
 
 Shutdown reverses resource ownership: stop producers/tasks first, unload game
 resources, close audio/display, then call `MosaicoGameShutdown()`.

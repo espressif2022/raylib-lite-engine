@@ -352,6 +352,8 @@ class GenericHostRuntime:
                 repository / "game_sdk/host/host_asset_runtime.c",
                 repository / "game_sdk/components/mosaico_game_2d/mosaico_game_2d.c",
                 repository / "game_sdk/components/mosaico_raylib_fast/mosaico_raylib_fast.c",
+                repository / "game_sdk/components/mosaico_game_fx/mosaico_game_fx.c",
+                repository / "game_sdk/components/mosaico_game_tilemap/mosaico_game_tilemap.c",
             ]
         else:
             sources = [adapter, project / "main/platform_game.c",
@@ -361,6 +363,8 @@ class GenericHostRuntime:
                     repository / "game_sdk/components/mosaico_game_assets/include",
                     repository / "game_sdk/components/mosaico_game_2d/include",
                     repository / "game_sdk/components/mosaico_raylib_fast/include",
+                    repository / "game_sdk/components/mosaico_game_fx/include",
+                    repository / "game_sdk/components/mosaico_game_tilemap/include",
                     project / "main", project / "assets/generated",
                     project / "managed_components/georgik__raylib/include",
                     project / "managed_components/georgik__raylib/raylib/src"]
@@ -712,9 +716,10 @@ def serve_interactive_preview(listen: str, port: int, runtime: object) -> None:
 <meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Mosaico game simulator</title><style>
 body{margin:0;background:#07111c;color:#dff;font:14px system-ui;display:grid;place-items:center;min-height:100vh}
-main{position:relative;padding:16px;background:#0c2030;border:1px solid #299fad;border-radius:16px;box-shadow:0 18px 80px #000}
-img{width:480px;height:480px;max-width:calc(100vw - 34px);max-height:calc(100vh - 170px);object-fit:contain;display:block;image-rendering:pixelated;touch-action:none}
-#state{margin-top:10px;color:#9ee;white-space:pre-wrap}.hint{color:#fff;margin-top:8px}.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}button,select{background:#17364b;color:#dff;border:1px solid #299fad;border-radius:6px;padding:6px 10px}
+main{position:relative;padding:16px;background:#0c2030;border:1px solid #299fad;border-radius:16px;box-shadow:0 18px 80px #000;width:min(512px,calc(100vw - 24px))}
+img{width:480px;height:480px;max-width:100%;aspect-ratio:1/1;object-fit:contain;display:block;image-rendering:pixelated;touch-action:none}
+#state{margin-top:10px;color:#9ee;white-space:pre-wrap;height:4.8em;overflow:hidden;line-height:1.35}
+.hint{color:#fff;margin-top:8px}.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}button,select{background:#17364b;color:#dff;border:1px solid #299fad;border-radius:6px;padding:6px 10px}
 </style></head><body><main><div class=tools><button id=pause>Pause</button><button id=step>Step</button><button id=reset>Reset</button><button id=shot>Screenshot</button><button id=record>Record</button><select id=speed><option>.25</option><option>.5</option><option selected>1</option><option>2</option></select></div><img id=screen tabindex=0 draggable=false><div id=state></div>
 <div class=hint>Keyboard: A/D or ←/→, Space action, P pause, Enter start · Touch: up to two tracked points</div></main>
 <script>

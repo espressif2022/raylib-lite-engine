@@ -5,7 +5,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "esp_err.h"
+#if __has_include("sdkconfig.h")
 #include "sdkconfig.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,7 +16,13 @@ extern "C" {
 #define MOSAICO_GAME_API_VERSION 3U
 #define MOSAICO_GAME_WIDTH 480
 #define MOSAICO_GAME_HEIGHT 480
+#ifndef MOSAICO_GAME_DEFAULT_FPS
+#ifdef CONFIG_MOSAICO_GAME_DEFAULT_FPS
 #define MOSAICO_GAME_DEFAULT_FPS CONFIG_MOSAICO_GAME_DEFAULT_FPS
+#else
+#define MOSAICO_GAME_DEFAULT_FPS 30
+#endif
+#endif
 
 typedef struct {
     int width;
@@ -65,6 +73,7 @@ typedef struct {
     uint32_t busy_frames;
     uint32_t superseded_frames;
     uint32_t display_errors;
+    uint32_t queue_overflows;
     uint32_t in_flight_frames;
     uint32_t peak_in_flight_frames;
     size_t free_internal_bytes;
@@ -79,9 +88,6 @@ typedef enum {
 } mosaico_game_frame_result_t;
 
 esp_err_t MosaicoGameInit(const mosaico_game_config_t *config);
-/* Register before esp_iris_start() so Recovery-first installs can verify the
- * active layout and persisted update result after the game boots. */
-esp_err_t MosaicoGameRegisterSystemInventory(void);
 void MosaicoGameShutdown(void);
 bool MosaicoGamePollDeviceEvent(mosaico_device_event_t *event);
 bool MosaicoGamePostDeviceEvent(const mosaico_device_event_t *event);

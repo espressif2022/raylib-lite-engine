@@ -65,6 +65,16 @@ esp_err_t mosaico_game_asset_open(const char *name, mosaico_asset_view_t *out)
 esp_err_t mosaico_game_asset_open_id(mosaico_asset_id_t id,
                                      mosaico_asset_view_t *out)
 {
-    return id == mosaico_game_asset_id("tower.atlas")
-        ? mosaico_game_asset_open("tower.atlas", out) : ESP_ERR_NOT_FOUND;
+    static const char *names[] = {
+        "tower.atlas", "terrain.atlas", "level01.map", NULL};
+    if (!out) return ESP_ERR_INVALID_ARG;
+    for (unsigned i = 0; i < HOST_FILE_COUNT; ++i) {
+        if (s_files[i].data && mosaico_game_asset_id(s_files[i].name) == id)
+            return mosaico_game_asset_open(s_files[i].name, out);
+    }
+    for (const char **name = names; *name; ++name) {
+        if (mosaico_game_asset_id(*name) == id)
+            return mosaico_game_asset_open(*name, out);
+    }
+    return ESP_ERR_NOT_FOUND;
 }

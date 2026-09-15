@@ -183,7 +183,7 @@ esp_err_t mosaico_raylib_port_copy_latest(uint16_t *out_pixels,
         return ESP_ERR_INVALID_ARG;
     }
     if (!s_latest || !s_latest_mutex) return ESP_ERR_INVALID_STATE;
-    if (xSemaphoreTake(s_latest_mutex, pdMS_TO_TICKS(250)) != pdTRUE) {
+    if (xSemaphoreTake(s_latest_mutex, 0) != pdTRUE) {
         return ESP_ERR_TIMEOUT;
     }
     memcpy(out_pixels, s_latest, FRAME_BYTES);

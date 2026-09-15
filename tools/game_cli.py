@@ -109,6 +109,38 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
 
 
 def _simulate(arguments: argparse.Namespace, project: Path, repository: Path) -> int:
+    pc_project = project / "pc" / "CMakeLists.txt"
+    if pc_project.is_file() and not arguments.replay \
+            and not arguments.state_output:
+        command = [sys.executable, str(repository / "tools/gsp-sim/run.py"),
+                   "--pc-project", str(pc_project.parent),
+                   "--headless" if arguments.headless else "--interactive"]
+        if arguments.headless:
+            tick_hz = 30
+            manifest = project / "game.sim.json"
+            if manifest.is_file():
+                try:
+                    tick_hz = max(1, int(json.loads(
+                        manifest.read_text(encoding="utf-8")).get("tick_hz", 30)))
+                except (OSError, ValueError, TypeError):
+                    pass
+            command.extend(("--duration", str(max(1, arguments.frames) / tick_hz)))
+        try:
+            result = subprocess.call(
+                command,
+                cwd=repository,
+                stdout=sys.stderr if arguments.headless else None,
+            )
+            if result == 0 and arguments.headless:
+                print(json.dumps({
+                    "frames": arguments.frames,
+                    "abi": 1,
+                    "game_id": project.name,
+                    "simulator": "gsp_sim_bridge",
+                }))
+            return result
+        except KeyboardInterrupt:
+            return 130
     command = [sys.executable, str(repository / "game_sdk/host/run_game.py"),
                "--project", str(project), "--listen", arguments.listen,
                "--port", str(arguments.port)]
