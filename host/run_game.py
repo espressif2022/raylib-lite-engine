@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic RGB565 Host simulator for Mosaico game projects."""
+"""Deterministic RGB565 Host simulator for Raylib Lite game projects."""
 from __future__ import annotations
 
 import argparse
@@ -20,6 +20,8 @@ from PIL import Image
 GENERIC_EVENT_TYPES = {
     "tap", "pause", "resume", "step", "reset", "pointer", "action", "imu",
 }
+
+ENGINE_ROOT = Path(__file__).resolve().parents[1]
 
 
 class HostGameDescriptor(ctypes.Structure):
@@ -96,7 +98,6 @@ def _rgb565_png_bytes(framebuffer: object, width: int, height: int) -> bytes:
 class GenericHostRuntime:
     """Versioned C module; Python never mirrors project-owned game structs."""
     def __init__(self, project: Path, directory: Path, generation: int = 0) -> None:
-        repository = Path(__file__).resolve().parents[2]
         manifest_path = project / "game.sim.json"
         library = directory / f"host_game_{generation}.so"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -116,20 +117,20 @@ class GenericHostRuntime:
             raise RuntimeError(f"simulator manifest has no sources: {manifest_path}")
         sources = [
             *project_sources,
-            repository / "game_sdk/host/host_module_bridge.c",
-            repository / "game_sdk/host/host_raylib_port.c",
-            repository / "game_sdk/host/host_asset_runtime.c",
-            repository / "game_sdk/components/mosaico_game_2d/mosaico_game_2d.c",
-            repository / "game_sdk/components/mosaico_raylib_fast/mosaico_raylib_fast.c",
-            repository / "game_sdk/components/mosaico_game_fx/mosaico_game_fx.c",
-            repository / "game_sdk/components/mosaico_game_tilemap/mosaico_game_tilemap.c",
+            ENGINE_ROOT / "host/host_module_bridge.c",
+            ENGINE_ROOT / "host/host_raylib_port.c",
+            ENGINE_ROOT / "host/host_asset_runtime.c",
+            ENGINE_ROOT / "components/mosaico_game_2d/mosaico_game_2d.c",
+            ENGINE_ROOT / "components/mosaico_raylib_fast/mosaico_raylib_fast.c",
+            ENGINE_ROOT / "components/mosaico_game_fx/mosaico_game_fx.c",
+            ENGINE_ROOT / "components/mosaico_game_tilemap/mosaico_game_tilemap.c",
         ]
-        includes = [repository / "game_sdk/host/include", repository / "game_sdk/host",
-                    repository / "game_sdk/components/mosaico_game_assets/include",
-                    repository / "game_sdk/components/mosaico_game_2d/include",
-                    repository / "game_sdk/components/mosaico_raylib_fast/include",
-                    repository / "game_sdk/components/mosaico_game_fx/include",
-                    repository / "game_sdk/components/mosaico_game_tilemap/include",
+        includes = [ENGINE_ROOT / "host/include", ENGINE_ROOT / "host",
+                    ENGINE_ROOT / "components/mosaico_game_assets/include",
+                    ENGINE_ROOT / "components/mosaico_game_2d/include",
+                    ENGINE_ROOT / "components/mosaico_raylib_fast/include",
+                    ENGINE_ROOT / "components/mosaico_game_fx/include",
+                    ENGINE_ROOT / "components/mosaico_game_tilemap/include",
                     project / "main", project / "assets/generated",
                     project / "managed_components/georgik__raylib/include",
                     project / "managed_components/georgik__raylib/raylib/src"]

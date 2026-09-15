@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Workspace-owned commands for creating, simulating, and building games."""
+"""Commands for creating, simulating, and building Raylib Lite games."""
 from __future__ import annotations
 
 import argparse
@@ -17,6 +17,8 @@ TEMPLATES = {
     "sky-hop": "sky_hop",
     "tower-defense": "tower_defense",
 }
+
+ENGINE_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -110,7 +112,7 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
 
 
 def _simulate(arguments: argparse.Namespace, project: Path, repository: Path) -> int:
-    command = [sys.executable, str(repository / "game_sdk/host/run_game.py"),
+    command = [sys.executable, str(ENGINE_ROOT / "host/run_game.py"),
                "--project", str(project), "--listen", arguments.listen,
                "--port", str(arguments.port)]
     if arguments.headless:

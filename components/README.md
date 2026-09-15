@@ -2,7 +2,7 @@
 
 The components in this directory form one repository-local SDK. They are not
 published as independent ESP Component Registry packages. Applications select
-them through `game_sdk/cmake/mosaico_game_sdk.cmake`, which keeps component
+them through `cmake/mosaico_game_sdk.cmake`, which keeps component
 paths and the Raylib dependency in one place.
 
 ## Responsibilities
@@ -58,7 +58,7 @@ Shutdown reverses resource ownership: stop producers/tasks first, unload game
 resources, close audio/display, then call `MosaicoGameShutdown()`.
 
 Asset source conversion is a build-time concern owned by
-`game_sdk/tools/pack_game_assets.py`; runtime components only consume packed
+`tools/pack_game_assets.py`; runtime components only consume packed
 files from the read-only `game_assets` partition.
 `mosaico_game_asset_register_memory()` is available for bounded embedded
 fallback assets. Partition assets take precedence when both stores contain the
