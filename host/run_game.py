@@ -250,6 +250,7 @@ def run_generic(project: Path, directory: Path, frames: int, output: Path,
     events = replay or []
     next_event = 0
     paused = False
+    actions = {"left": False, "right": False, "jump": False}
     if not replay:
         runtime.action(4, True)
         runtime.action(4, False)
@@ -272,7 +273,11 @@ def run_generic(project: Path, directory: Path, frames: int, output: Path,
                 raw_code = event["code"]
                 code = codes.get(str(raw_code), int(raw_code) if str(raw_code).lstrip("-").isdigit() else -1)
                 if code < 0: raise ValueError(f"unsupported action code: {raw_code}")
-                runtime.action(code, bool(event["pressed"]))
+                pressed = bool(event["pressed"])
+                if code < 3:
+                    actions[("left", "right", "jump")[code]] = pressed
+                else:
+                    runtime.action(code, pressed)
             elif kind == "imu":
                 runtime.imu(float(event["x"]), float(event["y"]), float(event["z"]))
             elif kind == "pause":
@@ -286,10 +291,10 @@ def run_generic(project: Path, directory: Path, frames: int, output: Path,
             next_event += 1
         if single_step and paused:
             runtime.control(2)
-            runtime.step(False, False, False)
+            runtime.step(actions["left"], actions["right"], actions["jump"])
             runtime.control(1)
         else:
-            runtime.step(False, False, False)
+            runtime.step(actions["left"], actions["right"], actions["jump"])
         for track, x, y in tap_releases:
             runtime.pointer(track, x, y, False)
     output.parent.mkdir(parents=True, exist_ok=True)
