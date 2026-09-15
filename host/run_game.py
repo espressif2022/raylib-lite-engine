@@ -217,6 +217,10 @@ class GenericHostRuntime:
         if self.context:
             self.api.mosaico_host_game_destroy_v1(self.context)
             self.context = None
+        if os.name == "nt" and self.api is not None:
+            handle = self.api._handle
+            self.api = None
+            ctypes.windll.kernel32.FreeLibrary(ctypes.c_void_p(handle))
 
     def _input(self, kind: int, code: int, pressed: bool = True,
                x: int = 0, y: int = 0, track_id: int = 0,
