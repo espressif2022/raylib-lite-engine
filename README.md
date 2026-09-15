@@ -41,7 +41,6 @@ GSP 只承担 480×480 RGB565 Canvas 提交、镜像和展示。
 ```bash
 python3 mosaico.py game build projects/raylib_shooter
 python3 mosaico.py game sim projects/raylib_shooter --headless
-python3 mosaico.py game sim projects/raylib_shooter --gsp
 python3 mosaico.py game sim projects/raylib_shooter --headless \
   --scenario scenario.json --state-output artifacts/state.json
 python3 mosaico.py game sim projects/raylib_shooter
@@ -49,8 +48,7 @@ python mosaico.py install --project projects/tower_defense
 ```
 
 `game sim` 一律使用确定性 Host RGB565 runner，适合日常开发、输入回放、像素检查和
-状态断言。`game sim --gsp` 才编译可选的项目 `pc/` backend，并通过 GSP sim_bridge
-检查场景打包、bind ID 和 Canvas 提交。
+状态断言。游戏项目不维护第二套 GSP PC backend。
 
 场景文件按帧记录 `action`、`pointer`、`tap`、`imu`、`pause`、`resume`、
 `step` 和 `reset`，例如：
