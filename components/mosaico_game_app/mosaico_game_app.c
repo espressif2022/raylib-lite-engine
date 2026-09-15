@@ -16,7 +16,6 @@
 #include "mosaico_game_action.h"
 #include "mosaico_game_debug.h"
 #include "mosaico_game_input.h"
-#include "mosaico_game_iris.h"
 #include "mosaico_raylib_fast.h"
 #include "mosaico_raylib_port.h"
 #include "nvs_flash.h"
@@ -110,7 +109,6 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
     s_config = config;
     const char *tag = config->tag ? config->tag : "mosaico_game_app";
     ESP_ERROR_CHECK(nvs_flash_init());
-    ESP_ERROR_CHECK(mosaico_game_iris_register_inventory());
     iris_ota_support_start();
     ESP_LOGI(tag, "management plane ready; renderer startup follows");
 #if defined(CONFIG_MOSAICO_GAME_DIAGNOSTIC_IRIS_ONLY) && CONFIG_MOSAICO_GAME_DIAGNOSTIC_IRIS_ONLY
