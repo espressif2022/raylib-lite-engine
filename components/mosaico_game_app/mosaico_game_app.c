@@ -90,10 +90,11 @@ static esp_err_t start_display(void)
             .panel_type = ESP_DISPLAY_PRESENT_PANEL_IO,
             .input_pixel_format = ESP_DISPLAY_PRESENT_PIXEL_FORMAT_RGB565,
             .rotation = ESP_DISPLAY_PRESENT_ROTATE_0, .swap_bytes = true,
-            .te_enabled = true,
-            .te_sync = {.gpio_num = BSP_LCD_TE, .bus_freq_hz = BSP_LCD_PIXEL_CLOCK_HZ,
-                         .data_lines = BSP_LCD_DATA_WIDTH}},
-        .fb = {.mode = ESP_DISPLAY_PRESENT_MODE_AUTO}};
+            .te_enabled = false,
+            .te_sync = ESP_DISPLAY_PRESENT_TE_SYNC_DISABLED()},
+        /* Games redraw continuously.  Submit directly to panel GRAM instead
+         * of holding complete frames for the TE-synchronised scheduler. */
+        .fb = {.mode = ESP_DISPLAY_PRESENT_MODE_NONE}};
     if (s_config->drawbuf_lines || s_config->te_compose_buffers) {
         host.display.drawbuf.lines = s_config->drawbuf_lines;
         host.display.drawbuf.in_psram = true;

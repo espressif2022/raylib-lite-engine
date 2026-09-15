@@ -11,8 +11,30 @@ extern "C" {
 #endif
 typedef struct { mosaico_asset_id_t id; Rectangle source; Vector2 pivot; } MosaicoSpriteFrame;
 typedef struct { Texture2D texture; const void *descriptor; uint16_t frame_count; } MosaicoAtlas;
+typedef struct {
+    uint32_t opaque_copy_calls;
+    uint32_t opaque_copy_pixels;
+    uint32_t opaque_scale_calls;
+    uint32_t opaque_scale_pixels;
+    uint32_t binary_alpha_calls;
+    uint32_t binary_alpha_pixels;
+    uint32_t binary_copy_calls;
+    uint32_t binary_copy_pixels;
+    uint32_t binary_scale_calls;
+    uint32_t binary_scale_pixels;
+    uint32_t tile_row_calls;
+    uint32_t tile_row_pixels;
+    uint32_t alpha_calls;
+    uint32_t alpha_pixels;
+    uint32_t rotated_calls;
+    uint32_t rotated_pixels;
+    uint32_t frame_lookup_hits;
+    uint32_t frame_lookup_misses;
+} mosaico_game_2d_raster_stats_t;
 void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int height);
 void mosaico_game_2d_set_clip(int x,int y,int width,int height);
+void mosaico_game_2d_reset_raster_stats(void);
+void mosaico_game_2d_get_raster_stats(mosaico_game_2d_raster_stats_t *out_stats);
 MosaicoAtlas LoadMosaicoAtlas(const char *asset_path);
 const MosaicoSpriteFrame *MosaicoAtlasGetFrame(MosaicoAtlas atlas,mosaico_asset_id_t frame_id);
 esp_err_t mosaico_game_2d_atlas_get_frame(MosaicoAtlas atlas,
@@ -23,6 +45,8 @@ void UnloadMosaicoAtlas(MosaicoAtlas atlas);
 Texture2D Mosaico2DLoadTexture(const char *asset_path);
 void Mosaico2DUnloadTexture(Texture2D texture);
 void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,Vector2 origin,float rotation,Color tint);
+void Mosaico2DDrawTileRow(Texture2D texture,const uint16_t *tile_ids,
+    size_t tile_count,int tile_width,int tile_height,int dest_x,int dest_y);
 #ifdef __cplusplus
 }
 #endif

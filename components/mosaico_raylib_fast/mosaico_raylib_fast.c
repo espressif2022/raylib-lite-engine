@@ -720,9 +720,16 @@ void MosaicoFastDrawText(const char *text, int x, int y, int font_size,
     int scale=font_size/8; if(scale<1)scale=1;
     for(;*text;++text,x+=6*scale){
         const uint8_t *rows=glyph(*text); if(!rows) continue;
-        for(int yy=0;yy<7;++yy) for(int xx=0;xx<5;++xx)
-            if(rows[yy]&(1U<<(4-xx)))
-                MosaicoFastDrawRectangle(x+xx*scale,y+yy*scale,scale,scale,color);
+        for(int yy=0;yy<7;++yy){
+            int xx=0;
+            while(xx<5){
+                while(xx<5&&!(rows[yy]&(1U<<(4-xx))))++xx;
+                int start=xx;
+                while(xx<5&&(rows[yy]&(1U<<(4-xx))))++xx;
+                if(start<xx)MosaicoFastDrawRectangle(x+start*scale,y+yy*scale,
+                    (xx-start)*scale,scale,color);
+            }
+        }
     }
     s_camera_active=restore_camera;
 }

@@ -125,8 +125,10 @@ def write_atlas(source: Path, manifest: dict, destination: Path) -> dict:
         raise ValueError("atlas frame table exceeds the declared grid")
     cell_w, cell_h = raw.width // columns, raw.height // rows
     output_cell = int(manifest.get("output_cell", 64))
-    atlas = Image.new("RGBA", (columns * output_cell, rows * output_cell))
-    frames = []
+    atlas_width = columns * output_cell
+    atlas_height = rows * output_cell
+    base_cells: dict[str, Image.Image] = {}
+    base_frames = []
     ids: set[int] = set()
     for index, item in enumerate(manifest["frames"]):
         col, row = index % columns, index // columns
@@ -136,15 +138,59 @@ def write_atlas(source: Path, manifest: dict, destination: Path) -> dict:
         crop.thumbnail((output_cell - 4, output_cell - 4), resampling.LANCZOS)
         x = col * output_cell + (output_cell - crop.width) // 2
         y = row * output_cell + (output_cell - crop.height) // 2
-        atlas.alpha_composite(crop, (x, y))
+        cell = Image.new("RGBA", (output_cell, output_cell))
+        cell.alpha_composite(crop, ((output_cell - crop.width) // 2,
+                                    (output_cell - crop.height) // 2))
+        base_cells[str(item["name"])] = cell
         identifier = asset_id(item["name"])
         if identifier in ids:
             raise ValueError(f"duplicate frame id: {item['name']}")
         ids.add(identifier)
-        frames.append((identifier, col * output_cell, row * output_cell,
-                       output_cell, output_cell,
-                       int(item.get("pivot_x", output_cell // 2)),
-                       int(item.get("pivot_y", output_cell // 2))))
+        base_frames.append((identifier, col * output_cell, row * output_cell,
+                            output_cell, output_cell,
+                            int(item.get("pivot_x", output_cell // 2)),
+                            int(item.get("pivot_y", output_cell // 2))))
+
+    # Optional build-time variants trade asset bytes for much cheaper 1:1
+    # device blits. They are packed below the regular grid using deterministic
+    # shelf placement and remain ordinary atlas frames to the runtime.
+    variants: list[tuple[dict, Image.Image, int, int]] = []
+    shelf_x, shelf_y, shelf_height = 0, atlas_height, 0
+    for item in manifest.get("variants", []):
+        name, source_name = str(item["name"]), str(item["source"])
+        if source_name not in base_cells:
+            raise ValueError(f"atlas variant references unknown frame: {source_name}")
+        width, height = int(item["width"]), int(item["height"])
+        if width <= 0 or height <= 0 or width > 65535 or height > 65535:
+            raise ValueError(f"invalid atlas variant size: {name}")
+        identifier = asset_id(name)
+        if identifier in ids:
+            raise ValueError(f"duplicate frame id: {name}")
+        ids.add(identifier)
+        if width > atlas_width:
+            atlas_width = width
+        if shelf_x and shelf_x + width > atlas_width:
+            shelf_x, shelf_y, shelf_height = 0, shelf_y + shelf_height, 0
+        variants.append((item, base_cells[source_name].resize(
+            (width, height), getattr(Image, "Resampling", Image).LANCZOS),
+            shelf_x, shelf_y))
+        shelf_x += width
+        shelf_height = max(shelf_height, height)
+    if variants:
+        atlas_height = shelf_y + shelf_height
+
+    atlas = Image.new("RGBA", (atlas_width, atlas_height))
+    for index, item in enumerate(manifest["frames"]):
+        col, row = index % columns, index // columns
+        atlas.alpha_composite(base_cells[str(item["name"])],
+                              (col * output_cell, row * output_cell))
+    frames = list(base_frames)
+    for item, variant, x, y in variants:
+        atlas.alpha_composite(variant, (x, y))
+        width, height = variant.size
+        frames.append((asset_id(str(item["name"])), x, y, width, height,
+                       int(item.get("pivot_x", width // 2)),
+                       int(item.get("pivot_y", height // 2))))
     alpha_mode = manifest.get("alpha_mode", "smooth")
     if alpha_mode not in {"smooth", "binary", "opaque"}:
         raise ValueError(f"unsupported alpha mode: {alpha_mode}")
@@ -165,7 +211,7 @@ def write_atlas(source: Path, manifest: dict, destination: Path) -> dict:
     destination.write_bytes(header + body + rgb + alpha)
     return {"file": destination.name, "type": "atlas", "bytes": destination.stat().st_size,
             "width": atlas.width, "height": atlas.height, "frames": len(frames),
-            "alpha_mode": alpha_mode}
+            "alpha_mode": alpha_mode, "variants": len(variants)}
 
 
 def write_terrain_atlas(destination: Path) -> dict:
@@ -329,6 +375,7 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
         image = _source_file(source, str(item.get("source", config["image"])))
         report.append(write_atlas(image, config, destination))
         identifiers.update(str(frame["name"]) for frame in config["frames"])
+        identifiers.update(str(frame["name"]) for frame in config.get("variants", []))
         animations.extend(config.get("animations", []))
 
     for item in manifest.get("maps", []):

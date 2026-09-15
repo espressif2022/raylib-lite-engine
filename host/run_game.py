@@ -9,6 +9,7 @@ import io
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -33,6 +34,28 @@ class HostGameInput(ctypes.Structure):
                 ("track_id", ctypes.c_int32), ("pressed", ctypes.c_bool),
                 ("value_x", ctypes.c_float), ("value_y", ctypes.c_float),
                 ("value_z", ctypes.c_float)]
+
+class RasterStats(ctypes.Structure):
+    _fields_ = [
+        ("opaque_copy_calls", ctypes.c_uint32),
+        ("opaque_copy_pixels", ctypes.c_uint32),
+        ("opaque_scale_calls", ctypes.c_uint32),
+        ("opaque_scale_pixels", ctypes.c_uint32),
+        ("binary_alpha_calls", ctypes.c_uint32),
+        ("binary_alpha_pixels", ctypes.c_uint32),
+        ("binary_copy_calls", ctypes.c_uint32),
+        ("binary_copy_pixels", ctypes.c_uint32),
+        ("binary_scale_calls", ctypes.c_uint32),
+        ("binary_scale_pixels", ctypes.c_uint32),
+        ("tile_row_calls", ctypes.c_uint32),
+        ("tile_row_pixels", ctypes.c_uint32),
+        ("alpha_calls", ctypes.c_uint32),
+        ("alpha_pixels", ctypes.c_uint32),
+        ("rotated_calls", ctypes.c_uint32),
+        ("rotated_pixels", ctypes.c_uint32),
+        ("frame_lookup_hits", ctypes.c_uint32),
+        ("frame_lookup_misses", ctypes.c_uint32),
+    ]
 
 def load_replay(path: Path | None) -> list[dict[str, object]]:
     if path is None:
@@ -137,11 +160,19 @@ class GenericHostRuntime:
             ctypes.POINTER(ctypes.c_uint16), ctypes.c_size_t]
         self.api.mosaico_host_game_state_json_v1.argtypes = [ctypes.c_void_p,
             ctypes.c_char_p, ctypes.c_size_t]
+        self.api.mosaico_game_2d_get_raster_stats.argtypes = [ctypes.POINTER(RasterStats)]
+        self.api.mosaico_game_2d_reset_raster_stats.argtypes = []
         self.context = self.api.mosaico_host_game_create_v1(
             str(project / "assets/generated").encode())
         if not self.context: raise RuntimeError("host adapter create failed")
         self.framebuffer = (ctypes.c_uint16 * (descriptor.width * descriptor.height))()
         self.frames = 0
+        self.render_count = 0
+        self.render_ns = 0
+        self.encode_ns = 0
+        self.last_render_ns = 0
+        self.last_encode_ns = 0
+        self.api.mosaico_game_2d_reset_raster_stats()
         self.lock = threading.Lock()
 
     def close(self) -> None:
@@ -177,20 +208,37 @@ class GenericHostRuntime:
         if self.api.mosaico_host_game_state_json_v1(self.context, output, len(output)) < 0:
             return {"error": "state unavailable"}
         value = json.loads(output.value)
+        raster = RasterStats()
+        self.api.mosaico_game_2d_get_raster_stats(ctypes.byref(raster))
         value.update({"frames": self.frames, "abi": 1,
                       "game_id": self.descriptor.game_id.decode(),
                       "title": self.descriptor.title.decode(),
                       "width": self.descriptor.width,
                       "height": self.descriptor.height,
                       "tick_hz": self.descriptor.tick_hz,
-                      "max_pointers": self.descriptor.max_pointers})
+                      "max_pointers": self.descriptor.max_pointers,
+                      "host_render_ms": self.last_render_ns / 1_000_000.0,
+                      "host_render_mean_ms": self.render_ns /
+                          max(1, self.render_count) / 1_000_000.0,
+                      "host_encode_ms": self.last_encode_ns / 1_000_000.0,
+                      "raster": {name: getattr(raster, name)
+                          for name, _ctype in RasterStats._fields_}})
         return value
     def frame(self) -> bytes:
+        started = time.perf_counter_ns()
         status = self.api.mosaico_host_game_render_rgb565_v1(
             self.context, self.framebuffer, self.descriptor.width)
         if status: raise RuntimeError(f"host render failed: {status}")
-        return _rgb565_png_bytes(self.framebuffer, self.descriptor.width,
-                                 self.descriptor.height)
+        rendered = time.perf_counter_ns()
+        frame = _rgb565_png_bytes(self.framebuffer, self.descriptor.width,
+                                  self.descriptor.height)
+        encoded = time.perf_counter_ns()
+        self.last_render_ns = rendered - started
+        self.last_encode_ns = encoded - rendered
+        self.render_ns += self.last_render_ns
+        self.encode_ns += self.last_encode_ns
+        self.render_count += 1
+        return frame
 
 class ReloadableHostRuntime:
     def __init__(self, project: Path, directory: Path) -> None:
@@ -202,10 +250,13 @@ class ReloadableHostRuntime:
         self.stamp = self._stamp()
 
     def _watched(self) -> list[Path]:
+        assets = self.project / "assets_src"
+        prepare = assets / "prepare_sprites.py"
+        images = (assets.glob("*source*.png") if prepare.is_file()
+                  else assets.glob("*.png"))
         return [*self.project.joinpath("main").glob("*.[ch]"),
-                self.project / "game.sim.json",
-                *self.project.joinpath("assets_src").glob("*.png"),
-                *self.project.joinpath("assets_src").glob("*.json")]
+                self.project / "game.sim.json", *images,
+                *assets.glob("*.json"), prepare]
     def _stamp(self) -> int:
         return max((path.stat().st_mtime_ns for path in self._watched()
                     if path.is_file()), default=0)
@@ -220,7 +271,7 @@ class ReloadableHostRuntime:
             manifest = self.project / "assets_src/game_assets.json"
             if manifest.is_file():
                 packer = Path(__file__).resolve().parents[1] / "tools/pack_game_assets.py"
-                subprocess.run([str(packer), "--source", str(manifest.parent),
+                subprocess.run([sys.executable, str(packer), "--source", str(manifest.parent),
                     "--output", str(self.project / "assets/generated")], check=True,
                     capture_output=True)
             self.generation += 1
@@ -231,7 +282,9 @@ class ReloadableHostRuntime:
             self.reload_error = ""
         except (OSError, subprocess.CalledProcessError, RuntimeError) as error:
             self.reload_error = str(error)
-        self.stamp = stamp
+        # Asset preparation may rewrite a watched PNG. Record the resulting
+        # source state, otherwise every simulation tick starts another build.
+        self.stamp = self._stamp()
     def step(self, *args: object, **kwargs: object) -> None:
         self._reload(); self.current.step(*args, **kwargs)
     def control(self, code: int) -> None: self.current.control(code)
@@ -305,7 +358,8 @@ def run_generic(project: Path, directory: Path, frames: int, output: Path,
 
 def serve_interactive_preview(listen: str, port: int, runtime: object) -> None:
     simulation = {"paused": False, "speed": 1.0,
-                  "actions": {"left": False, "right": False, "jump": False},
+                  "actions": {"left": False, "right": False, "jump": False,
+                              "back": False, "fire": False},
                   "pointers": {},
                   "recording": False, "events": [], "started": time.monotonic(),
                   "ticks": 0}
@@ -331,11 +385,11 @@ img{width:480px;height:480px;max-width:100%;aspect-ratio:1/1;object-fit:contain;
 #state{margin-top:10px;color:#9ee;white-space:pre-wrap;height:4.8em;overflow:hidden;line-height:1.35}
 .hint{color:#fff;margin-top:8px}.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}button,select{background:#17364b;color:#dff;border:1px solid #299fad;border-radius:6px;padding:6px 10px}
 </style></head><body><main><div class=tools><button id=pause>Pause</button><button id=step>Step</button><button id=reset>Reset</button><button id=shot>Screenshot</button><button id=record>Record</button><select id=speed><option>.25</option><option>.5</option><option selected>1</option><option>2</option></select></div><img id=screen tabindex=0 draggable=false><div id=state></div>
-<div class=hint>Keyboard: A/D or ←/→, Space action, P pause, Enter start · Touch: up to two tracked points</div></main>
+<div class=hint>Keyboard: A/D turn, W/S move, F/Ctrl fire, P pause · Touch: drag; tap crosshair to fire</div></main>
 <script>
 const held=new Set(), pointers=new Map(), img=document.querySelector('#screen'), state=document.querySelector('#state');
 let busy=false, phase='start',paused=false;
-function key(e,down){const k=e.key.toLowerCase();if(['arrowleft','arrowright',' ','a','d','p','enter'].includes(k))e.preventDefault();
+function key(e,down){const k=e.key.toLowerCase();if(['arrowleft','arrowright','arrowup','arrowdown',' ','a','d','w','s','f','control','p','enter'].includes(k))e.preventDefault();
  if(down&&!held.has(k)&&k==='p')control(paused?'resume':'pause');
  if(down&&!held.has(k)&&k==='enter')control('continue'); down?held.add(k):held.delete(k);sendInput()}
 addEventListener('keydown',e=>key(e,true));addEventListener('keyup',e=>key(e,false));
@@ -345,15 +399,15 @@ img.onpointerdown=e=>{img.focus();img.setPointerCapture(e.pointerId);pointer(e,t
 img.onpointermove=e=>{if(pointers.has(e.pointerId)){pointer(e,true);sendInput()}};
 img.onpointerup=img.onpointercancel=e=>{pointer(e,false);sendInput()};
 addEventListener('blur',()=>{held.clear();pointers.clear()});
-async function sendInput(){let left=held.has('a')||held.has('arrowleft'),right=held.has('d')||held.has('arrowright'),jump=held.has(' ');
+async function sendInput(){let left=held.has('a')||held.has('arrowleft'),right=held.has('d')||held.has('arrowright'),jump=held.has(' ')||held.has('w')||held.has('arrowup'),back=held.has('s')||held.has('arrowdown'),fire=held.has('f')||held.has('control');
  for(const p of pointers.values())if(p.y>=360){left|=p.x<150;right|=p.x>=150&&p.x<300;jump|=p.x>=300}
- await fetch('/api/v1/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({left,right,jump,pointers:[...pointers].map(([track,p])=>({track,...p,pressed:true}))})})}
+ await fetch('/api/v1/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({left,right,jump,back,fire,pointers:[...pointers].map(([track,p])=>({track,...p,pressed:true}))})})}
 async function control(command){await fetch('/api/v1/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command})})}
 async function tick(){if(busy)return;busy=true;
  try{const res=await fetch('/api/v1/frame');const meta=JSON.parse(res.headers.get('X-Mosaico-State'));const blob=await res.blob();
  phase=meta.phase;const old=img.src,url=URL.createObjectURL(blob);img.onload=()=>{if(old.startsWith('blob:'))URL.revokeObjectURL(old);img.onload=null};img.src=url;
  paused=meta.simulation.paused;const fields=Object.entries(meta).filter(([k])=>!['simulation','reload_error','title'].includes(k)).map(([k,v])=>`${k}=${v}`).join('  ');
- state.textContent=`${meta.title||meta.game_id||'Mosaico game'}\nLogic ${meta.simulation.logic_fps.toFixed(1)} Hz  Frame ${meta.simulation.frame_ms.toFixed(1)} ms\n${fields}`}
+ state.textContent=`${meta.title||meta.game_id||'Mosaico game'}\nLogic ${meta.simulation.logic_fps.toFixed(1)} Hz  Raster ${meta.host_render_ms.toFixed(2)} ms  PNG ${meta.host_encode_ms.toFixed(2)} ms\n${fields}`}
  finally{busy=false}}
 pause.onclick=()=>control(paused?'resume':'pause');step.onclick=()=>control('step');reset.onclick=()=>control('reset');speed.onchange=()=>control('speed:'+speed.value);shot.onclick=()=>{const a=document.createElement('a');a.href=img.src;a.download='mosaico-game.png';a.click()};record.onclick=async()=>{if(!metaRecording()){await control('record');record.textContent='Stop record'}else{await control('record');const a=document.createElement('a');a.href='/api/v1/recording';a.download='scenario.json';a.click();record.textContent='Record'}};
 function metaRecording(){return record.textContent==='Stop record'}
@@ -365,7 +419,7 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
             return {**runtime.metadata(), "simulation": {
                 "paused": simulation["paused"], "speed": simulation["speed"],
                 "logic_fps": simulation["ticks"] / elapsed,
-                "frame_ms": 1000.0 / tick_hz, "recording": simulation["recording"]}}
+                "recording": simulation["recording"]}}
         def do_GET(self) -> None:
             if self.path.startswith("/api/v1/frame") or self.path.startswith("/frame"):
                 from urllib.parse import parse_qs, urlparse
@@ -399,7 +453,7 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
             if self.path == "/api/v1/input":
                 previous_actions = simulation["actions"]
                 simulation["actions"] = {key: bool(value.get(key, False))
-                    for key in ("left", "right", "jump")}
+                    for key in ("left", "right", "jump", "back", "fire")}
                 incoming = {int(item.get("track", 0)): item
                             for item in value.get("pointers", [])[:2]}
                 if hasattr(runtime, "pointer"):
@@ -416,6 +470,8 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                         for item in value.get("actions", [])[:16]:
                             runtime.action(int(item.get("code", 0)),
                                            bool(item.get("pressed", True)))
+                        runtime.action(5, simulation["actions"]["back"])
+                        runtime.action(6, simulation["actions"]["fire"])
                 if simulation["recording"]:
                     for name, pressed in simulation["actions"].items():
                         if pressed != previous_actions.get(name, False):
