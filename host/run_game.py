@@ -95,6 +95,30 @@ def _rgb565_png_bytes(framebuffer: object, width: int, height: int) -> bytes:
     image.save(output, format="PNG", compress_level=1)
     return output.getvalue()
 
+def prepare_project_assets(project: Path) -> None:
+    """Build deterministic Host assets before compiling the game module."""
+    def run(command: list[str]) -> None:
+        result = subprocess.run(command, cwd=project, capture_output=True,
+                                text=True)
+        if result.returncode:
+            details = (result.stdout or "") + (result.stderr or "")
+            raise RuntimeError(
+                f"asset preparation failed ({result.returncode}):\n{details}"
+            )
+
+    assets = project / "assets_src"
+    hooks = [*sorted(assets.glob("prepare_*.py")),
+             *sorted(assets.glob("generate_*.py"))]
+    for hook in hooks:
+        run([sys.executable, str(hook)])
+    manifest = assets / "game_assets.json"
+    if manifest.is_file():
+        packer = ENGINE_ROOT / "tools/pack_game_assets.py"
+        run([
+            sys.executable, str(packer), "--source", str(assets),
+            "--output", str(project / "assets/generated"),
+        ])
+
 class GenericHostRuntime:
     """Versioned C module; Python never mirrors project-owned game structs."""
     def __init__(self, project: Path, directory: Path, generation: int = 0) -> None:
@@ -265,16 +289,7 @@ class ReloadableHostRuntime:
         stamp = self._stamp()
         if stamp == self.stamp: return
         try:
-            prepare = self.project / "assets_src/prepare_sprites.py"
-            if prepare.is_file():
-                subprocess.run([sys.executable, str(prepare)], check=True,
-                               capture_output=True)
-            manifest = self.project / "assets_src/game_assets.json"
-            if manifest.is_file():
-                packer = Path(__file__).resolve().parents[1] / "tools/pack_game_assets.py"
-                subprocess.run([sys.executable, str(packer), "--source", str(manifest.parent),
-                    "--output", str(self.project / "assets/generated")], check=True,
-                    capture_output=True)
+            prepare_project_assets(self.project)
             self.generation += 1
             replacement = GenericHostRuntime(self.project, self.directory, self.generation)
             previous = self.current
@@ -539,6 +554,7 @@ def main() -> int:
     manifest = args.project / "game.sim.json"
     if not manifest.is_file():
         parser.error(f"game simulator manifest not found: {manifest}")
+    prepare_project_assets(args.project)
     with tempfile.TemporaryDirectory(prefix="mosaico-game-") as directory:
         output = args.project / "build-host" / "frame.png"
         if args.headless:
