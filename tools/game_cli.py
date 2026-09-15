@@ -35,6 +35,11 @@ def _parser() -> argparse.ArgumentParser:
         sim.add_argument("project", nargs="?")
         sim.add_argument("--project", dest="project_option")
         sim.add_argument("--headless", action="store_true")
+        sim.add_argument(
+            "--gsp",
+            action="store_true",
+            help="Use the optional GSP sim_bridge Canvas integration preview",
+        )
         sim.add_argument("--frames", type=int, default=300)
         sim.add_argument("--listen", choices=("127.0.0.1", "0.0.0.0"), default="127.0.0.1")
         sim.add_argument("--port", type=int, default=8460)
@@ -110,8 +115,16 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
 
 def _simulate(arguments: argparse.Namespace, project: Path, repository: Path) -> int:
     pc_project = project / "pc" / "CMakeLists.txt"
-    if pc_project.is_file() and not arguments.replay \
-            and not arguments.state_output:
+    if arguments.gsp:
+        if arguments.replay or arguments.state_output:
+            print("mosaico: --gsp cannot be combined with --scenario or "
+                  "--state-output; use the Host simulator for deterministic replay",
+                  file=sys.stderr)
+            return 2
+        if not pc_project.is_file():
+            print(f"mosaico: GSP preview backend not found: {project / 'pc'}",
+                  file=sys.stderr)
+            return 2
         command = [sys.executable, str(repository / "tools/gsp-sim/run.py"),
                    "--pc-project", str(pc_project.parent),
                    "--headless" if arguments.headless else "--interactive"]
