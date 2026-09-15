@@ -1,0 +1,9 @@
+**/build*/
+**/managed_components/
+**/sdkconfig
+**/sdkconfig.old
+**/dependencies.lock
+**/__pycache__/
+**/*.py[cod]
+**/assets/generated/
+artifacts/

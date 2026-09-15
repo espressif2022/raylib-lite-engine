@@ -1,5 +1,10 @@
-# Shared project integration for the in-tree Mosaico Game SDK.
+# Project integration for Raylib Lite Engine.
 set(MOSAICO_GAME_SDK_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
+
+set(MOSAICO_GAME_GSPC_FETCHER "" CACHE FILEPATH
+    "Optional script that prints the path to a GSP compiler")
+set(MOSAICO_GAME_RECOVERY_COMPONENT_DIR "" CACHE PATH
+    "Optional application recovery component directory")
 
 function(mosaico_game_sdk_configure_gsp_compiler)
     # IDF 6.2's GCC 16 diagnoses a bounded strncpy in managed mdns 1.13.0 as
@@ -10,8 +15,7 @@ function(mosaico_game_sdk_configure_gsp_compiler)
         return()
     endif()
     find_program(_mosaico_python NAMES python3 python)
-    set(_mosaico_fetch_gspc
-        "${MOSAICO_GAME_SDK_ROOT}/../tools/gsp-sim/fetch_gspc.py")
+    set(_mosaico_fetch_gspc "${MOSAICO_GAME_GSPC_FETCHER}")
     if(_mosaico_python AND EXISTS "${_mosaico_fetch_gspc}")
         execute_process(
             COMMAND "${_mosaico_python}" "${_mosaico_fetch_gspc}"
@@ -24,12 +28,10 @@ function(mosaico_game_sdk_configure_gsp_compiler)
             return()
         endif()
     endif()
-    find_program(_mosaico_cargo NAMES cargo)
-    get_filename_component(_workspace_gspc
-        "${MOSAICO_GAME_SDK_ROOT}/../../../esp-gsp/ci/gspc-dev" ABSOLUTE)
-    if(_mosaico_cargo AND EXISTS "${_workspace_gspc}")
-        set(GSPC_EXECUTABLE "${_workspace_gspc}" CACHE FILEPATH
-            "Standalone ESP-GSP scene compiler")
+    find_program(_mosaico_gspc NAMES gspc gspc-dev)
+    if(_mosaico_gspc)
+        set(GSPC_EXECUTABLE "${_mosaico_gspc}" CACHE FILEPATH
+            "ESP-GSP scene compiler")
     endif()
 endfunction()
 
@@ -70,8 +72,15 @@ function(mosaico_game_sdk_add_components)
         list(APPEND EXTRA_COMPONENT_DIRS
             "${MOSAICO_GAME_SDK_ROOT}/components/${_component}")
     endforeach()
-    list(APPEND EXTRA_COMPONENT_DIRS
-        "${MOSAICO_GAME_SDK_ROOT}/../components/esp_mosaico_app_recovery")
+    if(MOSAICO_GAME_RECOVERY_COMPONENT_DIR)
+        if(NOT EXISTS "${MOSAICO_GAME_RECOVERY_COMPONENT_DIR}/CMakeLists.txt")
+            message(FATAL_ERROR
+                "MOSAICO_GAME_RECOVERY_COMPONENT_DIR is not an ESP-IDF component: "
+                "${MOSAICO_GAME_RECOVERY_COMPONENT_DIR}")
+        endif()
+        list(APPEND EXTRA_COMPONENT_DIRS
+            "${MOSAICO_GAME_RECOVERY_COMPONENT_DIR}")
+    endif()
     list(REMOVE_DUPLICATES EXTRA_COMPONENT_DIRS)
     set(EXTRA_COMPONENT_DIRS "${EXTRA_COMPONENT_DIRS}" PARENT_SCOPE)
 endfunction()
