@@ -91,7 +91,8 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
     source_name = TEMPLATES[arguments.template]
     source = repository / "projects" / source_name
     shutil.copytree(source, destination, ignore=shutil.ignore_patterns(
-        "build", "build-*", "managed_components", "dependencies.lock", "sdkconfig", "assets"
+        "build", "build-*", "managed_components", "dependencies.lock",
+        "sdkconfig", "assets", ".codex-runs", "pc"
     ))
     for path in destination.rglob("*"):
         if not path.is_file() or path.suffix.lower() not in {

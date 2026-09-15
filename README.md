@@ -48,7 +48,8 @@ python mosaico.py install --project projects/tower_defense
 ```
 
 `game sim` 一律使用确定性 Host RGB565 runner，适合日常开发、输入回放、像素检查和
-状态断言。游戏项目不维护第二套 GSP PC backend。
+状态断言。游戏项目不维护第二套 GSP PC backend。玩法与 view 进 Host 和固件；
+`game_module.c` 只给 Host；设备壳是薄 `main.c` 加 `*_app.c`。
 
 场景文件按帧记录 `action`、`pointer`、`tap`、`imu`、`pause`、`resume`、
 `step` 和 `reset`，例如：
