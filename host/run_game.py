@@ -7,7 +7,9 @@ import ctypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,6 +24,14 @@ GENERIC_EVENT_TYPES = {
 }
 
 ENGINE_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _host_compiler() -> str:
+    compiler = next((value for name in ("cc", "gcc", "clang")
+                     if (value := shutil.which(name))), None)
+    if compiler is None:
+        raise RuntimeError("no C compiler found (tried cc, gcc, and clang)")
+    return compiler
 
 
 class HostGameDescriptor(ctypes.Structure):
@@ -123,7 +133,8 @@ class GenericHostRuntime:
     """Versioned C module; Python never mirrors project-owned game structs."""
     def __init__(self, project: Path, directory: Path, generation: int = 0) -> None:
         manifest_path = project / "game.sim.json"
-        library = directory / f"host_game_{generation}.so"
+        suffix = ".dll" if os.name == "nt" else ".so"
+        library = directory / f"host_game_{generation}{suffix}"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if manifest.get("schema") != "mosaico-game-sim/v1":
             raise RuntimeError(f"unsupported simulator manifest: {manifest_path}")
@@ -158,9 +169,11 @@ class GenericHostRuntime:
                     project / "main", project / "assets/generated",
                     project / "managed_components/georgik__raylib/include",
                     project / "managed_components/georgik__raylib/raylib/src"]
-        command = ["cc", "-shared", "-fPIC", "-O2", "-std=c11", "-Wall",
+        command = [_host_compiler(), "-shared", "-O2", "-std=c11", "-Wall",
                    "-Wextra", "-Werror", "-DMOSAICO_HOST_SIMULATION=1",
                    *(str(path) for path in sources)]
+        if os.name != "nt":
+            command.insert(2, "-fPIC")
         for include in includes: command.extend(("-I", str(include)))
         command.extend(("-lm", "-o", str(library)))
         compiled = subprocess.run(command, capture_output=True, text=True)
