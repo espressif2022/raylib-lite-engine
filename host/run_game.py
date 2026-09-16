@@ -396,7 +396,8 @@ def run_generic(project: Path, directory: Path, frames: int, output: Path,
 def serve_interactive_preview(listen: str, port: int, runtime: object) -> None:
     simulation = {"paused": False, "speed": 1.0,
                   "actions": {"left": False, "right": False, "jump": False,
-                              "back": False, "fire": False},
+                              "back": False, "fire": False, "sprint": False,
+                              "strafe_left": False, "strafe_right": False},
                   "pointers": {},
                   "recording": False, "events": [], "started": time.monotonic(),
                   "ticks": 0}
@@ -422,27 +423,28 @@ img{width:480px;height:480px;max-width:100%;aspect-ratio:1/1;object-fit:contain;
 #state{margin-top:10px;color:#9ee;white-space:pre-wrap;height:4.8em;overflow:hidden;line-height:1.35}
 .hint{color:#fff;margin-top:8px}.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}button,select{background:#17364b;color:#dff;border:1px solid #299fad;border-radius:6px;padding:6px 10px}
 </style></head><body><main><div class=tools><button id=pause>Pause</button><button id=step>Step</button><button id=reset>Reset</button><button id=shot>Screenshot</button><button id=record>Record</button><select id=speed><option>.25</option><option>.5</option><option selected>1</option><option>2</option></select></div><img id=screen tabindex=0 draggable=false><div id=state></div>
-<div class=hint>Keyboard: A/D turn, W/S move, F/Ctrl fire, P pause · Touch: drag; tap crosshair to fire</div></main>
+<div class=hint>Keyboard: A/D turn, W/S walk, Shift sprint, Q/E strafe, F fire · Touch: left stick, right look, FIRE ring</div></main>
 <script>
-const held=new Set(), pointers=new Map(), img=document.querySelector('#screen'), state=document.querySelector('#state');
-let busy=false, phase='start',paused=false;
-function key(e,down){const k=e.key.toLowerCase();if(['arrowleft','arrowright','arrowup','arrowdown',' ','a','d','w','s','f','control','p','enter'].includes(k))e.preventDefault();
+const held=new Set(), pointers=new Map(), img=document.querySelector('#screen'), state=document.querySelector('#state'), sfxCache={};
+let busy=false, phase='start',paused=false,armedSfx='';
+function playSfx(name){if(!name)return;let a=sfxCache[name];if(!a){a=new Audio('/sfx/'+name+'.wav');a.preload='auto';sfxCache[name]=a}a.currentTime=0;a.volume=name.startsWith('step')?.35:.7;a.play().catch(()=>{})}
+function unlockAudio(){if(sfxCache._on)return;sfxCache._on=1;['rifle','step_l','alert','hurt','confirm'].forEach(n=>{const a=new Audio('/sfx/'+n+'.wav');a.preload='auto';sfxCache[n]=a})}
+function key(e,down){unlockAudio();const k=e.key.toLowerCase();if(['arrowleft','arrowright','arrowup','arrowdown',' ','a','d','w','s','f','control','p','enter','shift','q','e'].includes(k))e.preventDefault();
  if(down&&!held.has(k)&&k==='p')control(paused?'resume':'pause');
  if(down&&!held.has(k)&&k==='enter')control('continue'); down?held.add(k):held.delete(k);sendInput()}
 addEventListener('keydown',e=>key(e,true));addEventListener('keyup',e=>key(e,false));
 function pointer(e,down){e.preventDefault();const r=img.getBoundingClientRect();
  const p={x:(e.clientX-r.left)*480/r.width,y:(e.clientY-r.top)*480/r.height};down?pointers.set(e.pointerId,p):pointers.delete(e.pointerId)}
-img.onpointerdown=e=>{img.focus();img.setPointerCapture(e.pointerId);pointer(e,true);sendInput()};
+img.onpointerdown=e=>{unlockAudio();img.focus();img.setPointerCapture(e.pointerId);pointer(e,true);sendInput()};
 img.onpointermove=e=>{if(pointers.has(e.pointerId)){pointer(e,true);sendInput()}};
 img.onpointerup=img.onpointercancel=e=>{pointer(e,false);sendInput()};
 addEventListener('blur',()=>{held.clear();pointers.clear()});
-async function sendInput(){let left=held.has('a')||held.has('arrowleft'),right=held.has('d')||held.has('arrowright'),jump=held.has(' ')||held.has('w')||held.has('arrowup'),back=held.has('s')||held.has('arrowdown'),fire=held.has('f')||held.has('control');
- for(const p of pointers.values())if(p.y>=360){left|=p.x<150;right|=p.x>=150&&p.x<300;jump|=p.x>=300}
- await fetch('/api/v1/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({left,right,jump,back,fire,pointers:[...pointers].map(([track,p])=>({track,...p,pressed:true}))})})}
+async function sendInput(){let left=held.has('a')||held.has('arrowleft'),right=held.has('d')||held.has('arrowright'),jump=held.has(' ')||held.has('w')||held.has('arrowup'),back=held.has('s')||held.has('arrowdown'),fire=held.has('f')||held.has('control'),sprint=held.has('shift'),strafe_left=held.has('q'),strafe_right=held.has('e');
+ await fetch('/api/v1/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({left,right,jump,back,fire,sprint,strafe_left,strafe_right,pointers:[...pointers].map(([track,p])=>({track,...p,pressed:true}))})})}
 async function control(command){await fetch('/api/v1/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command})})}
 async function tick(){if(busy)return;busy=true;
  try{const res=await fetch('/api/v1/frame');const meta=JSON.parse(res.headers.get('X-Mosaico-State'));const blob=await res.blob();
- phase=meta.phase;const old=img.src,url=URL.createObjectURL(blob);img.onload=()=>{if(old.startsWith('blob:'))URL.revokeObjectURL(old);img.onload=null};img.src=url;
+ phase=meta.phase;if(meta.sfx&&meta.sfx!==armedSfx)playSfx(meta.sfx);armedSfx=meta.sfx||'';const old=img.src,url=URL.createObjectURL(blob);img.onload=()=>{if(old.startsWith('blob:'))URL.revokeObjectURL(old);img.onload=null};img.src=url;
  paused=meta.simulation.paused;const fields=Object.entries(meta).filter(([k])=>!['simulation','reload_error','title'].includes(k)).map(([k,v])=>`${k}=${v}`).join('  ');
  state.textContent=`${meta.title||meta.game_id||'Mosaico game'}\nLogic ${meta.simulation.logic_fps.toFixed(1)} Hz  Raster ${meta.host_render_ms.toFixed(2)} ms  PNG ${meta.host_encode_ms.toFixed(2)} ms\n${fields}`}
  finally{busy=false}}
@@ -475,6 +477,16 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                 metadata = self.metadata()
                 body = json.dumps({"events": simulation["events"]}, indent=2).encode()
                 content_type = "application/json"
+            elif self.path.startswith("/sfx/"):
+                from urllib.parse import unquote
+                name = Path(unquote(self.path.split("?", 1)[0])).name
+                project = getattr(runtime, "project", None)
+                wav = Path(project) / "assets_src" / name if project else Path()
+                if (name.endswith(".wav") and name.replace("_", "").removesuffix(".wav").isalnum()
+                        and wav.is_file()):
+                    body, metadata, content_type = wav.read_bytes(), self.metadata(), "audio/wav"
+                else:
+                    self.send_error(404); return
             else:
                 body, metadata, content_type = page, self.metadata(), "text/html; charset=utf-8"
             self.send_response(200)
@@ -490,7 +502,8 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
             if self.path == "/api/v1/input":
                 previous_actions = simulation["actions"]
                 simulation["actions"] = {key: bool(value.get(key, False))
-                    for key in ("left", "right", "jump", "back", "fire")}
+                    for key in ("left", "right", "jump", "back", "fire",
+                                "sprint", "strafe_left", "strafe_right")}
                 incoming = {int(item.get("track", 0)): item
                             for item in value.get("pointers", [])[:2]}
                 if hasattr(runtime, "pointer"):
@@ -509,6 +522,9 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                                            bool(item.get("pressed", True)))
                         runtime.action(5, simulation["actions"]["back"])
                         runtime.action(6, simulation["actions"]["fire"])
+                        runtime.action(7, simulation["actions"]["sprint"])
+                        runtime.action(8, simulation["actions"]["strafe_left"])
+                        runtime.action(9, simulation["actions"]["strafe_right"])
                 if simulation["recording"]:
                     for name, pressed in simulation["actions"].items():
                         if pressed != previous_actions.get(name, False):
