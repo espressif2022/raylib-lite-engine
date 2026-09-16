@@ -30,6 +30,10 @@ typedef struct {
     uint32_t rotated_pixels;
     uint32_t frame_lookup_hits;
     uint32_t frame_lookup_misses;
+    uint32_t column_calls;
+    uint32_t column_pixels;
+    uint32_t span_calls;
+    uint32_t span_pixels;
 } mosaico_game_2d_raster_stats_t;
 void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int height);
 void mosaico_game_2d_set_clip(int x,int y,int width,int height);
@@ -45,6 +49,17 @@ void UnloadMosaicoAtlas(MosaicoAtlas atlas);
 Texture2D Mosaico2DLoadTexture(const char *asset_path);
 void Mosaico2DUnloadTexture(Texture2D texture);
 void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,Vector2 origin,float rotation,Color tint);
+/* Opaque-atlas raycasting primitives. Alpha atlases are intentionally rejected. */
+void Mosaico2DDrawColumn(Texture2D texture, Rectangle source, int dest_x,
+                         int dest_y, int dest_width, int dest_height,
+                         unsigned light256);
+void Mosaico2DDrawSpan(Texture2D texture, Rectangle source, int dest_y,
+                       int dest_x0, int dest_x1, int u_16, int v_16,
+                       int du_16, int dv_16, unsigned light256);
+void Mosaico2DDrawFloorRow(Texture2D texture, Rectangle source, int dest_y,
+                           int dest_x, int column_width, int columns,
+                           const uint16_t *wall_bottom, int u_16, int v_16,
+                           int du_16, int dv_16, unsigned light256);
 void Mosaico2DDrawTileRow(Texture2D texture,const uint16_t *tile_ids,
     size_t tile_count,int tile_width,int tile_height,int dest_x,int dest_y);
 #ifdef __cplusplus

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "mosaico_game_2d.h"
 #include <math.h>
+#include <stdint.h>
 #include <string.h>
 #ifndef CONFIG_MOSAICO_GAME_MAX_TEXTURES
 #define CONFIG_MOSAICO_GAME_MAX_TEXTURES 12
@@ -37,6 +38,14 @@ Texture2D Mosaico2DLoadTexture(const char *path){
  return(Texture2D){0};}
 void Mosaico2DUnloadTexture(Texture2D texture){texture_slot_t*s=texture_slot(texture);if(s)memset(s,0,sizeof(*s));}
 static inline uint16_t tint565(uint16_t p,Color t){if(t.r==255&&t.g==255&&t.b==255)return p;return(uint16_t)((((p>>11)&31U)*t.r/255U)<<11|(((p>>5)&63U)*t.g/255U)<<5|((p&31U)*t.b/255U));}
+static inline uint16_t shade565(uint16_t p,unsigned light){
+ if(light>=256U)return p;
+ unsigned r=((p>>11)&31U)*light>>8,g=((p>>5)&63U)*light>>8,b=(p&31U)*light>>8;
+ return(uint16_t)((r<<11)|(g<<5)|b);
+}
+static inline void fill_shaded(uint16_t *dst,int count,uint16_t px){
+ for(int i=0;i<count;++i)dst[i]=px;
+}
 static inline uint16_t blend565(uint16_t d,uint16_t s,unsigned a){if(a>=255)return s;unsigned ia=255-a;return(uint16_t)(((((s&0xf81fU)*a+(d&0xf81fU)*ia)>>8)&0xf81fU)|((((s&0x07e0U)*a+(d&0x07e0U)*ia)>>8)&0x07e0U));}
 typedef struct{int value,base,remainder,denominator,error;} sample_step_t;
 static sample_step_t sample_step(int start,int numerator,int denominator){
@@ -195,6 +204,96 @@ void Mosaico2DDrawTileRow(Texture2D texture,const uint16_t*ids,size_t count,
   pixels+=(uint32_t)copy*(uint32_t)(y1-y0);
  }
  ++s_raster_stats.tile_row_calls;s_raster_stats.tile_row_pixels+=pixels;
+}
+static int wrap_coord(int value,int size)
+{
+ if(size<=0)return 0;
+ int wrapped=value%size;
+ return wrapped<0?wrapped+size:wrapped;
+}
+void Mosaico2DDrawColumn(Texture2D texture,Rectangle source,int dest_x,int dest_y,
+ int dest_width,int dest_height,unsigned light256)
+{
+ texture_slot_t *s=texture_slot(texture);
+ if(!s||!s_target||s->alpha||dest_width<=0||dest_height<=0||source.width==0||source.height==0)return;
+ int isw=(int)fabsf(source.width),ish=(int)fabsf(source.height);
+ if(isw<=0||ish<=0)return;
+ int source_x=(int)source.x,source_y=(int)source.y;
+ int sx=source_x+(isw>1?isw/2:0);
+ if(sx<0||sx>=s->header->width)return;
+ int x0=dest_x>s_clip_x0?dest_x:s_clip_x0;
+ int y0=dest_y>s_clip_y0?dest_y:s_clip_y0;
+ int x1=dest_x+dest_width<s_clip_x1?dest_x+dest_width:s_clip_x1;
+ int y1=dest_y+dest_height<s_clip_y1?dest_y+dest_height:s_clip_y1;
+ if(x0>=x1||y0>=y1)return;
+ unsigned light=light256>256U?256U:light256;
+ sample_step_t ystep=sample_step(y0-dest_y,ish,dest_height);
+ uint32_t drawn=0;
+ for(int y=y0;y<y1;++y){
+  int sy=sample_next(&ystep)+source_y;
+  if((unsigned)sy>=s->header->height)continue;
+  uint16_t px=shade565(s->rgb[(size_t)sy*s->header->width+(unsigned)sx],light);
+  fill_shaded(&s_target[(size_t)y*s_stride+x0],x1-x0,px);
+  drawn+=(uint32_t)(x1-x0);
+ }
+ ++s_raster_stats.column_calls;s_raster_stats.column_pixels+=drawn;
+}
+void Mosaico2DDrawSpan(Texture2D texture,Rectangle source,int dest_y,int dest_x0,
+ int dest_x1,int u_16,int v_16,int du_16,int dv_16,unsigned light256)
+{
+ texture_slot_t *s=texture_slot(texture);
+ if(!s||!s_target||s->alpha||dest_x1<=dest_x0||source.width==0||source.height==0)return;
+ if(dest_y<s_clip_y0||dest_y>=s_clip_y1)return;
+ int x0=dest_x0>s_clip_x0?dest_x0:s_clip_x0;
+ int x1=dest_x1<s_clip_x1?dest_x1:s_clip_x1;
+ if(x0>=x1)return;
+ int isw=(int)fabsf(source.width),ish=(int)fabsf(source.height);
+ if(isw<=0||ish<=0)return;
+ int source_x=(int)source.x,source_y=(int)source.y;
+ int skip=x0-dest_x0;
+ int64_t u=(int64_t)u_16+(int64_t)du_16*skip;
+ int64_t v=(int64_t)v_16+(int64_t)dv_16*skip;
+ unsigned light=light256>256U?256U:light256;
+ uint16_t *dst=&s_target[(size_t)dest_y*s_stride+x0];
+ uint32_t drawn=0;
+ for(int x=x0;x<x1;++x){
+  int uu=wrap_coord((int)(u>>16),isw),vv=wrap_coord((int)(v>>16),ish);
+  int sx=source_x+uu,sy=source_y+vv;
+  if((unsigned)sx<s->header->width&&(unsigned)sy<s->header->height){
+   *dst=shade565(s->rgb[(size_t)sy*s->header->width+(unsigned)sx],light);
+   ++drawn;
+  }
+  ++dst;u+=du_16;v+=dv_16;
+ }
+ ++s_raster_stats.span_calls;s_raster_stats.span_pixels+=drawn;
+}
+void Mosaico2DDrawFloorRow(Texture2D texture,Rectangle source,int dest_y,int dest_x,
+ int column_width,int columns,const uint16_t *wall_bottom,int u_16,int v_16,
+ int du_16,int dv_16,unsigned light256)
+{
+ texture_slot_t *s=texture_slot(texture);
+ if(!s||!s_target||s->alpha||column_width<=0||columns<=0||source.width==0||source.height==0)return;
+ if(dest_y<s_clip_y0||dest_y>=s_clip_y1)return;
+ int isw=(int)fabsf(source.width),ish=(int)fabsf(source.height);
+ if(isw<=0||ish<=0)return;
+ int source_x=(int)source.x,source_y=(int)source.y;
+ unsigned light=light256>256U?256U:light256;
+ uint32_t drawn=0;
+ int64_t u=u_16,v=v_16;
+ for(int column=0;column<columns;++column,u+=du_16,v+=dv_16){
+  if(wall_bottom&&dest_y<(int)wall_bottom[column])continue;
+  int left=dest_x+column*column_width;
+  int x0=left>s_clip_x0?left:s_clip_x0;
+  int x1=left+column_width<s_clip_x1?left+column_width:s_clip_x1;
+  if(x0>=x1)continue;
+  int uu=wrap_coord((int)(u>>16),isw),vv=wrap_coord((int)(v>>16),ish);
+  int sx=source_x+uu,sy=source_y+vv;
+  if((unsigned)sx>=s->header->width||(unsigned)sy>=s->header->height)continue;
+  uint16_t px=shade565(s->rgb[(size_t)sy*s->header->width+(unsigned)sx],light);
+  fill_shaded(&s_target[(size_t)dest_y*s_stride+x0],x1-x0,px);
+  drawn+=(uint32_t)(x1-x0);
+ }
+ ++s_raster_stats.span_calls;s_raster_stats.span_pixels+=drawn;
 }
 MosaicoAtlas LoadMosaicoAtlas(const char*path){Texture2D t=Mosaico2DLoadTexture(path);texture_slot_t*s=texture_slot(t);return(MosaicoAtlas){.texture=t,.descriptor=s?s->header:NULL,.frame_count=s?s->header->frame_count:0};}
 static const atlas_frame_t*find_frame(texture_slot_t*s,mosaico_asset_id_t id){
