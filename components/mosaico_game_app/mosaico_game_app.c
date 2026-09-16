@@ -157,7 +157,8 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
     if (config->after_healthy) ESP_ERROR_CHECK(config->after_healthy());
     ESP_ERROR_CHECK(xTaskCreate(touch_task, "game_touch", 4096, NULL, 5, NULL) == pdPASS
                     ? ESP_OK : ESP_ERR_NO_MEM);
-    TickType_t wake = xTaskGetTickCount();
+    int64_t previous_us = esp_timer_get_time();
+    int64_t tick_credit = 1000000; /* One immediate tick; units are microseconds * Hz. */
     uint32_t frames = 0;
     uint32_t stats_interval = config->stats_interval ? config->stats_interval : 100;
     while (!WindowShouldClose()) {
@@ -174,16 +175,36 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
             mosaico_action_apply_event(&event);
             if (config->on_event) config->on_event(&event);
         }
-        mosaico_action_begin_frame();
         uint32_t input_us = (uint32_t)(esp_timer_get_time() - input_started);
         if (config->idle && config->idle()) {
-            vTaskDelayUntil(&wake, pdMS_TO_TICKS(1000 / game_config.target_fps));
+            tick_credit = 1000000;
+            vTaskDelay(1);
+            previous_us = esp_timer_get_time();
             continue;
         }
-        int64_t started = esp_timer_get_time();
-        if (config->on_update) config->on_update();
-        uint32_t update_us = (uint32_t)(esp_timer_get_time() - started);
-        MosaicoGameRecordLogic(input_us, update_us);
+        int64_t now_us = esp_timer_get_time();
+        tick_credit += (now_us - previous_us) * game_config.target_fps;
+        previous_us = now_us;
+        /* Bound catch-up to three updates: avoid a spiral after long stalls.
+         * Preserve the fractional phase when discarding excessive backlog. */
+        if (tick_credit >= 4000000) tick_credit = 3000000 + tick_credit % 1000000;
+        if (tick_credit < 1000000) {
+            vTaskDelay(1);
+            continue; /* Retain pending input edges until an update consumes them. */
+        }
+        uint32_t update_us = 0;
+        int64_t started;
+        while (tick_credit >= 1000000) {
+            mosaico_action_begin_frame();
+            started = esp_timer_get_time();
+            if (config->on_update) config->on_update();
+            uint32_t step_us = (uint32_t)(esp_timer_get_time() - started);
+            update_us += step_us;
+            MosaicoGameRecordLogic(input_us, step_us);
+            input_us = 0;
+            MosaicoFastConsumeInputEdges();
+            tick_credit -= 1000000;
+        }
         started = esp_timer_get_time();
         config->on_render();
         MosaicoGameRecordTiming(update_us, (uint32_t)(esp_timer_get_time() - started));
@@ -191,7 +212,7 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
             mosaico_game_debug_log(tag);
             if (config->on_stats) config->on_stats();
         }
-        vTaskDelayUntil(&wake, pdMS_TO_TICKS(1000 / game_config.target_fps));
+        vTaskDelay(1); /* Yield to system tasks even while render is overloaded. */
     }
     return ESP_OK;
 }

@@ -34,11 +34,23 @@ typedef struct {
     uint32_t column_pixels;
     uint32_t span_calls;
     uint32_t span_pixels;
+    uint32_t sky_us;
+    uint32_t floor_us;
+    uint32_t wall_us;
+    uint32_t enemy_us;
+    uint32_t hud_us;
 } mosaico_game_2d_raster_stats_t;
+typedef struct {
+    int dest_x, dest_y, dest_width, dest_height;
+    int src_x, src_y, src_width, src_height;
+    unsigned light256;
+} mosaico_raycast_wall_t;
 void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int height);
 void mosaico_game_2d_set_clip(int x,int y,int width,int height);
 void mosaico_game_2d_reset_raster_stats(void);
 void mosaico_game_2d_get_raster_stats(mosaico_game_2d_raster_stats_t *out_stats);
+void mosaico_game_2d_set_phase_us(uint32_t sky_us, uint32_t floor_us, uint32_t wall_us,
+                                  uint32_t enemy_us, uint32_t hud_us);
 MosaicoAtlas LoadMosaicoAtlas(const char *asset_path);
 const MosaicoSpriteFrame *MosaicoAtlasGetFrame(MosaicoAtlas atlas,mosaico_asset_id_t frame_id);
 esp_err_t mosaico_game_2d_atlas_get_frame(MosaicoAtlas atlas,
@@ -60,6 +72,13 @@ void Mosaico2DDrawFloorRow(Texture2D texture, Rectangle source, int dest_y,
                            int dest_x, int column_width, int columns,
                            const uint16_t *wall_bottom, int u_16, int v_16,
                            int du_16, int dv_16, unsigned light256);
+void Mosaico2DDrawFloorRows(Texture2D texture, Rectangle source, int dest_y,
+                            int dest_x, int column_width, int columns,
+                            const uint16_t *wall_bottom, int u_16, int v_16,
+                            int du_16, int dv_16, unsigned light256, int row_repeat);
+void Mosaico2DCopyScanline(int src_y, int dst_y);
+void Mosaico2DDrawRaycastWalls(Texture2D texture,
+                               const mosaico_raycast_wall_t *columns, int column_count);
 void Mosaico2DDrawTileRow(Texture2D texture,const uint16_t *tile_ids,
     size_t tile_count,int tile_width,int tile_height,int dest_x,int dest_y);
 #ifdef __cplusplus

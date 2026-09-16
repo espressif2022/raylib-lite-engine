@@ -71,6 +71,11 @@ class RasterStats(ctypes.Structure):
         ("column_pixels", ctypes.c_uint32),
         ("span_calls", ctypes.c_uint32),
         ("span_pixels", ctypes.c_uint32),
+        ("sky_us", ctypes.c_uint32),
+        ("floor_us", ctypes.c_uint32),
+        ("wall_us", ctypes.c_uint32),
+        ("enemy_us", ctypes.c_uint32),
+        ("hud_us", ctypes.c_uint32),
     ]
 
 def load_replay(path: Path | None) -> list[dict[str, object]]:

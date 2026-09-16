@@ -50,6 +50,8 @@ void MosaicoFastInjectImu(float x, float y, float z);
 void MosaicoFastBeginDrawing(void);
 bool MosaicoFastFrameAvailable(void);
 void MosaicoFastEndDrawing(void);
+/* Consume one-shot edges after a logic tick; held input remains active. */
+void MosaicoFastConsumeInputEdges(void);
 void MosaicoFastBeginMode2D(Camera2D camera);
 void MosaicoFastEndMode2D(void);
 Vector2 MosaicoFastGetWorldToScreen2D(Vector2 position, Camera2D camera);

@@ -223,6 +223,16 @@ void MosaicoFastBeginDrawing(void)
 
 bool MosaicoFastFrameAvailable(void) { return s_pixels != NULL; }
 
+void MosaicoFastConsumeInputEdges(void)
+{
+    memset(s_key_pressed, 0, sizeof(s_key_pressed));
+    memset(s_key_released, 0, sizeof(s_key_released));
+    for (int i = 0; i < MOSAICO_FAST_POINTER_COUNT; ++i) {
+        s_pointers[i].pressed = false;
+        s_pointers[i].released = false;
+    }
+}
+
 void MosaicoFastEndDrawing(void)
 {
     if (s_pixels) (void)mosaico_raylib_port_present_frame();
@@ -232,12 +242,7 @@ void MosaicoFastEndDrawing(void)
     s_camera_active = false;
     s_scissor_active = false;
     ++s_presented_frames;
-    memset(s_key_pressed, 0, sizeof(s_key_pressed));
-    memset(s_key_released, 0, sizeof(s_key_released));
-    for (int i = 0; i < MOSAICO_FAST_POINTER_COUNT; ++i) {
-        s_pointers[i].pressed = false;
-        s_pointers[i].released = false;
-    }
+    MosaicoFastConsumeInputEdges();
 }
 
 void MosaicoFastBeginScissorMode(int x, int y, int width, int height)
