@@ -359,11 +359,15 @@ def _output_file(root: Path, value: str, suffix: str) -> Path:
 
 
 def compile_assets(source: Path, output: Path, manifest_file: Path,
-                   limit: int = 1024 * 1024) -> dict:
+                   limit: int | None = None) -> dict:
     """Compile one versioned project manifest into runtime assets."""
     manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
     if manifest.get("schema") != "mosaico-game-assets/v1":
         raise ValueError("unsupported game asset manifest schema")
+    if limit is None:
+        limit = int(manifest.get("limit_bytes", 1024 * 1024))
+    if limit <= 0:
+        raise ValueError("asset payload limit must be positive")
     output.mkdir(parents=True, exist_ok=True)
     for stale in output.iterdir():
         if stale.is_file() and stale.suffix in {".atlas", ".map", ".sound"}:
@@ -426,7 +430,7 @@ def main() -> int:
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--manifest", type=Path)
-    parser.add_argument("--limit", type=int, default=1024 * 1024)
+    parser.add_argument("--limit", type=int)
     args = parser.parse_args()
     manifest_file = args.manifest or args.source / "game_assets.json"
     summary = compile_assets(args.source, args.output, manifest_file, args.limit)
