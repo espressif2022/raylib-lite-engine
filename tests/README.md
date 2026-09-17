@@ -1,5 +1,36 @@
 # RGB565 raster regression
 
+## Generic solid primitives
+
+```sh
+python3 tests/test_primitives.py
+CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' python3 tests/test_primitives.py
+FAST_TEST_SOURCE=/path/to/previous/mosaico_raylib_fast.c python3 tests/test_primitives.py
+```
+
+The standalone suite has no game dependency. It checks rectangles, filled
+circles and filled ellipses against a scalar reference with all 256 alpha
+values (768 cases), negative/offscreen origins, scissor clipping, varied
+background colors, zero radius and padded/alternately aligned framebuffer rows.
+It compares the entire buffer, including padding. The reference preserves the
+existing RGB565 channel expansion and `/255` truncation, rather than assuming
+an approximate blend is equivalent. Circle masks use an independent squared
+distance test; ellipse coverage retains the established half-pixel convention.
+
+These primitives share a clipped horizontal span writer. Opaque spans use
+paired stores; alpha spans prepare constant source products once per primitive
+and blend contiguous destination pixels without per-pixel clipping checks.
+The implementation is scalar C shared by Host and device, allocates no heap,
+and keeps public APIs and painter ordering unchanged. Triangle and outline
+rasterization are not changed by this optimization.
+
+The six printed benchmarks cover opaque/alpha variants of each primitive,
+500 draws each. Times are informational Host CPU measurements; they do not
+establish device FPS or PSRAM bandwidth. Compare old/new sources with identical
+compiler settings and validate device behavior separately.
+
+## Textured raster paths
+
 Run from the engine repository:
 
 ```sh
@@ -27,6 +58,16 @@ implementation is shared by Host and device; no SIMD dependency is introduced.
 
 Device verification must additionally measure PSRAM/cache behavior and worst-case
 combat scenes. A faster Host kernel does not establish device frame rate.
+
+Opaque scaling adds 100 independent reference comparisons covering both source
+flips, clipped integer destinations, invalid source edges, widths crossing the
+64-entry lookup boundary, and framebuffer stride padding. The optimized path
+precomputes horizontal source indices in a bounded 256-byte stack workspace;
+it preserves nearest-neighbor sampling and performs no allocation. This path
+only handles unrotated opaque textures with white tint. The additional 500-frame
+benchmark scales an 8x8 texture to 480x205; it measures sampler overhead with a
+small source, not realistic atlas cache behavior. Validate that separately on
+the device before claiming an application speedup.
 
 Floor and span regression adds 400 comparisons against a modulo-based oracle:
 negative texture coordinates, power-of-two and arbitrary texture sizes, source

@@ -87,11 +87,34 @@ int main(int argc,char **argv){
    assert(!memcmp(actual,expected,sizeof(actual)));
   }
  }
+ /* Opaque scaling oracle: flipped sources, clipping, invalid atlas edges,
+  * integer destinations and widths spanning multiple lookup blocks. */
+ for(int trial=0;trial<100;trial++){
+  int dx=trial%30-15,dy=trial%20-10,dw=65+trial*3,dh=15+trial;
+  int sx0=trial%5-1,sy0=trial%4-1,sw=trial%7+1,sh=trial%6+1;
+  bool fx=(trial&1)!=0,fy=(trial&2)!=0;
+  memset(actual,0x5a,sizeof(actual));memset(expected,0x5a,sizeof(expected));
+  mosaico_game_2d_set_clip(3,2,W-8,W-5);
+  for(int y=2;y<W-3;y++)for(int x=3;x<W-5;x++){
+   if(x<dx||x>=dx+dw||y<dy||y>=dy+dh)continue;
+   int sx=(x-dx)*sw/dw,sy=(y-dy)*sh/dh;
+   sx=sx0+(fx?sw-1-sx:sx);sy=sy0+(fy?sh-1-sy:sy);
+   if((unsigned)sx<8&&(unsigned)sy<8)expected[y*STRIDE+x]=pixel(sx,sy);
+  }
+  Mosaico2DDrawTexturePro(texture,(Rectangle){sx0,sy0,fx?-sw:sw,fy?-sh:sh},
+    (Rectangle){dx,dy,dw,dh},(Vector2){0,0},0,(Color){255,255,255,255});
+  assert(!memcmp(actual,expected,sizeof(actual)));
+ }
  mosaico_game_2d_set_clip(0,0,W,W);
  for(int i=0;i<240;i++)columns[i]=(mosaico_raycast_wall_t){i*2,-30,2,450,i%8,0,1,8,160};
  clock_t start=clock();
  for(int i=0;i<500;i++)Mosaico2DDrawRaycastWalls(texture,columns,240);
- printf("100 randomized oracle cases passed; wall benchmark %.3f ms/frame\n",
+ printf("100 wall, 400 floor/span, 100 opaque-scale oracle cases passed; wall benchmark %.3f ms/frame\n",
+  (double)(clock()-start)*1000/CLOCKS_PER_SEC/500);
+ start=clock();
+ for(int i=0;i<500;i++)Mosaico2DDrawTexturePro(texture,(Rectangle){0,0,8,8},
+  (Rectangle){0,0,480,205},(Vector2){0,0},0,(Color){255,255,255,255});
+ printf("opaque scale benchmark %.3f ms/frame (Host CPU, informational only)\n",
   (double)(clock()-start)*1000/CLOCKS_PER_SEC/500);
  return 0;
 }

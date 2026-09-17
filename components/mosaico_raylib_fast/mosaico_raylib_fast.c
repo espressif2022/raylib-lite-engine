@@ -79,6 +79,49 @@ static inline uint16_t rgb565(Color c)
                       ((uint16_t)(c.g & 0xfcU) << 3) | (c.b >> 3));
 }
 
+/* Constant-color spans share preparation across rows. Keep the exact /255
+ * blend used by put_pixel; quantizing alpha would change layered UI output. */
+typedef struct {
+    uint16_t pixel;
+    unsigned alpha, inverse, red, green, blue;
+} span_paint_t;
+
+static span_paint_t span_paint(Color c)
+{
+    return (span_paint_t){rgb565(c), c.a, 255U-c.a,
+                          c.r*c.a, c.g*c.a, c.b*c.a};
+}
+
+static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
+{
+    if (!s_pixels || !paint->alpha || (unsigned)y >= MOSAICO_GAME_HEIGHT) return;
+    if (x0 < 0) x0 = 0;
+    if (x1 > MOSAICO_GAME_WIDTH) x1 = MOSAICO_GAME_WIDTH;
+    if (s_scissor_active) {
+        if (y < s_scissor_y0 || y >= s_scissor_y1) return;
+        if (x0 < s_scissor_x0) x0 = s_scissor_x0;
+        if (x1 > s_scissor_x1) x1 = s_scissor_x1;
+    }
+    if (x0 >= x1) return;
+    uint16_t *dst = s_pixels + (size_t)y*s_stride + x0;
+    int count = x1-x0;
+    if (paint->alpha == 255) {
+        uint16_t pixel = paint->pixel;
+        uint32_t pair = (uint32_t)pixel | ((uint32_t)pixel << 16);
+        if ((uintptr_t)dst & 3U) { *dst++ = pixel; --count; }
+        while (count >= 2) { memcpy(dst, &pair, sizeof(pair)); dst += 2; count -= 2; }
+        if (count) *dst = pixel;
+    } else {
+        for (int i = 0; i < count; ++i) {
+            unsigned old = dst[i];
+            unsigned r = ((old >> 11)*8U*paint->inverse + paint->red)/255U;
+            unsigned g = (((old >> 5)&63U)*4U*paint->inverse + paint->green)/255U;
+            unsigned b = ((old&31U)*8U*paint->inverse + paint->blue)/255U;
+            dst[i] = (uint16_t)(((r&0xf8U)<<8) | ((g&0xfcU)<<3) | (b>>3));
+        }
+    }
+}
+
 static inline void put_pixel(int x, int y, Color color)
 {
     if (!s_pixels || (unsigned)x >= MOSAICO_GAME_WIDTH ||
@@ -346,20 +389,8 @@ void MosaicoFastDrawRectangle(int x, int y, int width, int height, Color color)
         if (y1 > s_scissor_y1) y1 = s_scissor_y1;
     }
     if (x0 >= x1 || y0 >= y1) return;
-    if (color.a != 255) {
-        for (int yy=y0; yy<y1; ++yy) for (int xx=x0; xx<x1; ++xx)
-            put_pixel(xx, yy, color);
-        return;
-    }
-    uint16_t px = rgb565(color);
-    uint32_t pair = (uint32_t)px | ((uint32_t)px << 16);
-    for (int yy=y0; yy<y1; ++yy) {
-        uint16_t *dst = s_pixels + (size_t)yy*s_stride + x0;
-        int count = x1 - x0;
-        if (((uintptr_t)dst & 3U) && count) { *dst++ = px; --count; }
-        while (count >= 2) { memcpy(dst, &pair, sizeof(pair)); dst += 2; count -= 2; }
-        if (count) *dst = px;
-    }
+    span_paint_t paint = span_paint(color);
+    for (int yy=y0; yy<y1; ++yy) fill_span(yy, x0, x1, &paint);
 }
 
 void MosaicoFastDrawRectangleV(Vector2 position,Vector2 size,Color color)
@@ -477,9 +508,10 @@ void MosaicoFastDrawCircle(int center_x, int center_y, float radius, Color color
     Vector2 center=active_to_screen((Vector2){(float)center_x,(float)center_y});
     int r=(int)(radius*(s_camera_active?s_camera.zoom:1.0f));
     int rr=r*r;
+    span_paint_t paint = span_paint(color);
     for(int y=-r;y<=r;++y){
         int span=(int)sqrtf((float)(rr-y*y));
-        for(int x=-span;x<=span;++x)put_pixel((int)center.x+x,(int)center.y+y,color);
+        fill_span((int)center.y+y, (int)center.x-span, (int)center.x+span+1, &paint);
     }
 }
 
@@ -510,6 +542,7 @@ static void draw_ellipse(Vector2 center,float rh,float rv,Color color,bool outli
     rh=fabsf(rh*zoom);rv=fabsf(rv*zoom);
     if(rh<.5f||rv<.5f)return;
     int hy=(int)ceilf(rv);
+    span_paint_t paint = span_paint(color);
     for(int y=-hy;y<=hy;++y){
         float ny=(y+.5f)/rv,remain=1-ny*ny;
         if(remain<0)continue;
@@ -517,7 +550,7 @@ static void draw_ellipse(Vector2 center,float rh,float rv,Color color,bool outli
         if(outline){
             put_pixel((int)center.x-span,(int)center.y+y,color);
             put_pixel((int)center.x+span,(int)center.y+y,color);
-        }else for(int x=-span;x<=span;++x)put_pixel((int)center.x+x,(int)center.y+y,color);
+        }else fill_span((int)center.y+y, (int)center.x-span, (int)center.x+span+1, &paint);
     }
 }
 

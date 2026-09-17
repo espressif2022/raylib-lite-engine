@@ -101,18 +101,26 @@ void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,V
   int left=(int)(dest.x-origin.x),top=(int)(dest.y-origin.y),isw=(int)sw,ish=(int)sh;
   int source_x=(int)source.x,source_y=(int)source.y;
   int first_lx=x0-left,first_ly=y0-top;
-  sample_step_t ystep=sample_step(first_ly,ish,dh);
   uint32_t drawn=0;
-  for(int y=y0;y<y1;++y){
-   int sy=sample_next(&ystep);if(fy)sy=ish-1-sy;sy+=source_y;
-   if((unsigned)sy>=s->header->height)continue;
-   sample_step_t xstep=sample_step(first_lx,isw,dw);
-   uint16_t*dst=&s_target[(size_t)y*s_stride+x0];
-   for(int x=x0;x<x1;++x){
+  /* Bounded horizontal lookup: sample X once per block, not once per row.
+   * Keep exact rational sampling and the existing out-of-atlas skip behavior. */
+  sample_step_t xstep=sample_step(first_lx,isw,dw);
+  for(int left_x=x0;left_x<x1;){
+   int samples[64],count=x1-left_x;
+   if(count>64)count=64;
+   for(int i=0;i<count;++i){
     int sx=sample_next(&xstep);if(fx)sx=isw-1-sx;sx+=source_x;
-    if((unsigned)sx<s->header->width){*dst=s->rgb[(size_t)sy*s->header->width+sx];++drawn;}
-    ++dst;
+    samples[i]=(unsigned)sx<s->header->width?sx:-1;
    }
+   sample_step_t ystep=sample_step(first_ly,ish,dh);
+   for(int y=y0;y<y1;++y){
+    int sy=sample_next(&ystep);if(fy)sy=ish-1-sy;sy+=source_y;
+    if((unsigned)sy>=s->header->height)continue;
+    const uint16_t *src=s->rgb+(size_t)sy*s->header->width;
+    uint16_t *dst=s_target+(size_t)y*s_stride+left_x;
+    for(int i=0;i<count;++i)if(samples[i]>=0){dst[i]=src[samples[i]];++drawn;}
+   }
+   left_x+=count;
   }
   ++s_raster_stats.opaque_scale_calls;s_raster_stats.opaque_scale_pixels+=drawn;
   return;
