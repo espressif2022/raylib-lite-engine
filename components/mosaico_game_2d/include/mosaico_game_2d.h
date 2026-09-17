@@ -59,6 +59,9 @@ mosaico_asset_id_t MosaicoAnimationFrameAt(const mosaico_asset_id_t *frames,
     size_t frame_count,uint32_t frame_ticks,uint32_t elapsed_ticks,bool loop);
 void UnloadMosaicoAtlas(MosaicoAtlas atlas);
 Texture2D Mosaico2DLoadTexture(const char *asset_path);
+/* Register an already-decoded, tightly packed RGB565 surface. The caller owns
+ * the pixels and must keep them alive until Mosaico2DUnloadTexture(). */
+Texture2D Mosaico2DRegisterRGB565(const uint16_t *pixels, int width, int height);
 void Mosaico2DUnloadTexture(Texture2D texture);
 void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,Vector2 origin,float rotation,Color tint);
 /* Opaque-atlas raycasting primitives. Alpha atlases are intentionally rejected. */

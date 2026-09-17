@@ -13,7 +13,7 @@
 typedef struct __attribute__((packed)){uint32_t magic;uint16_t width,height,frame_count,flags;uint32_t rgb_bytes,alpha_bytes;} atlas_header_t;
 typedef struct __attribute__((packed)){uint32_t id;uint16_t x,y,width,height;int16_t pivot_x,pivot_y;} atlas_frame_t;
 typedef struct{uint32_t id;uint16_t index_plus_one;} frame_cache_entry_t;
-typedef struct{bool used;mosaico_asset_view_t asset;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;const uint8_t *alpha;frame_cache_entry_t frame_cache[M2D_FRAME_CACHE_SIZE];} texture_slot_t;
+typedef struct{bool used;mosaico_asset_view_t asset;atlas_header_t external_header;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;const uint8_t *alpha;frame_cache_entry_t frame_cache[M2D_FRAME_CACHE_SIZE];} texture_slot_t;
 static texture_slot_t s_textures[M2D_MAX_TEXTURES];
 static uint16_t *s_target;static size_t s_stride;static int s_target_width,s_target_height;
 static int s_clip_x0,s_clip_y0,s_clip_x1,s_clip_y1;
@@ -40,6 +40,17 @@ Texture2D Mosaico2DLoadTexture(const char *path){
  const atlas_header_t *h=(const atlas_header_t*)asset.data;size_t fb=(size_t)h->frame_count*sizeof(atlas_frame_t),expected=sizeof(*h)+fb+h->rgb_bytes+h->alpha_bytes;
  if(h->magic!=M2D_MAGIC||!h->width||!h->height||expected>asset.size||h->rgb_bytes!=(uint32_t)h->width*h->height*2U)return(Texture2D){0};
  for(unsigned i=0;i<M2D_MAX_TEXTURES;++i)if(!s_textures[i].used){texture_slot_t *s=&s_textures[i];s->used=true;s->asset=asset;s->header=h;s->frames=(const atlas_frame_t*)(asset.data+sizeof(*h));s->rgb=(const uint16_t*)(asset.data+sizeof(*h)+fb);s->alpha=h->alpha_bytes?asset.data+sizeof(*h)+fb+h->rgb_bytes:NULL;return(Texture2D){.id=i+1U,.width=h->width,.height=h->height,.mipmaps=1,.format=PIXELFORMAT_UNCOMPRESSED_R5G6B5};}
+ return(Texture2D){0};}
+Texture2D Mosaico2DRegisterRGB565(const uint16_t *pixels,int width,int height){
+ if(!pixels||width<=0||height<=0||width>65535||height>65535)return(Texture2D){0};
+ for(unsigned i=0;i<M2D_MAX_TEXTURES;++i)if(!s_textures[i].used){
+  texture_slot_t *s=&s_textures[i];memset(s,0,sizeof(*s));s->used=true;
+  s->external_header=(atlas_header_t){.magic=M2D_MAGIC,.width=(uint16_t)width,
+   .height=(uint16_t)height,.rgb_bytes=(uint32_t)width*(uint32_t)height*2U};
+  s->header=&s->external_header;s->rgb=pixels;
+  return(Texture2D){.id=i+1U,.width=width,.height=height,.mipmaps=1,
+   .format=PIXELFORMAT_UNCOMPRESSED_R5G6B5};
+ }
  return(Texture2D){0};}
 void Mosaico2DUnloadTexture(Texture2D texture){texture_slot_t*s=texture_slot(texture);if(s)memset(s,0,sizeof(*s));}
 static inline uint16_t tint565(uint16_t p,Color t){if(t.r==255&&t.g==255&&t.b==255)return p;return(uint16_t)((((p>>11)&31U)*t.r/255U)<<11|(((p>>5)&63U)*t.g/255U)<<5|((p&31U)*t.b/255U));}
