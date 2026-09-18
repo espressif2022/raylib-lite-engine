@@ -262,6 +262,7 @@ void MosaicoFastBeginDrawing(void)
     (void)mosaico_raylib_port_begin_frame(&s_pixels, &s_stride);
     mosaico_game_2d_set_target(s_pixels, s_stride, MOSAICO_GAME_WIDTH,
                                MOSAICO_GAME_HEIGHT);
+    mosaico_game_2d_reset_raster_stats();
 }
 
 bool MosaicoFastFrameAvailable(void) { return s_pixels != NULL; }
@@ -466,10 +467,17 @@ void MosaicoFastDrawLineEx(Vector2 start, Vector2 end, float thick, Color color)
     start = active_to_screen(start);
     end = active_to_screen(end);
     if (s_camera_active) thick *= s_camera.zoom;
-    if (thick <= 1.0f) {
+    if (thick <= 1.6f) {
         bool camera = s_camera_active;
         s_camera_active = false;
         MosaicoFastDrawLine((int)start.x, (int)start.y, (int)end.x, (int)end.y, color);
+        if (thick > 1.05f) {
+            float dx=end.x-start.x, dy=end.y-start.y;
+            if (fabsf(dx) >= fabsf(dy))
+                MosaicoFastDrawLine((int)start.x, (int)start.y+1, (int)end.x, (int)end.y+1, color);
+            else
+                MosaicoFastDrawLine((int)start.x+1, (int)start.y, (int)end.x+1, (int)end.y, color);
+        }
         s_camera_active = camera;
         return;
     }

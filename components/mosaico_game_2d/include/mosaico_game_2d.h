@@ -39,6 +39,10 @@ typedef struct {
     uint32_t wall_us;
     uint32_t enemy_us;
     uint32_t hud_us;
+    uint32_t triangle_calls;
+    uint32_t triangle_pixels;
+    uint32_t triangle_direct_pixels;
+    uint32_t triangle_mirror_pixels;
 } mosaico_game_2d_raster_stats_t;
 typedef struct {
     int dest_x, dest_y, dest_width, dest_height;

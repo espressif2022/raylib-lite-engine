@@ -76,6 +76,10 @@ class RasterStats(ctypes.Structure):
         ("wall_us", ctypes.c_uint32),
         ("enemy_us", ctypes.c_uint32),
         ("hud_us", ctypes.c_uint32),
+        ("triangle_calls", ctypes.c_uint32),
+        ("triangle_pixels", ctypes.c_uint32),
+        ("triangle_direct_pixels", ctypes.c_uint32),
+        ("triangle_mirror_pixels", ctypes.c_uint32),
     ]
 
 def load_replay(path: Path | None) -> list[dict[str, object]]:
@@ -165,6 +169,7 @@ class GenericHostRuntime:
             ENGINE_ROOT / "host/host_raylib_port.c",
             ENGINE_ROOT / "host/host_asset_runtime.c",
             ENGINE_ROOT / "components/mosaico_game_2d/mosaico_game_2d.c",
+            ENGINE_ROOT / "components/mosaico_game_2d/mosaico_rgb565.c",
             ENGINE_ROOT / "components/mosaico_raylib_fast/mosaico_raylib_fast.c",
             ENGINE_ROOT / "components/mosaico_game_fx/mosaico_game_fx.c",
             ENGINE_ROOT / "components/mosaico_game_tilemap/mosaico_game_tilemap.c",
@@ -178,7 +183,7 @@ class GenericHostRuntime:
                     project / "main", project / "assets/generated",
                     project / "managed_components/georgik__raylib/include",
                     project / "managed_components/georgik__raylib/raylib/src"]
-        command = [_host_compiler(), "-shared", "-O2", "-std=c11", "-Wall",
+        command = [_host_compiler(), "-shared", "-O3", "-funroll-loops", "-std=c11", "-Wall",
                    "-Wextra", "-Werror", "-DMOSAICO_HOST_SIMULATION=1",
                    *(str(path) for path in sources)]
         if os.name != "nt":

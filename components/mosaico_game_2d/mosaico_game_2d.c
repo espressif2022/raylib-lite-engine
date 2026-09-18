@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "mosaico_game_2d.h"
+#include "mosaico_rgb565.h"
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
 #ifndef CONFIG_MOSAICO_GAME_MAX_TEXTURES
 #define CONFIG_MOSAICO_GAME_MAX_TEXTURES 12
+#endif
+#if defined(ESP_PLATFORM)
+#include "esp_attr.h"
+#define M2D_HOT IRAM_ATTR
+#else
+#define M2D_HOT
 #endif
 #define M2D_MAX_TEXTURES CONFIG_MOSAICO_GAME_MAX_TEXTURES
 #define M2D_MAGIC 0x3141534dU
@@ -61,15 +68,13 @@ static inline unsigned quantize_light(unsigned light256)
  if(light>=248U)return 256U;
  return(light+8U)&~15U;
 }
-static inline uint16_t shade565(uint16_t p,unsigned light){
- if(light>=256U)return p;
- unsigned r=((p>>11)&31U)*light>>8,g=((p>>5)&63U)*light>>8,b=(p&31U)*light>>8;
- return(uint16_t)((r<<11)|(g<<5)|b);
+static inline uint16_t shade565(uint16_t p,unsigned light)
+{
+ return mosaico_shade565(p,light);
 }
-static inline void fill_shaded(uint16_t *dst,int count,uint16_t px){
- if(count==2){dst[0]=dst[1]=px;return;}
- if(count==4){dst[0]=dst[1]=dst[2]=dst[3]=px;return;}
- for(int i=0;i<count;++i)dst[i]=px;
+static inline void fill_shaded(uint16_t *dst,int count,uint16_t px)
+{
+ mosaico_fill_rgb565(dst,px,(size_t)count);
 }
 static inline uint16_t blend565(uint16_t d,uint16_t s,unsigned a){if(a>=255)return s;unsigned ia=255-a;return(uint16_t)(((((s&0xf81fU)*a+(d&0xf81fU)*ia)>>8)&0xf81fU)|((((s&0x07e0U)*a+(d&0x07e0U)*ia)>>8)&0x07e0U));}
 typedef struct{int value,base,remainder,denominator,error;} sample_step_t;
@@ -102,8 +107,8 @@ void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,V
   int sx=(int)source.x+(x0-left),sy=(int)source.y+(y0-top),copy=x1-x0;
   if(copy>0&&sx>=0&&sy>=0&&sx+copy<=s->header->width&&
      sy+(y1-y0)<=s->header->height){
-   for(int y=y0;y<y1;++y,++sy)memcpy(&s_target[(size_t)y*s_stride+x0],
-      &s->rgb[(size_t)sy*s->header->width+sx],(size_t)copy*sizeof(uint16_t));
+   for(int y=y0;y<y1;++y,++sy)mosaico_copy_rgb565(&s_target[(size_t)y*s_stride+x0],
+      &s->rgb[(size_t)sy*s->header->width+sx],(size_t)copy);
    ++s_raster_stats.opaque_copy_calls;
    s_raster_stats.opaque_copy_pixels+=(uint32_t)copy*(uint32_t)(y1-y0);
    return;
@@ -154,7 +159,7 @@ void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,V
      while(x<copy&&!mask[x])++x;
      int start=x;
      while(x<copy&&mask[x])++x;
-     if(start<x){memcpy(dst+start,src+start,(size_t)(x-start)*sizeof(uint16_t));
+     if(start<x){mosaico_copy_rgb565(dst+start,src+start,(size_t)(x-start));
       drawn+=(uint32_t)(x-start);}
     }
    }
@@ -246,7 +251,66 @@ static inline void mirror_fixed_advance(mirror_fixed_step_t *state)
  else if(state->phase>=state->period)state->phase-=state->period;
 }
 
-typedef struct { float x,u,v,dx,du,dv; } triangle_scan_edge_t;
+static int32_t fixed_from_float(float value)
+{
+ return (int32_t)(value * 65536.0f + (value >= 0 ? 0.5f : -0.5f));
+}
+
+static int32_t mul_fixed(int32_t a,int32_t b)
+{
+ return (int32_t)(((int64_t)a*(int64_t)b)>>16);
+}
+
+/* ceil(value - 0.5) without libm. Pixel coverage must stay identical. */
+static int raster_ceil_half(float value)
+{
+ float t=value-0.5f;
+ int i=(int)t;
+ if(t>0.0f&&t!=(float)i)return i+1;
+ return i;
+}
+
+static int raster_ceil_fixed(int32_t x_16)
+{
+ int64_t t=(int64_t)x_16-32768;
+ if(t>=0)return (int)((t+65535)>>16);
+ return (int)(-((-t)>>16));
+}
+
+static int uv_band(float value, float edge)
+{
+ if (edge <= 1.0f) return 0;
+ return (int)floorf(value / edge);
+}
+
+static float uv_in_band(float value, float edge, int band)
+{
+ if (band & 1) return (float)(band + 1) * edge - value;
+ return value - (float)band * edge;
+}
+
+static void fold_triangle_uv(mosaico_textured_vertex_t *a, mosaico_textured_vertex_t *b,
+ mosaico_textured_vertex_t *c, float max_u, float max_v)
+{
+ if (max_u > 1.0f) {
+  int band=uv_band(a->u,max_u);
+  if (band==uv_band(b->u,max_u) && band==uv_band(c->u,max_u)) {
+   a->u=uv_in_band(a->u,max_u,band);
+   b->u=uv_in_band(b->u,max_u,band);
+   c->u=uv_in_band(c->u,max_u,band);
+  }
+ }
+ if (max_v > 1.0f) {
+  int band=uv_band(a->v,max_v);
+  if (band==uv_band(b->v,max_v) && band==uv_band(c->v,max_v)) {
+   a->v=uv_in_band(a->v,max_v,band);
+   b->v=uv_in_band(b->v,max_v,band);
+   c->v=uv_in_band(c->v,max_v,band);
+  }
+ }
+}
+
+typedef struct { int32_t x,u,v,dx,du,dv; } triangle_scan_edge_t;
 
 static triangle_scan_edge_t triangle_scan_edge(mosaico_textured_vertex_t a,
  mosaico_textured_vertex_t b,float scan_y)
@@ -254,74 +318,120 @@ static triangle_scan_edge_t triangle_scan_edge(mosaico_textured_vertex_t a,
  float inverse_height=1.0f/(b.y-a.y);
  float position=(scan_y-a.y)*inverse_height;
  return (triangle_scan_edge_t){
-  a.x+(b.x-a.x)*position,a.u+(b.u-a.u)*position,
-  a.v+(b.v-a.v)*position,(b.x-a.x)*inverse_height,
-  (b.u-a.u)*inverse_height,(b.v-a.v)*inverse_height};
+  fixed_from_float(a.x+(b.x-a.x)*position),
+  fixed_from_float(a.u+(b.u-a.u)*position),
+  fixed_from_float(a.v+(b.v-a.v)*position),
+  fixed_from_float((b.x-a.x)*inverse_height),
+  fixed_from_float((b.u-a.u)*inverse_height),
+  fixed_from_float((b.v-a.v)*inverse_height)};
 }
 
-static void draw_textured_triangle_section(texture_slot_t*s,
+static M2D_HOT void fill_direct_unshaded(uint16_t *dst,const uint16_t *rgb,int width,
+ int32_t u,int32_t v,int32_t du,int32_t dv,int count)
+{
+ int prev=0x7fffffff;
+ const uint16_t *row=rgb;
+ int i=0;
+ for(;i+3<count;i+=4){
+  int vi=(int)(v>>16);
+  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
+  dst[i]=row[u>>16];
+  u+=du;v+=dv;
+  vi=(int)(v>>16);
+  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
+  dst[i+1]=row[u>>16];
+  u+=du;v+=dv;
+  vi=(int)(v>>16);
+  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
+  dst[i+2]=row[u>>16];
+  u+=du;v+=dv;
+  vi=(int)(v>>16);
+  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
+  dst[i+3]=row[u>>16];
+  u+=du;v+=dv;
+ }
+ for(;i<count;++i){
+  int vi=(int)(v>>16);
+  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
+  dst[i]=row[u>>16];
+  u+=du;v+=dv;
+ }
+}
+
+static M2D_HOT void fill_direct_shaded(uint16_t *dst,const uint16_t *rgb,int width,
+ int32_t u,int32_t v,int32_t du,int32_t dv,int count,unsigned light)
+{
+ int prev=0x7fffffff;
+ const uint16_t *row=rgb;
+ for(int i=0;i<count;++i){
+  int vi=(int)(v>>16);
+  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
+  dst[i]=shade565(row[u>>16],light);
+  u+=du;v+=dv;
+ }
+}
+
+static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
  mosaico_textured_vertex_t long_a,mosaico_textured_vertex_t long_b,
  mosaico_textured_vertex_t short_a,mosaico_textured_vertex_t short_b,
- int y0,int y1,float du_dx,float dv_dx,int32_t du_16,int32_t dv_16,
- unsigned light,bool direct_uv)
+ int y0,int y1,int32_t du_16,int32_t dv_16,unsigned light,bool direct_uv)
 {
  if(y0<s_clip_y0)y0=s_clip_y0;
  if(y1>s_clip_y1)y1=s_clip_y1;
  if(y0>=y1)return;
+ const uint16_t *rgb=s->rgb;
+ const int tex_w=s->header->width;
  float scan_y=y0+.5f;
  triangle_scan_edge_t long_edge=triangle_scan_edge(long_a,long_b,scan_y);
  triangle_scan_edge_t short_edge=triangle_scan_edge(short_a,short_b,scan_y);
  for(int y=y0;y<y1;++y){
   triangle_scan_edge_t*left=&long_edge,*right=&short_edge;
   if(left->x>right->x){left=&short_edge;right=&long_edge;}
-  float width=right->x-left->x;
-  if(width>.0001f){
-   int x0=(int)ceilf(left->x-.5f),x1=(int)ceilf(right->x-.5f);
+  if(right->x-left->x>64){
+   int x0=raster_ceil_fixed(left->x),x1=raster_ceil_fixed(right->x);
    if(x0<s_clip_x0)x0=s_clip_x0;
    if(x1>s_clip_x1)x1=s_clip_x1;
    if(x0<x1){
-    float start=(x0+.5f)-left->x;
-    int32_t u_16=(int32_t)lrintf((left->u+du_dx*start)*65536.0f);
-    int32_t v_16=(int32_t)lrintf((left->v+dv_dx*start)*65536.0f);
+    int32_t start=((int32_t)x0<<16)+32768-left->x;
+    int32_t u_16=left->u+mul_fixed(du_16,start);
+    int32_t v_16=left->v+mul_fixed(dv_16,start);
     uint16_t*target=&s_target[(size_t)y*s_stride+x0];
+    int count=x1-x0;
+    s_raster_stats.triangle_pixels+=(uint32_t)count;
+    if(direct_uv)s_raster_stats.triangle_direct_pixels+=(uint32_t)count;
+    else s_raster_stats.triangle_mirror_pixels+=(uint32_t)count;
     if(!s->alpha){
      if(direct_uv&&light>=256U)
-      for(int x=x0;x<x1;++x){
-       *target++=s->rgb[(size_t)(v_16>>16)*s->header->width+(u_16>>16)];
-       u_16+=du_16;v_16+=dv_16;
-      }
+      fill_direct_unshaded(target,rgb,tex_w,u_16,v_16,du_16,dv_16,count);
      else if(direct_uv)
-      for(int x=x0;x<x1;++x){
-       uint16_t pixel=s->rgb[(size_t)(v_16>>16)*s->header->width+(u_16>>16)];
-       *target++=shade565(pixel,light);
-       u_16+=du_16;v_16+=dv_16;
-      }
-    else if(light>=256U)
-      for(mirror_fixed_step_t mu=mirror_fixed_begin(u_16,du_16,s->header->width),
-          mv=mirror_fixed_begin(v_16,dv_16,s->header->height);x0<x1;++x0){
-       int tx=mirror_fixed_sample(&mu),ty=mirror_fixed_sample(&mv);
-       *target++=s->rgb[(size_t)ty*s->header->width+tx];
+      fill_direct_shaded(target,rgb,tex_w,u_16,v_16,du_16,dv_16,count,light);
+     else if(light>=256U){
+      mirror_fixed_step_t mu=mirror_fixed_begin(u_16,du_16,tex_w);
+      mirror_fixed_step_t mv=mirror_fixed_begin(v_16,dv_16,s->header->height);
+      for(int x=0;x<count;++x){
+       target[x]=rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+mirror_fixed_sample(&mu)];
        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
       }
-     else
-      for(mirror_fixed_step_t mu=mirror_fixed_begin(u_16,du_16,s->header->width),
-          mv=mirror_fixed_begin(v_16,dv_16,s->header->height);x0<x1;++x0){
-       int tx=mirror_fixed_sample(&mu),ty=mirror_fixed_sample(&mv);
-       *target++=shade565(s->rgb[(size_t)ty*s->header->width+tx],light);
+     }else{
+      mirror_fixed_step_t mu=mirror_fixed_begin(u_16,du_16,tex_w);
+      mirror_fixed_step_t mv=mirror_fixed_begin(v_16,dv_16,s->header->height);
+      for(int x=0;x<count;++x){
+       target[x]=shade565(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
+        mirror_fixed_sample(&mu)],light);
        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
       }
+     }
     }else{
-     mirror_fixed_step_t mu=mirror_fixed_begin(u_16,du_16,s->header->width);
+     mirror_fixed_step_t mu=mirror_fixed_begin(u_16,du_16,tex_w);
      mirror_fixed_step_t mv=mirror_fixed_begin(v_16,dv_16,s->header->height);
-     for(int x=x0;x<x1;++x){
-      int tx=mirror_fixed_sample(&mu),ty=mirror_fixed_sample(&mv);
-      size_t source=(size_t)ty*s->header->width+tx;
+     for(int x=0;x<count;++x){
+      size_t source=(size_t)mirror_fixed_sample(&mv)*tex_w+mirror_fixed_sample(&mu);
       unsigned alpha=s->alpha[source];
       if(alpha){
-       uint16_t pixel=shade565(s->rgb[source],light);
-       *target=alpha>=255?pixel:blend565(*target,pixel,alpha);
+       uint16_t pixel=shade565(rgb[source],light);
+       target[x]=alpha>=255?pixel:blend565(target[x],pixel,alpha);
       }
-      ++target;mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+      mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
      }
     }
    }
@@ -340,25 +450,29 @@ void Mosaico2DDrawTexturedTriangle(Texture2D texture,
  if(b.y>c.y){mosaico_textured_vertex_t swap=b;b=c;c=swap;}
  if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
  if(c.y-a.y<.001f)return;
+ if(c.y<s_clip_y0||a.y>=s_clip_y1)return;
+ float min_x=a.x<b.x?a.x:b.x;if(c.x<min_x)min_x=c.x;
+ float max_x=a.x>b.x?a.x:b.x;if(c.x>max_x)max_x=c.x;
+ if(max_x<s_clip_x0||min_x>=s_clip_x1)return;
  float area=(b.x-a.x)*(c.y-a.y)-(c.x-a.x)*(b.y-a.y);
  if(fabsf(area)<.001f)return;
- float inverse_area=1.0f/area;
- float du_dx=((b.u-a.u)*(c.y-a.y)-(c.u-a.u)*(b.y-a.y))*inverse_area;
- float dv_dx=((b.v-a.v)*(c.y-a.y)-(c.v-a.v)*(b.y-a.y))*inverse_area;
- int32_t du_16=(int32_t)lrintf(du_dx*65536.0f);
- int32_t dv_16=(int32_t)lrintf(dv_dx*65536.0f);
- unsigned light=quantize_light(light256);
+ ++s_raster_stats.triangle_calls;
  float max_u=s->header->width-1.0f,max_v=s->header->height-1.0f;
+ fold_triangle_uv(&a,&b,&c,max_u,max_v);
+ float inverse_area=1.0f/area;
+ int32_t du_16=fixed_from_float(((b.u-a.u)*(c.y-a.y)-(c.u-a.u)*(b.y-a.y))*inverse_area);
+ int32_t dv_16=fixed_from_float(((b.v-a.v)*(c.y-a.y)-(c.v-a.v)*(b.y-a.y))*inverse_area);
+ unsigned light=quantize_light(light256);
  bool direct_uv=a.u>=0&&a.u<=max_u&&a.v>=0&&a.v<=max_v&&
   b.u>=0&&b.u<=max_u&&b.v>=0&&b.v<=max_v&&
   c.u>=0&&c.u<=max_u&&c.v>=0&&c.v<=max_v;
- int middle=(int)ceilf(b.y-.5f);
+ int middle=raster_ceil_half(b.y);
  if(b.y-a.y>=.001f)
-  draw_textured_triangle_section(s,a,c,a,b,(int)ceilf(a.y-.5f),middle,
-   du_dx,dv_dx,du_16,dv_16,light,direct_uv);
+  draw_textured_triangle_section(s,a,c,a,b,raster_ceil_half(a.y),middle,
+   du_16,dv_16,light,direct_uv);
  if(c.y-b.y>=.001f)
-  draw_textured_triangle_section(s,a,c,b,c,middle,(int)ceilf(c.y-.5f),
-   du_dx,dv_dx,du_16,dv_16,light,direct_uv);
+  draw_textured_triangle_section(s,a,c,b,c,middle,raster_ceil_half(c.y),
+   du_16,dv_16,light,direct_uv);
 }
 void Mosaico2DDrawTileRow(Texture2D texture,const uint16_t*ids,size_t count,
  int tw,int th,int dx,int dy){
@@ -375,8 +489,8 @@ void Mosaico2DDrawTileRow(Texture2D texture,const uint16_t*ids,size_t count,
   int x1=left+tw<s_clip_x1?left+tw:s_clip_x1;
   if(x0>=x1||sx<0||sx+tw>s->header->width||th>s->header->height)continue;
   int source_x=sx+(x0-left),copy=x1-x0;
-  for(int y=y0;y<y1;++y)memcpy(&s_target[(size_t)y*s_stride+x0],
-    &s->rgb[(size_t)(y-dy)*s->header->width+source_x],(size_t)copy*sizeof(uint16_t));
+  for(int y=y0;y<y1;++y)mosaico_copy_rgb565(&s_target[(size_t)y*s_stride+x0],
+    &s->rgb[(size_t)(y-dy)*s->header->width+source_x],(size_t)copy);
   pixels+=(uint32_t)copy*(uint32_t)(y1-y0);
  }
  ++s_raster_stats.tile_row_calls;s_raster_stats.tile_row_pixels+=pixels;
@@ -509,8 +623,8 @@ void Mosaico2DCopyScanline(int src_y,int dst_y)
  if(src_y<s_clip_y0||src_y>=s_clip_y1||dst_y<s_clip_y0||dst_y>=s_clip_y1)return;
  int x0=s_clip_x0,x1=s_clip_x1;
  if(x0>=x1)return;
- memcpy(&s_target[(size_t)dst_y*s_stride+x0],&s_target[(size_t)src_y*s_stride+x0],
-  (size_t)(x1-x0)*sizeof(uint16_t));
+ mosaico_copy_rgb565(&s_target[(size_t)dst_y*s_stride+x0],
+  &s_target[(size_t)src_y*s_stride+x0],(size_t)(x1-x0));
 }
 /* Bounded stack workspace, no frame-time allocation. Process columns in input
  * order so overlapping batches retain painter ordering. Each block writes rows
