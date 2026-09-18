@@ -10,6 +10,7 @@
 #include "mosaico_game.h"
 #include "mosaico_game_2d.h"
 #include "mosaico_raylib_port.h"
+#include "mosaico_rgb565.h"
 
 static uint16_t *s_pixels;
 static size_t s_stride;
@@ -353,13 +354,14 @@ void MosaicoFastClearBackground(Color color)
 {
     if (!s_pixels) return;
     uint16_t px = rgb565(color);
-    uint32_t pair = (uint32_t)px | ((uint32_t)px << 16);
-    for (int y = 0; y < MOSAICO_GAME_HEIGHT; ++y) {
-        uint16_t *row = s_pixels + (size_t)y*s_stride;
-        for (int x = 0; x < MOSAICO_GAME_WIDTH; x += 2) {
-            memcpy(row + x, &pair, sizeof(pair));
-        }
+    if (s_stride == (size_t)MOSAICO_GAME_WIDTH) {
+        mosaico_fill_rgb565(s_pixels, px,
+            (size_t)MOSAICO_GAME_WIDTH * (size_t)MOSAICO_GAME_HEIGHT);
+        return;
     }
+    for (int y = 0; y < MOSAICO_GAME_HEIGHT; ++y)
+        mosaico_fill_rgb565(s_pixels + (size_t)y * s_stride, px,
+            (size_t)MOSAICO_GAME_WIDTH);
 }
 
 void MosaicoFastDrawPixel(int x, int y, Color color)
