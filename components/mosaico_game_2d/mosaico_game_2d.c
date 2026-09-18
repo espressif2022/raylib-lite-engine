@@ -218,14 +218,117 @@ void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,V
  s_raster_stats.rotated_pixels+=(uint32_t)(x1-x0)*(uint32_t)(y1-y0);
  for(int y=y0;y<y1;++y)for(int x=x0;x<x1;++x){float dx=x-dest.x,dy=y-dest.y;float lx=dx*cs+dy*sn+origin.x,ly=-dx*sn+dy*cs+origin.y;if(lx<0||ly<0||lx>=dw||ly>=dh)continue;int sx=(int)(lx*sw/dw),sy=(int)(ly*sh/dh);if(fx)sx=(int)sw-1-sx;if(fy)sy=(int)sh-1-sy;sx+=(int)source.x;sy+=(int)source.y;if((unsigned)sx>=s->header->width||(unsigned)sy>=s->header->height)continue;size_t i=(size_t)sy*s->header->width+sx;unsigned a=(s->alpha?s->alpha[i]:255U)*tint.a/255U;if(!a)continue;uint16_t*dst=&s_target[(size_t)y*s_stride+x];*dst=blend565(*dst,tint565(s->rgb[i],tint),a);}}
 
-static float triangle_edge(float ax,float ay,float bx,float by,float px,float py)
-{ return (px-ax)*(by-ay)-(py-ay)*(bx-ax); }
+typedef struct {
+ int32_t phase,step,period;
+ int edge;
+} mirror_fixed_step_t;
 
-static int mirror_texture_coordinate(int value,int size)
+static mirror_fixed_step_t mirror_fixed_begin(int32_t value,int32_t step,int size)
 {
- int edge=size-1;if(edge<=0)return 0;
- int period=edge*2;value%=period;if(value<0)value+=period;
- return value>edge?period-value:value;
+ int edge=size-1;
+ int32_t period=(edge>0?edge*2:1)*65536;
+ int32_t phase=value%period;
+ if(phase<0)phase+=period;
+ step%=period;
+ return(mirror_fixed_step_t){phase,step,period,edge};
+}
+
+static inline int mirror_fixed_sample(const mirror_fixed_step_t *state)
+{
+ int value=(int)(state->phase>>16);
+ return value>state->edge?state->edge*2-value:value;
+}
+
+static inline void mirror_fixed_advance(mirror_fixed_step_t *state)
+{
+ state->phase+=state->step;
+ if(state->phase<0)state->phase+=state->period;
+ else if(state->phase>=state->period)state->phase-=state->period;
+}
+
+typedef struct { float x,u,v,dx,du,dv; } triangle_scan_edge_t;
+
+static triangle_scan_edge_t triangle_scan_edge(mosaico_textured_vertex_t a,
+ mosaico_textured_vertex_t b,float scan_y)
+{
+ float inverse_height=1.0f/(b.y-a.y);
+ float position=(scan_y-a.y)*inverse_height;
+ return (triangle_scan_edge_t){
+  a.x+(b.x-a.x)*position,a.u+(b.u-a.u)*position,
+  a.v+(b.v-a.v)*position,(b.x-a.x)*inverse_height,
+  (b.u-a.u)*inverse_height,(b.v-a.v)*inverse_height};
+}
+
+static void draw_textured_triangle_section(texture_slot_t*s,
+ mosaico_textured_vertex_t long_a,mosaico_textured_vertex_t long_b,
+ mosaico_textured_vertex_t short_a,mosaico_textured_vertex_t short_b,
+ int y0,int y1,float du_dx,float dv_dx,int32_t du_16,int32_t dv_16,
+ unsigned light,bool direct_uv)
+{
+ if(y0<s_clip_y0)y0=s_clip_y0;
+ if(y1>s_clip_y1)y1=s_clip_y1;
+ if(y0>=y1)return;
+ float scan_y=y0+.5f;
+ triangle_scan_edge_t long_edge=triangle_scan_edge(long_a,long_b,scan_y);
+ triangle_scan_edge_t short_edge=triangle_scan_edge(short_a,short_b,scan_y);
+ for(int y=y0;y<y1;++y){
+  triangle_scan_edge_t*left=&long_edge,*right=&short_edge;
+  if(left->x>right->x){left=&short_edge;right=&long_edge;}
+  float width=right->x-left->x;
+  if(width>.0001f){
+   int x0=(int)ceilf(left->x-.5f),x1=(int)ceilf(right->x-.5f);
+   if(x0<s_clip_x0)x0=s_clip_x0;
+   if(x1>s_clip_x1)x1=s_clip_x1;
+   if(x0<x1){
+    float start=(x0+.5f)-left->x;
+    int32_t u_16=(int32_t)lrintf((left->u+du_dx*start)*65536.0f);
+    int32_t v_16=(int32_t)lrintf((left->v+dv_dx*start)*65536.0f);
+    uint16_t*target=&s_target[(size_t)y*s_stride+x0];
+    if(!s->alpha){
+     if(direct_uv&&light>=256U)
+      for(int x=x0;x<x1;++x){
+       *target++=s->rgb[(size_t)(v_16>>16)*s->header->width+(u_16>>16)];
+       u_16+=du_16;v_16+=dv_16;
+      }
+     else if(direct_uv)
+      for(int x=x0;x<x1;++x){
+       uint16_t pixel=s->rgb[(size_t)(v_16>>16)*s->header->width+(u_16>>16)];
+       *target++=shade565(pixel,light);
+       u_16+=du_16;v_16+=dv_16;
+      }
+    else if(light>=256U)
+      for(mirror_fixed_step_t mu=mirror_fixed_begin(u_16,du_16,s->header->width),
+          mv=mirror_fixed_begin(v_16,dv_16,s->header->height);x0<x1;++x0){
+       int tx=mirror_fixed_sample(&mu),ty=mirror_fixed_sample(&mv);
+       *target++=s->rgb[(size_t)ty*s->header->width+tx];
+       mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+      }
+     else
+      for(mirror_fixed_step_t mu=mirror_fixed_begin(u_16,du_16,s->header->width),
+          mv=mirror_fixed_begin(v_16,dv_16,s->header->height);x0<x1;++x0){
+       int tx=mirror_fixed_sample(&mu),ty=mirror_fixed_sample(&mv);
+       *target++=shade565(s->rgb[(size_t)ty*s->header->width+tx],light);
+       mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+      }
+    }else{
+     mirror_fixed_step_t mu=mirror_fixed_begin(u_16,du_16,s->header->width);
+     mirror_fixed_step_t mv=mirror_fixed_begin(v_16,dv_16,s->header->height);
+     for(int x=x0;x<x1;++x){
+      int tx=mirror_fixed_sample(&mu),ty=mirror_fixed_sample(&mv);
+      size_t source=(size_t)ty*s->header->width+tx;
+      unsigned alpha=s->alpha[source];
+      if(alpha){
+       uint16_t pixel=shade565(s->rgb[source],light);
+       *target=alpha>=255?pixel:blend565(*target,pixel,alpha);
+      }
+      ++target;mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+     }
+    }
+   }
+  }
+  long_edge.x+=long_edge.dx;long_edge.u+=long_edge.du;long_edge.v+=long_edge.dv;
+  short_edge.x+=short_edge.dx;short_edge.u+=short_edge.du;short_edge.v+=short_edge.dv;
+ }
 }
 
 void Mosaico2DDrawTexturedTriangle(Texture2D texture,
@@ -233,51 +336,29 @@ void Mosaico2DDrawTexturedTriangle(Texture2D texture,
  mosaico_textured_vertex_t c,unsigned light256)
 {
  texture_slot_t*s=texture_slot(texture);if(!s||!s_target)return;
- float area=triangle_edge(a.x,a.y,b.x,b.y,c.x,c.y);
+ if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
+ if(b.y>c.y){mosaico_textured_vertex_t swap=b;b=c;c=swap;}
+ if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
+ if(c.y-a.y<.001f)return;
+ float area=(b.x-a.x)*(c.y-a.y)-(c.x-a.x)*(b.y-a.y);
  if(fabsf(area)<.001f)return;
- float min_x=fminf(a.x,fminf(b.x,c.x)),max_x=fmaxf(a.x,fmaxf(b.x,c.x));
- float min_y=fminf(a.y,fminf(b.y,c.y)),max_y=fmaxf(a.y,fmaxf(b.y,c.y));
- int x0=(int)floorf(min_x),x1=(int)ceilf(max_x);
- int y0=(int)floorf(min_y),y1=(int)ceilf(max_y);
- if(x0<s_clip_x0)x0=s_clip_x0;
- if(y0<s_clip_y0)y0=s_clip_y0;
- if(x1>s_clip_x1)x1=s_clip_x1;
- if(y1>s_clip_y1)y1=s_clip_y1;
- if(x0>=x1||y0>=y1)return;
  float inverse_area=1.0f/area;
- float e0_dx=(c.y-b.y),e1_dx=(a.y-c.y),e2_dx=(b.y-a.y);
- float wa_dx=e0_dx*inverse_area,wb_dx=e1_dx*inverse_area;
- float du_dx=(a.u-c.u)*wa_dx+(b.u-c.u)*wb_dx;
- float dv_dx=(a.v-c.v)*wa_dx+(b.v-c.v)*wb_dx;
+ float du_dx=((b.u-a.u)*(c.y-a.y)-(c.u-a.u)*(b.y-a.y))*inverse_area;
+ float dv_dx=((b.v-a.v)*(c.y-a.y)-(c.v-a.v)*(b.y-a.y))*inverse_area;
  int32_t du_16=(int32_t)lrintf(du_dx*65536.0f);
  int32_t dv_16=(int32_t)lrintf(dv_dx*65536.0f);
- float tolerance=fabsf(area)*.0001f;
  unsigned light=quantize_light(light256);
- for(int y=y0;y<y1;++y){
-  float px=x0+.5f,py=y+.5f;
-  float e0=triangle_edge(b.x,b.y,c.x,c.y,px,py);
-  float e1=triangle_edge(c.x,c.y,a.x,a.y,px,py);
-  float e2=triangle_edge(a.x,a.y,b.x,b.y,px,py);
-  float wa=e0*inverse_area,wb=e1*inverse_area;
-  int32_t u_16=(int32_t)lrintf((c.u+(a.u-c.u)*wa+(b.u-c.u)*wb)*65536.0f);
-  int32_t v_16=(int32_t)lrintf((c.v+(a.v-c.v)*wa+(b.v-c.v)*wb)*65536.0f);
-  for(int x=x0;x<x1;++x){
-   bool inside=area>0?(e0>=-tolerance&&e1>=-tolerance&&e2>=-tolerance):
-                      (e0<=tolerance&&e1<=tolerance&&e2<=tolerance);
-   if(inside){
-    int tx=mirror_texture_coordinate(u_16/65536,s->header->width);
-    int ty=mirror_texture_coordinate(v_16/65536,s->header->height);
-    size_t source=(size_t)ty*s->header->width+tx;
-    unsigned alpha=s->alpha?s->alpha[source]:255U;
-    if(alpha){
-     uint16_t pixel=shade565(s->rgb[source],light);
-     uint16_t*target=&s_target[(size_t)y*s_stride+x];
-     *target=alpha>=255?pixel:blend565(*target,pixel,alpha);
-    }
-   }
-   e0+=e0_dx;e1+=e1_dx;e2+=e2_dx;u_16+=du_16;v_16+=dv_16;
-  }
- }
+ float max_u=s->header->width-1.0f,max_v=s->header->height-1.0f;
+ bool direct_uv=a.u>=0&&a.u<=max_u&&a.v>=0&&a.v<=max_v&&
+  b.u>=0&&b.u<=max_u&&b.v>=0&&b.v<=max_v&&
+  c.u>=0&&c.u<=max_u&&c.v>=0&&c.v<=max_v;
+ int middle=(int)ceilf(b.y-.5f);
+ if(b.y-a.y>=.001f)
+  draw_textured_triangle_section(s,a,c,a,b,(int)ceilf(a.y-.5f),middle,
+   du_dx,dv_dx,du_16,dv_16,light,direct_uv);
+ if(c.y-b.y>=.001f)
+  draw_textured_triangle_section(s,a,c,b,c,middle,(int)ceilf(c.y-.5f),
+   du_dx,dv_dx,du_16,dv_16,light,direct_uv);
 }
 void Mosaico2DDrawTileRow(Texture2D texture,const uint16_t*ids,size_t count,
  int tw,int th,int dx,int dy){
