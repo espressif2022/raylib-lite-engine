@@ -45,6 +45,7 @@ typedef struct {
     int src_x, src_y, src_width, src_height;
     unsigned light256;
 } mosaico_raycast_wall_t;
+typedef struct { float x,y,u,v; } mosaico_textured_vertex_t;
 void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int height);
 void mosaico_game_2d_set_clip(int x,int y,int width,int height);
 void mosaico_game_2d_reset_raster_stats(void);
@@ -59,8 +60,14 @@ mosaico_asset_id_t MosaicoAnimationFrameAt(const mosaico_asset_id_t *frames,
     size_t frame_count,uint32_t frame_ticks,uint32_t elapsed_ticks,bool loop);
 void UnloadMosaicoAtlas(MosaicoAtlas atlas);
 Texture2D Mosaico2DLoadTexture(const char *asset_path);
+/* Register caller-owned native RGB565 pixels without copying them. The pixel
+ * buffer must remain valid until Mosaico2DUnloadTexture() is called. */
+Texture2D Mosaico2DRegisterRGB565(const void *pixels,int width,int height);
 void Mosaico2DUnloadTexture(Texture2D texture);
 void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,Vector2 origin,float rotation,Color tint);
+void Mosaico2DDrawTexturedTriangle(Texture2D texture,
+    mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
+    mosaico_textured_vertex_t c,unsigned light256);
 /* Opaque-atlas raycasting primitives. Alpha atlases are intentionally rejected. */
 void Mosaico2DDrawColumn(Texture2D texture, Rectangle source, int dest_x,
                          int dest_y, int dest_width, int dest_height,

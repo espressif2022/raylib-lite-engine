@@ -13,7 +13,7 @@
 typedef struct __attribute__((packed)){uint32_t magic;uint16_t width,height,frame_count,flags;uint32_t rgb_bytes,alpha_bytes;} atlas_header_t;
 typedef struct __attribute__((packed)){uint32_t id;uint16_t x,y,width,height;int16_t pivot_x,pivot_y;} atlas_frame_t;
 typedef struct{uint32_t id;uint16_t index_plus_one;} frame_cache_entry_t;
-typedef struct{bool used;mosaico_asset_view_t asset;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;const uint8_t *alpha;frame_cache_entry_t frame_cache[M2D_FRAME_CACHE_SIZE];} texture_slot_t;
+typedef struct{bool used;mosaico_asset_view_t asset;atlas_header_t inline_header;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;const uint8_t *alpha;frame_cache_entry_t frame_cache[M2D_FRAME_CACHE_SIZE];} texture_slot_t;
 static texture_slot_t s_textures[M2D_MAX_TEXTURES];
 static uint16_t *s_target;static size_t s_stride;static int s_target_width,s_target_height;
 static int s_clip_x0,s_clip_y0,s_clip_x1,s_clip_y1;
@@ -41,6 +41,18 @@ Texture2D Mosaico2DLoadTexture(const char *path){
  if(h->magic!=M2D_MAGIC||!h->width||!h->height||expected>asset.size||h->rgb_bytes!=(uint32_t)h->width*h->height*2U)return(Texture2D){0};
  for(unsigned i=0;i<M2D_MAX_TEXTURES;++i)if(!s_textures[i].used){texture_slot_t *s=&s_textures[i];s->used=true;s->asset=asset;s->header=h;s->frames=(const atlas_frame_t*)(asset.data+sizeof(*h));s->rgb=(const uint16_t*)(asset.data+sizeof(*h)+fb);s->alpha=h->alpha_bytes?asset.data+sizeof(*h)+fb+h->rgb_bytes:NULL;return(Texture2D){.id=i+1U,.width=h->width,.height=h->height,.mipmaps=1,.format=PIXELFORMAT_UNCOMPRESSED_R5G6B5};}
  return(Texture2D){0};}
+Texture2D Mosaico2DRegisterRGB565(const void *pixels,int width,int height){
+ if(!pixels||width<=0||height<=0||width>UINT16_MAX||height>UINT16_MAX)return(Texture2D){0};
+ for(unsigned i=0;i<M2D_MAX_TEXTURES;++i)if(!s_textures[i].used){
+  texture_slot_t *s=&s_textures[i];memset(s,0,sizeof(*s));s->used=true;
+  s->inline_header=(atlas_header_t){.magic=M2D_MAGIC,.width=(uint16_t)width,
+   .height=(uint16_t)height,.rgb_bytes=(uint32_t)width*(uint32_t)height*2U};
+  s->header=&s->inline_header;s->rgb=(const uint16_t *)pixels;
+  return(Texture2D){.id=i+1U,.width=width,.height=height,.mipmaps=1,
+   .format=PIXELFORMAT_UNCOMPRESSED_R5G6B5};
+ }
+ return(Texture2D){0};
+}
 void Mosaico2DUnloadTexture(Texture2D texture){texture_slot_t*s=texture_slot(texture);if(s)memset(s,0,sizeof(*s));}
 static inline uint16_t tint565(uint16_t p,Color t){if(t.r==255&&t.g==255&&t.b==255)return p;return(uint16_t)((((p>>11)&31U)*t.r/255U)<<11|(((p>>5)&63U)*t.g/255U)<<5|((p&31U)*t.b/255U));}
 static inline unsigned quantize_light(unsigned light256)
@@ -205,6 +217,68 @@ void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,V
  ++s_raster_stats.rotated_calls;
  s_raster_stats.rotated_pixels+=(uint32_t)(x1-x0)*(uint32_t)(y1-y0);
  for(int y=y0;y<y1;++y)for(int x=x0;x<x1;++x){float dx=x-dest.x,dy=y-dest.y;float lx=dx*cs+dy*sn+origin.x,ly=-dx*sn+dy*cs+origin.y;if(lx<0||ly<0||lx>=dw||ly>=dh)continue;int sx=(int)(lx*sw/dw),sy=(int)(ly*sh/dh);if(fx)sx=(int)sw-1-sx;if(fy)sy=(int)sh-1-sy;sx+=(int)source.x;sy+=(int)source.y;if((unsigned)sx>=s->header->width||(unsigned)sy>=s->header->height)continue;size_t i=(size_t)sy*s->header->width+sx;unsigned a=(s->alpha?s->alpha[i]:255U)*tint.a/255U;if(!a)continue;uint16_t*dst=&s_target[(size_t)y*s_stride+x];*dst=blend565(*dst,tint565(s->rgb[i],tint),a);}}
+
+static float triangle_edge(float ax,float ay,float bx,float by,float px,float py)
+{ return (px-ax)*(by-ay)-(py-ay)*(bx-ax); }
+
+static int mirror_texture_coordinate(int value,int size)
+{
+ int edge=size-1;if(edge<=0)return 0;
+ int period=edge*2;value%=period;if(value<0)value+=period;
+ return value>edge?period-value:value;
+}
+
+void Mosaico2DDrawTexturedTriangle(Texture2D texture,
+ mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
+ mosaico_textured_vertex_t c,unsigned light256)
+{
+ texture_slot_t*s=texture_slot(texture);if(!s||!s_target)return;
+ float area=triangle_edge(a.x,a.y,b.x,b.y,c.x,c.y);
+ if(fabsf(area)<.001f)return;
+ float min_x=fminf(a.x,fminf(b.x,c.x)),max_x=fmaxf(a.x,fmaxf(b.x,c.x));
+ float min_y=fminf(a.y,fminf(b.y,c.y)),max_y=fmaxf(a.y,fmaxf(b.y,c.y));
+ int x0=(int)floorf(min_x),x1=(int)ceilf(max_x);
+ int y0=(int)floorf(min_y),y1=(int)ceilf(max_y);
+ if(x0<s_clip_x0)x0=s_clip_x0;
+ if(y0<s_clip_y0)y0=s_clip_y0;
+ if(x1>s_clip_x1)x1=s_clip_x1;
+ if(y1>s_clip_y1)y1=s_clip_y1;
+ if(x0>=x1||y0>=y1)return;
+ float inverse_area=1.0f/area;
+ float e0_dx=(c.y-b.y),e1_dx=(a.y-c.y),e2_dx=(b.y-a.y);
+ float wa_dx=e0_dx*inverse_area,wb_dx=e1_dx*inverse_area;
+ float du_dx=(a.u-c.u)*wa_dx+(b.u-c.u)*wb_dx;
+ float dv_dx=(a.v-c.v)*wa_dx+(b.v-c.v)*wb_dx;
+ int32_t du_16=(int32_t)lrintf(du_dx*65536.0f);
+ int32_t dv_16=(int32_t)lrintf(dv_dx*65536.0f);
+ float tolerance=fabsf(area)*.0001f;
+ unsigned light=quantize_light(light256);
+ for(int y=y0;y<y1;++y){
+  float px=x0+.5f,py=y+.5f;
+  float e0=triangle_edge(b.x,b.y,c.x,c.y,px,py);
+  float e1=triangle_edge(c.x,c.y,a.x,a.y,px,py);
+  float e2=triangle_edge(a.x,a.y,b.x,b.y,px,py);
+  float wa=e0*inverse_area,wb=e1*inverse_area;
+  int32_t u_16=(int32_t)lrintf((c.u+(a.u-c.u)*wa+(b.u-c.u)*wb)*65536.0f);
+  int32_t v_16=(int32_t)lrintf((c.v+(a.v-c.v)*wa+(b.v-c.v)*wb)*65536.0f);
+  for(int x=x0;x<x1;++x){
+   bool inside=area>0?(e0>=-tolerance&&e1>=-tolerance&&e2>=-tolerance):
+                      (e0<=tolerance&&e1<=tolerance&&e2<=tolerance);
+   if(inside){
+    int tx=mirror_texture_coordinate(u_16/65536,s->header->width);
+    int ty=mirror_texture_coordinate(v_16/65536,s->header->height);
+    size_t source=(size_t)ty*s->header->width+tx;
+    unsigned alpha=s->alpha?s->alpha[source]:255U;
+    if(alpha){
+     uint16_t pixel=shade565(s->rgb[source],light);
+     uint16_t*target=&s_target[(size_t)y*s_stride+x];
+     *target=alpha>=255?pixel:blend565(*target,pixel,alpha);
+    }
+   }
+   e0+=e0_dx;e1+=e1_dx;e2+=e2_dx;u_16+=du_16;v_16+=dv_16;
+  }
+ }
+}
 void Mosaico2DDrawTileRow(Texture2D texture,const uint16_t*ids,size_t count,
  int tw,int th,int dx,int dy){
  texture_slot_t*s=texture_slot(texture);if(!s||!ids||!count||tw<=0||th<=0||!s_target)return;
