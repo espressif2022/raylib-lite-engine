@@ -398,7 +398,8 @@ def run_generic(project: Path, directory: Path, frames: int, output: Path,
     runtime.close()
     return result
 
-def serve_interactive_preview(listen: str, port: int, runtime: object) -> None:
+def serve_interactive_preview(listen: str, port: int, runtime: object,
+                              preview_html: Path | None = None) -> None:
     simulation = {"paused": False, "speed": 1.0,
                   "actions": {"left": False, "right": False, "jump": False,
                               "back": False, "fire": False, "sprint": False,
@@ -419,7 +420,7 @@ def serve_interactive_preview(listen: str, port: int, runtime: object) -> None:
             deadline += 1.0 / (tick_hz * float(simulation["speed"]))
             time.sleep(max(0.0, deadline - time.monotonic()))
     threading.Thread(target=simulation_loop, daemon=True).start()
-    page = """<!doctype html><html><head><meta charset=utf-8>
+    default_page = """<!doctype html><html><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Mosaico game simulator</title><style>
 body{margin:0;background:#07111c;color:#dff;font:14px system-ui;display:grid;place-items:center;min-height:100vh}
@@ -457,6 +458,10 @@ pause.onclick=()=>control(paused?'resume':'pause');step.onclick=()=>control('ste
 function metaRecording(){return record.textContent==='Stop record'}
 let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()}requestAnimationFrame(animate)}requestAnimationFrame(animate);
 </script></body></html>""".encode("utf-8")
+    def page_bytes() -> bytes:
+        if preview_html is not None and preview_html.is_file():
+            return preview_html.read_bytes()
+        return default_page
     class Handler(BaseHTTPRequestHandler):
         def metadata(self) -> dict[str, object]:
             elapsed = max(.001, time.monotonic() - float(simulation["started"]))
@@ -493,13 +498,16 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                 else:
                     self.send_error(404); return
             else:
-                body, metadata, content_type = page, self.metadata(), "text/html; charset=utf-8"
+                body, metadata, content_type = page_bytes(), self.metadata(), "text/html; charset=utf-8"
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Mosaico-State", json.dumps(metadata, separators=(",", ":")))
-            self.end_headers(); self.wfile.write(body)
+            try:
+                self.end_headers(); self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                return
         def do_POST(self) -> None:
             length = min(int(self.headers.get("Content-Length", "0")), 65536)
             try: value = json.loads(self.rfile.read(length) or b"{}")
@@ -577,7 +585,15 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
             else: self.send_error(404); return
             body=json.dumps(self.metadata()).encode();self.send_response(200)
             self.send_header("Content-Type","application/json");self.send_header("Content-Length",str(len(body)))
-            self.end_headers();self.wfile.write(body)
+            try:
+                self.end_headers();self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                return
+        def finish(self) -> None:
+            try:
+                super().finish()
+            except (BrokenPipeError, ConnectionResetError):
+                return
         def log_message(self, fmt: str, *args: object) -> None:
             return
     print(json.dumps({"preview_url": f"http://{listen}:{port}/", **runtime.metadata()}), flush=True)
@@ -611,8 +627,15 @@ def main() -> int:
             print(json.dumps(result))
         else:
             runtime = ReloadableHostRuntime(args.project, Path(directory))
+            preview = None
             try:
-                serve_interactive_preview(args.listen, args.port, runtime)
+                relative = json.loads(manifest.read_text(encoding="utf-8")).get("preview")
+                if isinstance(relative, str) and relative:
+                    preview = (args.project / relative).resolve()
+            except (OSError, ValueError, TypeError):
+                preview = None
+            try:
+                serve_interactive_preview(args.listen, args.port, runtime, preview)
             except KeyboardInterrupt:
                 pass
         return 0

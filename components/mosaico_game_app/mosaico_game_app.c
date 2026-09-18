@@ -56,10 +56,14 @@ static void touch_task(void *ctx)
         }
         if (count > max_points) count = max_points;
         if (max_points <= 1) {
+            static int last_x = 0, last_y = 0;
             bool pressed = count > 0;
+            if (pressed) {
+                last_x = points[0].x;
+                last_y = points[0].y;
+            }
             if (pressed || was_pressed)
-                (void)mosaico_game_input_pointer(
-                    pressed ? points[0].x : 0, pressed ? points[0].y : 0, pressed, now);
+                (void)mosaico_game_input_pointer(last_x, last_y, pressed, now);
             was_pressed = pressed;
         } else {
             for (uint8_t i = 0; i < count; ++i) {
