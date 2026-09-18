@@ -289,9 +289,17 @@ static float uv_in_band(float value, float edge, int band)
  return value - (float)band * edge;
 }
 
+static inline bool uv_inside(float u,float v,float max_u,float max_v)
+{
+ return u>=0&&u<=max_u&&v>=0&&v<=max_v;
+}
+
 static void fold_triangle_uv(mosaico_textured_vertex_t *a, mosaico_textured_vertex_t *b,
  mosaico_textured_vertex_t *c, float max_u, float max_v)
 {
+ if (uv_inside(a->u,a->v,max_u,max_v)&&uv_inside(b->u,b->v,max_u,max_v)&&
+     uv_inside(c->u,c->v,max_u,max_v))
+  return;
  if (max_u > 1.0f) {
   int band=uv_band(a->u,max_u);
   if (band==uv_band(b->u,max_u) && band==uv_band(c->u,max_u)) {
@@ -306,6 +314,32 @@ static void fold_triangle_uv(mosaico_textured_vertex_t *a, mosaico_textured_vert
    a->v=uv_in_band(a->v,max_v,band);
    b->v=uv_in_band(b->v,max_v,band);
    c->v=uv_in_band(c->v,max_v,band);
+  }
+ }
+}
+
+static void fold_quad_uv(mosaico_textured_vertex_t *a,mosaico_textured_vertex_t *b,
+ mosaico_textured_vertex_t *c,mosaico_textured_vertex_t *d,float max_u,float max_v)
+{
+ if (uv_inside(a->u,a->v,max_u,max_v)&&uv_inside(b->u,b->v,max_u,max_v)&&
+     uv_inside(c->u,c->v,max_u,max_v)&&uv_inside(d->u,d->v,max_u,max_v))
+  return;
+ if (max_u > 1.0f) {
+  int band=uv_band(a->u,max_u);
+  if (band==uv_band(b->u,max_u)&&band==uv_band(c->u,max_u)&&band==uv_band(d->u,max_u)) {
+   a->u=uv_in_band(a->u,max_u,band);
+   b->u=uv_in_band(b->u,max_u,band);
+   c->u=uv_in_band(c->u,max_u,band);
+   d->u=uv_in_band(d->u,max_u,band);
+  }
+ }
+ if (max_v > 1.0f) {
+  int band=uv_band(a->v,max_v);
+  if (band==uv_band(b->v,max_v)&&band==uv_band(c->v,max_v)&&band==uv_band(d->v,max_v)) {
+   a->v=uv_in_band(a->v,max_v,band);
+   b->v=uv_in_band(b->v,max_v,band);
+   c->v=uv_in_band(c->v,max_v,band);
+   d->v=uv_in_band(d->v,max_v,band);
   }
  }
 }
@@ -326,12 +360,30 @@ static triangle_scan_edge_t triangle_scan_edge(mosaico_textured_vertex_t a,
   fixed_from_float((b.v-a.v)*inverse_height)};
 }
 
+static inline bool span_const_v(int32_t v,int32_t dv,int count)
+{
+ if(count<=1)return true;
+ int64_t last=(int64_t)v+(int64_t)dv*(count-1);
+ return (v>>16)==(int32_t)(last>>16);
+}
+
 static M2D_HOT void fill_direct_unshaded(uint16_t *dst,const uint16_t *rgb,int width,
  int32_t u,int32_t v,int32_t du,int32_t dv,int count)
 {
+ int i=0;
+ if(span_const_v(v,dv,count)){
+  const uint16_t *row=rgb+(size_t)(v>>16)*(size_t)width;
+  for(;i+3<count;i+=4){
+   dst[i]=row[u>>16];u+=du;
+   dst[i+1]=row[u>>16];u+=du;
+   dst[i+2]=row[u>>16];u+=du;
+   dst[i+3]=row[u>>16];u+=du;
+  }
+  for(;i<count;++i){dst[i]=row[u>>16];u+=du;}
+  return;
+ }
  int prev=0x7fffffff;
  const uint16_t *row=rgb;
- int i=0;
  for(;i+3<count;i+=4){
   int vi=(int)(v>>16);
   if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
@@ -358,15 +410,57 @@ static M2D_HOT void fill_direct_unshaded(uint16_t *dst,const uint16_t *rgb,int w
  }
 }
 
+/* Quantized light 240 is 15/16, the ocean reef-adjacent water path. */
+static inline uint16_t shade_span(uint16_t pixel,unsigned light)
+{
+ if(light==240U){
+  unsigned r=((pixel>>11)&31U)*15U>>4;
+  unsigned g=((pixel>>5)&63U)*15U>>4;
+  unsigned b=(pixel&31U)*15U>>4;
+  return (uint16_t)((r<<11)|(g<<5)|b);
+ }
+ return shade565(pixel,light);
+}
+
 static M2D_HOT void fill_direct_shaded(uint16_t *dst,const uint16_t *rgb,int width,
  int32_t u,int32_t v,int32_t du,int32_t dv,int count,unsigned light)
 {
+ int i=0;
+ if(span_const_v(v,dv,count)){
+  const uint16_t *row=rgb+(size_t)(v>>16)*(size_t)width;
+  for(;i+3<count;i+=4){
+   dst[i]=shade_span(row[u>>16],light);u+=du;
+   dst[i+1]=shade_span(row[u>>16],light);u+=du;
+   dst[i+2]=shade_span(row[u>>16],light);u+=du;
+   dst[i+3]=shade_span(row[u>>16],light);u+=du;
+  }
+  for(;i<count;++i){dst[i]=shade_span(row[u>>16],light);u+=du;}
+  return;
+ }
  int prev=0x7fffffff;
  const uint16_t *row=rgb;
- for(int i=0;i<count;++i){
+ for(;i+3<count;i+=4){
   int vi=(int)(v>>16);
   if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
-  dst[i]=shade565(row[u>>16],light);
+  dst[i]=shade_span(row[u>>16],light);
+  u+=du;v+=dv;
+  vi=(int)(v>>16);
+  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
+  dst[i+1]=shade_span(row[u>>16],light);
+  u+=du;v+=dv;
+  vi=(int)(v>>16);
+  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
+  dst[i+2]=shade_span(row[u>>16],light);
+  u+=du;v+=dv;
+  vi=(int)(v>>16);
+  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
+  dst[i+3]=shade_span(row[u>>16],light);
+  u+=du;v+=dv;
+ }
+ for(;i<count;++i){
+  int vi=(int)(v>>16);
+  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
+  dst[i]=shade_span(row[u>>16],light);
   u+=du;v+=dv;
  }
 }
@@ -384,6 +478,7 @@ static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
  float scan_y=y0+.5f;
  triangle_scan_edge_t long_edge=triangle_scan_edge(long_a,long_b,scan_y);
  triangle_scan_edge_t short_edge=triangle_scan_edge(short_a,short_b,scan_y);
+ uint32_t pixels=0;
  for(int y=y0;y<y1;++y){
   triangle_scan_edge_t*left=&long_edge,*right=&short_edge;
   if(left->x>right->x){left=&short_edge;right=&long_edge;}
@@ -397,9 +492,7 @@ static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
     int32_t v_16=left->v+mul_fixed(dv_16,start);
     uint16_t*target=&s_target[(size_t)y*s_stride+x0];
     int count=x1-x0;
-    s_raster_stats.triangle_pixels+=(uint32_t)count;
-    if(direct_uv)s_raster_stats.triangle_direct_pixels+=(uint32_t)count;
-    else s_raster_stats.triangle_mirror_pixels+=(uint32_t)count;
+    pixels+=(uint32_t)count;
     if(!s->alpha){
      if(direct_uv&&light>=256U)
       fill_direct_unshaded(target,rgb,tex_w,u_16,v_16,du_16,dv_16,count);
@@ -408,15 +501,54 @@ static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
      else if(light>=256U){
       mirror_fixed_step_t mu=mirror_fixed_begin(u_16,du_16,tex_w);
       mirror_fixed_step_t mv=mirror_fixed_begin(v_16,dv_16,s->header->height);
-      for(int x=0;x<count;++x){
-       target[x]=rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+mirror_fixed_sample(&mu)];
-       mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+      int x=0;
+      if(span_const_v(v_16,dv_16,count)){
+       const uint16_t *row=rgb+(size_t)mirror_fixed_sample(&mv)*tex_w;
+       for(;x+3<count;x+=4){
+        target[x]=row[mirror_fixed_sample(&mu)];mirror_fixed_advance(&mu);
+        target[x+1]=row[mirror_fixed_sample(&mu)];mirror_fixed_advance(&mu);
+        target[x+2]=row[mirror_fixed_sample(&mu)];mirror_fixed_advance(&mu);
+        target[x+3]=row[mirror_fixed_sample(&mu)];mirror_fixed_advance(&mu);
+       }
+       for(;x<count;++x){
+        target[x]=row[mirror_fixed_sample(&mu)];mirror_fixed_advance(&mu);
+       }
+      }else{
+       for(;x+3<count;x+=4){
+        target[x]=rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+mirror_fixed_sample(&mu)];
+        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+        target[x+1]=rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+mirror_fixed_sample(&mu)];
+        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+        target[x+2]=rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+mirror_fixed_sample(&mu)];
+        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+        target[x+3]=rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+mirror_fixed_sample(&mu)];
+        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+       }
+       for(;x<count;++x){
+        target[x]=rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+mirror_fixed_sample(&mu)];
+        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+       }
       }
      }else{
       mirror_fixed_step_t mu=mirror_fixed_begin(u_16,du_16,tex_w);
       mirror_fixed_step_t mv=mirror_fixed_begin(v_16,dv_16,s->header->height);
-      for(int x=0;x<count;++x){
-       target[x]=shade565(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
+      int x=0;
+      for(;x+3<count;x+=4){
+       target[x]=shade_span(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
+        mirror_fixed_sample(&mu)],light);
+       mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+       target[x+1]=shade_span(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
+        mirror_fixed_sample(&mu)],light);
+       mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+       target[x+2]=shade_span(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
+        mirror_fixed_sample(&mu)],light);
+       mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+       target[x+3]=shade_span(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
+        mirror_fixed_sample(&mu)],light);
+       mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
+      }
+      for(;x<count;++x){
+       target[x]=shade_span(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
         mirror_fixed_sample(&mu)],light);
        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
       }
@@ -428,7 +560,7 @@ static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
       size_t source=(size_t)mirror_fixed_sample(&mv)*tex_w+mirror_fixed_sample(&mu);
       unsigned alpha=s->alpha[source];
       if(alpha){
-       uint16_t pixel=shade565(rgb[source],light);
+       uint16_t pixel=shade_span(rgb[source],light);
        target[x]=alpha>=255?pixel:blend565(target[x],pixel,alpha);
       }
       mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
@@ -439,13 +571,15 @@ static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
   long_edge.x+=long_edge.dx;long_edge.u+=long_edge.du;long_edge.v+=long_edge.dv;
   short_edge.x+=short_edge.dx;short_edge.u+=short_edge.du;short_edge.v+=short_edge.dv;
  }
+ s_raster_stats.triangle_pixels+=pixels;
+ if(direct_uv)s_raster_stats.triangle_direct_pixels+=pixels;
+ else s_raster_stats.triangle_mirror_pixels+=pixels;
 }
 
-void Mosaico2DDrawTexturedTriangle(Texture2D texture,
+static void draw_textured_triangle_prepared(texture_slot_t *s,
  mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
- mosaico_textured_vertex_t c,unsigned light256)
+ mosaico_textured_vertex_t c,unsigned light,bool skip_fold)
 {
- texture_slot_t*s=texture_slot(texture);if(!s||!s_target)return;
  if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
  if(b.y>c.y){mosaico_textured_vertex_t swap=b;b=c;c=swap;}
  if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
@@ -458,14 +592,12 @@ void Mosaico2DDrawTexturedTriangle(Texture2D texture,
  if(fabsf(area)<.001f)return;
  ++s_raster_stats.triangle_calls;
  float max_u=s->header->width-1.0f,max_v=s->header->height-1.0f;
- fold_triangle_uv(&a,&b,&c,max_u,max_v);
+ if(!skip_fold)fold_triangle_uv(&a,&b,&c,max_u,max_v);
  float inverse_area=1.0f/area;
  int32_t du_16=fixed_from_float(((b.u-a.u)*(c.y-a.y)-(c.u-a.u)*(b.y-a.y))*inverse_area);
  int32_t dv_16=fixed_from_float(((b.v-a.v)*(c.y-a.y)-(c.v-a.v)*(b.y-a.y))*inverse_area);
- unsigned light=quantize_light(light256);
- bool direct_uv=a.u>=0&&a.u<=max_u&&a.v>=0&&a.v<=max_v&&
-  b.u>=0&&b.u<=max_u&&b.v>=0&&b.v<=max_v&&
-  c.u>=0&&c.u<=max_u&&c.v>=0&&c.v<=max_v;
+ bool direct_uv=uv_inside(a.u,a.v,max_u,max_v)&&uv_inside(b.u,b.v,max_u,max_v)&&
+  uv_inside(c.u,c.v,max_u,max_v);
  int middle=raster_ceil_half(b.y);
  if(b.y-a.y>=.001f)
   draw_textured_triangle_section(s,a,c,a,b,raster_ceil_half(a.y),middle,
@@ -473,6 +605,28 @@ void Mosaico2DDrawTexturedTriangle(Texture2D texture,
  if(c.y-b.y>=.001f)
   draw_textured_triangle_section(s,a,c,b,c,middle,raster_ceil_half(c.y),
    du_16,dv_16,light,direct_uv);
+}
+
+void Mosaico2DDrawTexturedTriangle(Texture2D texture,
+ mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
+ mosaico_textured_vertex_t c,unsigned light256)
+{
+ texture_slot_t*s=texture_slot(texture);if(!s||!s_target)return;
+ draw_textured_triangle_prepared(s,a,b,c,quantize_light(light256),false);
+}
+
+void Mosaico2DDrawTexturedQuad(Texture2D texture,
+ mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
+ mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light256)
+{
+ texture_slot_t*s=texture_slot(texture);if(!s||!s_target)return;
+ unsigned light=quantize_light(light256);
+ float max_u=s->header->width-1.0f,max_v=s->header->height-1.0f;
+ fold_quad_uv(&a,&b,&c,&d,max_u,max_v);
+ bool inside=uv_inside(a.u,a.v,max_u,max_v)&&uv_inside(b.u,b.v,max_u,max_v)&&
+  uv_inside(c.u,c.v,max_u,max_v)&&uv_inside(d.u,d.v,max_u,max_v);
+ draw_textured_triangle_prepared(s,a,c,b,light,inside);
+ draw_textured_triangle_prepared(s,b,c,d,light,inside);
 }
 void Mosaico2DDrawTileRow(Texture2D texture,const uint16_t*ids,size_t count,
  int tw,int th,int dx,int dy){

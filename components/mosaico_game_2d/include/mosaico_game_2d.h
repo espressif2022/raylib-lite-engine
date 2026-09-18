@@ -72,6 +72,10 @@ void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,V
 void Mosaico2DDrawTexturedTriangle(Texture2D texture,
     mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
     mosaico_textured_vertex_t c,unsigned light256);
+/* Grid quad in Z order: a--b / c--d. Emits (a,c,b) then (b,c,d). */
+void Mosaico2DDrawTexturedQuad(Texture2D texture,
+    mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
+    mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light256);
 /* Opaque-atlas raycasting primitives. Alpha atlases are intentionally rejected. */
 void Mosaico2DDrawColumn(Texture2D texture, Rectangle source, int dest_x,
                          int dest_y, int dest_width, int dest_height,
