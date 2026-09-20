@@ -2,6 +2,31 @@
 #include "mosaico_rgb565.h"
 #include <string.h>
 
+uint8_t mosaico_shade_r_lut[16][32];
+uint8_t mosaico_shade_g_lut[16][64];
+uint8_t mosaico_shade_b_lut[16][32];
+
+void mosaico_shade_lut_init(void)
+{
+    static int ready;
+    if (ready) return;
+    for (int level = 0; level < 16; ++level) {
+        unsigned light = (unsigned)level << 4;
+        for (int c = 0; c < 32; ++c) {
+            mosaico_shade_r_lut[level][c] = (uint8_t)((unsigned)c * light >> 8);
+            mosaico_shade_b_lut[level][c] = (uint8_t)((unsigned)c * light >> 8);
+        }
+        for (int c = 0; c < 64; ++c)
+            mosaico_shade_g_lut[level][c] = (uint8_t)((unsigned)c * light >> 8);
+    }
+    ready = 1;
+}
+
+#if defined(__GNUC__)
+static void mosaico_shade_lut_ctor(void) __attribute__((constructor));
+static void mosaico_shade_lut_ctor(void) { mosaico_shade_lut_init(); }
+#endif
+
 #if defined(MOSAICO_RGB565_PIE)
 void mosaico_rgb565_copy_pie(uint16_t *dst, const uint16_t *src, size_t count);
 void mosaico_rgb565_fill_pie(uint16_t *dst, uint16_t color, size_t count);
@@ -56,6 +81,7 @@ void mosaico_fill_rgb565(uint16_t *dst, uint16_t color, size_t count)
 void mosaico_shade_rgb565(uint16_t *dst, const uint16_t *src, size_t count,
                           unsigned light256)
 {
+    mosaico_shade_lut_init();
     if (!dst || !src || count == 0) {
         return;
     }
