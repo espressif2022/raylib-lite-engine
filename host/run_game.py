@@ -67,6 +67,19 @@ class RasterStats(ctypes.Structure):
         ("rotated_pixels", ctypes.c_uint32),
         ("frame_lookup_hits", ctypes.c_uint32),
         ("frame_lookup_misses", ctypes.c_uint32),
+        ("column_calls", ctypes.c_uint32),
+        ("column_pixels", ctypes.c_uint32),
+        ("span_calls", ctypes.c_uint32),
+        ("span_pixels", ctypes.c_uint32),
+        ("sky_us", ctypes.c_uint32),
+        ("floor_us", ctypes.c_uint32),
+        ("wall_us", ctypes.c_uint32),
+        ("enemy_us", ctypes.c_uint32),
+        ("hud_us", ctypes.c_uint32),
+        ("triangle_calls", ctypes.c_uint32),
+        ("triangle_pixels", ctypes.c_uint32),
+        ("triangle_direct_pixels", ctypes.c_uint32),
+        ("triangle_mirror_pixels", ctypes.c_uint32),
     ]
 
 def load_replay(path: Path | None) -> list[dict[str, object]]:
@@ -156,6 +169,7 @@ class GenericHostRuntime:
             ENGINE_ROOT / "host/host_raylib_port.c",
             ENGINE_ROOT / "host/host_asset_runtime.c",
             ENGINE_ROOT / "components/mosaico_game_2d/mosaico_game_2d.c",
+            ENGINE_ROOT / "components/mosaico_game_2d/mosaico_rgb565.c",
             ENGINE_ROOT / "components/mosaico_raylib_fast/mosaico_raylib_fast.c",
             ENGINE_ROOT / "components/mosaico_game_fx/mosaico_game_fx.c",
             ENGINE_ROOT / "components/mosaico_game_tilemap/mosaico_game_tilemap.c",
@@ -169,7 +183,7 @@ class GenericHostRuntime:
                     project / "main", project / "assets/generated",
                     project / "managed_components/georgik__raylib/include",
                     project / "managed_components/georgik__raylib/raylib/src"]
-        command = [_host_compiler(), "-shared", "-O2", "-std=c11", "-Wall",
+        command = [_host_compiler(), "-shared", "-O3", "-funroll-loops", "-std=c11", "-Wall",
                    "-Wextra", "-Werror", "-DMOSAICO_HOST_SIMULATION=1",
                    *(str(path) for path in sources)]
         if os.name != "nt":
@@ -389,10 +403,12 @@ def run_generic(project: Path, directory: Path, frames: int, output: Path,
     runtime.close()
     return result
 
-def serve_interactive_preview(listen: str, port: int, runtime: object) -> None:
+def serve_interactive_preview(listen: str, port: int, runtime: object,
+                              preview_html: Path | None = None) -> None:
     simulation = {"paused": False, "speed": 1.0,
                   "actions": {"left": False, "right": False, "jump": False,
-                              "back": False, "fire": False},
+                              "back": False, "fire": False, "sprint": False,
+                              "strafe_left": False, "strafe_right": False},
                   "pointers": {},
                   "recording": False, "events": [], "started": time.monotonic(),
                   "ticks": 0}
@@ -409,7 +425,7 @@ def serve_interactive_preview(listen: str, port: int, runtime: object) -> None:
             deadline += 1.0 / (tick_hz * float(simulation["speed"]))
             time.sleep(max(0.0, deadline - time.monotonic()))
     threading.Thread(target=simulation_loop, daemon=True).start()
-    page = """<!doctype html><html><head><meta charset=utf-8>
+    default_page = """<!doctype html><html><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Mosaico game simulator</title><style>
 body{margin:0;background:#07111c;color:#dff;font:14px system-ui;display:grid;place-items:center;min-height:100vh}
@@ -418,27 +434,28 @@ img{width:480px;height:480px;max-width:100%;aspect-ratio:1/1;object-fit:contain;
 #state{margin-top:10px;color:#9ee;white-space:pre-wrap;height:4.8em;overflow:hidden;line-height:1.35}
 .hint{color:#fff;margin-top:8px}.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}button,select{background:#17364b;color:#dff;border:1px solid #299fad;border-radius:6px;padding:6px 10px}
 </style></head><body><main><div class=tools><button id=pause>Pause</button><button id=step>Step</button><button id=reset>Reset</button><button id=shot>Screenshot</button><button id=record>Record</button><select id=speed><option>.25</option><option>.5</option><option selected>1</option><option>2</option></select></div><img id=screen tabindex=0 draggable=false><div id=state></div>
-<div class=hint>Keyboard: A/D turn, W/S move, F/Ctrl fire, P pause · Touch: drag; tap crosshair to fire</div></main>
+<div class=hint>Keyboard: A/D turn, W/S walk, Shift sprint, Q/E strafe, F fire · Touch: left stick, right look, FIRE ring</div></main>
 <script>
-const held=new Set(), pointers=new Map(), img=document.querySelector('#screen'), state=document.querySelector('#state');
-let busy=false, phase='start',paused=false;
-function key(e,down){const k=e.key.toLowerCase();if(['arrowleft','arrowright','arrowup','arrowdown',' ','a','d','w','s','f','control','p','enter'].includes(k))e.preventDefault();
+const held=new Set(), pointers=new Map(), img=document.querySelector('#screen'), state=document.querySelector('#state'), sfxCache={};
+let busy=false, phase='start',paused=false,armedSfx='';
+function playSfx(name){if(!name)return;let a=sfxCache[name];if(!a){a=new Audio('/sfx/'+name+'.wav');a.preload='auto';sfxCache[name]=a}a.currentTime=0;a.volume=name.startsWith('step')?.35:.7;a.play().catch(()=>{})}
+function unlockAudio(){if(sfxCache._on)return;sfxCache._on=1;['rifle','step_l','alert','hurt','confirm'].forEach(n=>{const a=new Audio('/sfx/'+n+'.wav');a.preload='auto';sfxCache[n]=a})}
+function key(e,down){unlockAudio();const k=e.key.toLowerCase();if(['arrowleft','arrowright','arrowup','arrowdown',' ','a','d','w','s','f','control','p','enter','shift','q','e'].includes(k))e.preventDefault();
  if(down&&!held.has(k)&&k==='p')control(paused?'resume':'pause');
  if(down&&!held.has(k)&&k==='enter')control('continue'); down?held.add(k):held.delete(k);sendInput()}
 addEventListener('keydown',e=>key(e,true));addEventListener('keyup',e=>key(e,false));
 function pointer(e,down){e.preventDefault();const r=img.getBoundingClientRect();
  const p={x:(e.clientX-r.left)*480/r.width,y:(e.clientY-r.top)*480/r.height};down?pointers.set(e.pointerId,p):pointers.delete(e.pointerId)}
-img.onpointerdown=e=>{img.focus();img.setPointerCapture(e.pointerId);pointer(e,true);sendInput()};
+img.onpointerdown=e=>{unlockAudio();img.focus();img.setPointerCapture(e.pointerId);pointer(e,true);sendInput()};
 img.onpointermove=e=>{if(pointers.has(e.pointerId)){pointer(e,true);sendInput()}};
 img.onpointerup=img.onpointercancel=e=>{pointer(e,false);sendInput()};
 addEventListener('blur',()=>{held.clear();pointers.clear()});
-async function sendInput(){let left=held.has('a')||held.has('arrowleft'),right=held.has('d')||held.has('arrowright'),jump=held.has(' ')||held.has('w')||held.has('arrowup'),back=held.has('s')||held.has('arrowdown'),fire=held.has('f')||held.has('control');
- for(const p of pointers.values())if(p.y>=360){left|=p.x<150;right|=p.x>=150&&p.x<300;jump|=p.x>=300}
- await fetch('/api/v1/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({left,right,jump,back,fire,pointers:[...pointers].map(([track,p])=>({track,...p,pressed:true}))})})}
+async function sendInput(){let left=held.has('a')||held.has('arrowleft'),right=held.has('d')||held.has('arrowright'),jump=held.has(' ')||held.has('w')||held.has('arrowup'),back=held.has('s')||held.has('arrowdown'),fire=held.has('f')||held.has('control'),sprint=held.has('shift'),strafe_left=held.has('q'),strafe_right=held.has('e');
+ await fetch('/api/v1/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({left,right,jump,back,fire,sprint,strafe_left,strafe_right,pointers:[...pointers].map(([track,p])=>({track,...p,pressed:true}))})})}
 async function control(command){await fetch('/api/v1/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command})})}
 async function tick(){if(busy)return;busy=true;
  try{const res=await fetch('/api/v1/frame');const meta=JSON.parse(res.headers.get('X-Mosaico-State'));const blob=await res.blob();
- phase=meta.phase;const old=img.src,url=URL.createObjectURL(blob);img.onload=()=>{if(old.startsWith('blob:'))URL.revokeObjectURL(old);img.onload=null};img.src=url;
+ phase=meta.phase;if(meta.sfx&&meta.sfx!==armedSfx)playSfx(meta.sfx);armedSfx=meta.sfx||'';const old=img.src,url=URL.createObjectURL(blob);img.onload=()=>{if(old.startsWith('blob:'))URL.revokeObjectURL(old);img.onload=null};img.src=url;
  paused=meta.simulation.paused;const fields=Object.entries(meta).filter(([k])=>!['simulation','reload_error','title'].includes(k)).map(([k,v])=>`${k}=${v}`).join('  ');
  state.textContent=`${meta.title||meta.game_id||'Mosaico game'}\nLogic ${meta.simulation.logic_fps.toFixed(1)} Hz  Raster ${meta.host_render_ms.toFixed(2)} ms  PNG ${meta.host_encode_ms.toFixed(2)} ms\n${fields}`}
  finally{busy=false}}
@@ -446,6 +463,10 @@ pause.onclick=()=>control(paused?'resume':'pause');step.onclick=()=>control('ste
 function metaRecording(){return record.textContent==='Stop record'}
 let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()}requestAnimationFrame(animate)}requestAnimationFrame(animate);
 </script></body></html>""".encode("utf-8")
+    def page_bytes() -> bytes:
+        if preview_html is not None and preview_html.is_file():
+            return preview_html.read_bytes()
+        return default_page
     class Handler(BaseHTTPRequestHandler):
         def metadata(self) -> dict[str, object]:
             elapsed = max(.001, time.monotonic() - float(simulation["started"]))
@@ -471,14 +492,27 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                 metadata = self.metadata()
                 body = json.dumps({"events": simulation["events"]}, indent=2).encode()
                 content_type = "application/json"
+            elif self.path.startswith("/sfx/"):
+                from urllib.parse import unquote
+                name = Path(unquote(self.path.split("?", 1)[0])).name
+                project = getattr(runtime, "project", None)
+                wav = Path(project) / "assets_src" / name if project else Path()
+                if (name.endswith(".wav") and name.replace("_", "").removesuffix(".wav").isalnum()
+                        and wav.is_file()):
+                    body, metadata, content_type = wav.read_bytes(), self.metadata(), "audio/wav"
+                else:
+                    self.send_error(404); return
             else:
-                body, metadata, content_type = page, self.metadata(), "text/html; charset=utf-8"
+                body, metadata, content_type = page_bytes(), self.metadata(), "text/html; charset=utf-8"
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Mosaico-State", json.dumps(metadata, separators=(",", ":")))
-            self.end_headers(); self.wfile.write(body)
+            try:
+                self.end_headers(); self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                return
         def do_POST(self) -> None:
             length = min(int(self.headers.get("Content-Length", "0")), 65536)
             try: value = json.loads(self.rfile.read(length) or b"{}")
@@ -486,7 +520,8 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
             if self.path == "/api/v1/input":
                 previous_actions = simulation["actions"]
                 simulation["actions"] = {key: bool(value.get(key, False))
-                    for key in ("left", "right", "jump", "back", "fire")}
+                    for key in ("left", "right", "jump", "back", "fire",
+                                "sprint", "strafe_left", "strafe_right")}
                 incoming = {int(item.get("track", 0)): item
                             for item in value.get("pointers", [])[:2]}
                 if hasattr(runtime, "pointer"):
@@ -505,6 +540,9 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                                            bool(item.get("pressed", True)))
                         runtime.action(5, simulation["actions"]["back"])
                         runtime.action(6, simulation["actions"]["fire"])
+                        runtime.action(7, simulation["actions"]["sprint"])
+                        runtime.action(8, simulation["actions"]["strafe_left"])
+                        runtime.action(9, simulation["actions"]["strafe_right"])
                 if simulation["recording"]:
                     for name, pressed in simulation["actions"].items():
                         if pressed != previous_actions.get(name, False):
@@ -552,7 +590,15 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
             else: self.send_error(404); return
             body=json.dumps(self.metadata()).encode();self.send_response(200)
             self.send_header("Content-Type","application/json");self.send_header("Content-Length",str(len(body)))
-            self.end_headers();self.wfile.write(body)
+            try:
+                self.end_headers();self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                return
+        def finish(self) -> None:
+            try:
+                super().finish()
+            except (BrokenPipeError, ConnectionResetError):
+                return
         def log_message(self, fmt: str, *args: object) -> None:
             return
     print(json.dumps({"preview_url": f"http://{listen}:{port}/", **runtime.metadata()}), flush=True)
@@ -586,8 +632,15 @@ def main() -> int:
             print(json.dumps(result))
         else:
             runtime = ReloadableHostRuntime(args.project, Path(directory))
+            preview = None
             try:
-                serve_interactive_preview(args.listen, args.port, runtime)
+                relative = json.loads(manifest.read_text(encoding="utf-8")).get("preview")
+                if isinstance(relative, str) and relative:
+                    preview = (args.project / relative).resolve()
+            except (OSError, ValueError, TypeError):
+                preview = None
+            try:
+                serve_interactive_preview(args.listen, args.port, runtime, preview)
             except KeyboardInterrupt:
                 pass
         return 0

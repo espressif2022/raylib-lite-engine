@@ -10,6 +10,7 @@
 #include "mosaico_game.h"
 #include "mosaico_game_2d.h"
 #include "mosaico_raylib_port.h"
+#include "mosaico_rgb565.h"
 
 static uint16_t *s_pixels;
 static size_t s_stride;
@@ -77,6 +78,49 @@ static inline uint16_t rgb565(Color c)
 {
     return (uint16_t)(((uint16_t)(c.r & 0xf8U) << 8) |
                       ((uint16_t)(c.g & 0xfcU) << 3) | (c.b >> 3));
+}
+
+/* Constant-color spans share preparation across rows. Keep the exact /255
+ * blend used by put_pixel; quantizing alpha would change layered UI output. */
+typedef struct {
+    uint16_t pixel;
+    unsigned alpha, inverse, red, green, blue;
+} span_paint_t;
+
+static span_paint_t span_paint(Color c)
+{
+    return (span_paint_t){rgb565(c), c.a, 255U-c.a,
+                          c.r*c.a, c.g*c.a, c.b*c.a};
+}
+
+static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
+{
+    if (!s_pixels || !paint->alpha || (unsigned)y >= MOSAICO_GAME_HEIGHT) return;
+    if (x0 < 0) x0 = 0;
+    if (x1 > MOSAICO_GAME_WIDTH) x1 = MOSAICO_GAME_WIDTH;
+    if (s_scissor_active) {
+        if (y < s_scissor_y0 || y >= s_scissor_y1) return;
+        if (x0 < s_scissor_x0) x0 = s_scissor_x0;
+        if (x1 > s_scissor_x1) x1 = s_scissor_x1;
+    }
+    if (x0 >= x1) return;
+    uint16_t *dst = s_pixels + (size_t)y*s_stride + x0;
+    int count = x1-x0;
+    if (paint->alpha == 255) {
+        uint16_t pixel = paint->pixel;
+        uint32_t pair = (uint32_t)pixel | ((uint32_t)pixel << 16);
+        if ((uintptr_t)dst & 3U) { *dst++ = pixel; --count; }
+        while (count >= 2) { memcpy(dst, &pair, sizeof(pair)); dst += 2; count -= 2; }
+        if (count) *dst = pixel;
+    } else {
+        for (int i = 0; i < count; ++i) {
+            unsigned old = dst[i];
+            unsigned r = ((old >> 11)*8U*paint->inverse + paint->red)/255U;
+            unsigned g = (((old >> 5)&63U)*4U*paint->inverse + paint->green)/255U;
+            unsigned b = ((old&31U)*8U*paint->inverse + paint->blue)/255U;
+            dst[i] = (uint16_t)(((r&0xf8U)<<8) | ((g&0xfcU)<<3) | (b>>3));
+        }
+    }
 }
 
 static inline void put_pixel(int x, int y, Color color)
@@ -219,9 +263,20 @@ void MosaicoFastBeginDrawing(void)
     (void)mosaico_raylib_port_begin_frame(&s_pixels, &s_stride);
     mosaico_game_2d_set_target(s_pixels, s_stride, MOSAICO_GAME_WIDTH,
                                MOSAICO_GAME_HEIGHT);
+    mosaico_game_2d_reset_raster_stats();
 }
 
 bool MosaicoFastFrameAvailable(void) { return s_pixels != NULL; }
+
+void MosaicoFastConsumeInputEdges(void)
+{
+    memset(s_key_pressed, 0, sizeof(s_key_pressed));
+    memset(s_key_released, 0, sizeof(s_key_released));
+    for (int i = 0; i < MOSAICO_FAST_POINTER_COUNT; ++i) {
+        s_pointers[i].pressed = false;
+        s_pointers[i].released = false;
+    }
+}
 
 void MosaicoFastEndDrawing(void)
 {
@@ -232,12 +287,7 @@ void MosaicoFastEndDrawing(void)
     s_camera_active = false;
     s_scissor_active = false;
     ++s_presented_frames;
-    memset(s_key_pressed, 0, sizeof(s_key_pressed));
-    memset(s_key_released, 0, sizeof(s_key_released));
-    for (int i = 0; i < MOSAICO_FAST_POINTER_COUNT; ++i) {
-        s_pointers[i].pressed = false;
-        s_pointers[i].released = false;
-    }
+    MosaicoFastConsumeInputEdges();
 }
 
 void MosaicoFastBeginScissorMode(int x, int y, int width, int height)
@@ -304,13 +354,14 @@ void MosaicoFastClearBackground(Color color)
 {
     if (!s_pixels) return;
     uint16_t px = rgb565(color);
-    uint32_t pair = (uint32_t)px | ((uint32_t)px << 16);
-    for (int y = 0; y < MOSAICO_GAME_HEIGHT; ++y) {
-        uint16_t *row = s_pixels + (size_t)y*s_stride;
-        for (int x = 0; x < MOSAICO_GAME_WIDTH; x += 2) {
-            memcpy(row + x, &pair, sizeof(pair));
-        }
+    if (s_stride == (size_t)MOSAICO_GAME_WIDTH) {
+        mosaico_fill_rgb565(s_pixels, px,
+            (size_t)MOSAICO_GAME_WIDTH * (size_t)MOSAICO_GAME_HEIGHT);
+        return;
     }
+    for (int y = 0; y < MOSAICO_GAME_HEIGHT; ++y)
+        mosaico_fill_rgb565(s_pixels + (size_t)y * s_stride, px,
+            (size_t)MOSAICO_GAME_WIDTH);
 }
 
 void MosaicoFastDrawPixel(int x, int y, Color color)
@@ -341,20 +392,8 @@ void MosaicoFastDrawRectangle(int x, int y, int width, int height, Color color)
         if (y1 > s_scissor_y1) y1 = s_scissor_y1;
     }
     if (x0 >= x1 || y0 >= y1) return;
-    if (color.a != 255) {
-        for (int yy=y0; yy<y1; ++yy) for (int xx=x0; xx<x1; ++xx)
-            put_pixel(xx, yy, color);
-        return;
-    }
-    uint16_t px = rgb565(color);
-    uint32_t pair = (uint32_t)px | ((uint32_t)px << 16);
-    for (int yy=y0; yy<y1; ++yy) {
-        uint16_t *dst = s_pixels + (size_t)yy*s_stride + x0;
-        int count = x1 - x0;
-        if (((uintptr_t)dst & 3U) && count) { *dst++ = px; --count; }
-        while (count >= 2) { memcpy(dst, &pair, sizeof(pair)); dst += 2; count -= 2; }
-        if (count) *dst = px;
-    }
+    span_paint_t paint = span_paint(color);
+    for (int yy=y0; yy<y1; ++yy) fill_span(yy, x0, x1, &paint);
 }
 
 void MosaicoFastDrawRectangleV(Vector2 position,Vector2 size,Color color)
@@ -430,10 +469,17 @@ void MosaicoFastDrawLineEx(Vector2 start, Vector2 end, float thick, Color color)
     start = active_to_screen(start);
     end = active_to_screen(end);
     if (s_camera_active) thick *= s_camera.zoom;
-    if (thick <= 1.0f) {
+    if (thick <= 1.6f) {
         bool camera = s_camera_active;
         s_camera_active = false;
         MosaicoFastDrawLine((int)start.x, (int)start.y, (int)end.x, (int)end.y, color);
+        if (thick > 1.05f) {
+            float dx=end.x-start.x, dy=end.y-start.y;
+            if (fabsf(dx) >= fabsf(dy))
+                MosaicoFastDrawLine((int)start.x, (int)start.y+1, (int)end.x, (int)end.y+1, color);
+            else
+                MosaicoFastDrawLine((int)start.x+1, (int)start.y, (int)end.x+1, (int)end.y, color);
+        }
         s_camera_active = camera;
         return;
     }
@@ -472,9 +518,10 @@ void MosaicoFastDrawCircle(int center_x, int center_y, float radius, Color color
     Vector2 center=active_to_screen((Vector2){(float)center_x,(float)center_y});
     int r=(int)(radius*(s_camera_active?s_camera.zoom:1.0f));
     int rr=r*r;
+    span_paint_t paint = span_paint(color);
     for(int y=-r;y<=r;++y){
         int span=(int)sqrtf((float)(rr-y*y));
-        for(int x=-span;x<=span;++x)put_pixel((int)center.x+x,(int)center.y+y,color);
+        fill_span((int)center.y+y, (int)center.x-span, (int)center.x+span+1, &paint);
     }
 }
 
@@ -505,6 +552,7 @@ static void draw_ellipse(Vector2 center,float rh,float rv,Color color,bool outli
     rh=fabsf(rh*zoom);rv=fabsf(rv*zoom);
     if(rh<.5f||rv<.5f)return;
     int hy=(int)ceilf(rv);
+    span_paint_t paint = span_paint(color);
     for(int y=-hy;y<=hy;++y){
         float ny=(y+.5f)/rv,remain=1-ny*ny;
         if(remain<0)continue;
@@ -512,7 +560,7 @@ static void draw_ellipse(Vector2 center,float rh,float rv,Color color,bool outli
         if(outline){
             put_pixel((int)center.x-span,(int)center.y+y,color);
             put_pixel((int)center.x+span,(int)center.y+y,color);
-        }else for(int x=-span;x<=span;++x)put_pixel((int)center.x+x,(int)center.y+y,color);
+        }else fill_span((int)center.y+y, (int)center.x-span, (int)center.x+span+1, &paint);
     }
 }
 

@@ -3,7 +3,7 @@
 #include "esp_mmap_assets.h"
 
 static mmap_assets_handle_t s_store;
-#define EMBEDDED_ASSET_CAPACITY 16
+#define EMBEDDED_ASSET_CAPACITY 32
 static mosaico_asset_view_t s_embedded[EMBEDDED_ASSET_CAPACITY];
 static size_t s_embedded_count;
 

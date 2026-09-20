@@ -116,7 +116,14 @@ def _rgb565_a8(image: Image.Image) -> tuple[bytes, bytes]:
 
 
 def write_atlas(source: Path, manifest: dict, destination: Path) -> dict:
-    raw = _strip_connected_light_background(Image.open(source))
+    alpha_mode = manifest.get("alpha_mode", "smooth")
+    if alpha_mode not in {"smooth", "binary", "opaque"}:
+        raise ValueError(f"unsupported alpha mode: {alpha_mode}")
+    source_image = Image.open(source)
+    # Tile textures are full-bleed.  Sprite-sheet background punch-out would
+    # eat light fill connected to the cell edge (fence panels, plaster).
+    raw = source_image.convert("RGBA") if alpha_mode == "opaque" else (
+        _strip_connected_light_background(source_image))
     columns = int(manifest["columns"])
     rows = int(manifest["rows"])
     if columns <= 0 or rows <= 0 or raw.width < columns or raw.height < rows:
@@ -130,17 +137,21 @@ def write_atlas(source: Path, manifest: dict, destination: Path) -> dict:
     base_cells: dict[str, Image.Image] = {}
     base_frames = []
     ids: set[int] = set()
+    resampling = getattr(Image, "Resampling", Image)
+    pad = 0 if alpha_mode == "opaque" else 4
     for index, item in enumerate(manifest["frames"]):
         col, row = index % columns, index // columns
         crop = raw.crop((col * cell_w, row * cell_h,
                          (col + 1) * cell_w, (row + 1) * cell_h))
-        resampling = getattr(Image, "Resampling", Image)
-        crop.thumbnail((output_cell - 4, output_cell - 4), resampling.LANCZOS)
-        x = col * output_cell + (output_cell - crop.width) // 2
-        y = row * output_cell + (output_cell - crop.height) // 2
         cell = Image.new("RGBA", (output_cell, output_cell))
-        cell.alpha_composite(crop, ((output_cell - crop.width) // 2,
-                                    (output_cell - crop.height) // 2))
+        if pad:
+            crop.thumbnail((output_cell - pad, output_cell - pad), resampling.LANCZOS)
+            cell.alpha_composite(crop, ((output_cell - crop.width) // 2,
+                                        (output_cell - crop.height) // 2))
+        else:
+            if crop.size != (output_cell, output_cell):
+                crop = crop.resize((output_cell, output_cell), resampling.LANCZOS)
+            cell.alpha_composite(crop, (0, 0))
         base_cells[str(item["name"])] = cell
         identifier = asset_id(item["name"])
         if identifier in ids:
@@ -191,9 +202,6 @@ def write_atlas(source: Path, manifest: dict, destination: Path) -> dict:
         frames.append((asset_id(str(item["name"])), x, y, width, height,
                        int(item.get("pivot_x", width // 2)),
                        int(item.get("pivot_y", height // 2))))
-    alpha_mode = manifest.get("alpha_mode", "smooth")
-    if alpha_mode not in {"smooth", "binary", "opaque"}:
-        raise ValueError(f"unsupported alpha mode: {alpha_mode}")
     if alpha_mode == "binary":
         atlas.putalpha(atlas.getchannel("A").point(lambda value: 255 if value >= 96 else 0))
     elif alpha_mode == "opaque":
@@ -351,11 +359,15 @@ def _output_file(root: Path, value: str, suffix: str) -> Path:
 
 
 def compile_assets(source: Path, output: Path, manifest_file: Path,
-                   limit: int = 1024 * 1024) -> dict:
+                   limit: int | None = None) -> dict:
     """Compile one versioned project manifest into runtime assets."""
     manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
     if manifest.get("schema") != "mosaico-game-assets/v1":
         raise ValueError("unsupported game asset manifest schema")
+    if limit is None:
+        limit = int(manifest.get("limit_bytes", 1024 * 1024))
+    if limit <= 0:
+        raise ValueError("asset payload limit must be positive")
     output.mkdir(parents=True, exist_ok=True)
     for stale in output.iterdir():
         if stale.is_file() and stale.suffix in {".atlas", ".map", ".sound"}:
@@ -418,7 +430,7 @@ def main() -> int:
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--manifest", type=Path)
-    parser.add_argument("--limit", type=int, default=1024 * 1024)
+    parser.add_argument("--limit", type=int)
     args = parser.parse_args()
     manifest_file = args.manifest or args.source / "game_assets.json"
     summary = compile_assets(args.source, args.output, manifest_file, args.limit)

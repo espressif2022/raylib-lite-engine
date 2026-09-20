@@ -15,7 +15,7 @@ paths and the Raylib dependency in one place.
 | `mosaico_raylib_port` | display handoff and Raylib platform lifecycle | game scenes or content |
 | `mosaico_raylib_fast` | RGB565 drawing implementation | board startup |
 | `mosaico_game_assets` | read-only asset partition lookup | source asset conversion |
-| `mosaico_game_2d` | textures, atlases, animation helpers | map rules or audio |
+| `mosaico_game_2d` | textures, atlases, animation helpers, raycast columns/spans/walls, textured triangles | map rules, camera math, or audio |
 | `mosaico_game_tilemap` | packed tile-map access and drawing | game-specific collision behavior |
 | `mosaico_game_audio` | clip loading, mixing, codec output | game music policy |
 | `mosaico_game_input` | device-event posting and Action Mapper (zones, buttons, joystick/IMU) | board driver ownership |
@@ -61,6 +61,6 @@ Asset source conversion is a build-time concern owned by
 `tools/pack_game_assets.py`; runtime components only consume packed
 files from the read-only `game_assets` partition.
 `mosaico_game_asset_register_memory()` is available for bounded embedded
-fallback assets. Partition assets take precedence when both stores contain the
-same name; embedding a complete game pack should remain an explicit project
-tradeoff because it consumes application partition space.
+fallback assets (32 slots). Partition assets take precedence when both stores
+contain the same name; embedding a complete game pack should remain an explicit
+project tradeoff because it consumes application partition space.
