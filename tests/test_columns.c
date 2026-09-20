@@ -7,6 +7,7 @@
 #include <time.h>
 #include "host_asset_runtime.h"
 #include "mosaico_game_2d.h"
+#include "mosaico_rgb565.h"
 #define W 480
 #define STRIDE 487
 static uint16_t actual[STRIDE*W], expected[STRIDE*W];
@@ -104,6 +105,30 @@ int main(int argc,char **argv){
   Mosaico2DDrawTexturePro(texture,(Rectangle){sx0,sy0,fx?-sw:sw,fy?-sh:sh},
     (Rectangle){dx,dy,dw,dh},(Vector2){0,0},0,(Color){255,255,255,255});
   assert(!memcmp(actual,expected,sizeof(actual)));
+ }
+ /* Constant-UV triangle/quad: every written pixel equals one atlas texel. */
+ mosaico_game_2d_set_clip(0,0,W,W);
+ mosaico_shade_lut_init();
+ for(int pass=0;pass<2;pass++){
+  memset(actual,0x5a,sizeof(actual));
+  uint16_t expect=mosaico_shade565(pixel(2,3),160);
+  if(pass){
+   Mosaico2DDrawTexturedQuad(texture,
+    (mosaico_textured_vertex_t){20,20,2,3},(mosaico_textured_vertex_t){90,20,2,3},
+    (mosaico_textured_vertex_t){20,90,2,3},(mosaico_textured_vertex_t){90,90,2,3},160);
+  }else{
+   Mosaico2DDrawTexturedTriangle(texture,
+    (mosaico_textured_vertex_t){20,20,2,3},(mosaico_textured_vertex_t){90,20,2,3},
+    (mosaico_textured_vertex_t){20,90,2,3},160);
+  }
+  int written=0;
+  for(int y=0;y<W;y++)for(int x=0;x<W;x++){
+   uint16_t p=actual[y*STRIDE+x];
+   if(p==0x5a5a)continue;
+   assert(p==expect);
+   ++written;
+  }
+  assert(written>100);
  }
  mosaico_game_2d_set_clip(0,0,W,W);
  for(int i=0;i<240;i++)columns[i]=(mosaico_raycast_wall_t){i*2,-30,2,450,i%8,0,1,8,160};

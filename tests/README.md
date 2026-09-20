@@ -29,6 +29,18 @@ The six printed benchmarks cover opaque/alpha variants of each primitive,
 establish device FPS or PSRAM bandwidth. Compare old/new sources with identical
 compiler settings and validate device behavior separately.
 
+## RGB565 helpers
+
+```sh
+python3 tests/test_rgb565.py
+CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' python3 tests/test_rgb565.py
+```
+
+The suite has no atlas or game dependency. It checks fill, copy, null guards,
+16-level lookup-table construction, and `mosaico_shade565()` against an
+independent multiply oracle for aligned LUT lights and unaligned multiply
+lights. Host and device share the same C.
+
 ## Textured raster paths
 
 Run from the engine repository:
@@ -37,6 +49,9 @@ Run from the engine repository:
 python3 tests/test_columns.py
 CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' python3 tests/test_columns.py
 ```
+
+Host builds of these suites must also compile `mosaico_rgb565.c`; the Python
+harnesses add it next to `mosaico_game_2d.c`.
 
 The test compares both column APIs against an independent integer-division
 oracle using 100 deterministic randomized batches. It covers negative origins,
@@ -68,6 +83,9 @@ only handles unrotated opaque textures with white tint. The additional 500-frame
 benchmark scales an 8x8 texture to 480x205; it measures sampler overhead with a
 small source, not realistic atlas cache behavior. Validate that separately on
 the device before claiming an application speedup.
+
+Constant-UV triangle and quad draws assert that every written pixel matches one
+atlas texel after the same 16-step light quantization used by the wall path.
 
 Floor and span regression adds 400 comparisons against a modulo-based oracle:
 negative texture coordinates, power-of-two and arbitrary texture sizes, source

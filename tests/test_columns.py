@@ -20,6 +20,9 @@ class ColumnTests(unittest.TestCase):
             command = [os.environ.get('CC', 'cc'), '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror']
             command += shlex.split(os.environ.get('CFLAGS', ''))
             command += [str(ROOT / 'tests/test_columns.c'), str(ROOT / 'host/host_asset_runtime.c'), source]
+            rgb565 = ROOT / 'components/mosaico_game_2d/mosaico_rgb565.c'
+            if Path(source).resolve() != rgb565.resolve():
+                command.append(str(rgb565))
             for include in ['host/include', 'host', 'components/mosaico_game_assets/include', 'components/mosaico_game_2d/include']:
                 command += ['-I', str(ROOT / include)]
             command += ['-lm', '-o', str(temp / 'columns')]
