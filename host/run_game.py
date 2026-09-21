@@ -430,7 +430,7 @@ def serve_interactive_preview(listen: str, port: int, runtime: object,
 <title>Mosaico game simulator</title><style>
 body{margin:0;background:#07111c;color:#dff;font:14px system-ui;display:grid;place-items:center;min-height:100vh}
 main{position:relative;padding:16px;background:#0c2030;border:1px solid #299fad;border-radius:16px;box-shadow:0 18px 80px #000;width:min(512px,calc(100vw - 24px))}
-img{width:480px;height:480px;max-width:100%;aspect-ratio:1/1;object-fit:contain;display:block;image-rendering:pixelated;touch-action:none}
+img{width:480px;height:480px;max-width:100%;aspect-ratio:1/1;object-fit:contain;display:block;image-rendering:pixelated;touch-action:none;background:#000;border-radius:60px;clip-path:inset(0 round 60px)}
 #state{margin-top:10px;color:#9ee;white-space:pre-wrap;height:4.8em;overflow:hidden;line-height:1.35}
 .hint{color:#fff;margin-top:8px}.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}button,select{background:#17364b;color:#dff;border:1px solid #299fad;border-radius:6px;padding:6px 10px}
 </style></head><body><main><div class=tools><button id=pause>Pause</button><button id=step>Step</button><button id=reset>Reset</button><button id=shot>Screenshot</button><button id=record>Record</button><select id=speed><option>.25</option><option>.5</option><option selected>1</option><option>2</option></select></div><img id=screen tabindex=0 draggable=false><div id=state></div>
@@ -459,7 +459,7 @@ async function tick(){if(busy)return;busy=true;
  paused=meta.simulation.paused;const fields=Object.entries(meta).filter(([k])=>!['simulation','reload_error','title'].includes(k)).map(([k,v])=>`${k}=${v}`).join('  ');
  state.textContent=`${meta.title||meta.game_id||'Mosaico game'}\nLogic ${meta.simulation.logic_fps.toFixed(1)} Hz  Raster ${meta.host_render_ms.toFixed(2)} ms  PNG ${meta.host_encode_ms.toFixed(2)} ms\n${fields}`}
  finally{busy=false}}
-pause.onclick=()=>control(paused?'resume':'pause');step.onclick=()=>control('step');reset.onclick=()=>control('reset');speed.onchange=()=>control('speed:'+speed.value);shot.onclick=()=>{const a=document.createElement('a');a.href=img.src;a.download='mosaico-game.png';a.click()};record.onclick=async()=>{if(!metaRecording()){await control('record');record.textContent='Stop record'}else{await control('record');const a=document.createElement('a');a.href='/api/v1/recording';a.download='scenario.json';a.click();record.textContent='Record'}};
+pause.onclick=()=>control(paused?'resume':'pause');step.onclick=()=>control('step');reset.onclick=()=>control('reset');speed.onchange=()=>control('speed:'+speed.value);shot.onclick=()=>{const canvas=document.createElement('canvas'),c=canvas.getContext('2d');canvas.width=canvas.height=480;c.beginPath();c.roundRect(0,0,480,480,60);c.clip();c.drawImage(img,0,0,480,480);const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download='mosaico-game.png';a.click()};record.onclick=async()=>{if(!metaRecording()){await control('record');record.textContent='Stop record'}else{await control('record');const a=document.createElement('a');a.href='/api/v1/recording';a.download='scenario.json';a.click();record.textContent='Record'}};
 function metaRecording(){return record.textContent==='Stop record'}
 let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()}requestAnimationFrame(animate)}requestAnimationFrame(animate);
 </script></body></html>""".encode("utf-8")
