@@ -18,13 +18,13 @@
 ## 运行
 
 ```bash
-python3 tools/game_cli.py sim examples/tower_defense --headless
-python3 tools/game_cli.py sim examples/tower_defense --headless \
-  --replay replay.json --state-output artifacts/tower-state.json
+# Host 仿真：本仓库根目录，主机 C 编译器 + Pillow
 python3 tools/game_cli.py sim examples/tower_defense
+python3 tools/game_cli.py sim examples/tower_defense --headless --frames 300
+python3 tools/game_cli.py sim examples/tower_defense --headless \
+  --scenario replay.json --state-output artifacts/tower-state.json
 
-# 真机：普通 ESP-IDF 工程，不经过 ESP-Iris
-export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+# 真机：普通 ESP-IDF，idf.py flash 写入 5MB factory
 idf.py -C examples/tower_defense set-target esp32s31 build flash monitor
 ```
 

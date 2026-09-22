@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Added `docs/README.md` and `host/README.md` for this repository's sim and
+  flash workflow; aligned example READMEs to `tools/game_cli.py` and the
+  5MB `factory` slot. Dropped unused `asset_prepare` / `tick_hz` keys.
+- Grew the example `factory` app slot from 1.75MB to 5MB so `idf.py flash`
+  can hold Last Zone and Living Worlds; `ota_0` and `game_assets` shift
+  after it on the 16MB map.
+- Pull `esp-mosaico-bsp` from Git with the Component Manager.
 - Removed ESP-Iris from the engine and examples: no `esp_iris` manifest,
   no Recovery cmake, no screen-mirror RPC, and `mosaico_game_iris` is gone.
 - Imported Sky Hop, Tower Defense, Raylib Shooter, Living Worlds, Last Zone,

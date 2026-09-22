@@ -1,6 +1,6 @@
 # Sky Hop 真机性能测试
 
-[游戏开发](game-development.zh-CN.md) · [Sky Hop](../examples/sky_hop/README.md)
+[文档索引](README.md) · [游戏开发](game-development.zh-CN.md) · [Sky Hop](../examples/sky_hop/README.md)
 
 本测试针对 Sky Hop 固定 60 秒场景，用于比较相同设备和玩法下的显示配置。
 LCD 保持受支持的 40 MHz QSPI 时钟；每组结果记录 framebuffer 数、
@@ -15,8 +15,8 @@ TE compose 缓冲数和 draw-buffer 行数。
 - `CONFIG_SKY_HOP_TE_COMPOSE_BUFFERS`：1、2。
 - `CONFIG_SKY_HOP_DRAWBUF_LINES`：10、34。
 
-用 `idf.py -C examples/sky_hop build flash monitor` 构建与安装。保存覆盖完整
-60 秒场景的串口日志。
+用 `idf.py -C examples/sky_hop set-target esp32s31 build flash monitor` 构建与安装。
+保存覆盖完整 60 秒场景的串口日志。这是普通 ESP-IDF 烧录，不经过 ESP-Iris。
 
 ## 分析与判据
 
@@ -33,5 +33,5 @@ python3 tools/analyze_game_perf.py --label fb3-te1-lines34 raw.log
 1000 µs，无显示错误，显示帧率不低于 24 FPS 基线。
 运行时允许 busy 或 superseded 帧，以最新游戏状态优先，避免 LCD 吞吐阻塞逻辑。
 
-Device ID、Boot ID、固件哈希、配置和原始日志必须一起保留，结果才可比较。
+固件哈希、`sdkconfig` 差异和原始日志必须一起保留，结果才可比较。
 这些数值是本测试的比较基线，不能代替其他应用的性能目标或当前构建的实测结果。

@@ -49,19 +49,19 @@ extern const uint8_t _binary_materials_atlas_start[];
 extern const uint8_t _binary_materials_atlas_end[];
 extern const uint8_t _binary_props_atlas_start[];
 extern const uint8_t _binary_props_atlas_end[];
-extern const uint8_t _binary_last_zone_rifle_start[], _binary_last_zone_rifle_end[];
-extern const uint8_t _binary_last_zone_bolt_start[], _binary_last_zone_bolt_end[];
-extern const uint8_t _binary_last_zone_impact_start[], _binary_last_zone_impact_end[];
-extern const uint8_t _binary_last_zone_confirm_start[], _binary_last_zone_confirm_end[];
-extern const uint8_t _binary_last_zone_hurt_start[], _binary_last_zone_hurt_end[];
-extern const uint8_t _binary_last_zone_empty_start[], _binary_last_zone_empty_end[];
-extern const uint8_t _binary_last_zone_pickup_start[], _binary_last_zone_pickup_end[];
-extern const uint8_t _binary_last_zone_alert_start[], _binary_last_zone_alert_end[];
-extern const uint8_t _binary_last_zone_step_l_start[], _binary_last_zone_step_l_end[];
-extern const uint8_t _binary_last_zone_step_r_start[], _binary_last_zone_step_r_end[];
-extern const uint8_t _binary_last_zone_explode_start[], _binary_last_zone_explode_end[];
-extern const uint8_t _binary_last_zone_extract_start[], _binary_last_zone_extract_end[];
-extern const uint8_t _binary_last_zone_music_start[], _binary_last_zone_music_end[];
+extern const uint8_t _binary_last_zone_rifle_sound_start[], _binary_last_zone_rifle_sound_end[];
+extern const uint8_t _binary_last_zone_bolt_sound_start[], _binary_last_zone_bolt_sound_end[];
+extern const uint8_t _binary_last_zone_impact_sound_start[], _binary_last_zone_impact_sound_end[];
+extern const uint8_t _binary_last_zone_confirm_sound_start[], _binary_last_zone_confirm_sound_end[];
+extern const uint8_t _binary_last_zone_hurt_sound_start[], _binary_last_zone_hurt_sound_end[];
+extern const uint8_t _binary_last_zone_empty_sound_start[], _binary_last_zone_empty_sound_end[];
+extern const uint8_t _binary_last_zone_pickup_sound_start[], _binary_last_zone_pickup_sound_end[];
+extern const uint8_t _binary_last_zone_alert_sound_start[], _binary_last_zone_alert_sound_end[];
+extern const uint8_t _binary_last_zone_step_l_sound_start[], _binary_last_zone_step_l_sound_end[];
+extern const uint8_t _binary_last_zone_step_r_sound_start[], _binary_last_zone_step_r_sound_end[];
+extern const uint8_t _binary_last_zone_explode_sound_start[], _binary_last_zone_explode_sound_end[];
+extern const uint8_t _binary_last_zone_extract_sound_start[], _binary_last_zone_extract_sound_end[];
+extern const uint8_t _binary_last_zone_music_sound_start[], _binary_last_zone_music_sound_end[];
 
 static esp_err_t embed(const char *name, const uint8_t *start, const uint8_t *end)
 {
@@ -80,19 +80,19 @@ static esp_err_t before_display(void)
         const uint8_t *end;
     } assets[] = {
         {"enemy.atlas", _binary_enemy_atlas_start, _binary_enemy_atlas_end},
-        {"rifle.sound", _binary_last_zone_rifle_start, _binary_last_zone_rifle_end},
-        {"bolt.sound", _binary_last_zone_bolt_start, _binary_last_zone_bolt_end},
-        {"impact.sound", _binary_last_zone_impact_start, _binary_last_zone_impact_end},
-        {"confirm.sound", _binary_last_zone_confirm_start, _binary_last_zone_confirm_end},
-        {"hurt.sound", _binary_last_zone_hurt_start, _binary_last_zone_hurt_end},
-        {"empty.sound", _binary_last_zone_empty_start, _binary_last_zone_empty_end},
-        {"pickup.sound", _binary_last_zone_pickup_start, _binary_last_zone_pickup_end},
-        {"alert.sound", _binary_last_zone_alert_start, _binary_last_zone_alert_end},
-        {"step_l.sound", _binary_last_zone_step_l_start, _binary_last_zone_step_l_end},
-        {"step_r.sound", _binary_last_zone_step_r_start, _binary_last_zone_step_r_end},
-        {"explode.sound", _binary_last_zone_explode_start, _binary_last_zone_explode_end},
-        {"extract.sound", _binary_last_zone_extract_start, _binary_last_zone_extract_end},
-        {"music.sound", _binary_last_zone_music_start, _binary_last_zone_music_end},
+        {"rifle.sound", _binary_last_zone_rifle_sound_start, _binary_last_zone_rifle_sound_end},
+        {"bolt.sound", _binary_last_zone_bolt_sound_start, _binary_last_zone_bolt_sound_end},
+        {"impact.sound", _binary_last_zone_impact_sound_start, _binary_last_zone_impact_sound_end},
+        {"confirm.sound", _binary_last_zone_confirm_sound_start, _binary_last_zone_confirm_sound_end},
+        {"hurt.sound", _binary_last_zone_hurt_sound_start, _binary_last_zone_hurt_sound_end},
+        {"empty.sound", _binary_last_zone_empty_sound_start, _binary_last_zone_empty_sound_end},
+        {"pickup.sound", _binary_last_zone_pickup_sound_start, _binary_last_zone_pickup_sound_end},
+        {"alert.sound", _binary_last_zone_alert_sound_start, _binary_last_zone_alert_sound_end},
+        {"step_l.sound", _binary_last_zone_step_l_sound_start, _binary_last_zone_step_l_sound_end},
+        {"step_r.sound", _binary_last_zone_step_r_sound_start, _binary_last_zone_step_r_sound_end},
+        {"explode.sound", _binary_last_zone_explode_sound_start, _binary_last_zone_explode_sound_end},
+        {"extract.sound", _binary_last_zone_extract_sound_start, _binary_last_zone_extract_sound_end},
+        {"music.sound", _binary_last_zone_music_sound_start, _binary_last_zone_music_sound_end},
         {"controls.atlas", _binary_controls_atlas_start, _binary_controls_atlas_end},
         {"weapon.atlas", _binary_weapon_atlas_start, _binary_weapon_atlas_end},
         {"materials.atlas", _binary_materials_atlas_start, _binary_materials_atlas_end},

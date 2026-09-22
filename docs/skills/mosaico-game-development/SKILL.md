@@ -10,7 +10,8 @@ examples do not depend on ESP-Iris.
 
 ## Start with the correct layer
 
-Read [the game development guide](../../game-development.zh-CN.md), then inspect
+Read [the documentation index](../../README.md) and
+[the game development guide](../../game-development.zh-CN.md), then inspect
 the closest example:
 
 - `examples/raylib_shooter` for a small code-drawn game;
@@ -24,9 +25,12 @@ Keep gameplay state and `update()` logic in C files that compile without ESP-IDF
 Device firmware uses a thin `main.c` that calls `mosaico_game_app_run()`; put
 board-specific assets, zones, audio, and callbacks in `<game>_app.c`.
 
-For local simulation, add `game.sim.json` and keep the Raylib renderer in a
-shared `<game>_view.c`. Use `game_module.c` only for Host lifecycle and input
-mapping. Run:
+For local simulation, add `game.sim.json` (`schema` + `sources` only) and keep
+the Raylib renderer in a shared `<game>_view.c`. Use `game_module.c` only for
+Host lifecycle and input mapping. The Host runner auto-runs
+`assets_src/prepare_*.py` / `generate_*.py` and the packer; it does not read
+`asset_prepare` or `tick_hz` from the manifest. Needs a host C compiler and
+Pillow. This is not `gsp-sim`. Run from the engine root:
 
 ```sh
 python3 tools/game_cli.py sim examples/<name>
@@ -44,7 +48,7 @@ For component selection and supported API details, read
 include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/mosaico_game_example.cmake")
 mosaico_game_sdk_configure_gsp_compiler()
 mosaico_game_sdk_add_components(RAYLIB AUDIO TILEMAP)
-mosaico_game_example_project(<name> VERSION 0.1.0)
+project(<name> VERSION 0.1.0)
 ```
 
 Use only the compatibility surface in
@@ -56,7 +60,9 @@ Use only the compatibility surface in
 2. Run `python3 -m unittest discover -s tests -v`.
 3. Run `python3 tools/game_cli.py sim examples/<name> --headless`.
 4. Device builds are ordinary ESP-IDF flashes of `examples/<name>`; they do
-   not use ESP-Iris.
+   not use ESP-Iris. Example `factory` partitions are 5MB.
 
 Do not claim device or audio success from a successful Host build alone.
-`examples/sky_hop/main/CMakeLists.txt` is the `game_assets` reference.
+`examples/sky_hop/main/CMakeLists.txt` is the mmap `game_assets` reference;
+Last Zone, Living Worlds, and Tomb embed packed files with
+`target_add_binary_data`.

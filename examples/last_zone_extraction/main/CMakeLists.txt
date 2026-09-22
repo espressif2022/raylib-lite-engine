@@ -64,7 +64,7 @@ target_add_binary_data(${COMPONENT_LIB} "${GAME_ASSET_OUTPUT}/props.atlas" BINAR
     RENAME_TO props_atlas DEPENDS last_zone_assets)
 foreach(sound rifle bolt impact confirm hurt empty pickup alert step_l step_r explode extract music)
     target_add_binary_data(${COMPONENT_LIB} "${GAME_ASSET_OUTPUT}/${sound}.sound" BINARY
-        RENAME_TO "last_zone_${sound}" DEPENDS last_zone_assets)
+        RENAME_TO "last_zone_${sound}_sound" DEPENDS last_zone_assets)
 endforeach()
 target_include_directories(${COMPONENT_LIB} PRIVATE "${GAME_ASSET_OUTPUT}")
 

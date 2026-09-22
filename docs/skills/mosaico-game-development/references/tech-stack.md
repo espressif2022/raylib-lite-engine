@@ -22,7 +22,7 @@ points. See [touch-input.md](touch-input.md).
 |---|---|---|
 | Core | `mosaico_game`, `mosaico_game_input`, `mosaico_game_debug` | Every game |
 | Raylib 2D | `mosaico_raylib_fast`, `mosaico_raylib_port`, `mosaico_game_2d`, `mosaico_game_assets` | Drawing through the compatible Raylib surface |
-| Assets | `mosaico_game_assets` | Reading packaged content from `game_assets` |
+| Assets | `mosaico_game_assets` | Reading packed files from the `game_assets` partition or embedded memory slots |
 | Tilemap | `mosaico_game_tilemap` | Finite orthogonal Tiled maps, collision and object/path queries |
 | Audio | `mosaico_game_audio` | 8 SFX voices and one looping BGM stream |
 
@@ -45,4 +45,7 @@ Use fixed arrays/object pools for enemies, projectiles and effects. A stable sta
 ## Device startup order
 
 Follow the management-before-render sequence in the engine
-[component lifecycle](../../../components/README.md#configuration-and-lifecycle). Screen mirror callbacks may return invalid state before the first framebuffer; that is acceptable. Marking healthy before a successful first frame is not acceptable.
+[component lifecycle](../../../components/README.md#configuration-and-lifecycle).
+Present the first framebuffer, then run `after_healthy`. Examples log
+`first frame presented` at that point. There is no ESP-Iris screen mirror or
+health RPC.

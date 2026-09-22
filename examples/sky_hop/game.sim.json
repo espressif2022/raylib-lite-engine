@@ -1,9 +1,5 @@
 {
   "schema": "mosaico-game-sim/v1",
-  "asset_prepare": [
-    "assets_src/prepare_sprites.py",
-    "assets_src/generate_audio.py"
-  ],
   "sources": [
     "main/game_module.c",
     "main/platform_game.c",

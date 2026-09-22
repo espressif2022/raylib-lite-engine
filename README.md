@@ -38,32 +38,35 @@ mosaico_game_sdk_add_components(RAYLIB AUDIO TILEMAP SCENE UI FX SAVE)
 ```
 
 Platform-owned dependencies are explicit. This engine does not depend on
-ESP-Iris. An application may provide:
+ESP-Iris. Examples pull `esp-mosaico-bsp` with the Component Manager from
+https://github.com/esp-mosaico/esp-mosaico-bsp. An application may provide:
 
 ```cmake
 set(MOSAICO_GAME_GSPC_FETCHER "/path/to/fetch_gspc.py" CACHE FILEPATH "")
-set(MOSAICO_BSP_COMPONENT_DIR "/path/to/esp-mosaico-bsp" CACHE PATH "")
 ```
 
 If no fetcher is configured, `mosaico_game_sdk_configure_gsp_compiler()` looks
-for `gspc` or `gspc-dev` on `PATH`. Board support is optional and injected
-through `MOSAICO_BSP_COMPONENT_DIR`; Recovery and ESP-Iris stay outside this
-repository.
+for `gspc` or `gspc-dev` on `PATH`.
 
 ## Examples
 
-Reference games live in `examples/`. Host simulation does not need ESP-Mosaico
-Vibe:
+Reference games live in `examples/`. Host simulation compiles the shared C
+sources with a host `cc`/`gcc`/`clang` and Pillow; it does not use ESP-Iris,
+ESP-Mosaico Vibe, or `tools/gsp-sim`. Preview URL is `http://127.0.0.1:8460/`.
 
 ```sh
+python3 -m pip install Pillow
 python3 tools/game_cli.py sim examples/sky_hop
-python3 tools/game_cli.py sim examples/tower_defense --headless --frames 300
-python3 tools/game_cli.py sim examples/raylib_shooter --headless --frames 10
+python3 tools/game_cli.py sim examples/living_worlds --headless --frames 300
+python3 tools/game_cli.py sim examples/last_zone_extraction --headless --frames 90
+python3 tools/game_cli.py sim examples/tomb_explorer --headless --frames 8
 ```
 
-Device firmware is a normal ESP-IDF project. Point `MOSAICO_BSP_COMPONENT_DIR`
-at a local `esp-mosaico-bsp` checkout if the board package is not on the
-Component Registry. See [docs/game-development.zh-CN.md](docs/game-development.zh-CN.md).
+Device firmware is a normal ESP-IDF project. The Component Manager clones
+`esp-mosaico-bsp` from Git. Example `factory` slots are 5MB on 16MB flash so
+`idf.py flash` can hold the larger games. Documentation index:
+[docs/README.md](docs/README.md). Host ABI:
+[host/README.md](host/README.md).
 
 ## Repository layout
 

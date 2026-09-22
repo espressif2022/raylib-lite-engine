@@ -23,12 +23,11 @@ the next level, while completing level 4 finishes the run.
 ## 构建与安装
 
 ```bash
-# Host 仿真：在本仓库根目录
+# Host 仿真：本仓库根目录，主机 C 编译器 + Pillow
 python3 tools/game_cli.py sim examples/sky_hop
 python3 tools/game_cli.py sim examples/sky_hop --headless --frames 300
 
-# 真机：普通 ESP-IDF 工程，不经过 ESP-Iris
-export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+# 真机：普通 ESP-IDF，idf.py flash 写入 5MB factory
 idf.py -C examples/sky_hop set-target esp32s31 build flash monitor
 ```
 

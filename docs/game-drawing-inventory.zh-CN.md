@@ -1,5 +1,7 @@
 # ESP-Mosaico 游戏绘制总表
 
+[返回文档索引](README.md)
+
 快照日期：2026-09-21。对照当前仓库实现，不是规划方案。  
 覆盖 `examples/` 下全部游戏示例。  
 2.5D 三条路径重点写 **Last Zone**、**Living Worlds**、**Tomb Explorer**。  
@@ -18,7 +20,7 @@ micropixel 只作为 Tomb / INDEX8 网格的外部对标，不是所有游戏的
 | RGB565 网格 | Living Worlds | `Mosaico2DDrawTexturedQuad` / `Triangle` | `.atlas` / JPEG→RGB565 |
 | INDEX8 网格 | Tomb Explorer | 目前只用 `Mosaico2DDrawIndexedTexturedTriangle` | MSW2 行主序 `.wall` INDEX8 |
 
-其余游戏（Sky Hop、Tower Defense、Shooter、Jelly Ghost）是 2D Atlas + 代码图元，不走墙柱或网格内核。
+其余游戏（Sky Hop、Tower Defense、Shooter）是 2D Atlas + 代码图元，不走墙柱或网格内核。
 
 引擎里已有凸四边形 INDEX8 扫描线（`Mosaico2DDrawIndexedTexturedQuad`），**没有任何游戏在调用它**。Tomb 拆成三角；Living Worlds 走的是 RGB565 Quad（内部再拆两个仿射三角）。
 
@@ -36,7 +38,7 @@ micropixel 只作为 Tomb / INDEX8 网格的外部对标，不是所有游戏的
 
 循环：项目 `logic_hz` 固定更新，`target_fps` 限制显示；慢帧丢画面，不加速玩法。未设 `logic_hz` 时默认等于 `target_fps`。
 
-`docs/game-platform.md` 把 `.wall` 写成「列主序 INDEX8」。打包器实际支持两种：默认 MSW1 列主序（射线柱），`layout: row-major` 为 MSW2（网格水平 span）。Tomb 用的是后者。
+打包器支持两种 `.wall`：默认 MSW1 列主序（射线柱），`layout: row-major` 为 MSW2（网格水平 span）。Tomb 用的是后者。见 [content-pipeline.md](skills/mosaico-game-development/references/content-pipeline.md)。
 
 ## 3. 内核目录：谁在用
 
@@ -66,8 +68,6 @@ micropixel 只作为 Tomb / INDEX8 网格的外部对标，不是所有游戏的
 | `sky_hop` | 横版跳跃 | `BeginMode2D` 跟随 | 30 / 30 | Atlas 精灵 + 代码视差 | `tower.atlas` |
 | `tower_defense` | 俯视塔防 | 固定 480×320 战场 | 30 / 30 | Tilemap + Atlas + HUD 矩形 | `.map` + `.atlas` |
 | `raylib_shooter` | 纵版射击 | 固定屏 | 30 / 30 | 代码背景 + Atlas 精灵 | `shooter.atlas` |
-| `jelly_ghost` | 触摸软体演示 | 固定屏 | 60 / 60 | 分层 Atlas 变形 | `jelly.atlas` |
-| `hello_world` | **非游戏** | GSP 场景 | GSP 循环 | ESP-GSP UI | `ui/main.json` |
 
 ## 5. Last Zone：射线柱路径
 
@@ -146,11 +146,9 @@ micropixel 流水线（仅 Tomb 对标，其它游戏不套）：Guest 出 TRIAN
 
 | 项目 | 像素从哪来 | 和 2.5D 的关系 | 已知点 |
 |---|---|---|---|
-| Sky Hop | Atlas 平台精灵 + 代码视差/HUD；`BeginMode2D` | 不用墙柱/网格内核；设备性能矩阵见 `docs/game-performance.md` | 双触点移动+跳是输入参考，不是绘制参考 |
+| Sky Hop | Atlas 平台精灵 + 代码视差/HUD；`BeginMode2D` | 不用墙柱/网格内核；设备性能矩阵见 [sky-hop-performance.zh-CN.md](sky-hop-performance.zh-CN.md) | 双触点移动+跳是输入参考，不是绘制参考 |
 | Tower Defense | `DrawMosaicoTilemapLayer` + Atlas + 大量 HUD 矩形 | 正交 tile，无透视 | 脏矩形更适合这类静止地图 |
 | Shooter | 代码星空/城市带 + Atlas 飞机 | 无 INDEX8 | 背景是 fill/copy，不是 mesh |
-| Jelly Ghost | 分层 Atlas + 裙摆 UV 变形 | 最近的「假 3D」是精灵变形，不是投影 | 60 Hz，和其他游戏 30 Hz 不同 |
-| Hello World | GSP 声明式 UI | **不是 Game SDK 绘制路径** | 不能当游戏模板 |
 
 ## 9. 引擎缺陷（跨游戏）
 
@@ -160,8 +158,8 @@ micropixel 流水线（仅 Tomb 对标，其它游戏不套）：Guest 出 TRIAN
 | RGB565 Quad = 两个仿射三角 | Living Worlds | 大深度网格会拧；没有与 INDEX8 Quad 对等的「一行一条 span」 |
 | 三角 / 四边形 / 墙柱三套 walker | 全部 2.5D | 3/4 顶点不能像 micropixel `DrawPolygon` 那样进同一个内核 |
 | 只有整图元 `light256` | 三条 2.5D | 没有顶点光插值 |
-| `.wall` 文档只写列主序 | 打包 / Tomb | MSW2 行主序是一等布局，平台说明未同步 |
-| 相位统计字段是 sky/floor/wall/enemy/hud | Tomb 借用这些槽 | SDK 通用结构掺了游戏语义（渲染指南已警告） |
+| `.wall` 文档只写列主序 | 打包 / Tomb | MSW2 行主序是一等布局，见 content-pipeline |
+| 相位统计字段是 sky/floor/wall/enemy/hud | Tomb 借用这些槽 | SDK 通用结构掺了游戏语义 |
 | 无画单 ABI | 全部 | 不能按 QUAD/TRI 记录在 Host 侧单独 profile |
 | Raylib 层无 MeshRenderer | Tomb、Living Worlds 各自实现前端 | 近裁、细分、排序不能复用 |
 
@@ -189,11 +187,11 @@ micropixel 流水线（仅 Tomb 对标，其它游戏不套）：Guest 出 TRIAN
 - `DrawPolygon` 的 POT bitmask wrap：Tomb 图集 320×128、Last Zone 墙图 512×128，都不满足「每槽 64×64 POT」。
 - 用 Last Zone 墙柱去画 Tomb 房间，或用 Tomb INDEX8 三角去画 Last Zone 480 列，都是错配布局。
 - 把 Living Worlds 的 RGB565 网格「升级成 INDEX8」前，要先有行主序图集和 UV 仍落在砖内的保证。
-- Mosaic claw、micropixel runtime、`hello_world` 当游戏模板、BSP 的 USB Serial/JTAG 当产品烧录。
+- Mosaic claw、micropixel runtime、把 GSP Hello World 当游戏模板、把 BSP 的 USB Serial/JTAG 当产品烧录。
 
 ## 12. 以后若动绘制，按路径拆
 
-1. **Last Zone**：继续墙柱 + 地板行；别改成网格。验收仍是 480 列、门/窗走墙内核、镜像空帧另案。
+1. **Last Zone**：继续墙柱 + 地板行；别改成网格。验收仍是 480 列、门/窗走墙内核。
 2. **Living Worlds**：瓶颈在 RGB565 Quad/三角数量和过绘制（Ocean/Sunrise）。要加速是减面、cover、或给 RGB565 Quad 做真正的一行 span；不是引进射线柱。
 3. **Tomb**：未裁剪四面改走已有 INDEX8 Quad；补距离光。不要把 micropixel wrap 套到非 POT 图集。
 4. **2D 游戏**：保持 Atlas 快路径；性能矩阵仍以 Sky Hop 为准。
@@ -205,11 +203,12 @@ micropixel 流水线（仅 Tomb 对标，其它游戏不套）：Guest 出 TRIAN
 | Last Zone 绘制 | `examples/last_zone_extraction/main/last_zone_view.c` |
 | Living Worlds 绘制 | `examples/living_worlds/main/living_worlds_view.c`、`living_worlds_ocean.c`、`living_worlds_aurora.c`、`living_worlds_volume.c` |
 | Tomb 绘制 | `examples/tomb_explorer/main/tomb_view.c` |
-| INDEX8 / 墙柱 / RGB565 三角四边形 | `submodule/raylib-lite-engine/components/mosaico_game_2d/mosaico_game_2d.c` |
-| Raylib 映射 | `submodule/raylib-lite-engine/components/mosaico_raylib_fast/` |
-| `.wall` 打包 MSW1/MSW2 | `submodule/raylib-lite-engine/tools/pack_game_assets.py` |
-| 平台 / API / 画质指南 | `docs/game-platform.md`、`docs/raylib-api.md`、`docs/game-rendering-guide.zh-CN.md` |
-| Sky Hop 设备性能矩阵 | `docs/game-performance.md` |
+| INDEX8 / 墙柱 / RGB565 三角四边形 | `components/mosaico_game_2d/mosaico_game_2d.c` |
+| Raylib 映射 | `components/mosaico_raylib_fast/` |
+| `.wall` 打包 MSW1/MSW2 | `tools/pack_game_assets.py` |
+| Host 仿真与真机流程 | [game-development.zh-CN.md](game-development.zh-CN.md) |
+| 资源管线 | [content-pipeline.md](skills/mosaico-game-development/references/content-pipeline.md) |
+| Sky Hop 设备性能矩阵 | [sky-hop-performance.zh-CN.md](sky-hop-performance.zh-CN.md) |
 | micropixel Tomb | https://github.com/78/micropixel/tree/main/guest/apps/tomb-explorer |
 | MeshRenderer | https://github.com/78/micropixel/blob/main/guest/runtime/mesh_renderer.cpp |
 | Host `DrawPolygon` | https://github.com/78/micropixel/blob/main/firmware/espressif/main/runtime/graphics/raster_kernels.cpp |

@@ -14,9 +14,11 @@ reference implementation for preserving track IDs and simultaneous actions.
 
 ## Integration boundary
 
-Maintain the registry component in the BSP submodule, not separately in every
-game. Future driver updates must change the BSP include, I2C configuration,
-constructor and dependency together without bypassing `bsp_touch_new()`.
+Keep the CST92xx driver in the ESP-Mosaico BSP, not in every game. Examples
+pull `esp-mosaico-bsp` with the Component Manager from
+https://github.com/esp-mosaico/esp-mosaico-bsp. Future driver updates must
+change the BSP include, I2C configuration, constructor and dependency together
+without bypassing `bsp_touch_new()`.
 
 The game platform input event must represent a bounded set of two contacts:
 

@@ -2,7 +2,14 @@
 
 ## Source and generated assets
 
-Put editable inputs and deterministic generators in `examples/<game>/assets_src`. Put build outputs in `examples/<game>/assets/generated`. The device must consume only generated `.atlas`, `.map`, and `.sound` files through `esp_mmap_assets`.
+Put editable inputs and deterministic generators in `examples/<game>/assets_src`. Put build outputs in `examples/<game>/assets/generated`. Runtime consumes only generated `.atlas`, `.map`, `.wall`, and `.sound` files.
+
+Device examples load those files in two ways:
+
+- mmap the `game_assets` partition (`spiffs_create_partition_assets`), as in Sky Hop and Tower Defense;
+- embed packed files with `target_add_binary_data` and `mosaico_game_asset_register_memory()`, as in Last Zone, Living Worlds, and Tomb Explorer.
+
+Host simulation does not flash a partition. `host/run_game.py` runs `assets_src/prepare_*.py` and `generate_*.py`, then `tools/pack_game_assets.py`, and the Host asset runtime serves `assets/generated`.
 
 `tools/pack_game_assets.py` consumes a `mosaico-game-assets/v1`
 `game_assets.json` manifest containing only the content a project uses:

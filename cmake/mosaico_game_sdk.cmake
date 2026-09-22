@@ -3,14 +3,10 @@ set(MOSAICO_GAME_SDK_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 
 set(MOSAICO_GAME_GSPC_FETCHER "" CACHE FILEPATH
     "Optional script that prints the path to a GSP compiler")
-set(MOSAICO_BSP_COMPONENT_DIR "" CACHE PATH
-    "Optional ESP-Mosaico BSP component directory")
 
 function(mosaico_game_sdk_configure_gsp_compiler)
-    # IDF 6.2's GCC 16 diagnoses a bounded strncpy in managed mdns 1.13.0 as
-    # stringop-truncation. Keep all other default warnings fatal while the
-    # upstream managed component catches up with the toolchain.
-    add_compile_options(-Wno-error=stringop-truncation)
+    # Do not call add_compile_options() here: this runs before project() and
+    # would make CMake pick the host compiler.
     if(DEFINED GSPC_EXECUTABLE OR DEFINED ENV{GSPC_EXECUTABLE})
         return()
     endif()
@@ -72,14 +68,6 @@ function(mosaico_game_sdk_add_components)
         list(APPEND EXTRA_COMPONENT_DIRS
             "${MOSAICO_GAME_SDK_ROOT}/components/${_component}")
     endforeach()
-    if(MOSAICO_BSP_COMPONENT_DIR)
-        if(NOT EXISTS "${MOSAICO_BSP_COMPONENT_DIR}/CMakeLists.txt")
-            message(FATAL_ERROR
-                "MOSAICO_BSP_COMPONENT_DIR is not an ESP-IDF component: "
-                "${MOSAICO_BSP_COMPONENT_DIR}")
-        endif()
-        list(APPEND EXTRA_COMPONENT_DIRS "${MOSAICO_BSP_COMPONENT_DIR}")
-    endif()
     list(REMOVE_DUPLICATES EXTRA_COMPONENT_DIRS)
     set(EXTRA_COMPONENT_DIRS "${EXTRA_COMPONENT_DIRS}" PARENT_SCOPE)
 endfunction()

@@ -45,20 +45,23 @@ paths and the Raylib dependency in one place.
 Reusable capacity and performance choices belong in component `Kconfig`
 files. Game-specific tuning belongs in the application's `sdkconfig.defaults`.
 Do not add a private `#define` for a value already exposed by Kconfig.
+`mosaico_game_app_config_t.register_mirror` is unused leftover ABI; examples
+do not register a screen mirror.
 
 Raylib games call `mosaico_game_app_run()`. Startup order is:
 
 1. NVS, board power, `MosaicoGameInit()`, and Action Mapper reset;
 2. project `before_display` (assets, zones), display, Raylib port, first frame;
-3. project `after_healthy`, then the shared loop.
+3. first presented frame, project `after_healthy`, then the shared loop.
 
 Shutdown reverses resource ownership: stop producers/tasks first, unload game
 resources, close audio/display, then call `MosaicoGameShutdown()`.
 
 Asset source conversion is a build-time concern owned by
-`tools/pack_game_assets.py`; runtime components only consume packed
-files from the read-only `game_assets` partition.
-`mosaico_game_asset_register_memory()` is available for bounded embedded
-fallback assets (32 slots). Partition assets take precedence when both stores
-contain the same name; embedding a complete game pack should remain an explicit
-project tradeoff because it consumes application partition space.
+`tools/pack_game_assets.py`. Runtime components consume packed files from the
+read-only `game_assets` partition and/or
+`mosaico_game_asset_register_memory()` (32 slots). Partition assets take
+precedence when both stores contain the same name. Embedding a complete game
+pack is an explicit project tradeoff because it consumes the 5MB `factory`
+slot. Host simulation uses the packed files under `assets/generated` and does
+not mount a flash partition.
