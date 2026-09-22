@@ -5,6 +5,14 @@
 - Imported Sky Hop, Tower Defense, Raylib Shooter, Living Worlds, Last Zone,
   and Tomb Explorer from ESP-Mosaico Vibe into `examples/`, with Host CLI
   templates and game-development guides.
+- Added MTX2 block textures: 4x4 texels per 8-byte block, a quarter of raw
+  RGB565, with punch-through alpha and mipmaps. `tools/pack_game_assets.py`
+  emits them for atlases marked `"block": true`, keeping the `.atlas` name and
+  distinguishing the format by header magic; packing needs NumPy. Measured
+  3.00x on opaque atlases and 4.35-4.50x where an A8 plane is replaced, at
+  27.6-40.2 dB. Sampling reaches parity with raw RGB565 only when palette
+  decode is amortized across the four scanlines a block row covers, so the
+  sampler is not yet wired into the draw paths.
 - Added INDEX8 wall-atlas loading and textured triangle/quad/column draws so
   Tomb Explorer can share Host and device assets.
 - Added opaque raycast column, span, floor-row and batched wall primitives.

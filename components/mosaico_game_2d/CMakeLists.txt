@@ -1,4 +1,4 @@
-set(srcs "mosaico_game_2d.c" "mosaico_rgb565.c")
+set(srcs "mosaico_game_2d.c" "mosaico_rgb565.c" "mosaico_mtx2.c")
 if(IDF_TARGET STREQUAL "esp32s31")
     list(APPEND srcs "mosaico_rgb565_pie.S")
 endif()

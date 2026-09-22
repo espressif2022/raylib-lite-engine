@@ -8,7 +8,10 @@ python3 -m unittest tests.test_platform_game tests.test_game_cli tests.test_host
 ```
 
 `test_host_runner` compiles the shared Host simulator and needs Pillow. Device
-Recovery and ESP-Iris flows are not covered here.
+Recovery and ESP-Iris flows are not covered here. Packing an atlas with
+`"block": true` additionally needs NumPy; `tools/pack_game_assets.py` imports it
+lazily so projects that leave block compression off keep the Pillow-only
+dependency set.
 
 # RGB565 raster regression
 
@@ -111,3 +114,46 @@ while retaining fractional phase. This bounds catch-up work; it cannot preserve
 all elapsed simulation time under sustained overload. Idle resets the clock.
 Pressed/released input edges are consumed after each logic update; held state
 persists. Host frame-count replay remains independent of wall-clock scheduling.
+
+## MTX2 block textures
+
+```sh
+python3 tests/test_mtx2.py
+CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' python3 tests/test_mtx2.py
+```
+
+MTX2 stores 4x4 texels in an 8-byte block, a quarter of raw RGB565. The suite
+has no atlas or game dependency: it synthesises blocks directly instead of
+calling `tools/mtx2_codec.py`, so it pins the format contract rather than
+agreeing with the encoder by construction. Two textures are checked, one
+punch-through and one all-opaque, so both palette modes and the unscaled 1:1
+fast path are covered. Every texel is compared against an independent Python
+decoder at an unlit and a lit level, degenerate blocks with identical endpoints
+are included, and transparent texels must leave the destination untouched
+rather than store black. The varying-V entry point is asserted to agree with
+the constant-V fast path, and `mosaico_mtx2_blit` with the span path it
+replaces.
+
+Palette channels are interpolated in 5/6/5 space with integer division, not in
+RGB888, so the sampler never leaves RGB565. `tools/mtx2_codec.py` encodes with
+the identical arithmetic; changing one side alone desynchronises decoding.
+Textures flagged opaque must encode `c0 > c1` in every block, which is what
+lets the unscaled path drop the per-pixel transparency test; a flat block
+therefore cannot store equal endpoints.
+
+The benchmark reports two access patterns at three working-set sizes. Per
+scanline the sampler costs about 2.3x a raw RGB565 sampler of the same loop
+shape, because a block spans four scanlines and its palette is rebuilt for each
+one. `mosaico_mtx2_blit` decodes each block row once and reaches roughly 1.1x
+when cache-resident, and beats the raw sampler once the working set no longer
+fits, where the 4x smaller footprint dominates. The overhead is palette
+construction rather than lighting: unshaded MTX2 still costs about 1.7 ns/px
+more than raw, while shading adds comparably to both formats.
+
+These are informational Host CPU measurements. The Host has no flash cache and
+a far wider memory system than the device, so they bound ALU cost and show the
+direction of the memory effect only; they do not establish device FPS. The
+practical consequence for integration is that MTX2 must amortize palette decode
+across the four scanlines a block row covers, so a per-scanline sampler should
+not be wired into the draw paths directly. Encoder quality is measured
+separately and is not asserted here.
