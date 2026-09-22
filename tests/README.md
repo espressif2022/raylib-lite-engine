@@ -1,3 +1,14 @@
+# Tests
+
+Example-backed suites live next to the raster regressions:
+
+```sh
+python3 -m unittest tests.test_platform_game tests.test_game_cli tests.test_host_runner -v
+```
+
+`test_host_runner` compiles the shared Host simulator and needs Pillow. Device
+Recovery and ESP-Iris flows are not covered here.
+
 # RGB565 raster regression
 
 ## Generic solid primitives

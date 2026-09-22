@@ -6,4 +6,7 @@
 **/__pycache__/
 **/*.py[cod]
 **/assets/generated/
+examples/sky_hop/assets_src/*.wav
+examples/sky_hop/assets_src/sky_hop_atlas.png
+examples/raylib_shooter/assets_src/shooter_atlas.png
 artifacts/

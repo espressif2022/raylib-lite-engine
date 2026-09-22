@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Imported Sky Hop, Tower Defense, and Raylib Shooter from ESP-Mosaico Vibe
+  into `examples/`, with Host CLI templates and game-development guides.
 - Added opaque raycast column, span, floor-row and batched wall primitives.
 - Added textured triangle/quad fills and shared RGB565 fill/copy/shade helpers,
   including a 16-level shade lookup table.

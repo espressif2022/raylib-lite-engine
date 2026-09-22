@@ -46,12 +46,29 @@ If no fetcher is configured, `mosaico_game_sdk_configure_gsp_compiler()` looks
 for `gspc` or `gspc-dev` on `PATH`. Recovery policy remains owned by the
 application, not this engine.
 
+## Examples
+
+Reference games live in `examples/`. Host simulation does not need ESP-Mosaico
+Vibe:
+
+```sh
+python3 tools/game_cli.py sim examples/sky_hop
+python3 tools/game_cli.py sim examples/tower_defense --headless --frames 300
+python3 tools/game_cli.py sim examples/raylib_shooter --headless --frames 10
+```
+
+Device Recovery, flashing, and ESP-Iris updates stay in the ESP-Mosaico Vibe
+workspace. Check out this repository as `submodule/raylib-lite-engine` there, or
+set `MOSAICO_VIBE_ROOT`. See [docs/game-development.zh-CN.md](docs/game-development.zh-CN.md).
+
 ## Repository layout
 
 - `components/`: ESP-IDF runtime, renderer and reusable game modules.
+- `examples/`: Sky Hop, Tower Defense, and Raylib Shooter reference games.
 - `host/`: native Host ABI, RGB565 renderer bridge and browser simulator.
-- `tools/`: deterministic asset compiler and performance analysis tools.
-- `cmake/`: application integration helpers.
+- `tools/`: game CLI, asset compiler, and performance analysis tools.
+- `cmake/`: application and example integration helpers.
+- `docs/`: game development guides and the mosaico-game-development skill.
 
 ## Versioning
 

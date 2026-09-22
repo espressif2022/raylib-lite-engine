@@ -21,10 +21,46 @@ TEMPLATES = {
 ENGINE_ROOT = Path(__file__).resolve().parents[1]
 
 
+def _default_tool_root() -> Path:
+    env = os.environ.get("MOSAICO_VIBE_ROOT")
+    candidates = []
+    if env:
+        candidates.append(Path(env).expanduser() / "submodule/esp-mosaico-utils/mosaico-tools")
+    parent = ENGINE_ROOT.parent
+    if parent.name == "submodule":
+        candidates.append(parent.parent / "submodule/esp-mosaico-utils/mosaico-tools")
+    for candidate in candidates:
+        if (candidate / "tools/mosaico_cli/runtime.py").is_file():
+            return candidate
+    return ENGINE_ROOT
+
+
+def _inside_any(value: str, *roots: Path) -> Path:
+    candidate = Path(value).expanduser()
+    if candidate.is_absolute():
+        project = candidate.resolve()
+    else:
+        project = None
+        for root in roots:
+            resolved = (root / candidate).resolve()
+            if (resolved / "CMakeLists.txt").is_file() or project is None:
+                project = resolved
+                if (resolved / "CMakeLists.txt").is_file():
+                    break
+        assert project is not None
+    for root in roots:
+        try:
+            project.relative_to(root.resolve())
+            return project
+        except ValueError:
+            continue
+    raise ValueError("game project must be inside this repository or Raylib Lite Engine")
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="mosaico.py game",
-        description="Create, simulate, or build a Mosaico Raylib game",
+        prog="game_cli.py",
+        description="Create, simulate, or build a Raylib Lite Engine game",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     commands = parser.add_subparsers(dest="command", required=True)
@@ -51,27 +87,17 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _inside(repository: Path, value: str) -> Path:
-    candidate = Path(value).expanduser()
-    project = candidate.resolve() if candidate.is_absolute() else (repository / candidate).resolve()
-    try:
-        project.relative_to(repository.resolve())
-    except ValueError as error:
-        raise ValueError("game project must be inside this repository") from error
-    return project
-
-
 def _selected_project(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
                       repository: Path) -> Path:
     value = arguments.project_option or arguments.project
     if not value:
         parser.error("a project path is required")
     try:
-        project = _inside(repository, value)
+        project = _inside_any(value, repository, ENGINE_ROOT)
     except ValueError as error:
         parser.error(str(error))
     if not (project / "CMakeLists.txt").is_file():
-        parser.error(f"not a Mosaico game project: {project}")
+        parser.error(f"not a Raylib Lite Engine game project: {project}")
     return project
 
 
@@ -79,10 +105,11 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
             repository: Path) -> int:
     raw = Path(arguments.destination)
     try:
-        destination = _inside(
-            repository,
-            str(raw if len(raw.parts) > 1 else Path("projects") / raw),
-        )
+        if raw.is_absolute() or len(raw.parts) > 1:
+            destination = _inside_any(str(raw), repository, ENGINE_ROOT)
+        else:
+            destination = (ENGINE_ROOT / "examples" / raw).resolve()
+            destination.relative_to(ENGINE_ROOT.resolve())
     except ValueError as error:
         parser.error(str(error))
     name = destination.name
@@ -91,7 +118,9 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
     if destination.exists():
         parser.error(f"project already exists: {destination}")
     source_name = TEMPLATES[arguments.template]
-    source = repository / "projects" / source_name
+    source = ENGINE_ROOT / "examples" / source_name
+    if not (source / "CMakeLists.txt").is_file():
+        parser.error(f"template missing: {source}")
     shutil.copytree(source, destination, ignore=shutil.ignore_patterns(
         "build", "build-*", "managed_components", "dependencies.lock",
         "sdkconfig", "assets", ".codex-runs", "pc"
@@ -122,7 +151,7 @@ def _simulate(arguments: argparse.Namespace, project: Path, repository: Path) ->
     if arguments.state_output:
         command.extend(("--state-output", arguments.state_output))
     try:
-        return subprocess.call(command, cwd=repository)
+        return subprocess.call(command, cwd=ENGINE_ROOT)
     except KeyboardInterrupt:
         return 130
 
@@ -175,6 +204,4 @@ def main(argv: Optional[Sequence[str]] = None, *, repository: Path,
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(repository=Path(__file__).resolve().parents[2],
-                          tool_root=Path(__file__).resolve().parents[2] /
-                          "submodule/esp-mosaico-utils/esp-mosaico-recovery"))
+    raise SystemExit(main(repository=ENGINE_ROOT, tool_root=_default_tool_root()))
