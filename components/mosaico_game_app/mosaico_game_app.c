@@ -6,13 +6,11 @@
 #include "esp_check.h"
 #include "esp_display_present_config.h"
 #include "esp_gsp_esp_lcd.h"
-#include "esp_iris.h"
 #include "esp_lcd_touch.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "iris_ota_support.h"
 #include "mosaico_game_action.h"
 #include "mosaico_game_debug.h"
 #include "mosaico_game_input.h"
@@ -128,12 +126,6 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
     s_config = config;
     const char *tag = config->tag ? config->tag : "mosaico_game_app";
     ESP_ERROR_CHECK(nvs_flash_init());
-    iris_ota_support_start();
-    ESP_LOGI(tag, "management plane ready; renderer startup follows");
-#if defined(CONFIG_MOSAICO_GAME_DIAGNOSTIC_IRIS_ONLY) && CONFIG_MOSAICO_GAME_DIAGNOSTIC_IRIS_ONLY
-    ESP_LOGW(tag, "diagnostic Iris-only boot; renderer is intentionally disabled");
-    return ESP_OK;
-#endif
     ESP_ERROR_CHECK(bsp_power_init());
     ESP_ERROR_CHECK(bsp_power_set_vcc_3v3(true));
     mosaico_game_config_t game_config = MOSAICO_GAME_CONFIG_DEFAULT();
@@ -158,8 +150,7 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
     if (config->on_start) ESP_ERROR_CHECK(config->on_start());
     config->on_render();
     ESP_ERROR_CHECK(esp_gsp_flush(s_gsp, 3000));
-    ESP_ERROR_CHECK(esp_iris_mark_healthy());
-    ESP_LOGI(tag, "first frame presented; OTA image accepted");
+    ESP_LOGI(tag, "first frame presented");
     if (config->after_healthy) ESP_ERROR_CHECK(config->after_healthy());
     ESP_ERROR_CHECK(xTaskCreate(touch_task, "game_touch", 4096, NULL, 5, NULL) == pdPASS
                     ? ESP_OK : ESP_ERR_NO_MEM);

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Removed ESP-Iris from the engine and examples: no `esp_iris` manifest,
+  no Recovery cmake, no screen-mirror RPC, and `mosaico_game_iris` is gone.
 - Imported Sky Hop, Tower Defense, Raylib Shooter, Living Worlds, Last Zone,
   and Tomb Explorer from ESP-Mosaico Vibe into `examples/`, with Host CLI
   templates and game-development guides.

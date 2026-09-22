@@ -37,16 +37,18 @@ include("${RAYLIB_LITE_ROOT}/cmake/mosaico_game_sdk.cmake")
 mosaico_game_sdk_add_components(RAYLIB AUDIO TILEMAP SCENE UI FX SAVE)
 ```
 
-Platform-owned dependencies are explicit. An application may provide:
+Platform-owned dependencies are explicit. This engine does not depend on
+ESP-Iris. An application may provide:
 
 ```cmake
 set(MOSAICO_GAME_GSPC_FETCHER "/path/to/fetch_gspc.py" CACHE FILEPATH "")
-set(MOSAICO_GAME_RECOVERY_COMPONENT_DIR "/path/to/recovery" CACHE PATH "")
+set(MOSAICO_BSP_COMPONENT_DIR "/path/to/esp-mosaico-bsp" CACHE PATH "")
 ```
 
 If no fetcher is configured, `mosaico_game_sdk_configure_gsp_compiler()` looks
-for `gspc` or `gspc-dev` on `PATH`. Recovery policy remains owned by the
-application, not this engine.
+for `gspc` or `gspc-dev` on `PATH`. Board support is optional and injected
+through `MOSAICO_BSP_COMPONENT_DIR`; Recovery and ESP-Iris stay outside this
+repository.
 
 ## Examples
 
@@ -59,9 +61,9 @@ python3 tools/game_cli.py sim examples/tower_defense --headless --frames 300
 python3 tools/game_cli.py sim examples/raylib_shooter --headless --frames 10
 ```
 
-Device Recovery, flashing, and ESP-Iris updates stay in the ESP-Mosaico Vibe
-workspace. Check out this repository as `submodule/raylib-lite-engine` there, or
-set `MOSAICO_VIBE_ROOT`. See [docs/game-development.zh-CN.md](docs/game-development.zh-CN.md).
+Device firmware is a normal ESP-IDF project. Point `MOSAICO_BSP_COMPONENT_DIR`
+at a local `esp-mosaico-bsp` checkout if the board package is not on the
+Component Registry. See [docs/game-development.zh-CN.md](docs/game-development.zh-CN.md).
 
 ## Repository layout
 

@@ -2,9 +2,8 @@
 
 [返回 README](../README.md)
 
-参考游戏现由本仓库维护，不再放在 ESP-Mosaico Vibe 的 `projects/` 下。
-Host 与设备编译同一份玩法和绘制代码；PC 预览适合验证状态、输入和像素结果，
-LCD 时序、触摸手感与音频仍需在 Mosaico 工作区做真机验收。
+参考游戏由本仓库维护。Host 与设备编译同一份玩法和绘制代码；PC 预览适合验证
+状态、输入和像素结果。本仓库不依赖 ESP-Iris。LCD 时序、触摸手感和音频仍需真机验收。
 
 ## 选择参考项目
 
@@ -19,8 +18,6 @@ LCD 时序、触摸手感与音频仍需在 Mosaico 工作区做真机验收。
 
 新游戏可复制 `examples/<name>/`，或使用 `python3 tools/game_cli.py create <name>`。
 实现新能力前先看[组件职责与生命周期](../components/README.md)。
-设备侧 Recovery 契约仍由 ESP-Mosaico Vibe 的 Hello World 约束，不要把 Hello World
-当成游戏模板。
 
 ## 组织同源代码
 
@@ -70,19 +67,17 @@ python3 tools/game_cli.py sim examples/raylib_shooter --headless --scenario my_r
 
 ## 构建与真机验证
 
-真机构建、Recovery 和 ESP-Iris 更新仍在 ESP-Mosaico Vibe 工作区完成。
-把本仓库作为 vibe 的 `submodule/raylib-lite-engine`，或设置 `MOSAICO_VIBE_ROOT`。
+示例是普通 ESP-IDF 工程，不经过 ESP-Iris 或 Recovery。板级支持通过 Component
+Registry 的 `esp-mosaico-bsp`，或本地路径：
 
 ```sh
-# 在 ESP-Mosaico Vibe 仓库根目录
-python mosaico.py game sim submodule/raylib-lite-engine/examples/sky_hop --headless --frames 300
-python mosaico.py game build submodule/raylib-lite-engine/examples/sky_hop
-python mosaico.py recover
-python mosaico.py iris system-update --project submodule/raylib-lite-engine/examples/sky_hop
+export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+idf.py -C examples/sky_hop set-target esp32s31 build flash monitor
+# 或
+python3 tools/game_cli.py build examples/sky_hop
 ```
 
-空白或未验证设备先 `recover`。首次安装或分区/资源变化用 `system-update`；
-完整分区表一致且仅改代码时用 `app-update`。
+`MOSAICO_VIBE_ROOT` 只用来查找本机 BSP 和可选的 `gspc` 脚本，不是运行时依赖。
 
 Sky Hop 的固定场景和性能矩阵见 [Sky Hop 性能测试](sky-hop-performance.zh-CN.md)。
 2.5D 射线柱 / 体积网格 / INDEX8 房间对照见

@@ -15,8 +15,8 @@ TE compose 缓冲数和 draw-buffer 行数。
 - `CONFIG_SKY_HOP_TE_COMPOSE_BUFFERS`：1、2。
 - `CONFIG_SKY_HOP_DRAWBUF_LINES`：10、34。
 
-在 ESP-Mosaico Vibe 工作区通过 `mosaico.py` 构建与安装。保存覆盖完整 60 秒
-场景的 ESP-Iris 原始日志。
+用 `idf.py -C examples/sky_hop build flash monitor` 构建与安装。保存覆盖完整
+60 秒场景的串口日志。
 
 ## 分析与判据
 

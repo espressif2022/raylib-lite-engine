@@ -9,9 +9,8 @@ paths and the Raylib dependency in one place.
 
 | Component | Owns | Must not own |
 | --- | --- | --- |
-| `mosaico_game` | runtime configuration, device-event queue, frame statistics | rendering, ESP-Iris, asset formats, game rules |
-| `mosaico_game_iris` | ESP-Iris system inventory registration | game loop or display startup |
-| `mosaico_game_app` | device boot, touch task, action mapping, and the shared Raylib game loop | project-specific gameplay or drawing |
+| `mosaico_game` | runtime configuration, device-event queue, frame statistics | rendering, asset formats, game rules |
+| `mosaico_game_app` | device boot, touch task, action mapping, and the shared Raylib game loop | project-specific gameplay |
 | `mosaico_raylib_port` | display handoff and Raylib platform lifecycle | game scenes or content |
 | `mosaico_raylib_fast` | RGB565 drawing implementation | board startup |
 | `mosaico_game_assets` | read-only asset partition lookup | source asset conversion |
@@ -49,10 +48,9 @@ Do not add a private `#define` for a value already exposed by Kconfig.
 
 Raylib games call `mosaico_game_app_run()`. Startup order is:
 
-1. NVS, `mosaico_game_iris_register_inventory()`, and `iris_ota_support_start()`;
-2. board power, `MosaicoGameInit()`, and Action Mapper reset;
-3. project `before_display` (assets, zones), display, Raylib port, first frame;
-4. `esp_iris_mark_healthy()`, project `after_healthy`, then the shared loop.
+1. NVS, board power, `MosaicoGameInit()`, and Action Mapper reset;
+2. project `before_display` (assets, zones), display, Raylib port, first frame;
+3. project `after_healthy`, then the shared loop.
 
 Shutdown reverses resource ownership: stop producers/tasks first, unload game
 resources, close audio/display, then call `MosaicoGameShutdown()`.

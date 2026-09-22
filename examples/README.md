@@ -19,5 +19,5 @@ python3 tools/game_cli.py sim examples/<name>
 python3 tools/game_cli.py sim examples/<name> --headless --frames 300
 ```
 
-Device builds stay in ESP-Mosaico Vibe, with this repository as
-`submodule/raylib-lite-engine`. See [the game development guide](../docs/game-development.zh-CN.md).
+Device builds are ordinary ESP-IDF projects and do not use ESP-Iris. See
+[the game development guide](../docs/game-development.zh-CN.md).

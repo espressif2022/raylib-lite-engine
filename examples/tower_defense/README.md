@@ -22,15 +22,11 @@ python3 tools/game_cli.py sim examples/tower_defense --headless
 python3 tools/game_cli.py sim examples/tower_defense --headless \
   --replay replay.json --state-output artifacts/tower-state.json
 python3 tools/game_cli.py sim examples/tower_defense
-# 真机在 ESP-Mosaico Vibe 工作区：
-python mosaico.py recover  # 第一次部署 game_assets 分区时执行
-python mosaico.py game build --project submodule/raylib-lite-engine/examples/tower_defense
-python mosaico.py iris system-update --project submodule/raylib-lite-engine/examples/tower_defense
+
+# 真机：普通 ESP-IDF 工程，不经过 ESP-Iris
+export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+idf.py -C examples/tower_defense set-target esp32s31 build flash monitor
 ```
 
 非 headless 预览地址为 `http://127.0.0.1:8460/`；局域网预览可加
-`--listen 0.0.0.0`。安装使用 Recovery system-update，先校验并写资源分区，再写应用。
-网页工作台和 `python mosaico.py tap X Y` 可远程操作，
-`python mosaico.py screenshot` 可取得真机 RGB565 画面。
-
-首次安装或布局、资源变化使用 `iris system-update`；分区表完全一致且仅修改代码时可用 `iris app-update`。
+`--listen 0.0.0.0`。

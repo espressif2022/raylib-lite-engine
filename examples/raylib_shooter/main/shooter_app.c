@@ -6,7 +6,6 @@
 #include "game_audio.h"
 #include "mosaico_game_2d.h"
 #include "mosaico_game_assets.h"
-#include "raylib_screen_mirror.h"
 #include "shooter_app.h"
 #include "shooter_game.h"
 #include "shooter_view.h"
@@ -102,7 +101,6 @@ static const mosaico_game_app_config_t s_config = {
     .imu_sample_ms = 20,
     .target_fps = 30,
     .gsp_bundle = gsp_bundle_config,
-    .register_mirror = raylib_screen_mirror_register,
     .before_display = before_display,
     .on_start = on_start,
     .after_healthy = after_healthy,

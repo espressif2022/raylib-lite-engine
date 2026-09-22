@@ -5,8 +5,8 @@ description: Create, extend, debug, test, package, or install 2D games with Rayl
 
 # Mosaico Game Development
 
-Reference games live under `examples/` in this repository. ESP-Mosaico Vibe
-Hello World is only the Recovery/application contract, never the game template.
+Reference games live under `examples/` in this repository. The engine and its
+examples do not depend on ESP-Iris.
 
 ## Start with the correct layer
 
@@ -55,8 +55,8 @@ Use only the compatibility surface in
 1. Compile the gameplay model with the Host C compiler using `-Wall -Wextra -Werror`.
 2. Run `python3 -m unittest discover -s tests -v`.
 3. Run `python3 tools/game_cli.py sim examples/<name> --headless`.
-4. Device install stays on ESP-Mosaico Vibe: `python mosaico.py game build` /
-   `iris system-update` against `submodule/raylib-lite-engine/examples/<name>`.
+4. Device builds are ordinary ESP-IDF flashes of `examples/<name>`; they do
+   not use ESP-Iris.
 
 Do not claim device or audio success from a successful Host build alone.
 `examples/sky_hop/main/CMakeLists.txt` is the `game_assets` reference.

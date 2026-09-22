@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "main.c" "shooter_app.c" "shooter_game.c" "shooter_view.c" "game_audio.c" "raylib_screen_mirror.c"
+    SRCS "main.c" "shooter_app.c" "shooter_game.c" "shooter_view.c" "game_audio.c"
     INCLUDE_DIRS "."
     REQUIRES mosaico_game_app mosaico_game_assets mosaico_game_2d
              mosaico_raylib_fast mosaico_raylib_port raylib esp-gsp)

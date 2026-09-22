@@ -30,7 +30,7 @@ micropixel 只作为 Tomb / INDEX8 网格的外部对标，不是所有游戏的
        |-- Raylib 2D (DrawTexturePro / 矩形圆线字)
        |-- mosaico_game_2d 快路径 (墙柱 / 地板行 / RGB565 三角四边形 / INDEX8 三角四边形)
   -> 480x480 RGB565
-       Host: mosaico.py game sim -> 浏览器 / PNG
+       Host: python3 tools/game_cli.py sim -> 浏览器 / PNG
        设备: PSRAM framebuffer -> GSP Canvas -> LCD
 ```
 
@@ -94,7 +94,7 @@ micropixel 只作为 Tomb / INDEX8 网格的外部对标，不是所有游戏的
 | 光 | `300/(1+depth×0.18)`，量化 16 档；侧面/窗/门有系数 | 整柱一档，无 Gouraud | Tomb 烘焙顶点再平均；micropixel `LightFor` | `distance_light` |
 | 遮挡 | 列深度缓冲 + 精灵 visible run；无 z-buffer、无 scissor | 精灵与墙交界是列级，不是像素级 | Tomb 门户剪刀；Living Worlds 32×32 cover | `column_visible` |
 | 地板 | 透视 `dist = 165/(y-horizon)`，16.16 UV | 隔行（y+=2）是有损档 | 渲染指南中的「两行共用」 | `draw_floor`；`docs/game-rendering-guide.zh-CN.md` |
-| 真机镜像 | GRAM 直写 | ESP-Iris screen-mirror 可能空帧，游戏仍在跑 | Living Worlds Sunrise 有真机截图 | README |
+| 真机送屏 | GRAM 直写 | 连续重绘，不走镜像 RPC | Living Worlds Sunrise 有真机截图 | README |
 | 统计占位 | `refined_columns`、`grade_us` 恒 0 | 计时字段未接 | Tomb 把 emit/raster 塞进 sky/floor/wall 相位 | `last_zone_view.c` |
 
 ## 6. Living Worlds：RGB565 网格路径
@@ -171,7 +171,6 @@ micropixel 流水线（仅 Tomb 对标，其它游戏不套）：Guest 出 TRIAN
 
 | 游戏 | 现象 | 更可能的原因 |
 |---|---|---|
-| Last Zone | 真机镜像空帧 | GRAM 直写，screen-mirror RPC 拿不到同一块 buffer |
 | Last Zone | 近门曾卡 | 已改为门走墙内核；若再出现优先查是否退回 per-column Rectangle |
 | Living Worlds | Ocean ~14 fps、Sunrise ~17 fps | RGB565 大网格 + 体积三角过绘制；Jungle 全景反而满 30 |
 | Living Worlds | 斜看礁石穿帮 | 侧面/背面体积不画 |

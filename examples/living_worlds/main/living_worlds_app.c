@@ -6,7 +6,6 @@
 #include "esp_log.h"
 #include <stdlib.h>
 #include "mosaico_game_assets.h"
-#include "raylib_screen_mirror.h"
 #include "living_worlds_app.h"
 #include "living_worlds_view.h"
 #include "living_worlds_world.h"
@@ -208,5 +207,5 @@ static void on_event(const mosaico_device_event_t *event){
 static void on_update(void){living_world_update(&world);}
 static void on_render(void){living_worlds_view_render(&world,&atlases);}
 static void on_stats(void){ESP_LOGI("living_worlds","yaw=%.1f pitch=%.1f hash=%08lx",world.yaw,world.pitch,(unsigned long)living_world_hash(&world));}
-static const mosaico_game_app_config_t CONFIG={.tag="living_worlds",.window_title="Living Worlds",.canvas_bind=GSP_LIVING_WORLDS_BIND_GAME_CANVAS,.touch_points=1,.target_fps=30,.gsp_bundle=gsp_bundle_config,.register_mirror=raylib_screen_mirror_register,.before_display=before_display,.on_start=on_start,.on_event=on_event,.on_update=on_update,.on_render=on_render,.on_stats=on_stats};
+static const mosaico_game_app_config_t CONFIG={.tag="living_worlds",.window_title="Living Worlds",.canvas_bind=GSP_LIVING_WORLDS_BIND_GAME_CANVAS,.touch_points=1,.target_fps=30,.gsp_bundle=gsp_bundle_config,.before_display=before_display,.on_start=on_start,.on_event=on_event,.on_update=on_update,.on_render=on_render,.on_stats=on_stats};
 const mosaico_game_app_config_t *living_worlds_app_config(void){return &CONFIG;}

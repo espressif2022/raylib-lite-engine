@@ -1,7 +1,6 @@
 idf_component_register(
     SRCS "main.c" "living_worlds_app.c" "living_worlds_world.c" "living_worlds_aurora.c"
          "living_worlds_ocean.c" "living_worlds_volume.c" "living_worlds_view.c"
-         "raylib_screen_mirror.c"
     INCLUDE_DIRS "."
     REQUIRES mosaico_game_app mosaico_game_assets mosaico_game_2d esp_driver_jpeg
              mosaico_raylib_fast mosaico_raylib_port raylib esp-gsp)

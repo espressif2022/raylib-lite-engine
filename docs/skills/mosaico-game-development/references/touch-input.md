@@ -58,7 +58,7 @@ Verify on the physical board:
 3. Crossing two fingers preserves track identity.
 4. Empty and malformed reports do not stall later touches.
 5. Two held controls work concurrently, for example move plus jump.
-6. Single-touch games and ESP-Iris remote input retain their existing behavior.
+6. Single-touch games retain their existing behavior.
 
 Log point count and track IDs in a rate-limited diagnostic mode. Do not log every
-touch report in production because it can perturb timing and flood ESP-Iris.
+touch report in production because it can perturb timing.

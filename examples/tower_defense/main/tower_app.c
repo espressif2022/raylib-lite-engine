@@ -10,7 +10,6 @@
 #include "tower_app.h"
 #include "tower_audio.h"
 #include "tower_game.h"
-#include "tower_screen_mirror.h"
 #include "tower_view.h"
 
 static const char *TAG = "tower_defense";
@@ -167,7 +166,6 @@ static const mosaico_game_app_config_t s_config = {
     .touch_points = 1,
     .target_fps = 30,
     .gsp_bundle = gsp_bundle_config,
-    .register_mirror = tower_screen_mirror_register,
     .before_display = before_display,
     .on_start = on_start,
     .after_healthy = after_healthy,

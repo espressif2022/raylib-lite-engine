@@ -6,11 +6,10 @@
   check its `sdkconfig.defaults` for the FreeRTOS tick rate.
 - ESP-Mosaico BSP for display, touch, power and ES8311/I2S audio.
 - ESP-GSP 1.4.0 Canvas for presenting the 480×480 RGB565 framebuffer.
-- ESP-Iris for lifecycle, system inventory, screen/input RPC, logs, health and recovery-first update.
 - Raylib 6.0-compatible public types and selected 2D calls; the embedded fast layer is intentionally not full Raylib.
 
-Check the selected example's `main/idf_component.yml`. Device Recovery
-constraints still come from ESP-Mosaico Vibe Hello World.
+Check the selected example's `main/idf_component.yml`. Examples do not depend
+on ESP-Iris.
 
 The CST92xx touch hardware can report two contacts, but support is end-to-end:
 the BSP driver, `CONFIG_ESP_LCD_TOUCH_MAX_POINTS`, the requested point-array

@@ -3,5 +3,5 @@ idf_component_register(
     INCLUDE_DIRS "include"
     REQUIRES mosaico_game mosaico_game_input mosaico_game_debug
              mosaico_raylib_fast mosaico_raylib_port esp-gsp esp-mosaico-bsp
-             esp_iris nvs_flash esp_timer esp_mosaico_app_recovery
+             nvs_flash esp_timer
 )

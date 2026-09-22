@@ -10,7 +10,6 @@
 #include "mosaico_game_assets.h"
 #include "mosaico_game_audio.h"
 #include "platform_game.h"
-#include "raylib_screen_mirror.h"
 #include "sdkconfig.h"
 #include "sky_hop_app.h"
 #include "sky_hop_save.h"
@@ -222,7 +221,6 @@ static const mosaico_game_app_config_t s_config = {
 #endif
     .stats_interval = 300,
     .gsp_bundle = gsp_bundle_config,
-    .register_mirror = raylib_screen_mirror_register,
     .before_display = before_display,
     .on_start = on_start,
     .after_healthy = after_healthy,

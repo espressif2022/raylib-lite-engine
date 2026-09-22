@@ -8,7 +8,7 @@ python3 -m unittest tests.test_platform_game tests.test_game_cli tests.test_host
 ```
 
 `test_host_runner` compiles the shared Host simulator and needs Pillow. Device
-Recovery and ESP-Iris flows are not covered here. Packing an atlas with
+flash and ESP-Iris flows are not covered here. Packing an atlas with
 `"block": true` additionally needs NumPy; `tools/pack_game_assets.py` imports it
 lazily so projects that leave block compression off keep the Pillow-only
 dependency set.

@@ -8,9 +8,10 @@ latency and are presented without an extra full-frame copy.
 
 ```bash
 python3 tools/game_cli.py sim examples/raylib_shooter
-# 真机在 ESP-Mosaico Vibe 工作区：
-python mosaico.py game build --project submodule/raylib-lite-engine/examples/raylib_shooter
-python mosaico.py iris system-update --project submodule/raylib-lite-engine/examples/raylib_shooter
+
+# 真机：普通 ESP-IDF 工程，不经过 ESP-Iris
+export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+idf.py -C examples/raylib_shooter set-target esp32s31 build flash monitor
 ```
 
 The Registry GSP package needs a standalone scene compiler. This workspace
@@ -27,5 +28,3 @@ The fast compatibility layer currently accelerates `InitWindow`,
 `BeginDrawing`/`EndDrawing`, clear, pixels, rectangles, triangles, bitmap text,
 measurement and `TextFormat`. Extend that layer for additional Raylib calls;
 unsupported APIs must not silently fall back to the slow `rlsw` path.
-
-首次安装或布局、资源变化使用 `iris system-update`；分区表完全一致且仅修改代码时可用 `iris app-update`。

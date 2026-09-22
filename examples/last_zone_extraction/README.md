@@ -9,11 +9,9 @@ device share the same fixed-step model and RGB565 view.
 
 ![Last Zone: Extraction](docs/screenshot.png)
 
-The screenshot is a Host RGB565 frame of the Dock mission. The current device
-present path writes GRAM directly, so the ESP-Iris screen-mirror RPC can return
-an empty frame even while the game is running.
+The screenshot is a Host RGB565 frame of the Dock mission.
 
-截图为 Dock 关卡的 Host RGB565 画面。真机当前走 GRAM 直写，ESP-Iris 镜像 RPC 可能在游戏正常运行时仍返回空帧。
+截图为 Dock 关卡的 Host RGB565 画面。
 
 ## Play / 玩法
 
@@ -54,13 +52,7 @@ progress and per-mission bests.
 python3 tools/game_cli.py sim examples/last_zone_extraction
 python3 tools/game_cli.py sim examples/last_zone_extraction --headless --frames 90
 
-# 真机：在 ESP-Mosaico Vibe 仓库根目录
-python mosaico.py recover   # blank or unverified devices first
-python mosaico.py iris system-update --project submodule/raylib-lite-engine/examples/last_zone_extraction
-python mosaico.py iris logs
+# 真机：普通 ESP-IDF 工程，不经过 ESP-Iris
+export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+idf.py -C examples/last_zone_extraction set-target esp32s31 build flash monitor
 ```
-
-Use `iris system-update` for the first install or layout/resource changes;
-`iris app-update` only when the full partition table is unchanged.
-
-首次安装或布局/资源变化用 `iris system-update`；分区表完全一致且只改代码时可用 `iris app-update`。

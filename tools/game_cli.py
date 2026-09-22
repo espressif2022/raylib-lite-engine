@@ -24,20 +24,6 @@ TEMPLATES = {
 ENGINE_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _default_tool_root() -> Path:
-    env = os.environ.get("MOSAICO_VIBE_ROOT")
-    candidates = []
-    if env:
-        candidates.append(Path(env).expanduser() / "submodule/esp-mosaico-utils/mosaico-tools")
-    parent = ENGINE_ROOT.parent
-    if parent.name == "submodule":
-        candidates.append(parent.parent / "submodule/esp-mosaico-utils/mosaico-tools")
-    for candidate in candidates:
-        if (candidate / "tools/mosaico_cli/runtime.py").is_file():
-            return candidate
-    return ENGINE_ROOT
-
-
 def _inside_any(value: str, *roots: Path) -> Path:
     candidate = Path(value).expanduser()
     if candidate.is_absolute():
@@ -159,42 +145,30 @@ def _simulate(arguments: argparse.Namespace, project: Path, repository: Path) ->
         return 130
 
 
-def _build(project: Path, tool_root: Path, global_args: Sequence[str],
-           clean: bool = False, idf_path: Optional[str] = None) -> int:
-    package_root = tool_root / "tools"
-    if not (package_root / "mosaico_cli/runtime.py").is_file():
-        print("mosaico: initialize submodule/esp-mosaico-utils before building", file=sys.stderr)
-        return 3
-    sys.path.insert(0, str(package_root))
-    from mosaico_cli.errors import MosaicoError
-    from mosaico_cli.runtime import RunContext, build_application, resolve_idf_path
-    from mosaico_cli.workspace import load_workspace
-
-    workspace_arg = None
-    if "--workspace" in global_args:
-        index = global_args.index("--workspace")
-        if index + 1 < len(global_args):
-            workspace_arg = global_args[index + 1]
-    try:
-        workspace = load_workspace(tool_root, start=project.parent, explicit=workspace_arg)
-        resolved_idf = (Path(idf_path).expanduser().resolve() if idf_path
-                        else resolve_idf_path(workspace, project))
-        os.environ["IDF_PATH"] = str(resolved_idf)
-        if clean:
-            shutil.rmtree(project / "build", ignore_errors=True)
-        context = RunContext(workspace, "game-build", "--verbose" in global_args,
-                             "--json" in global_args)
-        build_application(context, project)
-    except (MosaicoError, OSError) as error:
-        print(f"mosaico: {error}", file=sys.stderr)
-        return getattr(error, "exit_code", 3)
-    print(json.dumps({"status": "succeeded", "project": str(project),
-                      "log": str(context.log_path)}))
-    return 0
+def _build(project: Path, clean: bool = False, idf_path: Optional[str] = None) -> int:
+    env = os.environ.copy()
+    if idf_path:
+        env["IDF_PATH"] = str(Path(idf_path).expanduser().resolve())
+    if clean:
+        shutil.rmtree(project / "build", ignore_errors=True)
+    idf_py = shutil.which("idf.py", path=env.get("PATH"))
+    if idf_py:
+        command = [idf_py, "-C", str(project), "build"]
+    else:
+        idf_root = env.get("IDF_PATH")
+        if not idf_root:
+            print("game_cli: set IDF_PATH or pass --idf-path, or source export.sh",
+                  file=sys.stderr)
+            return 3
+        idf_script = Path(idf_root) / "tools" / "idf.py"
+        if not idf_script.is_file():
+            print(f"game_cli: idf.py not found: {idf_script}", file=sys.stderr)
+            return 3
+        command = [sys.executable, str(idf_script), "-C", str(project), "build"]
+    return subprocess.call(command, env=env)
 
 
-def main(argv: Optional[Sequence[str]] = None, *, repository: Path,
-         tool_root: Path, global_args: Sequence[str] = ()) -> int:
+def main(argv: Optional[Sequence[str]] = None, *, repository: Path) -> int:
     parser = _parser()
     arguments = parser.parse_args(argv)
     if arguments.command in {"create", "new"}:
@@ -202,9 +176,8 @@ def main(argv: Optional[Sequence[str]] = None, *, repository: Path,
     project = _selected_project(parser, arguments, repository)
     if arguments.command in {"sim", "run"}:
         return _simulate(arguments, project, repository)
-    return _build(project, tool_root, global_args, arguments.clean,
-                  arguments.idf_path)
+    return _build(project, arguments.clean, arguments.idf_path)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(repository=ENGINE_ROOT, tool_root=_default_tool_root()))
+    raise SystemExit(main(repository=ENGINE_ROOT))

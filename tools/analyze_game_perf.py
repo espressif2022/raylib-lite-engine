@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize mosaico_game_debug samples from ESP-Iris monitor logs."""
+"""Summarize mosaico_game_debug samples from device monitor logs."""
 from __future__ import annotations
 
 import argparse
