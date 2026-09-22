@@ -283,6 +283,15 @@ void MosaicoFastBeginDrawing(void)
 
 bool MosaicoFastFrameAvailable(void) { return s_pixels != NULL; }
 
+uint16_t *MosaicoFastGetFramebuffer(int *width, int *height,
+                                    size_t *stride_pixels)
+{
+    if (width) *width = MOSAICO_GAME_WIDTH;
+    if (height) *height = MOSAICO_GAME_HEIGHT;
+    if (stride_pixels) *stride_pixels = s_stride;
+    return s_pixels;
+}
+
 void MosaicoFastConsumeInputEdges(void)
 {
     memset(s_key_pressed, 0, sizeof(s_key_pressed));
@@ -822,14 +831,20 @@ int MosaicoFastMeasureText(const char *text, int font_size)
     return (int)strlen(text)*6*scale-scale;
 }
 
-const char *MosaicoFastTextFormat(const char *format, ...)
+const char *MosaicoFastTextFormatV(const char *format, va_list args)
 {
     static char buffers[2][64];
     static unsigned index;
     char *out = buffers[index++ & 1U];
+    vsnprintf(out, sizeof(buffers[0]), format ? format : "", args);
+    return out;
+}
+
+const char *MosaicoFastTextFormat(const char *format, ...)
+{
     va_list args;
     va_start(args, format);
-    vsnprintf(out, sizeof(buffers[0]), format, args);
+    const char *out = MosaicoFastTextFormatV(format, args);
     va_end(args);
     return out;
 }

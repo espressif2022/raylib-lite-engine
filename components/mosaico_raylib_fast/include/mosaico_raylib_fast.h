@@ -4,6 +4,9 @@
 /* Raylib-compatible 2D API backed by the ESP-Mosaico RGB565 surface. Keep the
  * mapping explicit: unsupported upstream APIs fail at link time instead of
  * silently pulling a software OpenGL renderer into device firmware. */
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 #include "raylib.h"
 
 #ifdef __cplusplus
@@ -119,7 +122,10 @@ void MosaicoFastDrawTexturePro(Texture2D texture, Rectangle source,
 
 void MosaicoFastDrawText(const char *text, int x, int y, int font_size, Color color);
 int MosaicoFastMeasureText(const char *text, int font_size);
+const char *MosaicoFastTextFormatV(const char *format, va_list args);
 const char *MosaicoFastTextFormat(const char *format, ...);
+uint16_t *MosaicoFastGetFramebuffer(int *width, int *height,
+                                    size_t *stride_pixels);
 
 bool MosaicoFastCheckCollisionRecs(Rectangle first, Rectangle second);
 bool MosaicoFastCheckCollisionCircles(Vector2 first, float first_radius,
