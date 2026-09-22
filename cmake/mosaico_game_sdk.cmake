@@ -1,10 +1,14 @@
 # Project integration for Raylib Lite Engine.
 set(MOSAICO_GAME_SDK_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 
-set(MOSAICO_GAME_GSPC_FETCHER "" CACHE FILEPATH
-    "Optional script that prints the path to a GSP compiler")
-set(MOSAICO_GAME_RECOVERY_COMPONENT_DIR "" CACHE PATH
-    "Optional application recovery component directory")
+if(NOT DEFINED MOSAICO_GAME_GSPC_FETCHER)
+    set(MOSAICO_GAME_GSPC_FETCHER "" CACHE FILEPATH
+        "Optional script that prints the path to a GSP compiler")
+endif()
+if(NOT DEFINED MOSAICO_GAME_RECOVERY_COMPONENT_DIR)
+    set(MOSAICO_GAME_RECOVERY_COMPONENT_DIR "" CACHE PATH
+        "Optional application recovery component directory")
+endif()
 
 function(mosaico_game_sdk_configure_gsp_compiler)
     # IDF 6.2's GCC 16 diagnoses a bounded strncpy in managed mdns 1.13.0 as

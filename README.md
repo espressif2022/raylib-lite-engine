@@ -60,3 +60,11 @@ versioned and reject incompatible inputs.
 ## License
 
 Source files are licensed under Apache-2.0 unless stated otherwise.
+
+## Examples and validation
+
+Complete ESP-Mosaico games live in the BSP repository's examples/ directory.
+The workspace product CLI creates them and invokes this engine's public
+`host/run_game.py --project PATH` simulator. The engine does not own a workspace
+creation CLI or depend on the vibe repository layout. Run `python -m unittest
+discover -s tests -v` for engine implementation tests.
