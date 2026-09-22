@@ -29,9 +29,24 @@ static void reference(const mosaico_raycast_wall_t *c,int lo,int hi){
   expected[y*STRIDE+x]=p;
  }
 }
+static void indexed_reference(const mosaico_raycast_wall_t *c,int lo,int hi){
+ if(c->dest_width<=0||c->dest_height<=0||!c->src_width||!c->src_height)return;
+ int sw=abs(c->src_width),sh=abs(c->src_height),sx=c->src_x+(sw>1?sw/2:0);
+ unsigned light=c->light256>256?256:c->light256;
+ unsigned level=(light*15U+128U)>>8;
+ for(int y=lo;y<hi;y++)for(int x=lo;x<hi;x++){
+  if(x<c->dest_x||x>=c->dest_x+c->dest_width||y<c->dest_y||y>=c->dest_y+c->dest_height)continue;
+  int sy=c->src_y+(int)((int64_t)(y-c->dest_y)*sh/c->dest_height);
+  if((unsigned)sx>=8||(unsigned)sy>=8)continue;
+  unsigned index=(unsigned)(sy*8+sx);
+  expected[y*STRIDE+x]=(uint16_t)(level*257U+index*997U+31U);
+ }
+}
 int main(int argc,char **argv){
  assert(argc>=2);mosaico_host_assets_set_root(argv[1]);
  Texture2D texture=Mosaico2DLoadTexture("test.atlas");assert(texture.id);
+ MosaicoWallAtlas wall=LoadMosaicoWallAtlas("test.wall");assert(wall.descriptor);
+ MosaicoWallAtlas row_wall=LoadMosaicoWallAtlas("test_row.wall");assert(row_wall.descriptor);
  mosaico_game_2d_set_target(actual,STRIDE,W,W);
  mosaico_raycast_wall_t columns[240];
  for(int trial=0;trial<100;trial++){
@@ -53,6 +68,39 @@ int main(int argc,char **argv){
    Mosaico2DDrawColumn(texture,(Rectangle){c->src_x,c->src_y,c->src_width,c->src_height},
     c->dest_x,c->dest_y,c->dest_width,c->dest_height,c->light256);
   }
+  assert(!memcmp(actual,expected,sizeof(actual)));
+ }
+ for(int trial=0;trial<50;trial++){
+  int lo=trial%11,hi=W-trial%19;
+  mosaico_solid_wall_t solids[65];
+  mosaico_game_2d_set_clip(lo,lo,hi-lo,hi-lo);
+  memset(actual,0x5a,sizeof(actual));memset(expected,0x5a,sizeof(expected));
+  int n=trial%2?65:33;
+  for(int i=0;i<n;i++){
+   solids[i]=(mosaico_solid_wall_t){(int)(random_u()%530)-25,
+    (int)(random_u()%600)-150,(int)(random_u()%10),(int)(random_u()%700),
+    (uint16_t)random_u()};
+   const mosaico_solid_wall_t *c=&solids[i];
+   for(int y=lo;y<hi;y++)for(int x=lo;x<hi;x++)
+    if(x>=c->dest_x&&x<c->dest_x+c->dest_width&&
+       y>=c->dest_y&&y<c->dest_y+c->dest_height)
+     expected[y*STRIDE+x]=c->color565;
+  }
+  Mosaico2DDrawSolidRaycastWalls(solids,n);
+  assert(!memcmp(actual,expected,sizeof(actual)));
+ }
+ for(int trial=0;trial<100;trial++){
+  int lo=trial%13,hi=W-trial%17;
+  mosaico_game_2d_set_clip(lo,lo,hi-lo,hi-lo);
+  memset(actual,0x5a,sizeof(actual));memset(expected,0x5a,sizeof(expected));
+  int n=trial%2?65:33;
+  for(int i=0;i<n;i++){
+   columns[i]=(mosaico_raycast_wall_t){(int)(random_u()%530)-25,(int)(random_u()%600)-150,
+    (int)(random_u()%50),(int)(random_u()%700),(int)(random_u()%12)-2,(int)(random_u()%12)-2,
+    (int)(random_u()%9)-4,(int)(random_u()%17)-8,random_u()%350};
+   indexed_reference(&columns[i],lo,hi);
+  }
+  Mosaico2DDrawIndexedRaycastWalls(wall,columns,n);
   assert(!memcmp(actual,expected,sizeof(actual)));
  }
  /* Floor/span oracle includes negative wrapping, non-power-of-two tiles,
@@ -131,10 +179,48 @@ int main(int argc,char **argv){
   assert(written>100);
  }
  mosaico_game_2d_set_clip(0,0,W,W);
+ memset(actual,0x5a,sizeof(actual));
+ unsigned indexed_level=(160U*15U+128U)>>8;
+ unsigned indexed_texel=(unsigned)(3*8+2);
+ uint16_t indexed_expect=(uint16_t)(indexed_level*257U+indexed_texel*997U+31U);
+ Mosaico2DDrawIndexedTexturedTriangle(wall,
+  (mosaico_textured_vertex_t){20,20,2,3},(mosaico_textured_vertex_t){90,20,2,3},
+  (mosaico_textured_vertex_t){20,90,2,3},160);
+ int indexed_written=0;
+ for(int y=0;y<W;y++)for(int x=0;x<W;x++){
+  uint16_t p=actual[y*STRIDE+x];
+  if(p==0x5a5a)continue;
+  assert(p==indexed_expect);
+  ++indexed_written;
+ }
+ assert(indexed_written>100);
+ memset(actual,0x5a,sizeof(actual));
+ mosaico_game_2d_reset_raster_stats();
+ Mosaico2DDrawIndexedTexturedQuad(row_wall,
+  (mosaico_textured_vertex_t){20,20,2,3},(mosaico_textured_vertex_t){90,20,2,3},
+  (mosaico_textured_vertex_t){20,90,2,3},(mosaico_textured_vertex_t){90,90,2,3},160);
+ int indexed_quad_written=0;
+ for(int y=0;y<W;y++)for(int x=0;x<W;x++){
+  uint16_t p=actual[y*STRIDE+x];
+  if(p==0x5a5a)continue;
+  assert(p==indexed_expect);
+  ++indexed_quad_written;
+ }
+ assert(indexed_quad_written>100);
+ mosaico_game_2d_raster_stats_t quad_stats={0};
+ mosaico_game_2d_get_raster_stats(&quad_stats);
+ assert(quad_stats.quad_calls==1);
+ assert(quad_stats.quad_pixels==(uint32_t)indexed_quad_written);
+ assert(quad_stats.triangle_calls==0);
+ mosaico_game_2d_set_clip(0,0,W,W);
  for(int i=0;i<240;i++)columns[i]=(mosaico_raycast_wall_t){i*2,-30,2,450,i%8,0,1,8,160};
  clock_t start=clock();
  for(int i=0;i<500;i++)Mosaico2DDrawRaycastWalls(texture,columns,240);
- printf("100 wall, 400 floor/span, 100 opaque-scale oracle cases passed; wall benchmark %.3f ms/frame\n",
+ printf("100 RGB565 wall, 100 INDEX8 wall, 50 solid wall, 400 floor/span, 100 opaque-scale oracle cases passed; wall benchmark %.3f ms/frame\n",
+  (double)(clock()-start)*1000/CLOCKS_PER_SEC/500);
+ start=clock();
+ for(int i=0;i<500;i++)Mosaico2DDrawIndexedRaycastWalls(wall,columns,240);
+ printf("indexed wall benchmark %.3f ms/frame (Host CPU, informational only)\n",
   (double)(clock()-start)*1000/CLOCKS_PER_SEC/500);
  start=clock();
  for(int i=0;i<500;i++)Mosaico2DDrawTexturePro(texture,(Rectangle){0,0,8,8},

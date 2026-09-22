@@ -138,6 +138,7 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
     ESP_ERROR_CHECK(bsp_power_set_vcc_3v3(true));
     mosaico_game_config_t game_config = MOSAICO_GAME_CONFIG_DEFAULT();
     if (config->target_fps > 0) game_config.target_fps = config->target_fps;
+    int logic_hz = config->logic_hz > 0 ? config->logic_hz : game_config.target_fps;
     ESP_ERROR_CHECK(MosaicoGameInit(&game_config));
     mosaico_action_reset();
     if (config->before_display) ESP_ERROR_CHECK(config->before_display());
@@ -153,6 +154,7 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
     if (config->register_mirror) ESP_ERROR_CHECK(config->register_mirror());
     InitWindow(MOSAICO_GAME_WIDTH, MOSAICO_GAME_HEIGHT,
                config->window_title ? config->window_title : "Mosaico");
+    SetTargetFPS(game_config.target_fps);
     if (config->on_start) ESP_ERROR_CHECK(config->on_start());
     config->on_render();
     ESP_ERROR_CHECK(esp_gsp_flush(s_gsp, 3000));
@@ -162,7 +164,10 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
     ESP_ERROR_CHECK(xTaskCreate(touch_task, "game_touch", 4096, NULL, 5, NULL) == pdPASS
                     ? ESP_OK : ESP_ERR_NO_MEM);
     int64_t previous_us = esp_timer_get_time();
-    int64_t tick_credit = 1000000; /* One immediate tick; units are microseconds * Hz. */
+    /* Separate fixed gameplay ticks from presentation. Credits use
+     * microseconds * Hz and start with one immediate update/frame. */
+    int64_t logic_credit = 1000000;
+    int64_t render_credit = 1000000;
     uint32_t frames = 0;
     uint32_t stats_interval = config->stats_interval ? config->stats_interval : 100;
     while (!WindowShouldClose()) {
@@ -181,24 +186,31 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
         }
         uint32_t input_us = (uint32_t)(esp_timer_get_time() - input_started);
         if (config->idle && config->idle()) {
-            tick_credit = 1000000;
+            logic_credit = 1000000;
+            render_credit = 1000000;
             vTaskDelay(1);
             previous_us = esp_timer_get_time();
             continue;
         }
         int64_t now_us = esp_timer_get_time();
-        tick_credit += (now_us - previous_us) * game_config.target_fps;
+        int64_t elapsed_us = now_us - previous_us;
+        logic_credit += elapsed_us * logic_hz;
+        render_credit += elapsed_us * game_config.target_fps;
         previous_us = now_us;
         /* Bound catch-up to three updates: avoid a spiral after long stalls.
          * Preserve the fractional phase when discarding excessive backlog. */
-        if (tick_credit >= 4000000) tick_credit = 3000000 + tick_credit % 1000000;
-        if (tick_credit < 1000000) {
+        if (logic_credit >= 4000000)
+            logic_credit = 3000000 + logic_credit % 1000000;
+        /* Rendering never catches up old frames. Keep only the newest due frame. */
+        if (render_credit >= 2000000)
+            render_credit = 1000000 + render_credit % 1000000;
+        if (logic_credit < 1000000 && render_credit < 1000000) {
             vTaskDelay(1);
-            continue; /* Retain pending input edges until an update consumes them. */
+            continue;
         }
         uint32_t update_us = 0;
         int64_t started;
-        while (tick_credit >= 1000000) {
+        while (logic_credit >= 1000000) {
             mosaico_action_begin_frame();
             started = esp_timer_get_time();
             if (config->on_update) config->on_update();
@@ -207,11 +219,13 @@ esp_err_t mosaico_game_app_run(const mosaico_game_app_config_t *config)
             MosaicoGameRecordLogic(input_us, step_us);
             input_us = 0;
             MosaicoFastConsumeInputEdges();
-            tick_credit -= 1000000;
+            logic_credit -= 1000000;
         }
+        if (render_credit < 1000000) continue;
         started = esp_timer_get_time();
         config->on_render();
         MosaicoGameRecordTiming(update_us, (uint32_t)(esp_timer_get_time() - started));
+        render_credit -= 1000000;
         if (++frames % stats_interval == 0) {
             mosaico_game_debug_log(tag);
             if (config->on_stats) config->on_stats();

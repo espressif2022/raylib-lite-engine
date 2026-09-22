@@ -68,8 +68,8 @@ CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' python3 tests/test
 Host builds of these suites must also compile `mosaico_rgb565.c`; the Python
 harnesses add it next to `mosaico_game_2d.c`.
 
-The test compares both column APIs against an independent integer-division
-oracle using 100 deterministic randomized batches. It covers negative origins,
+The test compares both textured column APIs and the solid wall batch against
+independent oracles using deterministic randomized batches. It covers negative origins,
 viewport clipping, non-integral scaling, source bounds, signed source extents,
 brightness quantization, overlapping columns across 32-column blocks, and
 framebuffer stride padding. The reference does not share the optimized sampler.
@@ -79,12 +79,14 @@ CPU time is informational, not a test threshold or an estimate of device FPS.
 For before/after comparisons, `M2D_TEST_SOURCE=/path/to/old/mosaico_game_2d.c`
 selects the previous implementation with identical compiler flags and workload.
 
-The batch implementation prepares up to 32 columns on the stack (no heap
-allocation), then traverses each block by scanline. Rational quotient/remainder
-stepping preserves the old nearest-neighbor samples without division in the
-pixel loop. Blocks retain input painter ordering even when columns overlap.
-Clipping, source X and quantized light are prepared once per column. The scalar
-implementation is shared by Host and device; no SIMD dependency is introduced.
+The RGB565 and compatibility MSW2 paths prepare bounded 64-column blocks and
+traverse each block by scanline. MSW1 INDEX8 assets are column-major and use a
+tight vertical loop that keeps one source column and one light-table row hot;
+the destination advances by framebuffer stride. Magnified one-pixel columns
+reuse the lit texel while the exact sampler remains on the same source row.
+Rational quotient/remainder stepping preserves exact nearest-neighbor samples
+without division in the pixel loop. The scalar implementation is shared by Host
+and device; no SIMD dependency is introduced.
 
 Device verification must additionally measure PSRAM/cache behavior and worst-case
 combat scenes. A faster Host kernel does not establish device frame rate.
@@ -107,11 +109,11 @@ negative texture coordinates, power-of-two and arbitrary texture sizes, source
 bounds, destination clipping, row repetition and wall occlusion. Floor/span
 kernels select mask wrapping once per call and hoist valid-source/row preparation.
 
-Device scheduling accumulates elapsed microseconds multiplied by the configured
-logic rate (no 33 ms truncation at 30 Hz). Each presentation runs up to three
-updates then renders the newest state. Longer stalls discard excess whole ticks
-while retaining fractional phase. This bounds catch-up work; it cannot preserve
-all elapsed simulation time under sustained overload. Idle resets the clock.
+Device scheduling keeps separate elapsed-time credits for fixed `logic_hz`
+updates and the `target_fps` presentation cap. A presentation can reuse the
+latest state when no logic tick is due. Each pass runs at most three updates;
+longer stalls discard excess whole ticks while retaining fractional phase.
+Rendering never catches up stale frames. Idle resets both clocks.
 Pressed/released input edges are consumed after each logic update; held state
 persists. Host frame-count replay remains independent of wall-clock scheduling.
 

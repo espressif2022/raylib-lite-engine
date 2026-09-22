@@ -16,8 +16,10 @@ compatibility aliases rather than a flag-day rename.
 - Raylib-style immediate 2D API rendered directly into RGB565 framebuffers.
 - Fast opaque copies, integer-DDA scaling, alpha sprites, tile rows and bitmap
   text.
-- Opaque raycast columns, spans, floor rows and batched walls, plus textured
-  triangles and quads with shared RGB565 fill/copy/shade helpers.
+- Opaque raycast columns, spans, floor rows and batched walls, including
+  column-major INDEX8 assets for ray columns and row-major INDEX8 assets for
+  mesh spans. Textured convex quads use one edge walk and one continuous span
+  per scanline, with a build-time 16-level RGB565 light table.
 - Fixed-step update scheduling and non-blocking, latest-wins presentation.
 - Keyboard, pointer, two-point touch and IMU input.
 - Atlas, tilemap and PCM/IMA-ADPCM asset compilation.
