@@ -1,0 +1,12 @@
+menu "Tomb Explorer benchmark"
+
+config TOMB_EXPLORER_BENCHMARK_MODE
+    bool "Run deterministic performance replay"
+    default n
+    help
+        Drives Tomb Explorer from a fixed input sequence derived from the
+        logic tick and ignores touch input, so raster and frame-time samples
+        are comparable between builds. Use this only for repeatable device
+        benchmarks, not normal gameplay.
+
+endmenu

@@ -85,6 +85,10 @@ static void begin_joystick(int32_t track, int32_t x, int32_t y)
 
 static void on_event(const mosaico_device_event_t *event)
 {
+#if CONFIG_TOMB_EXPLORER_BENCHMARK_MODE
+    (void)event; /* The fixed replay must not be perturbed by live input. */
+    return;
+#else
     if (event->type != MOSAICO_DEVICE_EVENT_POINTER &&
         event->type != MOSAICO_DEVICE_EVENT_TOUCH) return;
     const int32_t track = event->value;
@@ -119,10 +123,21 @@ static void on_event(const mosaico_device_event_t *event)
         s_look_x = event->x;
         s_look_y = event->y;
     }
+#endif
 }
 
 static void on_update(void)
 {
+#if CONFIG_TOMB_EXPLORER_BENCHMARK_MODE
+    /* Fixed 300-tick replay, 10 s at 30 Hz. Walking the loop while sweeping
+     * the camera keeps the run passing through several rooms, so the raster
+     * sample covers varied geometry instead of one static view. */
+    const uint32_t phase = s_game.tick % 300U;
+    s_move_forward = phase < 225U ? 1.0f : 0.25f;
+    s_move_strafe = phase < 150U ? 0.0f : (phase < 225U ? 0.7f : -0.7f);
+    tomb_set_look(&s_game, phase < 150U ? 0.012f : -0.008f, 0.0f);
+    tomb_set_jump(&s_game, s_game.tick % 90U == 11U);
+#endif
     tomb_set_stick(&s_game, s_move_strafe, -s_move_forward);
     tomb_update(&s_game);
 }
@@ -156,6 +171,16 @@ static void on_stats(void)
              (unsigned long)raster.triangle_pixels,
              (unsigned long)raster.quad_calls,
              (unsigned long)raster.quad_pixels);
+    /* Store shape. run_len below 16 means every store touches a 32-byte cache
+     * line it only partly fills; overdraw is written pixels per screen pixel. */
+    ESP_LOGI(TAG, "raster fb_runs=%lu fb_pixels=%lu run_len=%u.%02u overdraw=%u.%02u",
+             (unsigned long)raster.fb_runs, (unsigned long)raster.fb_pixels,
+             (unsigned)(raster.fb_runs ? raster.fb_pixels / raster.fb_runs : 0),
+             (unsigned)(raster.fb_runs
+                 ? (raster.fb_pixels * 100U / raster.fb_runs) % 100U : 0),
+             (unsigned)(raster.fb_pixels / (MOSAICO_GAME_WIDTH * MOSAICO_GAME_HEIGHT)),
+             (unsigned)((raster.fb_pixels * 100U
+                 / (MOSAICO_GAME_WIDTH * MOSAICO_GAME_HEIGHT)) % 100U));
 }
 
 static const mosaico_game_app_config_t s_config = {

@@ -20,6 +20,11 @@ COUNTER_PATTERN = re.compile(
     r"superseded=(?P<superseded>\d+) errors=(?P<errors>\d+).*?"
     r"inflight=(?P<inflight>\d+)/(?P<peak_inflight>\d+)"
     r"(?: heap=(?P<heap>\d+) psram=(?P<psram>\d+))?")
+# Optional: games that log framebuffer store shape. Absent for games that do
+# not, in which case the raster section is omitted rather than reported as 0.
+RASTER_FIELDS = ("fb_runs", "fb_pixels")
+RASTER_PATTERN = re.compile(
+    r"fb_runs=(?P<fb_runs>\d+) fb_pixels=(?P<fb_pixels>\d+)")
 
 
 def percentile(values: list[float], fraction: float) -> float:
@@ -55,6 +60,27 @@ def summarize(text: str) -> dict[str, object]:
             result[key] = 0
         result["min_heap_bytes"] = None
         result["min_psram_bytes"] = None
+    raster = [{key: float(match.group(key)) for key in RASTER_FIELDS}
+              for match in RASTER_PATTERN.finditer(text)]
+    if raster:
+        section: dict[str, object] = {"samples": len(raster)}
+        for key in RASTER_FIELDS:
+            values = [sample[key] for sample in raster]
+            section[key] = {
+                "mean": round(statistics.fmean(values), 2),
+                "p50": round(percentile(values, .50), 2),
+                "p95": round(percentile(values, .95), 2),
+            }
+        lengths = [s["fb_pixels"] / s["fb_runs"] for s in raster if s["fb_runs"]]
+        # Mean run length below 16 means a 32-byte cache line is only partly
+        # used by each store, which is the signal tiling would address.
+        section["run_length"] = {
+            "mean": round(statistics.fmean(lengths), 2) if lengths else 0.0,
+            "p50": round(percentile(lengths, .50), 2),
+        }
+        section["overdraw"] = round(
+            statistics.fmean([s["fb_pixels"] / (480 * 480) for s in raster]), 3)
+        result["raster"] = section
     result["accepted"] = bool(samples) and 29.5 <= result["logic"]["mean"] <= 30.5 \
         and result["acquire"]["p95"] <= 1000 and result["errors"] == 0 \
         and result["display"]["mean"] >= 24.0
