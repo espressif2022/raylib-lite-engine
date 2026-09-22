@@ -1,0 +1,10 @@
+{
+  "events": [
+    {"frame": 0, "type": "action", "code": 5, "pressed": true},
+    {"frame": 45, "type": "action", "code": 5, "pressed": false},
+    {"frame": 46, "type": "pointer", "track": 2, "x": 300, "y": 220, "pressed": true},
+    {"frame": 47, "type": "pointer", "track": 2, "x": 380, "y": 220, "pressed": true},
+    {"frame": 48, "type": "pointer", "track": 2, "x": 460, "y": 220, "pressed": true},
+    {"frame": 49, "type": "pointer", "track": 2, "x": 460, "y": 220, "pressed": false}
+  ]
+}

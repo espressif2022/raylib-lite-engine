@@ -21,6 +21,7 @@ from PIL import Image, ImageDraw
 
 ATLAS_HEADER = struct.Struct("<4sHHHHII")
 ATLAS_FRAME = struct.Struct("<IHHHHhh")
+WALL_HEADER = struct.Struct("<4sHHHHII")
 MAP_HEADER = struct.Struct("<4sHHHHHHIIII")
 MAP_OBJECT = struct.Struct("<IhhhhI")
 SOUND_HEADER = struct.Struct("<4sIHHII")
@@ -222,6 +223,100 @@ def write_atlas(source: Path, manifest: dict, destination: Path) -> dict:
             "alpha_mode": alpha_mode, "variants": len(variants)}
 
 
+def _grid_cell(raw: Image.Image, columns: int, rows: int, index: int) -> Image.Image:
+    if index < 0 or index >= columns * rows:
+        raise ValueError(f"source_index outside atlas grid: {index}")
+    cell_w, cell_h = raw.width // columns, raw.height // rows
+    col, row = index % columns, index // columns
+    return raw.crop((col * cell_w, row * cell_h,
+                     (col + 1) * cell_w, (row + 1) * cell_h))
+
+
+def write_wall_atlas(source: Path, manifest: dict, destination: Path) -> dict:
+    """Pack an opaque INDEX8 wall atlas with 16 RGB565 light levels.
+
+    Column-major remains the default for ray-cast columns. Meshes can request
+    row-major so horizontal quad/triangle spans read adjacent texels.
+    """
+    opened = Image.open(source)
+    preserve = opened.mode == "P"
+    raw = opened if preserve else opened.convert("RGB")
+    columns, rows = int(manifest["columns"]), int(manifest["rows"])
+    frames_config = manifest["frames"]
+    if columns <= 0 or rows <= 0 or raw.width < columns or raw.height < rows:
+        raise ValueError("wall atlas grid is invalid for the source image")
+    if len(frames_config) > columns * rows:
+        raise ValueError("wall atlas frame table exceeds the declared grid")
+    output_cell = int(manifest.get("output_cell", 64))
+    if output_cell <= 0 or output_cell > 65535:
+        raise ValueError("invalid wall atlas output_cell")
+    width, height = columns * output_cell, rows * output_cell
+    resampling = getattr(Image, "Resampling", Image)
+    if preserve:
+        palette = list(raw.getpalette() or [])
+        palette.extend([0] * (768 - len(palette)))
+        atlas = Image.new("P", (width, height), 0)
+        atlas.putpalette(palette[:768])
+    else:
+        atlas = Image.new("RGB", (width, height))
+    frames = []
+    ids: set[int] = set()
+    for index, item in enumerate(frames_config):
+        crop = _grid_cell(raw, columns, rows, int(item.get("source_index", index)))
+        if crop.size != (output_cell, output_cell):
+            crop = crop.resize((output_cell, output_cell),
+                               resampling.NEAREST if preserve else resampling.LANCZOS)
+        col, row = index % columns, index // columns
+        x, y = col * output_cell, row * output_cell
+        atlas.paste(crop, (x, y))
+        identifier = asset_id(str(item["name"]))
+        if identifier in ids:
+            raise ValueError(f"duplicate wall frame id: {item['name']}")
+        ids.add(identifier)
+        frames.append((identifier, x, y, output_cell, output_cell,
+                       int(item.get("pivot_x", output_cell // 2)),
+                       int(item.get("pivot_y", output_cell // 2))))
+
+    if preserve:
+        indexed = atlas
+        palette = list(indexed.getpalette() or [])
+        palette.extend([0] * (768 - len(palette)))
+    else:
+        quantize = getattr(Image, "Quantize", Image)
+        dither = getattr(Image, "Dither", Image)
+        indexed = atlas.quantize(colors=256, method=quantize.MEDIANCUT, dither=dither.NONE)
+        palette = indexed.getpalette() or []
+        palette.extend([0] * (768 - len(palette)))
+    row_major = bytes(indexed.getdata())
+    column_major = bytes(row_major[y * width + x]
+                         for x in range(width) for y in range(height))
+    layout = str(manifest.get("layout", "column-major"))
+    if layout not in {"column-major", "row-major"}:
+        raise ValueError("wall atlas layout must be column-major or row-major")
+    magic = b"MSW2" if layout == "row-major" else b"MSW1"
+    packed_indices = row_major if layout == "row-major" else column_major
+    light_lut = bytearray()
+    for level in range(16):
+        light = (level * 256 + 7) // 15
+        for index in range(256):
+            r, g, b = palette[index * 3:index * 3 + 3]
+            pixel = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+            if light < 256:
+                pixel = ((((pixel >> 11) * light >> 8) << 11) |
+                         (((((pixel >> 5) & 63) * light >> 8) << 5)) |
+                         ((pixel & 31) * light >> 8))
+            light_lut.extend(struct.pack("<H", pixel))
+    body = b"".join(ATLAS_FRAME.pack(*frame) for frame in frames)
+    header = WALL_HEADER.pack(magic, width, height, len(frames), 16,
+                              256, len(packed_indices))
+    destination.write_bytes(header + body + light_lut + packed_indices)
+    return {"file": destination.name, "type": "wall_atlas",
+            "bytes": destination.stat().st_size, "width": width,
+            "height": height, "frames": len(frames), "colors": 256,
+            "light_levels": 16, "layout": layout,
+            "indexed_source": preserve}
+
+
 def write_terrain_atlas(destination: Path) -> dict:
     atlas = Image.new("RGBA", (96, 32), (0, 0, 0, 0))
     draw = ImageDraw.Draw(atlas)
@@ -370,7 +465,7 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
         raise ValueError("asset payload limit must be positive")
     output.mkdir(parents=True, exist_ok=True)
     for stale in output.iterdir():
-        if stale.is_file() and stale.suffix in {".atlas", ".map", ".sound"}:
+        if stale.is_file() and stale.suffix in {".atlas", ".wall", ".map", ".sound"}:
             stale.unlink()
     report: list[dict] = []
     identifiers: set[str] = set()
@@ -390,6 +485,14 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
         identifiers.update(str(frame["name"]) for frame in config.get("variants", []))
         animations.extend(config.get("animations", []))
 
+    for item in manifest.get("wall_atlases", []):
+        destination = _output_file(output, str(item["output"]), ".wall")
+        config_file = _source_file(source, str(item["config"]))
+        config = json.loads(config_file.read_text(encoding="utf-8"))
+        image = _source_file(source, str(item.get("source", config["image"])))
+        report.append(write_wall_atlas(image, config, destination))
+        identifiers.update(str(frame["name"]) for frame in config["frames"])
+
     for item in manifest.get("maps", []):
         source_map = _source_file(source, str(item["source"]))
         destination = _output_file(output, str(item["output"]), ".map")
@@ -408,7 +511,7 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
             report.append(write_sound(wav, _output_file(output, output_name, ".sound")))
 
     identifiers.update(path.name for path in output.iterdir()
-                       if path.suffix in {".atlas", ".map", ".sound"})
+                       if path.suffix in {".atlas", ".wall", ".map", ".sound"})
     write_asset_ids(output / "assets_ids.h", identifiers, animations)
     total = sum(item["bytes"] for item in report)
     if total > limit:

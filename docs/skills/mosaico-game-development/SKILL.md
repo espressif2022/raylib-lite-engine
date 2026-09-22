@@ -15,7 +15,10 @@ the closest example:
 
 - `examples/raylib_shooter` for a small code-drawn game;
 - `examples/tower_defense` for Atlas, Tiled, audio, and Host replay;
-- `examples/sky_hop` for platform physics, scrolling, generated art, and audio cues.
+- `examples/sky_hop` for platform physics, scrolling, generated art, and audio cues;
+- `examples/living_worlds` for 360° scenes and RGB565 volume meshes;
+- `examples/last_zone_extraction` for raycast walls and a campaign shooter;
+- `examples/tomb_explorer` for portal rooms and INDEX8 textured triangles.
 
 Keep gameplay state and `update()` logic in C files that compile without ESP-IDF.
 Device firmware uses a thin `main.c` that calls `mosaico_game_app_run()`; put

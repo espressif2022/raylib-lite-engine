@@ -75,7 +75,8 @@ class TowerHostRunnerTests(unittest.TestCase):
 class SkyHopHostRunnerTests(unittest.TestCase):
     def test_host_runtime_has_no_project_specific_renderer(self) -> None:
         source = RUNNER.read_text(encoding="utf-8")
-        for project_name in ("tower_defense", "sky_hop", "raylib_shooter"):
+        for project_name in ("tower_defense", "sky_hop", "raylib_shooter",
+                             "living_worlds", "last_zone_extraction", "tomb_explorer"):
             self.assertNotIn(project_name, source)
         self.assertFalse((ENGINE / "host/tower_host_renderer.c").exists())
 

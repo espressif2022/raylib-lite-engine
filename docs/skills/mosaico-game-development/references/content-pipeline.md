@@ -8,6 +8,7 @@ Put editable inputs and deterministic generators in `examples/<game>/assets_src`
 `game_assets.json` manifest containing only the content a project uses:
 
 - `atlases`: source image, frame config and output filename, or an explicit generator;
+- `wall_atlases`: opaque INDEX8 `.wall` sheets (MSW1 column-major or MSW2 row-major);
 - `maps`: finite orthogonal Tiled source and output filename;
 - `sounds`: PCM WAV source or glob and optional output filename.
 

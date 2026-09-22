@@ -13,6 +13,9 @@ LCD 时序、触摸手感与音频仍需在 Mosaico 工作区做真机验收。
 | [Raylib Shooter](../examples/raylib_shooter/README.md) | 小型射击玩法与共享绘制 |
 | [Tower Defense](../examples/tower_defense/README.md) | Atlas、Tiled 地图、音频和 Host 回放 |
 | [Sky Hop](../examples/sky_hop/README.md) | 平台物理、滚动视图、关卡与性能对比 |
+| [Living Worlds](../examples/living_worlds/README.md) | 四场景 360° 环视、体积网格 |
+| [Last Zone: Extraction](../examples/last_zone_extraction/README.md) | 伪 3D 射线柱射击与战役 |
+| [Tomb Explorer](../examples/tomb_explorer/README.md) | 传送门房间、INDEX8 三角网格 |
 
 新游戏可复制 `examples/<name>/`，或使用 `python3 tools/game_cli.py create <name>`。
 实现新能力前先看[组件职责与生命周期](../components/README.md)。
@@ -82,4 +85,6 @@ python mosaico.py iris system-update --project submodule/raylib-lite-engine/exam
 完整分区表一致且仅改代码时用 `app-update`。
 
 Sky Hop 的固定场景和性能矩阵见 [Sky Hop 性能测试](sky-hop-performance.zh-CN.md)。
+2.5D 射线柱 / 体积网格 / INDEX8 房间对照见
+[游戏绘制总表](game-drawing-inventory.zh-CN.md)。
 Agent 工作流见 [mosaico-game-development](skills/mosaico-game-development/SKILL.md)。

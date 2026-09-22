@@ -1,0 +1,10 @@
+{
+  "schema": "mosaico-game-sim/v1",
+  "tick_hz": 30,
+  "sources": [
+    "main/game_module.c",
+    "main/tomb_game.c",
+    "main/tomb_view.c",
+    "main/tomb_level_data.c"
+  ]
+}

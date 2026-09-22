@@ -3,7 +3,8 @@
 Example-backed suites live next to the raster regressions:
 
 ```sh
-python3 -m unittest tests.test_platform_game tests.test_game_cli tests.test_host_runner -v
+python3 -m unittest tests.test_platform_game tests.test_game_cli tests.test_host_runner \
+    tests.test_living_worlds tests.test_last_zone_model tests.test_tomb_explorer -v
 ```
 
 `test_host_runner` compiles the shared Host simulator and needs Pillow. Device

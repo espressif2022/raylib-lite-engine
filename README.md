@@ -64,7 +64,8 @@ set `MOSAICO_VIBE_ROOT`. See [docs/game-development.zh-CN.md](docs/game-developm
 ## Repository layout
 
 - `components/`: ESP-IDF runtime, renderer and reusable game modules.
-- `examples/`: Sky Hop, Tower Defense, and Raylib Shooter reference games.
+- `examples/`: Sky Hop, Tower Defense, Raylib Shooter, Living Worlds, Last Zone,
+  and Tomb Explorer reference games.
 - `host/`: native Host ABI, RGB565 renderer bridge and browser simulator.
 - `tools/`: game CLI, asset compiler, and performance analysis tools.
 - `cmake/`: application and example integration helpers.

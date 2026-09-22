@@ -80,6 +80,10 @@ class RasterStats(ctypes.Structure):
         ("triangle_pixels", ctypes.c_uint32),
         ("triangle_direct_pixels", ctypes.c_uint32),
         ("triangle_mirror_pixels", ctypes.c_uint32),
+        ("quad_calls", ctypes.c_uint32),
+        ("quad_pixels", ctypes.c_uint32),
+        ("fb_runs", ctypes.c_uint32),
+        ("fb_pixels", ctypes.c_uint32),
     ]
 
 def load_replay(path: Path | None) -> list[dict[str, object]]:

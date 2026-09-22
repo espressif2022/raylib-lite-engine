@@ -16,6 +16,9 @@ TEMPLATES = {
     "shooter": "raylib_shooter",
     "sky-hop": "sky_hop",
     "tower-defense": "tower_defense",
+    "living-worlds": "living_worlds",
+    "last-zone": "last_zone_extraction",
+    "tomb-explorer": "tomb_explorer",
 }
 
 ENGINE_ROOT = Path(__file__).resolve().parents[1]

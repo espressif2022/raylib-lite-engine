@@ -2,8 +2,11 @@
 
 ## Unreleased
 
-- Imported Sky Hop, Tower Defense, and Raylib Shooter from ESP-Mosaico Vibe
-  into `examples/`, with Host CLI templates and game-development guides.
+- Imported Sky Hop, Tower Defense, Raylib Shooter, Living Worlds, Last Zone,
+  and Tomb Explorer from ESP-Mosaico Vibe into `examples/`, with Host CLI
+  templates and game-development guides.
+- Added INDEX8 wall-atlas loading and textured triangle/quad/column draws so
+  Tomb Explorer can share Host and device assets.
 - Added opaque raycast column, span, floor-row and batched wall primitives.
 - Added textured triangle/quad fills and shared RGB565 fill/copy/shade helpers,
   including a 16-level shade lookup table.

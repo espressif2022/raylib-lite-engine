@@ -29,7 +29,8 @@ class GameCliTests(unittest.TestCase):
             self.assertIn(command, output)
 
     def test_templates_live_under_examples(self) -> None:
-        for name in ("raylib_shooter", "sky_hop", "tower_defense"):
+        for name in ("raylib_shooter", "sky_hop", "tower_defense",
+                     "living_worlds", "last_zone_extraction", "tomb_explorer"):
             self.assertTrue((ENGINE / "examples" / name / "CMakeLists.txt").is_file())
 
 

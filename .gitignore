@@ -9,4 +9,11 @@
 examples/sky_hop/assets_src/*.wav
 examples/sky_hop/assets_src/sky_hop_atlas.png
 examples/raylib_shooter/assets_src/shooter_atlas.png
+examples/last_zone_extraction/assets_src/*.wav
+examples/last_zone_extraction/assets_src/enemy_run.png
+examples/last_zone_extraction/assets_src/weapon.png
+examples/last_zone_extraction/assets_src/controls.png
+examples/last_zone_extraction/assets_src/tactical_panoramas.png
+examples/last_zone_extraction/assets_src/tactical_materials.png
+examples/last_zone_extraction/assets_src/props.png
 artifacts/

@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.16)
+
+if(NOT SDKCONFIG)
+    set(SDKCONFIG "${CMAKE_BINARY_DIR}/sdkconfig")
+endif()
+if(NOT SDKCONFIG_DEFAULTS)
+    set(SDKCONFIG_DEFAULTS "sdkconfig.defaults;sdkconfig.application.defaults")
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/mosaico_game_example.cmake")
+mosaico_game_sdk_configure_gsp_compiler()
+mosaico_game_sdk_add_components(RAYLIB)
+mosaico_game_example_project(tomb_explorer VERSION 0.1.0)
