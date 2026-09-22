@@ -445,7 +445,7 @@ static void on_update(void)
         play_haptic(22, 14);
         SetSoundVolume(s_hurt_sound, .62f);
     }
-    if ((s_game.tick % 15U) == 0U) {
+    {
         mosaico_game_stats_t stats;
         MosaicoGameGetStats(&stats);
         last_zone_set_performance(&s_game, stats.logic_fps, stats.display_fps,

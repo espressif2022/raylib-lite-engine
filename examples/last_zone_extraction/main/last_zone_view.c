@@ -1129,6 +1129,12 @@ static void draw_bearing_marker(float bearing, Color color, const char *label)
     DrawText(label, x - 18, 88, 12, color);
 }
 
+static void draw_fps(const last_zone_game_t *game)
+{
+    int fps = game->perf_display_fps > 0.5f ? (int)(game->perf_display_fps + 0.5f) : 0;
+    DrawText(TextFormat("FPS %d", fps), 8, 6, 16, (Color){255, 220, 72, 255});
+}
+
 static void draw_status_hud(const last_zone_game_t *game)
 {
     int alive = last_zone_enemies_alive(game);
@@ -1361,6 +1367,7 @@ void last_zone_view_render(const last_zone_game_t *game, MosaicoAtlas enemies,
     draw_weapon(game, weapon);
     draw_controls(game, controls);
     draw_phase_overlay(game);
+    draw_fps(game);
     int64_t t8 = view_now_us();
     EndDrawing();
     int64_t t9 = view_now_us();
