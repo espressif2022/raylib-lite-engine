@@ -171,16 +171,6 @@ static void on_stats(void)
              (unsigned long)raster.triangle_pixels,
              (unsigned long)raster.quad_calls,
              (unsigned long)raster.quad_pixels);
-    /* Store shape. run_len below 16 means every store touches a 32-byte cache
-     * line it only partly fills; overdraw is written pixels per screen pixel. */
-    ESP_LOGI(TAG, "raster fb_runs=%lu fb_pixels=%lu run_len=%u.%02u overdraw=%u.%02u",
-             (unsigned long)raster.fb_runs, (unsigned long)raster.fb_pixels,
-             (unsigned)(raster.fb_runs ? raster.fb_pixels / raster.fb_runs : 0),
-             (unsigned)(raster.fb_runs
-                 ? (raster.fb_pixels * 100U / raster.fb_runs) % 100U : 0),
-             (unsigned)(raster.fb_pixels / (MOSAICO_GAME_WIDTH * MOSAICO_GAME_HEIGHT)),
-             (unsigned)((raster.fb_pixels * 100U
-                 / (MOSAICO_GAME_WIDTH * MOSAICO_GAME_HEIGHT)) % 100U));
 }
 
 static const mosaico_game_app_config_t s_config = {

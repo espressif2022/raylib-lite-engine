@@ -341,6 +341,10 @@ static void begin_joystick(int32_t track, int32_t x, int32_t y)
 
 static void on_event(const mosaico_device_event_t *event)
 {
+#if CONFIG_LAST_ZONE_BENCHMARK_MODE
+    (void)event; /* The fixed replay must not be perturbed by live input. */
+    return;
+#else
     if (event->type != MOSAICO_DEVICE_EVENT_POINTER &&
         event->type != MOSAICO_DEVICE_EVENT_TOUCH) return;
     if (s_game.phase != LAST_ZONE_PHASE_PLAYING) {
@@ -386,13 +390,28 @@ static void on_event(const mosaico_device_event_t *event)
         s_look_x = event->x;
         s_look_y = event->y;
     }
+#endif
 }
 
 static void on_update(void)
 {
+#if CONFIG_LAST_ZONE_BENCHMARK_MODE
+    /* Fixed 300-tick replay. Confirming out of any non-playing phase keeps a
+     * long capture inside gameplay instead of parked on the start screen. */
+    if (s_game.phase != LAST_ZONE_PHASE_PLAYING) {
+        last_zone_confirm(&s_game);
+    } else {
+        const uint32_t phase = s_game.tick % 300U;
+        last_zone_set_motion(&s_game, phase < 225U ? 1.0f : 0.2f,
+                             phase < 150U ? 0.0f : 0.6f,
+                             phase < 150U ? 0.02f : -0.015f);
+        last_zone_set_fire_held(&s_game, s_game.tick % 30U < 10U);
+    }
+#else
     last_zone_set_motion(&s_game, s_move_forward, s_move_strafe, 0.0f);
     last_zone_set_fire_held(&s_game, s_fire_track >= 0);
     if (s_look_track < 0) last_zone_settle_look(&s_game);
+#endif
     last_zone_update(&s_game);
     if (s_game.fire_cooldown == 11 && s_previous_fire_cooldown > 11)
         PlaySound(s_bolt_sound);

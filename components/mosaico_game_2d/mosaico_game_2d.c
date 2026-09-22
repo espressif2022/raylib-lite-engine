@@ -9,6 +9,7 @@
 #endif
 #if defined(ESP_PLATFORM)
 #include "esp_attr.h"
+#include "esp_log.h"
 #define M2D_HOT IRAM_ATTR
 #else
 #define M2D_HOT
@@ -40,6 +41,19 @@ void mosaico_game_2d_set_clip(int x,int y,int width,int height){
 }
 void mosaico_game_2d_reset_raster_stats(void){memset(&s_raster_stats,0,sizeof(s_raster_stats));}
 void mosaico_game_2d_get_raster_stats(mosaico_game_2d_raster_stats_t*out){if(out)*out=s_raster_stats;}
+/* Strong override of the weak stub in mosaico_game_debug, so every game that
+   links the rasteriser reports store shape without its own logging code.
+   MosaicoFastBeginDrawing clears the counters each frame, so these describe
+   the frame that just finished rather than a running total. fb_pixels/fb_runs
+   below 16 means each store only partly fills a 32-byte cache line. */
+#if defined(ESP_PLATFORM)
+void mosaico_game_2d_log_raster_shape(const char*tag){
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster fb_runs=%lu fb_pixels=%lu tris=%lu/%lu quads=%lu/%lu",
+  (unsigned long)s_raster_stats.fb_runs,(unsigned long)s_raster_stats.fb_pixels,
+  (unsigned long)s_raster_stats.triangle_calls,(unsigned long)s_raster_stats.triangle_pixels,
+  (unsigned long)s_raster_stats.quad_calls,(unsigned long)s_raster_stats.quad_pixels);
+}
+#endif
 void mosaico_game_2d_set_phase_us(uint32_t sky_us,uint32_t floor_us,uint32_t wall_us,
  uint32_t enemy_us,uint32_t hud_us){
  s_raster_stats.sky_us=sky_us;s_raster_stats.floor_us=floor_us;s_raster_stats.wall_us=wall_us;
