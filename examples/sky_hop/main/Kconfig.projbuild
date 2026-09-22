@@ -1,4 +1,4 @@
-menu "Sky Hop benchmark"
+menu "Sky Hop"
 
 config SKY_HOP_BENCHMARK_MODE
     bool "Run deterministic performance replay"
@@ -10,11 +10,19 @@ config SKY_HOP_BENCHMARK_MODE
 config SKY_HOP_TE_COMPOSE_BUFFERS
     int "TE compose buffer count"
     range 1 2
-    default 1
+    default 2
 
 config SKY_HOP_DRAWBUF_LINES
     int "Display draw-buffer lines"
     range 10 80
-    default 34
+    default 80
+
+config SKY_HOP_TARGET_FPS
+    int "Display frame-rate limit"
+    range 30 60
+    default 60
+    help
+        Rendering limit only; game logic remains fixed at 30 Hz.
+        The display pipeline applies backpressure when all frames are busy.
 
 endmenu

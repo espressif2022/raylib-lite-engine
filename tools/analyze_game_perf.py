@@ -72,8 +72,7 @@ def summarize(text: str) -> dict[str, object]:
                 "p95": round(percentile(values, .95), 2),
             }
         lengths = [s["fb_pixels"] / s["fb_runs"] for s in raster if s["fb_runs"]]
-        # Mean run length below 16 means a 32-byte cache line is only partly
-        # used by each store, which is the signal tiling would address.
+        # This is instrumented store shape, not cache misses or unique coverage.
         section["run_length"] = {
             "mean": round(statistics.fmean(lengths), 2) if lengths else 0.0,
             "p50": round(percentile(lengths, .50), 2),
@@ -81,6 +80,24 @@ def summarize(text: str) -> dict[str, object]:
         section["overdraw"] = round(
             statistics.fmean([s["fb_pixels"] / (480 * 480) for s in raster]), 3)
         result["raster"] = section
+    paths: dict[str, list[int]] = {}
+    for line in text.splitlines():
+        if "raster_path " not in line:
+            continue
+        for key, value in re.findall(r"(\w+)=(\d+)", line.split("raster_path ", 1)[1]):
+            paths.setdefault(key, []).append(int(value))
+    if paths:
+        result["paths"] = {key: {"samples": len(values), "mean": round(statistics.fmean(values), 2),
+                                  "p95": round(percentile(values, .95), 2)}
+                           for key, values in paths.items()}
+    if raster:
+        # Preserve the old field for existing consumers; its name is misleading.
+        result["raster"]["writes_per_screen"] = result["raster"]["overdraw"]
+        result["raster"]["includes_primitives"] = "primitive_pixels" in paths
+        result["raster"]["unique_coverage_measured"] = False
+    # Timing logs hold the last render attempt. With exhausted frame slots,
+    # a skipped draw can take only microseconds; its mean is not kernel speed.
+    result["render_samples_may_include_busy_attempts"] = result["busy"] > 0
     result["accepted"] = bool(samples) and 29.5 <= result["logic"]["mean"] <= 30.5 \
         and result["acquire"]["p95"] <= 1000 and result["errors"] == 0 \
         and result["display"]["mean"] >= 24.0

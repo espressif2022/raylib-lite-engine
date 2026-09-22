@@ -281,10 +281,10 @@ static void draw_aurora_light_field(const living_aurora_t *aurora,
         for(int i=0;i<band_n[band];++i){
             int ix=band_ix[band][i],iy=band_iy[band][i];
             int a=iy*GW+ix,b=a+1,c=a+GW,d=c+1;
-            mosaico_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy]};
-            mosaico_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+1],tv[iy]};
-            mosaico_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+1]};
-            mosaico_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+1],tv[iy+1]};
+            mosaico_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy],0.f};
+            mosaico_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+1],tv[iy],0.f};
+            mosaico_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+1],0.f};
+            mosaico_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+1],tv[iy+1],0.f};
             Mosaico2DDrawTexturedQuad(space.texture,va,vb,vc,vd,256);
         }
     }

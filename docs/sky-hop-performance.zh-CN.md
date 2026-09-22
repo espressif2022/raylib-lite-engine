@@ -35,3 +35,28 @@ python3 tools/analyze_game_perf.py --label fb3-te1-lines34 raw.log
 
 固件哈希、`sdkconfig` 差异和原始日志必须一起保留，结果才可比较。
 这些数值是本测试的比较基线，不能代替其他应用的性能目标或当前构建的实测结果。
+
+
+## 2026-09-22 显示缓冲复测
+
+在相同 40 MHz LCD 时钟、480×480 RGB565、固定 30 Hz 逻辑回放下，
+每个配置两次启动，各采集 75 秒。完整记录见
+`artifacts/full-profile-v1/sky_hop`、`high-fps-v3/sky_hop` 与
+`sky-throughput-v4/sky_hop`。
+
+| 配置 | framebuffer | drawbuf 行数 | compose | 请求上限 | 两轮 display |
+|---|---:|---:|---:|---:|---|
+| 原基线 | 3 | 34 | 1 | 30 | 29.90 / 29.96 fps |
+| 仅提高上限（同时含图元优化） | 3 | 34 | 1 | 60 | 29.95 / 29.96 fps |
+| 新默认缓冲组合 | 4 | 80 | 2 | 60 | **39.55 / 40.18 fps** |
+
+最终组合平均约 39.87 fps，比原基线约 **+33.2%**。这包含显示缓冲和请求上限的
+收益，不能全部归因于像素 kernel。该组合已写入 `sdkconfig.defaults`；
+已有 sdkconfig 要显式同步这四个配置值。游戏逻辑仍固定 30 Hz，
+没有修改关卡、角色速度或精灵像素。
+
+新组合首轮剩余 PSRAM 12,827,912 字节，比原配置约少 542 KiB；
+显示错误为 0，仍存在 framebuffer busy 的跳过请求（原设计允许最新状态优先）。
+`display` 统计来自已提交 framebuffer 的释放计数，不是请求频率。
+有 busy 时，日志中的 `render` 可能是一次跳过绘制的耗时，不能将均值下降
+当作光栅提速；分析器会输出 `render_samples_may_include_busy_attempts`。

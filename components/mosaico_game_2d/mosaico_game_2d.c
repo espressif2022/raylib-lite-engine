@@ -4,15 +4,25 @@
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #ifndef CONFIG_MOSAICO_GAME_MAX_TEXTURES
 #define CONFIG_MOSAICO_GAME_MAX_TEXTURES 12
 #endif
 #if defined(ESP_PLATFORM)
 #include "esp_attr.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #define M2D_HOT IRAM_ATTR
 #else
 #define M2D_HOT
+#endif
+#if defined(ESP_PLATFORM) && CONFIG_MOSAICO_GAME_RASTER_PROFILE
+#include "esp_timer.h"
+#define PROFILE_START(name) uint32_t name=(uint32_t)esp_timer_get_time()
+#define PROFILE_ADD(field,name) s_raster_stats.field+=(uint32_t)esp_timer_get_time()-(name)
+#else
+#define PROFILE_START(name) ((void)0)
+#define PROFILE_ADD(field,name) ((void)0)
 #endif
 #define M2D_MAX_TEXTURES CONFIG_MOSAICO_GAME_MAX_TEXTURES
 #define M2D_MAGIC 0x3141534dU
@@ -24,7 +34,7 @@ typedef struct __attribute__((packed)){uint32_t magic;uint16_t width,height,fram
 typedef struct __attribute__((packed)){uint32_t id;uint16_t x,y,width,height;int16_t pivot_x,pivot_y;} atlas_frame_t;
 typedef struct __attribute__((packed)){uint32_t magic;uint16_t width,height,frame_count,light_levels;uint32_t palette_entries,index_bytes;} wall_header_t;
 typedef struct{uint32_t id;uint16_t index_plus_one;} frame_cache_entry_t;
-typedef struct{bool used;mosaico_asset_view_t asset;atlas_header_t inline_header;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;const uint8_t *alpha;frame_cache_entry_t frame_cache[M2D_FRAME_CACHE_SIZE];} texture_slot_t;
+typedef struct{bool used;mosaico_asset_view_t asset;atlas_header_t inline_header;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;uint16_t *light_cache;unsigned cached_light;const uint8_t *alpha;frame_cache_entry_t frame_cache[M2D_FRAME_CACHE_SIZE];} texture_slot_t;
 static texture_slot_t s_textures[M2D_MAX_TEXTURES];
 static uint16_t *s_target;static size_t s_stride;static int s_target_width,s_target_height;
 static int s_clip_x0,s_clip_y0,s_clip_x1,s_clip_y1;
@@ -41,17 +51,53 @@ void mosaico_game_2d_set_clip(int x,int y,int width,int height){
 }
 void mosaico_game_2d_reset_raster_stats(void){memset(&s_raster_stats,0,sizeof(s_raster_stats));}
 void mosaico_game_2d_get_raster_stats(mosaico_game_2d_raster_stats_t*out){if(out)*out=s_raster_stats;}
+void mosaico_game_2d_note_primitives(uint32_t pixels,uint32_t runs,uint32_t clear_pixels){
+ s_raster_stats.primitive_pixels+=pixels;s_raster_stats.primitive_runs+=runs;
+ s_raster_stats.clear_pixels+=clear_pixels;
+ s_raster_stats.fb_pixels+=pixels+clear_pixels;
+ s_raster_stats.fb_runs+=runs+(clear_pixels&&s_target_width>0?(clear_pixels/(uint32_t)s_target_width):0);
+}
 /* Strong override of the weak stub in mosaico_game_debug, so every game that
    links the rasteriser reports store shape without its own logging code.
    MosaicoFastBeginDrawing clears the counters each frame, so these describe
-   the frame that just finished rather than a running total. fb_pixels/fb_runs
-   below 16 means each store only partly fills a 32-byte cache line. */
+   the frame that just finished rather than a running total. Store shape
+   alone does not measure cache misses or unique pixel coverage. */
 #if defined(ESP_PLATFORM)
 void mosaico_game_2d_log_raster_shape(const char*tag){
  ESP_LOGI(tag?tag:"mosaico_game_2d","raster fb_runs=%lu fb_pixels=%lu tris=%lu/%lu quads=%lu/%lu",
   (unsigned long)s_raster_stats.fb_runs,(unsigned long)s_raster_stats.fb_pixels,
   (unsigned long)s_raster_stats.triangle_calls,(unsigned long)s_raster_stats.triangle_pixels,
   (unsigned long)s_raster_stats.quad_calls,(unsigned long)s_raster_stats.quad_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path opaque_copy_calls=%lu opaque_copy_pixels=%lu",
+  (unsigned long)s_raster_stats.opaque_copy_calls,(unsigned long)s_raster_stats.opaque_copy_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path opaque_scale_calls=%lu opaque_scale_pixels=%lu",
+  (unsigned long)s_raster_stats.opaque_scale_calls,(unsigned long)s_raster_stats.opaque_scale_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path binary_alpha_calls=%lu binary_alpha_pixels=%lu",
+  (unsigned long)s_raster_stats.binary_alpha_calls,(unsigned long)s_raster_stats.binary_alpha_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path binary_copy_calls=%lu binary_copy_pixels=%lu",
+  (unsigned long)s_raster_stats.binary_copy_calls,(unsigned long)s_raster_stats.binary_copy_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path binary_scale_calls=%lu binary_scale_pixels=%lu",
+  (unsigned long)s_raster_stats.binary_scale_calls,(unsigned long)s_raster_stats.binary_scale_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path tile_row_calls=%lu tile_row_pixels=%lu",
+  (unsigned long)s_raster_stats.tile_row_calls,(unsigned long)s_raster_stats.tile_row_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path alpha_calls=%lu alpha_pixels=%lu",
+  (unsigned long)s_raster_stats.alpha_calls,(unsigned long)s_raster_stats.alpha_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path rotated_calls=%lu rotated_pixels=%lu",
+  (unsigned long)s_raster_stats.rotated_calls,(unsigned long)s_raster_stats.rotated_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path column_calls=%lu column_pixels=%lu",
+  (unsigned long)s_raster_stats.column_calls,(unsigned long)s_raster_stats.column_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path span_calls=%lu span_pixels=%lu",
+  (unsigned long)s_raster_stats.span_calls,(unsigned long)s_raster_stats.span_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path frame_lookup_hits=%lu frame_lookup_misses=%lu triangle_direct_pixels=%lu triangle_mirror_pixels=%lu",
+  (unsigned long)s_raster_stats.frame_lookup_hits,(unsigned long)s_raster_stats.frame_lookup_misses,
+  (unsigned long)s_raster_stats.triangle_direct_pixels,(unsigned long)s_raster_stats.triangle_mirror_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path primitive_pixels=%lu primitive_runs=%lu clear_pixels=%lu rgb_const_v_pixels=%lu rgb_vary_v_pixels=%lu",
+  (unsigned long)s_raster_stats.primitive_pixels,(unsigned long)s_raster_stats.primitive_runs,(unsigned long)s_raster_stats.clear_pixels,
+  (unsigned long)s_raster_stats.rgb_const_v_pixels,(unsigned long)s_raster_stats.rgb_vary_v_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path indexed_const_v_pixels=%lu indexed_vary_v_pixels=%lu indexed_magnify_pixels=%lu indexed_minify_pixels=%lu triangle_setup_us=%lu triangle_raster_us=%lu",
+  (unsigned long)s_raster_stats.indexed_const_v_pixels,(unsigned long)s_raster_stats.indexed_vary_v_pixels,
+  (unsigned long)s_raster_stats.indexed_magnify_pixels,(unsigned long)s_raster_stats.indexed_minify_pixels,
+  (unsigned long)s_raster_stats.triangle_setup_us,(unsigned long)s_raster_stats.triangle_raster_us);
 }
 #endif
 void mosaico_game_2d_set_phase_us(uint32_t sky_us,uint32_t floor_us,uint32_t wall_us,
@@ -97,13 +143,32 @@ MosaicoWallAtlas LoadMosaicoWallAtlas(const char *path){
   .row_major=h->magic==M2D_WALL_MAGIC_ROW};
 }
 void UnloadMosaicoWallAtlas(MosaicoWallAtlas atlas){(void)atlas;}
-void Mosaico2DUnloadTexture(Texture2D texture){texture_slot_t*s=texture_slot(texture);if(s)memset(s,0,sizeof(*s));}
+void Mosaico2DUnloadTexture(Texture2D texture){texture_slot_t*s=texture_slot(texture);if(s){free(s->light_cache);memset(s,0,sizeof(*s));}}
 static inline uint16_t tint565(uint16_t p,Color t){if(t.r==255&&t.g==255&&t.b==255)return p;return(uint16_t)((((p>>11)&31U)*t.r/255U)<<11|(((p>>5)&63U)*t.g/255U)<<5|((p&31U)*t.b/255U));}
 static inline unsigned quantize_light(unsigned light256)
 {
  unsigned light=light256>256U?256U:light256;
  if(light>=248U)return 256U;
  return(light+8U)&~15U;
+}
+bool Mosaico2DCacheTextureLight(Texture2D texture,unsigned light256)
+{
+ texture_slot_t *s=texture_slot(texture);
+ if(!s)return false;
+ unsigned light=quantize_light(light256);
+ if(light==256U){free(s->light_cache);s->light_cache=NULL;return true;}
+ if(s->light_cache&&s->cached_light==light)return true;
+ size_t count=(size_t)s->header->width*s->header->height;
+ if(count>SIZE_MAX/sizeof(uint16_t))return false;
+#if defined(ESP_PLATFORM)
+ uint16_t *cache=heap_caps_malloc(count*sizeof(uint16_t),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+#else
+ uint16_t *cache=malloc(count*sizeof(uint16_t));
+#endif
+ if(!cache)return false;
+ mosaico_shade_rgb565(cache,s->rgb,count,light);
+ free(s->light_cache);s->light_cache=cache;s->cached_light=light;
+ return true;
 }
 static inline unsigned indexed_light_level(unsigned light256)
 {
@@ -135,6 +200,11 @@ static inline void m2d_note_scatter(uint32_t runs,uint32_t pixels)
 static inline void fill_shaded(uint16_t *dst,int count,uint16_t px)
 {
  m2d_note_store(count);
+ /* Raycast runs are commonly 1, 2 or 4 pixels. Keep these stores inline;
+  * entering the general PIE/memcpy dispatcher per ray row is expensive. */
+ if(count==1){dst[0]=px;return;}
+ if(count==2){dst[0]=px;dst[1]=px;return;}
+ if(count==4){dst[0]=px;dst[1]=px;dst[2]=px;dst[3]=px;return;}
  mosaico_fill_rgb565(dst,px,(size_t)count);
 }
 static inline uint16_t blend565(uint16_t d,uint16_t s,unsigned a){if(a>=255)return s;unsigned ia=255-a;return(uint16_t)(((((s&0xf81fU)*a+(d&0xf81fU)*ia)>>8)&0xf81fU)|((((s&0x07e0U)*a+(d&0x07e0U)*ia)>>8)&0x07e0U));}
@@ -340,9 +410,10 @@ static int raster_ceil_half(float value)
 
 static int raster_ceil_fixed(int32_t x_16)
 {
- int64_t t=(int64_t)x_16-32768;
- if(t>=0)return (int)((t+65535)>>16);
- return (int)(-((-t)>>16));
+ /* ceil(x - 0.5): the fractional half-tie belongs to the lower pixel.
+  * Splitting the signed integer and unsigned fraction avoids 64-bit
+  * arithmetic on every scanline, including INT32_MIN/MAX safely. */
+ return (x_16>>16)+((uint32_t)(x_16&65535)>32768U);
 }
 
 static int uv_band(float value, float edge)
@@ -441,6 +512,7 @@ static M2D_HOT void fill_direct_unshaded(uint16_t *dst,const uint16_t *rgb,int w
  int i=0;
  m2d_note_store(count);
  if(span_const_v(v,dv,count)){
+  s_raster_stats.rgb_const_v_pixels+=(uint32_t)count;
   const uint16_t *row=rgb+(size_t)(v>>16)*(size_t)width;
   for(;i+3<count;i+=4){
    dst[i]=row[u>>16];u+=du;
@@ -451,44 +523,18 @@ static M2D_HOT void fill_direct_unshaded(uint16_t *dst,const uint16_t *rgb,int w
   for(;i<count;++i){dst[i]=row[u>>16];u+=du;}
   return;
  }
- int prev=0x7fffffff;
- const uint16_t *row=rgb;
+ s_raster_stats.rgb_vary_v_pixels+=(uint32_t)count;
+ /* Varying rows: compute each address directly instead of branching
+  * on a cached row index for every sample. */
  for(;i+3<count;i+=4){
-  int vi=(int)(v>>16);
-  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
-  dst[i]=row[u>>16];
-  u+=du;v+=dv;
-  vi=(int)(v>>16);
-  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
-  dst[i+1]=row[u>>16];
-  u+=du;v+=dv;
-  vi=(int)(v>>16);
-  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
-  dst[i+2]=row[u>>16];
-  u+=du;v+=dv;
-  vi=(int)(v>>16);
-  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
-  dst[i+3]=row[u>>16];
-  u+=du;v+=dv;
+  dst[i]=rgb[(size_t)(v>>16)*(size_t)width+(u>>16)];u+=du;v+=dv;
+  dst[i+1]=rgb[(size_t)(v>>16)*(size_t)width+(u>>16)];u+=du;v+=dv;
+  dst[i+2]=rgb[(size_t)(v>>16)*(size_t)width+(u>>16)];u+=du;v+=dv;
+  dst[i+3]=rgb[(size_t)(v>>16)*(size_t)width+(u>>16)];u+=du;v+=dv;
  }
  for(;i<count;++i){
-  int vi=(int)(v>>16);
-  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
-  dst[i]=row[u>>16];
-  u+=du;v+=dv;
+  dst[i]=rgb[(size_t)(v>>16)*(size_t)width+(u>>16)];u+=du;v+=dv;
  }
-}
-
-/* Quantized light 240 is 15/16, the ocean reef-adjacent water path. */
-static inline uint16_t shade_span(uint16_t pixel,unsigned light)
-{
- if(light==240U){
-  unsigned r=((pixel>>11)&31U)*15U>>4;
-  unsigned g=((pixel>>5)&63U)*15U>>4;
-  unsigned b=(pixel&31U)*15U>>4;
-  return (uint16_t)((r<<11)|(g<<5)|b);
- }
- return shade565(pixel,light);
 }
 
 static M2D_HOT void fill_direct_shaded(uint16_t *dst,const uint16_t *rgb,int width,
@@ -497,41 +543,28 @@ static M2D_HOT void fill_direct_shaded(uint16_t *dst,const uint16_t *rgb,int wid
  int i=0;
  m2d_note_store(count);
  if(span_const_v(v,dv,count)){
+  s_raster_stats.rgb_const_v_pixels+=(uint32_t)count;
   const uint16_t *row=rgb+(size_t)(v>>16)*(size_t)width;
   for(;i+3<count;i+=4){
-   dst[i]=shade_span(row[u>>16],light);u+=du;
-   dst[i+1]=shade_span(row[u>>16],light);u+=du;
-   dst[i+2]=shade_span(row[u>>16],light);u+=du;
-   dst[i+3]=shade_span(row[u>>16],light);u+=du;
+   dst[i]=shade565(row[u>>16],light);u+=du;
+   dst[i+1]=shade565(row[u>>16],light);u+=du;
+   dst[i+2]=shade565(row[u>>16],light);u+=du;
+   dst[i+3]=shade565(row[u>>16],light);u+=du;
   }
-  for(;i<count;++i){dst[i]=shade_span(row[u>>16],light);u+=du;}
+  for(;i<count;++i){dst[i]=shade565(row[u>>16],light);u+=du;}
   return;
  }
- int prev=0x7fffffff;
- const uint16_t *row=rgb;
+ s_raster_stats.rgb_vary_v_pixels+=(uint32_t)count;
+ /* Varying rows: compute each address directly instead of branching
+  * on a cached row index for every sample. */
  for(;i+3<count;i+=4){
-  int vi=(int)(v>>16);
-  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
-  dst[i]=shade_span(row[u>>16],light);
-  u+=du;v+=dv;
-  vi=(int)(v>>16);
-  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
-  dst[i+1]=shade_span(row[u>>16],light);
-  u+=du;v+=dv;
-  vi=(int)(v>>16);
-  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
-  dst[i+2]=shade_span(row[u>>16],light);
-  u+=du;v+=dv;
-  vi=(int)(v>>16);
-  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
-  dst[i+3]=shade_span(row[u>>16],light);
-  u+=du;v+=dv;
+  dst[i]=shade565(rgb[(size_t)(v>>16)*(size_t)width+(u>>16)],light);u+=du;v+=dv;
+  dst[i+1]=shade565(rgb[(size_t)(v>>16)*(size_t)width+(u>>16)],light);u+=du;v+=dv;
+  dst[i+2]=shade565(rgb[(size_t)(v>>16)*(size_t)width+(u>>16)],light);u+=du;v+=dv;
+  dst[i+3]=shade565(rgb[(size_t)(v>>16)*(size_t)width+(u>>16)],light);u+=du;v+=dv;
  }
  for(;i<count;++i){
-  int vi=(int)(v>>16);
-  if(vi!=prev){row=rgb+(size_t)vi*(size_t)width;prev=vi;}
-  dst[i]=shade_span(row[u>>16],light);
-  u+=du;v+=dv;
+  dst[i]=shade565(rgb[(size_t)(v>>16)*(size_t)width+(u>>16)],light);u+=du;v+=dv;
  }
 }
 
@@ -544,6 +577,7 @@ static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
  if(y1>s_clip_y1)y1=s_clip_y1;
  if(y0>=y1)return;
  const uint16_t *rgb=s->rgb;
+ if(s->light_cache&&s->cached_light==light){rgb=s->light_cache;light=256U;}
  const int tex_w=s->header->width;
  float scan_y=y0+.5f;
  triangle_scan_edge_t long_edge=triangle_scan_edge(long_a,long_b,scan_y);
@@ -607,21 +641,21 @@ static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
       mirror_fixed_step_t mv=mirror_fixed_begin(v_16,dv_16,s->header->height);
       int x=0;
       for(;x+3<count;x+=4){
-       target[x]=shade_span(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
+       target[x]=shade565(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
         mirror_fixed_sample(&mu)],light);
        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
-       target[x+1]=shade_span(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
+       target[x+1]=shade565(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
         mirror_fixed_sample(&mu)],light);
        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
-       target[x+2]=shade_span(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
+       target[x+2]=shade565(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
         mirror_fixed_sample(&mu)],light);
        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
-       target[x+3]=shade_span(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
+       target[x+3]=shade565(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
         mirror_fixed_sample(&mu)],light);
        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
       }
       for(;x<count;++x){
-       target[x]=shade_span(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
+       target[x]=shade565(rgb[(size_t)mirror_fixed_sample(&mv)*tex_w+
         mirror_fixed_sample(&mu)],light);
        mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
       }
@@ -633,7 +667,7 @@ static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
       size_t source=(size_t)mirror_fixed_sample(&mv)*tex_w+mirror_fixed_sample(&mu);
       unsigned alpha=s->alpha[source];
       if(alpha){
-       uint16_t pixel=shade_span(rgb[source],light);
+       uint16_t pixel=shade565(rgb[source],light);
        target[x]=alpha>=255?pixel:blend565(target[x],pixel,alpha);
       }
       mirror_fixed_advance(&mu);mirror_fixed_advance(&mv);
@@ -653,6 +687,7 @@ static void draw_textured_triangle_prepared(texture_slot_t *s,
  mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
  mosaico_textured_vertex_t c,unsigned light,bool skip_fold)
 {
+ PROFILE_START(setup_started);
  if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
  if(b.y>c.y){mosaico_textured_vertex_t swap=b;b=c;c=swap;}
  if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
@@ -671,6 +706,8 @@ static void draw_textured_triangle_prepared(texture_slot_t *s,
  int32_t dv_16=fixed_from_float(((b.v-a.v)*(c.y-a.y)-(c.v-a.v)*(b.y-a.y))*inverse_area);
  bool direct_uv=uv_inside(a.u,a.v,max_u,max_v)&&uv_inside(b.u,b.v,max_u,max_v)&&
   uv_inside(c.u,c.v,max_u,max_v);
+ PROFILE_ADD(triangle_setup_us,setup_started);
+ PROFILE_START(raster_started);
  int middle=raster_ceil_half(b.y);
  if(b.y-a.y>=.001f)
   draw_textured_triangle_section(s,a,c,a,b,raster_ceil_half(a.y),middle,
@@ -678,6 +715,7 @@ static void draw_textured_triangle_prepared(texture_slot_t *s,
  if(c.y-b.y>=.001f)
   draw_textured_triangle_section(s,a,c,b,c,middle,raster_ceil_half(c.y),
    du_16,dv_16,light,direct_uv);
+ PROFILE_ADD(triangle_raster_us,raster_started);
 }
 
 void Mosaico2DDrawTexturedTriangle(Texture2D texture,
@@ -687,6 +725,10 @@ void Mosaico2DDrawTexturedTriangle(Texture2D texture,
  texture_slot_t*s=texture_slot(texture);if(!s||!s_target)return;
  draw_textured_triangle_prepared(s,a,b,c,quantize_light(light256),false);
 }
+
+static void draw_rgb_quad_direct(texture_slot_t *s,
+ mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
+ mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light);
 
 void Mosaico2DDrawTexturedQuad(Texture2D texture,
  mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
@@ -698,6 +740,12 @@ void Mosaico2DDrawTexturedQuad(Texture2D texture,
  fold_quad_uv(&a,&b,&c,&d,max_u,max_v);
  bool inside=uv_inside(a.u,a.v,max_u,max_v)&&uv_inside(b.u,b.v,max_u,max_v)&&
   uv_inside(c.u,c.v,max_u,max_v)&&uv_inside(d.u,d.v,max_u,max_v);
+ /* Opaque in-range quads are one span per row. Alpha or a UV that still
+  * wraps after folding stays on the two-triangle path. */
+ if(inside&&!s->alpha){
+  draw_rgb_quad_direct(s,a,b,c,d,light);
+  return;
+ }
  draw_textured_triangle_prepared(s,a,c,b,light,inside);
  draw_textured_triangle_prepared(s,b,c,d,light,inside);
 }
@@ -719,7 +767,10 @@ static M2D_HOT void fill_indexed_row_major(uint16_t *dst,const MosaicoWallAtlas 
  const int width=atlas->width;
  int i=0;
  m2d_note_store(count);
+ if(du>-65536&&du<65536)s_raster_stats.indexed_magnify_pixels+=(uint32_t)count;
+ else s_raster_stats.indexed_minify_pixels+=(uint32_t)count;
  if(span_const_v(v,dv,count)){
+  s_raster_stats.indexed_const_v_pixels+=(uint32_t)count;
   const uint8_t *row=indices+(size_t)(v>>16)*(size_t)width;
   int previous_u=INT32_MIN;
   uint16_t pixel=0;
@@ -739,6 +790,7 @@ static M2D_HOT void fill_indexed_row_major(uint16_t *dst,const MosaicoWallAtlas 
   }
   return;
  }
+ s_raster_stats.indexed_vary_v_pixels+=(uint32_t)count;
  int prev=0x7fffffff;
  const uint8_t *row=indices;
  int previous_u=INT32_MIN;
@@ -766,6 +818,149 @@ static M2D_HOT void fill_indexed_row_major(uint16_t *dst,const MosaicoWallAtlas 
   if(vi!=prev){row=indices+(size_t)vi*(size_t)width;prev=vi;previous_u=INT32_MIN;}
   int ui=u>>16;if(ui!=previous_u){pixel=lut[row[ui]];previous_u=ui;}
   dst[i]=pixel;u+=du;v+=dv;
+ }
+}
+
+typedef struct {
+ int32_t x,dx;
+ float uq,vq,q,duq,dvq,dq;
+} persp_edge_t;
+
+static persp_edge_t persp_scan_edge(mosaico_textured_vertex_t a,
+ mosaico_textured_vertex_t b,float scan_y)
+{
+ float inverse_height=1.0f/(b.y-a.y);
+ float position=(scan_y-a.y)*inverse_height;
+ float uq0=a.u*a.q,uq1=b.u*b.q;
+ float vq0=a.v*a.q,vq1=b.v*b.q;
+ return (persp_edge_t){
+  fixed_from_float(a.x+(b.x-a.x)*position),
+  fixed_from_float((b.x-a.x)*inverse_height),
+  uq0+(uq1-uq0)*position,
+  vq0+(vq1-vq0)*position,
+  a.q+(b.q-a.q)*position,
+  (uq1-uq0)*inverse_height,
+  (vq1-vq0)*inverse_height,
+  (b.q-a.q)*inverse_height};
+}
+
+static void persp_edge_step(persp_edge_t *edge)
+{
+ edge->x+=edge->dx;
+ edge->uq+=edge->duq;
+ edge->vq+=edge->dvq;
+ edge->q+=edge->dq;
+}
+
+static void persp_uv_at(const persp_edge_t *left,const persp_edge_t *right,
+ int pixel,float *u,float *v,float *q)
+{
+ int32_t span=right->x-left->x;
+ float t=span?(float)((((int32_t)pixel)<<16)+32768-left->x)/(float)span:0.0f;
+ if(t<0.0f)t=0.0f;
+ if(t>1.0f)t=1.0f;
+ float qq=left->q+(right->q-left->q)*t;
+ if(qq<1.0e-8f)qq=1.0e-8f;
+ float inv=1.0f/qq;
+ *u=(left->uq+(right->uq-left->uq)*t)*inv;
+ *v=(left->vq+(right->vq-left->vq)*t)*inv;
+ *q=qq;
+}
+
+static float persp_q_ratio(float a,float b)
+{
+ float hi=a>b?a:b,lo=a<b?a:b;
+ if(lo<1.0e-6f)return 1.0e6f;
+ return hi/lo;
+}
+
+/* Vertex 1/z within 15% is an affine wall. The old walker then costs the
+ * same as before. Steeper faces correct per row, and a row is split only
+ * into pieces that themselves stay under that ratio. */
+static bool persp_span_needed(float a,float b,float c,float d,int corners)
+{
+ if(!(a>0.0f&&b>0.0f&&c>0.0f)||(corners==4&&!(d>0.0f)))return false;
+ float hi=a,lo=a;
+ if(b>hi)hi=b;else if(b<lo)lo=b;
+ if(c>hi)hi=c;else if(c<lo)lo=c;
+ if(corners==4){if(d>hi)hi=d;else if(d<lo)lo=d;}
+ return persp_q_ratio(lo,hi)>=1.15f;
+}
+
+/* Longest run starting at qs whose 1/z stays within 15% of qs. */
+static int persp_piece_length(float qs,float qe,int remain)
+{
+ if(remain<=4||persp_q_ratio(qs,qe)<1.15f)return remain;
+ float dq=(qe-qs)/(float)(remain-1);
+ if(dq>-1.0e-8f&&dq<1.0e-8f)return remain;
+ float limit=dq>0.0f?qs*1.15f:qs/1.15f;
+ int n=(int)((limit-qs)/dq);
+ if(n<4)n=4;
+ if(n>remain)n=remain;
+ return n;
+}
+
+static int32_t clamp_texel_fixed(float value,int limit)
+{
+ if(value<0.0f)value=0.0f;
+ float max_value=(float)limit-0.001f;
+ if(max_value<0.0f)max_value=0.0f;
+ if(value>max_value)value=max_value;
+ return fixed_from_float(value);
+}
+
+static void fill_indexed_affine(const MosaicoWallAtlas *atlas,uint16_t *dst,
+ float u0,float v0,float u1,float v1,int count,unsigned level,bool direct_uv)
+{
+ if(count<=0)return;
+ int32_t u=clamp_texel_fixed(u0,atlas->width);
+ int32_t v=clamp_texel_fixed(v0,atlas->height);
+ int32_t du=0,dv=0;
+ if(count>1){
+  int32_t ue=clamp_texel_fixed(u1,atlas->width);
+  int32_t ve=clamp_texel_fixed(v1,atlas->height);
+  du=(int32_t)(((int64_t)ue-(int64_t)u)/(count-1));
+  dv=(int32_t)(((int64_t)ve-(int64_t)v)/(count-1));
+ }
+ if(direct_uv&&atlas->row_major){
+  fill_indexed_row_major(dst,atlas,u,v,du,dv,count,level);
+  return;
+ }
+ for(int i=0;i<count;++i){
+  dst[i]=sample_indexed_texel(atlas,u>>16,v>>16,level);
+  u+=du;v+=dv;
+ }
+}
+
+/* Ends of the span are perspective-correct. A row whose 1/z stays within
+ * 15% is one affine fill. Steeper rows take the longest piece that still
+ * does, and stop at 4 pixels. */
+static void fill_indexed_persp_span(const MosaicoWallAtlas *atlas,
+ const persp_edge_t *left,const persp_edge_t *right,int x0,int x1,
+ unsigned level,bool direct_uv,int y)
+{
+ if(x0>=x1)return;
+ float u0,v0,q0,u1,v1,q1;
+ persp_uv_at(left,right,x0,&u0,&v0,&q0);
+ int count=x1-x0;
+ uint16_t *row=&s_target[(size_t)y*s_stride];
+ if(count==1){
+  fill_indexed_affine(atlas,row+x0,u0,v0,u0,v0,1,level,direct_uv);
+  return;
+ }
+ persp_uv_at(left,right,x1-1,&u1,&v1,&q1);
+ int x=x0;
+ while(x<x1){
+  int remain=x1-x;
+  float us,vs,qs,ue,ve,qe;
+  if(x==x0){us=u0;vs=v0;qs=q0;}
+  else persp_uv_at(left,right,x,&us,&vs,&qs);
+  int n=persp_piece_length(qs,q1,remain);
+  if(n>=remain){ue=u1;ve=v1;qe=q1;}
+  else persp_uv_at(left,right,x+n-1,&ue,&ve,&qe);
+  fill_indexed_affine(atlas,row+x,us,vs,ue,ve,n,level,direct_uv);
+  if(n>=remain)break;
+  x+=n;
  }
 }
 
@@ -823,10 +1018,42 @@ static M2D_HOT void draw_indexed_triangle_section(const MosaicoWallAtlas *atlas,
  s_raster_stats.triangle_direct_pixels+=pixels;
 }
 
+static void draw_indexed_triangle_section_persp(const MosaicoWallAtlas *atlas,
+ mosaico_textured_vertex_t long_a,mosaico_textured_vertex_t long_b,
+ mosaico_textured_vertex_t short_a,mosaico_textured_vertex_t short_b,
+ int y0,int y1,unsigned level,bool direct_uv)
+{
+ if(y0<s_clip_y0)y0=s_clip_y0;
+ if(y1>s_clip_y1)y1=s_clip_y1;
+ if(y0>=y1)return;
+ float scan_y=y0+.5f;
+ persp_edge_t long_edge=persp_scan_edge(long_a,long_b,scan_y);
+ persp_edge_t short_edge=persp_scan_edge(short_a,short_b,scan_y);
+ uint32_t pixels=0;
+ for(int y=y0;y<y1;++y){
+  persp_edge_t *left=&long_edge,*right=&short_edge;
+  if(left->x>right->x){left=&short_edge;right=&long_edge;}
+  if(right->x-left->x>64){
+   int x0=raster_ceil_fixed(left->x),x1=raster_ceil_fixed(right->x);
+   if(x0<s_clip_x0)x0=s_clip_x0;
+   if(x1>s_clip_x1)x1=s_clip_x1;
+   if(x0<x1){
+    pixels+=(uint32_t)(x1-x0);
+    fill_indexed_persp_span(atlas,left,right,x0,x1,level,direct_uv,y);
+   }
+  }
+  persp_edge_step(&long_edge);
+  persp_edge_step(&short_edge);
+ }
+ s_raster_stats.triangle_pixels+=pixels;
+ s_raster_stats.triangle_direct_pixels+=pixels;
+}
+
 static void draw_indexed_triangle_prepared(const MosaicoWallAtlas *atlas,
  mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
  mosaico_textured_vertex_t c,unsigned level,bool skip_fold)
 {
+ PROFILE_START(setup_started);
  if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
  if(b.y>c.y){mosaico_textured_vertex_t swap=b;b=c;c=swap;}
  if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
@@ -845,13 +1072,26 @@ static void draw_indexed_triangle_prepared(const MosaicoWallAtlas *atlas,
  int32_t dv_16=fixed_from_float(((b.v-a.v)*(c.y-a.y)-(c.v-a.v)*(b.y-a.y))*inverse_area);
  bool direct_uv=uv_inside(a.u,a.v,max_u,max_v)&&uv_inside(b.u,b.v,max_u,max_v)&&
   uv_inside(c.u,c.v,max_u,max_v);
+ bool persp=persp_span_needed(a.q,b.q,c.q,0.0f,3);
+ PROFILE_ADD(triangle_setup_us,setup_started);
+ PROFILE_START(raster_started);
  int middle=raster_ceil_half(b.y);
- if(b.y-a.y>=.001f)
-  draw_indexed_triangle_section(atlas,a,c,a,b,raster_ceil_half(a.y),middle,
-   du_16,dv_16,level,direct_uv);
- if(c.y-b.y>=.001f)
-  draw_indexed_triangle_section(atlas,a,c,b,c,middle,raster_ceil_half(c.y),
-   du_16,dv_16,level,direct_uv);
+ if(persp){
+  if(b.y-a.y>=.001f)
+   draw_indexed_triangle_section_persp(atlas,a,c,a,b,raster_ceil_half(a.y),middle,
+    level,direct_uv);
+  if(c.y-b.y>=.001f)
+   draw_indexed_triangle_section_persp(atlas,a,c,b,c,middle,raster_ceil_half(c.y),
+    level,direct_uv);
+ }else{
+  if(b.y-a.y>=.001f)
+   draw_indexed_triangle_section(atlas,a,c,a,b,raster_ceil_half(a.y),middle,
+    du_16,dv_16,level,direct_uv);
+  if(c.y-b.y>=.001f)
+   draw_indexed_triangle_section(atlas,a,c,b,c,middle,raster_ceil_half(c.y),
+    du_16,dv_16,level,direct_uv);
+ }
+ PROFILE_ADD(triangle_raster_us,raster_started);
 }
 
 typedef struct {
@@ -875,6 +1115,80 @@ static bool indexed_quad_chain_advance(indexed_quad_chain_t *chain,int row)
   return true;
  }
  return false;
+}
+
+typedef struct {
+ const mosaico_textured_vertex_t *vertices;
+ int index,step,remaining,end_y;
+ persp_edge_t edge;
+} persp_quad_chain_t;
+
+static bool persp_quad_chain_advance(persp_quad_chain_t *chain,int row)
+{
+ while(chain->remaining>0){
+  --chain->remaining;
+  int next=(chain->index+chain->step+4)&3;
+  mosaico_textured_vertex_t a=chain->vertices[chain->index];
+  mosaico_textured_vertex_t b=chain->vertices[next];
+  chain->index=next;
+  int end=raster_ceil_half(b.y);
+  if(b.y<=a.y+.001f||end<=row)continue;
+  chain->edge=persp_scan_edge(a,b,row+.5f);
+  chain->end_y=end;
+  return true;
+ }
+ return false;
+}
+
+static void draw_indexed_quad_persp(const MosaicoWallAtlas *atlas,
+ mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
+ mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned level)
+{
+ mosaico_textured_vertex_t p[4]={a,b,d,c};
+ int top=0;
+ float min_y=p[0].y,max_y=p[0].y,min_x=p[0].x,max_x=p[0].x;
+ double area=0.0;
+ for(int i=0;i<4;++i){
+  int j=(i+1)&3;
+  area+=(double)p[i].x*p[j].y-(double)p[j].x*p[i].y;
+  if(p[i].y<min_y){min_y=p[i].y;top=i;}
+  if(p[i].y>max_y)max_y=p[i].y;
+  if(p[i].x<min_x)min_x=p[i].x;
+  if(p[i].x>max_x)max_x=p[i].x;
+ }
+ if(fabs(area)<.001||max_y<s_clip_y0||min_y>=s_clip_y1||
+    max_x<s_clip_x0||min_x>=s_clip_x1)return;
+ int row=raster_ceil_half(min_y),row_end=raster_ceil_half(max_y);
+ if(row<s_clip_y0)row=s_clip_y0;
+ if(row_end>s_clip_y1)row_end=s_clip_y1;
+ if(row>=row_end)return;
+ persp_quad_chain_t first={p,top,1,3,0,{0}};
+ persp_quad_chain_t second={p,top,-1,3,0,{0}};
+ if(!persp_quad_chain_advance(&first,row)||
+    !persp_quad_chain_advance(&second,row))return;
+ uint32_t pixels=0;
+ ++s_raster_stats.quad_calls;
+ for(;;){
+  persp_edge_t *left=&first.edge,*right=&second.edge;
+  if(left->x>right->x){left=&second.edge;right=&first.edge;}
+  if(right->x-left->x>64){
+   int x0=raster_ceil_fixed(left->x),x1=raster_ceil_fixed(right->x);
+   if(x0<s_clip_x0)x0=s_clip_x0;
+   if(x1>s_clip_x1)x1=s_clip_x1;
+   if(x0<x1){
+    fill_indexed_persp_span(atlas,left,right,x0,x1,level,true,row);
+    pixels+=(uint32_t)(x1-x0);
+   }
+  }
+  if(++row>=row_end)break;
+  if(row==first.end_y){
+   if(!persp_quad_chain_advance(&first,row))break;
+  }else persp_edge_step(&first.edge);
+  if(row==second.end_y){
+   if(!persp_quad_chain_advance(&second,row))break;
+  }else persp_edge_step(&second.edge);
+ }
+ s_raster_stats.quad_pixels+=pixels;
 }
 
 /* Convex opaque INDEX8 quad. Unlike the compatibility implementation that
@@ -945,6 +1259,76 @@ static M2D_HOT void draw_indexed_quad_direct(const MosaicoWallAtlas *atlas,
  s_raster_stats.quad_pixels+=pixels;
 }
 
+/* RGB565 counterpart of draw_indexed_quad_direct. One edge walk, one span
+ * per row, same shade565 sampler as the triangle path. */
+static void draw_rgb_quad_direct(texture_slot_t *s,
+ mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
+ mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light)
+{
+ mosaico_textured_vertex_t p[4]={a,b,d,c};
+ int top=0;
+ float min_y=p[0].y,max_y=p[0].y,min_x=p[0].x,max_x=p[0].x;
+ double area=0.0;
+ for(int i=0;i<4;++i){
+  int j=(i+1)&3;
+  area+=(double)p[i].x*p[j].y-(double)p[j].x*p[i].y;
+  if(p[i].y<min_y){min_y=p[i].y;top=i;}
+  if(p[i].y>max_y)max_y=p[i].y;
+  if(p[i].x<min_x)min_x=p[i].x;
+  if(p[i].x>max_x)max_x=p[i].x;
+ }
+ if(fabs(area)<.001||max_y<s_clip_y0||min_y>=s_clip_y1||
+    max_x<s_clip_x0||min_x>=s_clip_x1)return;
+ int row=raster_ceil_half(min_y),row_end=raster_ceil_half(max_y);
+ if(row<s_clip_y0)row=s_clip_y0;
+ if(row_end>s_clip_y1)row_end=s_clip_y1;
+ if(row>=row_end)return;
+ indexed_quad_chain_t first={p,top,1,3,0,{0}};
+ indexed_quad_chain_t second={p,top,-1,3,0,{0}};
+ if(!indexed_quad_chain_advance(&first,row)||
+    !indexed_quad_chain_advance(&second,row))return;
+ const uint16_t *rgb=s->rgb;
+ if(s->light_cache&&s->cached_light==light){rgb=s->light_cache;light=256U;}
+ const int tex_w=s->header->width;
+ uint32_t pixels=0;
+ ++s_raster_stats.quad_calls;
+ for(;;){
+  triangle_scan_edge_t *left=&first.edge,*right=&second.edge;
+  if(left->x>right->x){left=&second.edge;right=&first.edge;}
+  int32_t width=right->x-left->x;
+  if(width>64){
+   int x0=raster_ceil_fixed(left->x),x1=raster_ceil_fixed(right->x);
+   if(x0<s_clip_x0)x0=s_clip_x0;
+   if(x1>s_clip_x1)x1=s_clip_x1;
+   if(x0<x1){
+    float reciprocal=65536.0f/(float)width;
+    int32_t du=(int32_t)((float)(right->u-left->u)*reciprocal);
+    int32_t dv=(int32_t)((float)(right->v-left->v)*reciprocal);
+    int32_t prestep=((int32_t)x0<<16)+32768-left->x;
+    int32_t u=left->u+mul_fixed(du,prestep);
+    int32_t v=left->v+mul_fixed(dv,prestep);
+    int count=x1-x0;
+    uint16_t *dst=&s_target[(size_t)row*s_stride+x0];
+    if(light>=256U)fill_direct_unshaded(dst,rgb,tex_w,u,v,du,dv,count);
+    else fill_direct_shaded(dst,rgb,tex_w,u,v,du,dv,count,light);
+    pixels+=(uint32_t)count;
+   }
+  }
+  if(++row>=row_end)break;
+  if(row==first.end_y){
+   if(!indexed_quad_chain_advance(&first,row))break;
+  }else{
+   first.edge.x+=first.edge.dx;first.edge.u+=first.edge.du;first.edge.v+=first.edge.dv;
+  }
+  if(row==second.end_y){
+   if(!indexed_quad_chain_advance(&second,row))break;
+  }else{
+   second.edge.x+=second.edge.dx;second.edge.u+=second.edge.du;second.edge.v+=second.edge.dv;
+  }
+ }
+ s_raster_stats.quad_pixels+=pixels;
+}
+
 void Mosaico2DDrawIndexedTexturedTriangle(MosaicoWallAtlas atlas,
  mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
  mosaico_textured_vertex_t c,unsigned light256)
@@ -966,7 +1350,10 @@ void Mosaico2DDrawIndexedTexturedQuad(MosaicoWallAtlas atlas,
  bool inside=uv_inside(a.u,a.v,max_u,max_v)&&uv_inside(b.u,b.v,max_u,max_v)&&
   uv_inside(c.u,c.v,max_u,max_v)&&uv_inside(d.u,d.v,max_u,max_v);
  if(atlas.row_major&&inside){
-  draw_indexed_quad_direct(&atlas,a,b,c,d,level);
+  if(persp_span_needed(a.q,b.q,c.q,d.q,4))
+   draw_indexed_quad_persp(&atlas,a,b,c,d,level);
+  else
+   draw_indexed_quad_direct(&atlas,a,b,c,d,level);
   return;
  }
  draw_indexed_triangle_prepared(&atlas,a,c,b,level,inside);
@@ -1134,6 +1521,7 @@ typedef struct {
  int x0,width,y0,y1,sx,source_y;
  unsigned light;
  sample_step_t sample;
+ int32_t phase,step;
 } prepared_wall_t;
 void Mosaico2DDrawRaycastWalls(Texture2D texture,const mosaico_raycast_wall_t *columns,
  int column_count)
@@ -1161,8 +1549,13 @@ void Mosaico2DDrawRaycastWalls(Texture2D texture,const mosaico_raycast_wall_t *c
    int ish=c->src_height<0?-c->src_height:c->src_height;
    int sx=c->src_x+(isw>1?isw/2:0);
    if(x0>=x1||(unsigned)sx>=(unsigned)atlas_w)continue;
-   prepared[used++]=(prepared_wall_t){x0,x1-x0,y0,y1,sx,c->src_y,
-    quantize_light(c->light256),sample_step(y0-c->dest_y,ish,c->dest_height)};
+   prepared_wall_t column={x0,x1-x0,y0,y1,sx,c->src_y,
+    quantize_light(c->light256),{0},0,0};
+   if(c->v_step_16){
+    column.step=c->v_step_16;
+    column.phase=c->v_phase_16+(int32_t)(y0-c->dest_y)*column.step;
+   }else column.sample=sample_step(y0-c->dest_y,ish,c->dest_height);
+   prepared[used++]=column;
    if(y0<y_min)y_min=y0;
    if(y1>y_max)y_max=y1;
   }
@@ -1171,7 +1564,9 @@ void Mosaico2DDrawRaycastWalls(Texture2D texture,const mosaico_raycast_wall_t *c
    for(int i=0;i<used;++i){
     prepared_wall_t *p=&prepared[i];
     if(y<p->y0||y>=p->y1)continue;
-    int sy=p->source_y+sample_next(&p->sample);
+    int sy;
+    if(p->step){sy=p->source_y+(p->phase>>16);p->phase+=p->step;}
+    else sy=p->source_y+sample_next(&p->sample);
     if((unsigned)sy>=(unsigned)atlas_h)continue;
     uint16_t px=shade565(s->rgb[(size_t)sy*atlas_w+(unsigned)p->sx],p->light);
     fill_shaded(row+p->x0,p->width,px);
@@ -1182,14 +1577,6 @@ void Mosaico2DDrawRaycastWalls(Texture2D texture,const mosaico_raycast_wall_t *c
  }
  if(any_rows)++s_raster_stats.column_calls;
  s_raster_stats.column_pixels+=drawn;
-}
-static inline void fill_wall_run(uint16_t *dst,int count,uint16_t pixel)
-{
- m2d_note_store(count);
- if(count==1){dst[0]=pixel;return;}
- if(count==2){dst[0]=pixel;dst[1]=pixel;return;}
- if(count==4){dst[0]=pixel;dst[1]=pixel;dst[2]=pixel;dst[3]=pixel;return;}
- mosaico_fill_rgb565(dst,pixel,(size_t)count);
 }
 void Mosaico2DDrawIndexedRaycastWalls(MosaicoWallAtlas atlas,
  const mosaico_raycast_wall_t *columns,int column_count)
@@ -1238,7 +1625,7 @@ void Mosaico2DDrawIndexedRaycastWalls(MosaicoWallAtlas atlas,
    for(int y=y0;y<y1;++y,dst+=s_stride){
     int sy=c->src_y+sample_next(&sample);
     if((unsigned)sy>=atlas.height)continue;
-    fill_wall_run(dst,width,light[source[sy]]);
+    fill_shaded(dst,width,light[source[sy]]);
     drawn+=(uint32_t)width;
    }
   }
@@ -1265,7 +1652,7 @@ void Mosaico2DDrawIndexedRaycastWalls(MosaicoWallAtlas atlas,
    if(x0>=x1||(unsigned)sx>=atlas.width)continue;
    any_rows=true;
    prepared[used++]=(prepared_wall_t){x0,x1-x0,y0,y1,sx,c->src_y,
-    indexed_light_level(c->light256),sample_step(y0-c->dest_y,ish,c->dest_height)};
+    indexed_light_level(c->light256),sample_step(y0-c->dest_y,ish,c->dest_height),0,0};
    if(y0<y_min)y_min=y0;
    if(y1>y_max)y_max=y1;
   }
@@ -1279,7 +1666,7 @@ void Mosaico2DDrawIndexedRaycastWalls(MosaicoWallAtlas atlas,
     size_t source=(size_t)(unsigned)sy*atlas.width+(unsigned)p->sx;
     uint8_t index=atlas.indices[source];
     uint16_t pixel=atlas.light_lut[(size_t)p->light*256U+index];
-    fill_wall_run(row+p->x0,p->width,pixel);
+    fill_shaded(row+p->x0,p->width,pixel);
     drawn+=(uint32_t)p->width;
    }
   }
@@ -1306,7 +1693,7 @@ void Mosaico2DDrawSolidRaycastWalls(const mosaico_solid_wall_t *columns,
   int width=x1-x0;
   any=true;
   for(int y=y0;y<y1;++y,dst+=s_stride){
-   fill_wall_run(dst,width,c->color565);
+   fill_shaded(dst,width,c->color565);
    drawn+=(uint32_t)width;
   }
  }

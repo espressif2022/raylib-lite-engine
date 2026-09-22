@@ -225,10 +225,10 @@ static void draw_sunrise_orbit(const living_world_t *world,MosaicoAtlas sunrise)
         for(int i=0;i<band_n[band];++i){
             int ix=band_ix[band][i],iy=band_iy[band][i];
             int a=iy*GW+ix,b=a+1,c=a+GW,d=c+1;
-            mosaico_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy]};
-            mosaico_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+1],tv[iy]};
-            mosaico_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+1]};
-            mosaico_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+1],tv[iy+1]};
+            mosaico_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy],0.f};
+            mosaico_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+1],tv[iy],0.f};
+            mosaico_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+1],0.f};
+            mosaico_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+1],tv[iy+1],0.f};
             Mosaico2DDrawTexturedQuad(sunrise.texture,va,vb,vc,vd,256);
         }
     }
@@ -236,6 +236,12 @@ static void draw_sunrise_orbit(const living_world_t *world,MosaicoAtlas sunrise)
 
 static Vector2 sunrise_volume_screen[SUNRISE_FRONT_VERTEX_COUNT];
 static uint8_t sunrise_volume_valid[SUNRISE_FRONT_VERTEX_COUNT];
+/* Cover pass fills these; the real pass reuses them. Rear, side and front
+ * each keep their own slot so the second walk does not project again. */
+static Vector2 sunrise_cache_screen[3][SUNRISE_FRONT_VERTEX_COUNT];
+static uint8_t sunrise_cache_valid[3][SUNRISE_FRONT_VERTEX_COUNT];
+static const sunrise_volume_vertex_t *sunrise_cache_key[3];
+static int sunrise_cache_count[3];
 
 static void draw_sunrise_volume_part(const sunrise_camera_t *camera,
     const sunrise_volume_vertex_t *vertices,int vertex_count,
@@ -244,17 +250,37 @@ static void draw_sunrise_volume_part(const sunrise_camera_t *camera,
 {
     if(vertex_count>SUNRISE_FRONT_VERTEX_COUNT)return;
     if(!cover_only&&!atlas.texture.id)return;
-    for(int i=0;i<vertex_count;++i){
-        const sunrise_volume_vertex_t *v=&vertices[i];
-        sunrise_volume_valid[i]=(uint8_t)sunrise_project_xyz(camera,v->x*.001f,
-            v->y*.001f,v->z*.001f,&sunrise_volume_screen[i]);
+    int slot=-1;
+    for(int i=0;i<3;++i)if(sunrise_cache_key[i]==vertices)slot=i;
+    Vector2 *screen=sunrise_volume_screen;
+    uint8_t *valid=sunrise_volume_valid;
+    if(!cover_only&&slot>=0&&sunrise_cache_count[slot]==vertex_count){
+        screen=sunrise_cache_screen[slot];
+        valid=sunrise_cache_valid[slot];
+    }else{
+        for(int i=0;i<vertex_count;++i){
+            const sunrise_volume_vertex_t *v=&vertices[i];
+            sunrise_volume_valid[i]=(uint8_t)sunrise_project_xyz(camera,v->x*.001f,
+                v->y*.001f,v->z*.001f,&sunrise_volume_screen[i]);
+        }
+        if(cover_only){
+            if(slot<0){
+                for(int i=0;i<3;++i)if(!sunrise_cache_key[i]){slot=i;break;}
+                if(slot<0)slot=0;
+            }
+            memcpy(sunrise_cache_screen[slot],sunrise_volume_screen,
+                   (size_t)vertex_count*sizeof(Vector2));
+            memcpy(sunrise_cache_valid[slot],sunrise_volume_valid,
+                   (size_t)vertex_count);
+            sunrise_cache_key[slot]=vertices;
+            sunrise_cache_count[slot]=vertex_count;
+        }
     }
     float scale_u=atlas.texture.width/authored_width;
     float scale_v=atlas.texture.height/authored_height;
     for(int i=0;i<face_count;++i){
         unsigned ia=faces[i].a,ib=faces[i].b,ic=faces[i].c;
-        if(!sunrise_volume_valid[ia]||!sunrise_volume_valid[ib]||
-           !sunrise_volume_valid[ic])continue;
+        if(!valid[ia]||!valid[ib]||!valid[ic])continue;
         const sunrise_volume_vertex_t *a=&vertices[ia],*b=&vertices[ib],*c=&vertices[ic];
         if(part==3){
             float cx=(a->x+b->x+c->x)*.000333333f;
@@ -264,8 +290,7 @@ static void draw_sunrise_volume_part(const sunrise_camera_t *camera,
                          faces[i].nz*(camera->z-cz);
             if(facing<=0)continue;
         }
-        Vector2 pa=sunrise_volume_screen[ia],pb=sunrise_volume_screen[ib],
-            pc=sunrise_volume_screen[ic];
+        Vector2 pa=screen[ia],pb=screen[ib],pc=screen[ic];
         float area=(pb.x-pa.x)*(pc.y-pa.y)-(pb.y-pa.y)*(pc.x-pa.x);
         if(fabsf(area)<=.25f)continue;
         if(part==1&&area<0)continue;
@@ -298,9 +323,9 @@ static void draw_sunrise_volume_part(const sunrise_camera_t *camera,
             au=a->u*scale_u;av=a->v*scale_v;bu=b->u*scale_u;bv=b->v*scale_v;
             cu=c->u*scale_u;cv=c->v*scale_v;
         }
-        mosaico_textured_vertex_t va={pa.x,pa.y,au,av};
-        mosaico_textured_vertex_t vb={pb.x,pb.y,bu,bv};
-        mosaico_textured_vertex_t vc={pc.x,pc.y,cu,cv};
+        mosaico_textured_vertex_t va={pa.x,pa.y,au,av,0.f};
+        mosaico_textured_vertex_t vb={pb.x,pb.y,bu,bv,0.f};
+        mosaico_textured_vertex_t vc={pc.x,pc.y,cu,cv,0.f};
         Mosaico2DDrawTexturedTriangle(atlas.texture,va,vb,vc,faces[i].light);
     }
 }
@@ -322,13 +347,13 @@ static void draw_sunrise_ridge_patch(const sunrise_camera_t *camera,
     }
     for(int ring=0;ring<1;++ring){
         mosaico_textured_vertex_t a={screen[ring][0].x,screen[ring][0].y,
-                                      42.0f,source_v[ring]};
+                                      42.0f,source_v[ring],0.f};
         mosaico_textured_vertex_t b={screen[ring][1].x,screen[ring][1].y,
-                                      220.0f,source_v[ring]};
+                                      220.0f,source_v[ring],0.f};
         mosaico_textured_vertex_t c={screen[ring+1][0].x,screen[ring+1][0].y,
-                                      42.0f,source_v[ring+1]};
+                                      42.0f,source_v[ring+1],0.f};
         mosaico_textured_vertex_t d={screen[ring+1][1].x,screen[ring+1][1].y,
-                                      220.0f,source_v[ring+1]};
+                                      220.0f,source_v[ring+1],0.f};
         Mosaico2DDrawTexturedQuad(side.texture,a,b,c,d,248U);
     }
 }
@@ -514,7 +539,8 @@ static mosaico_textured_vertex_t rainforest_flow_vertex(
     return (mosaico_textured_vertex_t){
         p.x,p.y,
         source.longitude*((float)rainforest.texture.width/360.0f),
-        source.source_v*(float)rainforest.texture.height
+        source.source_v*(float)rainforest.texture.height,
+        0.f
     };
 }
 

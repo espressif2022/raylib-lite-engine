@@ -8,6 +8,7 @@
 #include "mosaico_game_assets.h"
 #include "living_worlds_app.h"
 #include "living_worlds_view.h"
+#include "living_worlds_ocean_draw.h"
 #include "living_worlds_world.h"
 
 static living_world_t world;
@@ -77,6 +78,8 @@ static esp_err_t load_scene_background(uint8_t scene)
     free(background_pixels);
     background_pixels=next_pixels;
     atlases.aurora=atlases.ocean=atlases.sunrise=atlases.rainforest=next;
+    if(scene==LIVING_SCENE_OCEAN&&!Mosaico2DCacheTextureLight(next.texture,232))
+        ESP_LOGW("living_worlds","water light cache unavailable; using direct shading");
     loaded_scene=scene;
     return ESP_OK;
 }
@@ -158,6 +161,7 @@ static esp_err_t register_atlas(const char *name,const uint8_t *start,const uint
 static esp_err_t before_display(void)
 {
     esp_err_t err;
+    mosaico_game_2d_run_benchmark();
     err=register_atlas("sunrise_cliff_front.atlas",_binary_sunrise_cliff_front_atlas_start,_binary_sunrise_cliff_front_atlas_end);
     if(err!=ESP_OK)return err;
     err=register_atlas("sunrise_cliff_side.atlas",_binary_sunrise_cliff_side_atlas_start,_binary_sunrise_cliff_side_atlas_end);
@@ -190,6 +194,10 @@ static esp_err_t before_display(void)
 }
 static esp_err_t on_start(void){living_world_reset(&world);return ESP_OK;}
 static void on_event(const mosaico_device_event_t *event){
+#if CONFIG_LIVING_WORLDS_BENCHMARK_MODE
+    (void)event;
+    return;
+#endif
     if(event&&(event->type==MOSAICO_DEVICE_EVENT_POINTER||
                event->type==MOSAICO_DEVICE_EVENT_TOUCH)){
         uint8_t previous=world.scene;
@@ -206,6 +214,16 @@ static void on_event(const mosaico_device_event_t *event){
 }
 static void on_update(void){living_world_update(&world);}
 static void on_render(void){living_worlds_view_render(&world,&atlases);}
-static void on_stats(void){ESP_LOGI("living_worlds","yaw=%.1f pitch=%.1f hash=%08lx",world.yaw,world.pitch,(unsigned long)living_world_hash(&world));}
+static void on_stats(void){
+ if(world.scene==LIVING_SCENE_OCEAN){mosaico_game_2d_raster_stats_t s; mosaico_game_2d_get_raster_stats(&s);
+ ESP_LOGI("living_worlds","ocean cover=%luus water=%luus reefs=%luus actors=%luus water_setup=%luus tick=%lu tris=%lu quads=%lu tri_px=%lu quad_px=%lu",
+ (unsigned long)s.sky_us,(unsigned long)s.floor_us,(unsigned long)s.wall_us,(unsigned long)s.enemy_us,(unsigned long)s.hud_us,(unsigned long)world.tick,
+ (unsigned long)s.triangle_calls,(unsigned long)s.quad_calls,(unsigned long)s.triangle_pixels,(unsigned long)s.quad_pixels);}
+#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+ living_ocean_draw_profile_t p=living_ocean_draw_profile();
+ if(world.scene==LIVING_SCENE_OCEAN)ESP_LOGI("living_worlds","ocean_emit water=%luus reefs=%luus jelly=%luus",
+     (unsigned long)p.water_emit_us,(unsigned long)p.reefs_emit_us,(unsigned long)p.jelly_us);
+#endif
+ ESP_LOGI("living_worlds","yaw=%.1f pitch=%.1f hash=%08lx",world.yaw,world.pitch,(unsigned long)living_world_hash(&world));}
 static const mosaico_game_app_config_t CONFIG={.tag="living_worlds",.window_title="Living Worlds",.canvas_bind=GSP_LIVING_WORLDS_BIND_GAME_CANVAS,.touch_points=1,.target_fps=30,.gsp_bundle=gsp_bundle_config,.before_display=before_display,.on_start=on_start,.on_event=on_event,.on_update=on_update,.on_render=on_render,.on_stats=on_stats};
 const mosaico_game_app_config_t *living_worlds_app_config(void){return &CONFIG;}

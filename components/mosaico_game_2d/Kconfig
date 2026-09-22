@@ -5,4 +5,10 @@ config MOSAICO_GAME_MAX_TEXTURES
     range 1 32
     default 12
 
+config MOSAICO_GAME_RASTER_PROFILE
+    bool "Time triangle setup and raster stages"
+    default n
+config MOSAICO_GAME_RASTER_BENCHMARK
+    bool "Run startup raster microbenchmarks (Living Worlds)"
+    default n
 endmenu

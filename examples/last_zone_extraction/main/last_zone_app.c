@@ -10,6 +10,7 @@
 #include "freertos/timers.h"
 #include "last_zone_app.h"
 #include "last_zone_game.h"
+#include "last_zone_benchmark.h"
 #include "last_zone_save.h"
 #include "last_zone_view.h"
 #include "mosaico_game_2d.h"
@@ -396,17 +397,7 @@ static void on_event(const mosaico_device_event_t *event)
 static void on_update(void)
 {
 #if CONFIG_LAST_ZONE_BENCHMARK_MODE
-    /* Fixed 300-tick replay. Confirming out of any non-playing phase keeps a
-     * long capture inside gameplay instead of parked on the start screen. */
-    if (s_game.phase != LAST_ZONE_PHASE_PLAYING) {
-        last_zone_confirm(&s_game);
-    } else {
-        const uint32_t phase = s_game.tick % 300U;
-        last_zone_set_motion(&s_game, phase < 225U ? 1.0f : 0.2f,
-                             phase < 150U ? 0.0f : 0.6f,
-                             phase < 150U ? 0.02f : -0.015f);
-        last_zone_set_fire_held(&s_game, s_game.tick % 30U < 10U);
-    }
+    last_zone_benchmark_input(&s_game);
 #else
     last_zone_set_motion(&s_game, s_move_forward, s_move_strafe, 0.0f);
     last_zone_set_fire_held(&s_game, s_fire_track >= 0);
@@ -494,7 +485,8 @@ static const mosaico_game_app_config_t s_config = {
     .canvas_bind = GSP_LAST_ZONE_EXTRACTION_BIND_GAME_CANVAS,
     .touch_points = 2,
     .enable_imu = false,
-    .target_fps = 30,
+    .target_fps = CONFIG_LAST_ZONE_TARGET_FPS,
+    .logic_hz = 30,
     .gsp_bundle = gsp_bundle_config,
     .before_display = before_display,
     .after_healthy = after_healthy,

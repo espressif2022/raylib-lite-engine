@@ -1,0 +1,8 @@
+menu "Living Worlds benchmark"
+config LIVING_WORLDS_BENCHMARK_MODE
+    bool "Ignore touch during deterministic idle-camera replay"
+    default n
+    help
+        Keeps the initial ocean scene and its tick-driven camera animation.
+        Touch events are ignored so repeated boot runs are comparable.
+endmenu

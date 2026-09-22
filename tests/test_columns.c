@@ -57,7 +57,7 @@ int main(int argc,char **argv){
   for(int i=0;i<n;i++){
    columns[i]=(mosaico_raycast_wall_t){(int)(random_u()%530)-25,(int)(random_u()%600)-150,
     (int)(random_u()%50),(int)(random_u()%700), (int)(random_u()%12)-2,(int)(random_u()%12)-2,
-    (int)(random_u()%9)-4,(int)(random_u()%17)-8,random_u()%350};
+    (int)(random_u()%9)-4,(int)(random_u()%17)-8,random_u()%350,0,0};
    reference(&columns[i],lo,hi);
   }
   Mosaico2DDrawRaycastWalls(texture,columns,n);
@@ -97,7 +97,7 @@ int main(int argc,char **argv){
   for(int i=0;i<n;i++){
    columns[i]=(mosaico_raycast_wall_t){(int)(random_u()%530)-25,(int)(random_u()%600)-150,
     (int)(random_u()%50),(int)(random_u()%700),(int)(random_u()%12)-2,(int)(random_u()%12)-2,
-    (int)(random_u()%9)-4,(int)(random_u()%17)-8,random_u()%350};
+    (int)(random_u()%9)-4,(int)(random_u()%17)-8,random_u()%350,0,0};
    indexed_reference(&columns[i],lo,hi);
   }
   Mosaico2DDrawIndexedRaycastWalls(wall,columns,n);
@@ -162,12 +162,12 @@ int main(int argc,char **argv){
   uint16_t expect=mosaico_shade565(pixel(2,3),160);
   if(pass){
    Mosaico2DDrawTexturedQuad(texture,
-    (mosaico_textured_vertex_t){20,20,2,3},(mosaico_textured_vertex_t){90,20,2,3},
-    (mosaico_textured_vertex_t){20,90,2,3},(mosaico_textured_vertex_t){90,90,2,3},160);
+    (mosaico_textured_vertex_t){20,20,2,3,0.f},(mosaico_textured_vertex_t){90,20,2,3,0.f},
+    (mosaico_textured_vertex_t){20,90,2,3,0.f},(mosaico_textured_vertex_t){90,90,2,3,0.f},160);
   }else{
    Mosaico2DDrawTexturedTriangle(texture,
-    (mosaico_textured_vertex_t){20,20,2,3},(mosaico_textured_vertex_t){90,20,2,3},
-    (mosaico_textured_vertex_t){20,90,2,3},160);
+    (mosaico_textured_vertex_t){20,20,2,3,0.f},(mosaico_textured_vertex_t){90,20,2,3,0.f},
+    (mosaico_textured_vertex_t){20,90,2,3,0.f},160);
   }
   int written=0;
   for(int y=0;y<W;y++)for(int x=0;x<W;x++){
@@ -178,14 +178,23 @@ int main(int argc,char **argv){
   }
   assert(written>100);
  }
+ mosaico_game_2d_reset_raster_stats();
+ Mosaico2DDrawTexturedQuad(texture,
+  (mosaico_textured_vertex_t){20,20,2,3,0.f},(mosaico_textured_vertex_t){90,20,2,3,0.f},
+  (mosaico_textured_vertex_t){20,90,2,3,0.f},(mosaico_textured_vertex_t){90,90,2,3,0.f},160);
+ mosaico_game_2d_raster_stats_t rgb_quad={0};
+ mosaico_game_2d_get_raster_stats(&rgb_quad);
+ assert(rgb_quad.quad_calls==1);
+ assert(rgb_quad.triangle_calls==0);
+ assert(rgb_quad.quad_pixels>100);
  mosaico_game_2d_set_clip(0,0,W,W);
  memset(actual,0x5a,sizeof(actual));
  unsigned indexed_level=(160U*15U+128U)>>8;
  unsigned indexed_texel=(unsigned)(3*8+2);
  uint16_t indexed_expect=(uint16_t)(indexed_level*257U+indexed_texel*997U+31U);
  Mosaico2DDrawIndexedTexturedTriangle(wall,
-  (mosaico_textured_vertex_t){20,20,2,3},(mosaico_textured_vertex_t){90,20,2,3},
-  (mosaico_textured_vertex_t){20,90,2,3},160);
+  (mosaico_textured_vertex_t){20,20,2,3,0.f},(mosaico_textured_vertex_t){90,20,2,3,0.f},
+  (mosaico_textured_vertex_t){20,90,2,3,0.f},160);
  int indexed_written=0;
  for(int y=0;y<W;y++)for(int x=0;x<W;x++){
   uint16_t p=actual[y*STRIDE+x];
@@ -197,8 +206,8 @@ int main(int argc,char **argv){
  memset(actual,0x5a,sizeof(actual));
  mosaico_game_2d_reset_raster_stats();
  Mosaico2DDrawIndexedTexturedQuad(row_wall,
-  (mosaico_textured_vertex_t){20,20,2,3},(mosaico_textured_vertex_t){90,20,2,3},
-  (mosaico_textured_vertex_t){20,90,2,3},(mosaico_textured_vertex_t){90,90,2,3},160);
+  (mosaico_textured_vertex_t){20,20,2,3,0.f},(mosaico_textured_vertex_t){90,20,2,3,0.f},
+  (mosaico_textured_vertex_t){20,90,2,3,0.f},(mosaico_textured_vertex_t){90,90,2,3,0.f},160);
  int indexed_quad_written=0;
  for(int y=0;y<W;y++)for(int x=0;x<W;x++){
   uint16_t p=actual[y*STRIDE+x];
@@ -212,8 +221,36 @@ int main(int argc,char **argv){
  assert(quad_stats.quad_calls==1);
  assert(quad_stats.quad_pixels==(uint32_t)indexed_quad_written);
  assert(quad_stats.triangle_calls==0);
+ /* Perspective: left edge is 4x nearer, so the screen midpoint follows 1/z
+  * toward texel 1, not the affine midpoint texel 3. q==0 above stays affine. */
+ memset(actual,0x5a,sizeof(actual));
+ mosaico_game_2d_reset_raster_stats();
+ Mosaico2DDrawIndexedTexturedQuad(row_wall,
+  (mosaico_textured_vertex_t){20,30,0,1,1.0f},
+  (mosaico_textured_vertex_t){220,30,7,1,0.25f},
+  (mosaico_textured_vertex_t){20,90,0,1,1.0f},
+  (mosaico_textured_vertex_t){220,90,7,1,0.25f},160);
+ {
+  unsigned near_index=1U*8U+1U;
+  uint16_t near_expect=(uint16_t)(indexed_level*257U+near_index*997U+31U);
+  unsigned far_index=1U*8U+3U;
+  uint16_t far_expect=(uint16_t)(indexed_level*257U+far_index*997U+31U);
+  assert(actual[60*STRIDE+120]==near_expect);
+  assert(actual[60*STRIDE+120]!=far_expect);
+ }
+ mosaico_game_2d_raster_stats_t persp_stats={0};
+ mosaico_game_2d_get_raster_stats(&persp_stats);
+ assert(persp_stats.quad_calls==1);
+ assert(persp_stats.triangle_calls==0);
+ /* 16.16 vertical phase sticks the first row to source row 3. The integer
+  * sampler would start at row 0 for this column. */
+ memset(actual,0x5a,sizeof(actual));
+ mosaico_raycast_wall_t phased=(mosaico_raycast_wall_t){40,10,2,20,1,0,1,8,256,3<<16,32768};
+ Mosaico2DDrawRaycastWalls(texture,&phased,1);
+ assert(actual[10*STRIDE+40]==pixel(1,3));
+ assert(actual[12*STRIDE+40]==pixel(1,4));
  mosaico_game_2d_set_clip(0,0,W,W);
- for(int i=0;i<240;i++)columns[i]=(mosaico_raycast_wall_t){i*2,-30,2,450,i%8,0,1,8,160};
+ for(int i=0;i<240;i++)columns[i]=(mosaico_raycast_wall_t){i*2,-30,2,450,i%8,0,1,8,160,0,0};
  clock_t start=clock();
  for(int i=0;i<500;i++)Mosaico2DDrawRaycastWalls(texture,columns,240);
  printf("100 RGB565 wall, 100 INDEX8 wall, 50 solid wall, 400 floor/span, 100 opaque-scale oracle cases passed; wall benchmark %.3f ms/frame\n",

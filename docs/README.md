@@ -12,6 +12,8 @@
 | 选示例、复制工程 | [examples](../examples/README.md) |
 | 组件职责与启动顺序 | [components](../components/README.md) |
 | 2.5D / 2D 绘制对照 | [游戏绘制总表](game-drawing-inventory.zh-CN.md) |
+| 墙和 micropixel 的重合度、不超预算的画法 | [墙体绘制方案](wall-rendering-design.zh-CN.md) |
+| Living Worlds 四场景优化 | [Living Worlds 优化](living-worlds-optimization.zh-CN.md) |
 | Sky Hop 真机性能矩阵 | [Sky Hop 性能测试](sky-hop-performance.zh-CN.md) |
 | 渲染瓶颈实测基线与优化路线 | [渲染优化计划](render-optimization-plan.zh-CN.md) |
 | Host 单元测试 | [tests](../tests/README.md) |

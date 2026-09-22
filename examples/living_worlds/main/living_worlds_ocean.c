@@ -10,6 +10,15 @@
 #include "ocean_right_volume.h"
 #include "living_worlds_ocean_draw.h"
 #include "living_worlds_volume.h"
+#ifdef ESP_PLATFORM
+#include "esp_timer.h"
+static uint32_t ocean_now_us(void){return (uint32_t)esp_timer_get_time();}
+#else
+static uint32_t ocean_now_us(void){return 0;}
+#endif
+static uint32_t water_setup_us;
+static living_ocean_draw_profile_t draw_profile;
+living_ocean_draw_profile_t living_ocean_draw_profile(void){return draw_profile;}
 #endif
 
 #define OCEAN_DT (1.0f/30.0f)
@@ -299,6 +308,7 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
                              MosaicoAtlas water,int jelly_count,float t)
 {
     if(!water.texture.id||!camera)return;
+    uint32_t setup_start=ocean_now_us();
     const int n=OCEAN_RENDER_GRID;
     enum { X0=-8, Y0=-4, GW=33, GH=25 };
     static Vector2 mesh[GW*GH];
@@ -337,8 +347,12 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
     static uint8_t band_occludes[8][QUAD_CAP];
     int band_n[8];
     memset(band_n,0,sizeof band_n);
+    /* Far bands (0..3) collapse a 2x2 of equal cells into one quad. */
+    static uint8_t cell_skip[GW*GH];
+    memset(cell_skip,0,sizeof cell_skip);
     for(int iy=0;iy<GH-1;++iy)
     for(int ix=0;ix<GW-1;++ix){
+        if(cell_skip[iy*GW+ix])continue;
         int a=iy*GW+ix,b=a+1,c=a+GW,d=c+1;
         if(!ok[a]||!ok[b]||!ok[c]||!ok[d])continue;
         unsigned average=(unsigned)((depth[a]+depth[b]+depth[c]+depth[d])*.25f);
@@ -361,18 +375,53 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
            wider threshold is used only for creature occlusion; lighting keeps
            its original threshold so the background image does not change. */
         band_occludes[band][slot]=(uint8_t)(reef<128U);
+        int span=1;
+        if(band<4&&(ix&1)==0&&(iy&1)==0&&ix+2<GW&&iy+2<GH&&reef>=128U){
+            int merge=1;
+            for(int dy=0;dy<2&&merge;++dy)
+            for(int dx=0;dx<2;++dx){
+                if(dx==0&&dy==0)continue;
+                int sa=(iy+dy)*GW+(ix+dx);
+                int sb=sa+1,sc=sa+GW,sd=sc+1;
+                if(!ok[sa]||!ok[sb]||!ok[sc]||!ok[sd]){merge=0;break;}
+                unsigned savg=(unsigned)((depth[sa]+depth[sb]+depth[sc]+depth[sd])*.25f);
+                int sband=(int)(savg*8U/65536U);
+                if(sband<0)sband=0;
+                if(sband>7)sband=7;
+                if(sband!=band){merge=0;break;}
+                float sl=fminf(fminf(mesh[sa].x,mesh[sb].x),fminf(mesh[sc].x,mesh[sd].x));
+                float sr=fmaxf(fmaxf(mesh[sa].x,mesh[sb].x),fmaxf(mesh[sc].x,mesh[sd].x));
+                float st=fminf(fminf(mesh[sa].y,mesh[sb].y),fminf(mesh[sc].y,mesh[sd].y));
+                float sbm=fmaxf(fmaxf(mesh[sa].y,mesh[sb].y),fmaxf(mesh[sc].y,mesh[sd].y));
+                if(sr<0||sl>=480||sbm<0||st>=480||(sr-sl)*(sbm-st)<1.5f){merge=0;break;}
+                if(living_cover_quad(mesh[sa],mesh[sb],mesh[sc],mesh[sd])){merge=0;break;}
+                unsigned sreef=(unsigned)((mask[sa]+mask[sb]+mask[sc]+mask[sd])*.25f);
+                if(sreef<128U){merge=0;break;}
+            }
+            if(merge){
+                span=2;
+                cell_skip[(iy)*GW+(ix+1)]=1;
+                cell_skip[(iy+1)*GW+ix]=1;
+                cell_skip[(iy+1)*GW+(ix+1)]=1;
+            }
+        }
+        if(span==2)band_iy[band][slot]=(uint16_t)(iy|0x8000);
     }
+    water_setup_us=ocean_now_us()-setup_start;
     for(int band=0;band<8;++band){
         for(int i=0;i<band_n[band];++i){
             /* Foreground-mask cells are delayed, not duplicated. */
             if(band_occludes[band][i])continue;
-            int ix=band_ix[band][i],iy=band_iy[band][i];
-            int a=iy*GW+ix,b=a+1,c=a+GW,d=c+1;
+            int ix=band_ix[band][i];
+            int iy_bits=band_iy[band][i];
+            int iy=iy_bits&0x7fff;
+            int span=(iy_bits&0x8000)?2:1;
+            int a=iy*GW+ix,b=a+span,c=a+span*GW,d=c+span;
             unsigned background_light=band_light[band][i];
-            mosaico_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy]};
-            mosaico_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+1],tv[iy]};
-            mosaico_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+1]};
-            mosaico_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+1],tv[iy+1]};
+            mosaico_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy],0.f};
+            mosaico_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+span],tv[iy],0.f};
+            mosaico_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+span],0.f};
+            mosaico_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+span],tv[iy+span],0.f};
             Mosaico2DDrawTexturedQuad(water.texture,va,vb,vc,vd,background_light);
         }
         /* Depth values map to z as 1 / (raw * .3 / 65535).  Insert each
@@ -383,7 +432,15 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
             int jelly_band=(int)(26.6666667f/z);
             if(jelly_band<0)jelly_band=0;
             if(jelly_band>7)jelly_band=7;
-            if(jelly_band==band)draw_ocean_jelly(camera,&ocean->jellies[i],t);
+            if(jelly_band==band){
+#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+                uint32_t jelly_start=ocean_now_us();
+#endif
+                draw_ocean_jelly(camera,&ocean->jellies[i],t);
+#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+                draw_profile.jelly_us+=ocean_now_us()-jelly_start;
+#endif
+            }
         }
     }
     /* Draw authored foreground-mask cells once, after all jellies.  Moving
@@ -392,12 +449,15 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
     for(int band=0;band<8;++band)
     for(int i=0;i<band_n[band];++i){
         if(!band_occludes[band][i])continue;
-        int ix=band_ix[band][i],iy=band_iy[band][i];
-        int a=iy*GW+ix,b=a+1,c=a+GW,d=c+1;
-        mosaico_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy]};
-        mosaico_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+1],tv[iy]};
-        mosaico_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+1]};
-        mosaico_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+1],tv[iy+1]};
+        int ix=band_ix[band][i];
+        int iy_bits=band_iy[band][i];
+        int iy=iy_bits&0x7fff;
+        int span=(iy_bits&0x8000)?2:1;
+        int a=iy*GW+ix,b=a+span,c=a+span*GW,d=c+span;
+        mosaico_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy],0.f};
+        mosaico_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+span],tv[iy],0.f};
+        mosaico_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+span],0.f};
+        mosaico_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+span],tv[iy+span],0.f};
         Mosaico2DDrawTexturedQuad(water.texture,va,vb,vc,vd,band_light[band][i]);
     }
 }
@@ -446,32 +506,31 @@ static void draw_ocean_fish(const living_camera_t *camera,float x,float y,float 
               x-dir*size*1.34f,y-size*.36f,z,tail);
 }
 
-static void rotate_local(float x,float y,float z,float roll,float yaw,
-                         float *ox,float *oy,float *oz)
-{
-    float c=cosf(roll),s=sinf(roll),cy=cosf(yaw),sy=sinf(yaw);
-    float a=x*c-y*s,b=x*s+y*c;
-    *ox=a*cy+z*sy;*oy=b;*oz=-a*sy+z*cy;
-}
+typedef struct { float c,s,cy,sy; } jelly_rotation_t;
 
-static void jelly_world(const ocean_jelly_t *jelly,float x,float y,float z,
-                        float *wx,float *wy,float *wz)
+static void jelly_world(const ocean_jelly_t *jelly,const jelly_rotation_t *rotation,
+                        float x,float y,float z,float *wx,float *wy,float *wz)
 {
-    float lx,ly,lz;rotate_local(x,y,z,jelly->roll,jelly->yaw,&lx,&ly,&lz);
+    float a=x*rotation->c-y*rotation->s,b=x*rotation->s+y*rotation->c;
+    float lx=a*rotation->cy+z*rotation->sy,ly=b,lz=-a*rotation->sy+z*rotation->cy;
     *wx=jelly->x+lx*jelly->radius;*wy=jelly->y+ly*jelly->radius;*wz=jelly->z+lz*jelly->radius;
 }
 
 static void draw_ocean_jelly(const living_camera_t *camera,const ocean_jelly_t *jelly,float t)
 {
+    /* Orientation is shared by every cap/tentacle point. Evaluate libm once
+     * per jelly, retaining the original multiply/add order for projection. */
+    const jelly_rotation_t rotation={cosf(jelly->roll),sinf(jelly->roll),
+                                    cosf(jelly->yaw),sinf(jelly->yaw)};
     float contract=1.0f-jelly->pulse*.145f;
     float h=.76f*(1.0f+jelly->pulse*.15f);
     float wx,wy,wz;
     Vector2 top,left,right;
-    jelly_world(jelly,0,h-.04f,0,&wx,&wy,&wz);
+    jelly_world(jelly,&rotation,0,h-.04f,0,&wx,&wy,&wz);
     bool cap_valid=ocean_project(camera,wx,wy,wz,&top);
-    jelly_world(jelly,-contract,-.04f,0,&wx,&wy,&wz);
+    jelly_world(jelly,&rotation,-contract,-.04f,0,&wx,&wy,&wz);
     cap_valid=cap_valid&&ocean_project(camera,wx,wy,wz,&left);
-    jelly_world(jelly,contract,-.04f,0,&wx,&wy,&wz);
+    jelly_world(jelly,&rotation,contract,-.04f,0,&wx,&wy,&wz);
     cap_valid=cap_valid&&ocean_project(camera,wx,wy,wz,&right);
     if(cap_valid){
         float rim_x=(left.x+right.x)*.5f;
@@ -497,12 +556,13 @@ static void draw_ocean_jelly(const living_camera_t *camera,const ocean_jelly_t *
     int tentacles=jelly->id==0?10:7;
     for(int i=0;i<tentacles;++i){
         float ang=i/(float)tentacles*6.2831853f;
+        float root_x=cosf(ang)*.24f,root_z=sinf(ang)*.22f;
         Vector2 last;bool has=false;
         for(int s=0;s<=8;++s){
             float f=s/8.0f;
             float wx,wy,wz;
-            jelly_world(jelly,cosf(ang)*.24f+sinf(t*.95f-f*5.5f+i)*.18f*f,
-                        -.13f-f*3.1f,sinf(ang)*.22f+sinf(f*4.0f-t*.8f+i)*.23f*f,
+            jelly_world(jelly,&rotation,root_x+sinf(t*.95f-f*5.5f+i)*.18f*f,
+                        -.13f-f*3.1f,root_z+sinf(f*4.0f-t*.8f+i)*.23f*f,
                         &wx,&wy,&wz);
             Vector2 screen;
             if(!ocean_project(camera,wx,wy,wz,&screen)){has=false;continue;}
@@ -552,6 +612,7 @@ void living_ocean_draw(const living_ocean_t *ocean,float yaw,float pitch,
                            MosaicoAtlas left_rear,MosaicoAtlas right_front,
                            MosaicoAtlas right_side,MosaicoAtlas right_rear)
 {
+    uint32_t phase_start=ocean_now_us();
     float nx=yaw/OCEAN_YAW_LIMIT,ny=pitch/OCEAN_PITCH_LIMIT,length=sqrtf(nx*nx+ny*ny);
     if(length>1.0f){yaw/=length;pitch/=length;}
     living_camera_t camera=living_camera_orbit(yaw,pitch,OCEAN_FOCUS);
@@ -563,9 +624,31 @@ void living_ocean_draw(const living_ocean_t *ocean,float yaw,float pitch,
     living_cover_seal();
     float t=ocean->tick*OCEAN_DT;
     int jellies=effects_level==0?3:ocean->jelly_count;
+    uint32_t cover_us=ocean_now_us()-phase_start;
+    memset(&draw_profile,0,sizeof draw_profile);
+#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+    mosaico_game_2d_raster_stats_t before_water,after_water,after_reefs;
+    mosaico_game_2d_get_raster_stats(&before_water);
+#endif
+    phase_start=ocean_now_us();
     draw_ocean_water(ocean,&camera,water,jellies,t);
+    uint32_t water_us=ocean_now_us()-phase_start;
+#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+    mosaico_game_2d_get_raster_stats(&after_water);
+    uint32_t accounted=water_setup_us+draw_profile.jelly_us+
+        after_water.triangle_raster_us-before_water.triangle_raster_us;
+    draw_profile.water_emit_us=water_us>accounted?water_us-accounted:0;
+#endif
+    phase_start=ocean_now_us();
     /* The reefs frame the canyon as the closest foreground layer. */
     draw_ocean_reefs(&camera,yaw,left_front,left_side,left_rear,right_front,right_side,right_rear);
+    uint32_t reefs_us=ocean_now_us()-phase_start;
+#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+    mosaico_game_2d_get_raster_stats(&after_reefs);
+    accounted=after_reefs.triangle_raster_us-after_water.triangle_raster_us;
+    draw_profile.reefs_emit_us=reefs_us>accounted?reefs_us-accounted:0;
+#endif
+    phase_start=ocean_now_us();
     int shoals=effects_level==0?3:ocean->shoal_count;
     int wanderers=effects_level==0?3:ocean->wanderer_count;
     uint8_t order[OCEAN_SHOAL_CAP+OCEAN_WANDERER_CAP];
@@ -612,5 +695,6 @@ void living_ocean_draw(const living_ocean_t *ocean,float yaw,float pitch,
             DrawCircle((int)screen.x,(int)screen.y,1,(Color){195,238,255,80});
         }
     }
+    mosaico_game_2d_set_phase_us(cover_us,water_us,reefs_us,ocean_now_us()-phase_start,water_setup_us);
 }
 #endif

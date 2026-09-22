@@ -54,8 +54,13 @@ typedef struct {
     uint32_t quad_calls;
     uint32_t quad_pixels;
     /* Framebuffer store shape. A run is one contiguous horizontal write.
-     * fb_pixels/fb_runs is the mean run length: with a 32-byte cache line a
-     * mean below 16 means every store pulls a line it only partly uses. */
+     * fb_pixels/fb_runs is the mean run length of instrumented paths;
+     * this is not unique coverage or a measurement of cache-line traffic. */
+    uint32_t primitive_pixels, primitive_runs, clear_pixels;
+    uint32_t rgb_const_v_pixels, rgb_vary_v_pixels;
+    uint32_t indexed_const_v_pixels, indexed_vary_v_pixels;
+    uint32_t indexed_magnify_pixels, indexed_minify_pixels;
+    uint32_t triangle_setup_us, triangle_raster_us;
     uint32_t fb_runs;
     uint32_t fb_pixels;
 } mosaico_game_2d_raster_stats_t;
@@ -63,12 +68,20 @@ typedef struct {
     int dest_x, dest_y, dest_width, dest_height;
     int src_x, src_y, src_width, src_height;
     unsigned light256;
+    /* 0 keeps the integer row sampler. Otherwise 16.16 source V at dest_y
+     * and the per-row step. One texel per row; no second tap. */
+    int v_phase_16, v_step_16;
 } mosaico_raycast_wall_t;
 typedef struct {
     int dest_x, dest_y, dest_width, dest_height;
     uint16_t color565;
 } mosaico_solid_wall_t;
-typedef struct { float x,y,u,v; } mosaico_textured_vertex_t;
+/* q == 0 keeps affine u,v. q > 0 is 1/z. INDEX8 triangle and quad then
+ * interpolate u*q, v*q and q, and divide only at span ends. RGB565 draws
+ * ignore q. */
+typedef struct { float x,y,u,v,q; } mosaico_textured_vertex_t;
+void mosaico_game_2d_note_primitives(uint32_t pixels, uint32_t runs, uint32_t clear_pixels);
+void mosaico_game_2d_run_benchmark(void);
 void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int height);
 void mosaico_game_2d_set_clip(int x,int y,int width,int height);
 void mosaico_game_2d_reset_raster_stats(void);
@@ -90,6 +103,11 @@ Texture2D Mosaico2DLoadTexture(const char *asset_path);
 /* Register caller-owned native RGB565 pixels without copying them. The pixel
  * buffer must remain valid until Mosaico2DUnloadTexture() is called. */
 Texture2D Mosaico2DRegisterRGB565(const void *pixels,int width,int height);
+/* Optional exact pre-shading for triangle/quad draws at one quantized light.
+ * Uses width*height*2 bytes (PSRAM on device), released on unload. Allocation
+ * failure leaves ordinary sampling available. Source pixels must be immutable
+ * while cached; light >= 248 drops the cache. Other draw paths are unchanged. */
+bool Mosaico2DCacheTextureLight(Texture2D texture,unsigned light256);
 void Mosaico2DUnloadTexture(Texture2D texture);
 void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,Vector2 origin,float rotation,Color tint);
 void Mosaico2DDrawTexturedTriangle(Texture2D texture,

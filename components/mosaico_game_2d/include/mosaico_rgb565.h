@@ -21,11 +21,12 @@ static inline uint16_t mosaico_shade565(uint16_t pixel, unsigned light)
         return pixel;
     }
     if ((light & 15U) == 0U) {
-        unsigned li = light >> 4;
-        unsigned r = mosaico_shade_r_lut[li][(pixel >> 11) & 31U];
-        unsigned g = mosaico_shade_g_lut[li][(pixel >> 5) & 63U];
-        unsigned b = mosaico_shade_b_lut[li][pixel & 31U];
-        return (uint16_t)((r << 11) | (g << 5) | b);
+        /* Quantized light uses a four-bit factor. The red/blue products
+         * fit in separate lanes, preserving exact channel truncation. */
+        unsigned factor = light >> 4;
+        uint32_t rb = (((uint32_t)(pixel & 0xf81fU) * factor) >> 4) & 0xf81fU;
+        uint32_t g = (((uint32_t)(pixel & 0x07e0U) * factor) >> 4) & 0x07e0U;
+        return (uint16_t)(rb | g);
     }
     unsigned r = ((pixel >> 11) & 31U) * light >> 8;
     unsigned g = ((pixel >> 5) & 63U) * light >> 8;

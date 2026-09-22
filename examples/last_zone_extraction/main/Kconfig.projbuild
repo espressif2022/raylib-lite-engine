@@ -9,4 +9,12 @@ config LAST_ZONE_BENCHMARK_MODE
         comparable between builds. Use this only for repeatable device
         benchmarks, not normal gameplay.
 
+config LAST_ZONE_TARGET_FPS
+    int "Display frame-rate limit"
+    range 30 60
+    default 30
+    help
+        Rendering limit only; game logic remains fixed at 30 Hz.
+        Set 60 when measuring available rendering headroom.
+
 endmenu

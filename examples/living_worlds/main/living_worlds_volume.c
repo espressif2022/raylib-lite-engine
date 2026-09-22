@@ -74,9 +74,9 @@ void living_draw_volume_uv(const living_camera_t *camera,
         float min_y=fminf(pa.y,fminf(pb.y,pc.y));
         float max_y=fmaxf(pa.y,fmaxf(pb.y,pc.y));
         if(max_x<0||min_x>=480||max_y<0||min_y>=480)continue;
-        mosaico_textured_vertex_t va={pa.x,pa.y,dst_u0+a->u*su,dst_v0+a->v*sv};
-        mosaico_textured_vertex_t vb={pb.x,pb.y,dst_u0+b->u*su,dst_v0+b->v*sv};
-        mosaico_textured_vertex_t vc={pc.x,pc.y,dst_u0+c->u*su,dst_v0+c->v*sv};
+        mosaico_textured_vertex_t va={pa.x,pa.y,dst_u0+a->u*su,dst_v0+a->v*sv,0.f};
+        mosaico_textured_vertex_t vb={pb.x,pb.y,dst_u0+b->u*su,dst_v0+b->v*sv,0.f};
+        mosaico_textured_vertex_t vc={pc.x,pc.y,dst_u0+c->u*su,dst_v0+c->v*sv,0.f};
         Mosaico2DDrawTexturedTriangle(atlas.texture,va,vb,vc,faces[i].light);
     }
 }
@@ -171,17 +171,31 @@ void living_cover_seal(void)
 
 int living_cover_quad(Vector2 a,Vector2 b,Vector2 c,Vector2 d)
 {
-    const float to_cell=LIVING_COVER_N/480.0f;
-    int cells[4][2]={{(int)(a.x*to_cell),(int)(a.y*to_cell)},
-                     {(int)(b.x*to_cell),(int)(b.y*to_cell)},
-                     {(int)(c.x*to_cell),(int)(c.y*to_cell)},
-                     {(int)(d.x*to_cell),(int)(d.y*to_cell)}};
-    for(int i=0;i<4;++i){
-        int cx=cells[i][0],cy=cells[i][1];
-        if((unsigned)cx>=LIVING_COVER_N||(unsigned)cy>=LIVING_COVER_N)return 0;
+    /* Grid order is a--b / c--d. A cell counts when its centre lies in either
+     * triangle the rasterizer would draw. Off-screen corners are ignored, so a
+     * quad clipped by the screen can still be skipped. */
+    const float to_cell=LIVING_COVER_N/480.0f,to_px=480.0f/LIVING_COVER_N;
+    float min_x=fminf(fminf(a.x,b.x),fminf(c.x,d.x));
+    float max_x=fmaxf(fmaxf(a.x,b.x),fmaxf(c.x,d.x));
+    float min_y=fminf(fminf(a.y,b.y),fminf(c.y,d.y));
+    float max_y=fmaxf(fmaxf(a.y,b.y),fmaxf(c.y,d.y));
+    int x0=(int)(min_x*to_cell),x1=(int)(max_x*to_cell);
+    int y0=(int)(min_y*to_cell),y1=(int)(max_y*to_cell);
+    if(x0<0)x0=0;
+    if(y0<0)y0=0;
+    if(x1>=LIVING_COVER_N)x1=LIVING_COVER_N-1;
+    if(y1>=LIVING_COVER_N)y1=LIVING_COVER_N-1;
+    if(x0>x1||y0>y1)return 0;
+    int hits=0;
+    for(int cy=y0;cy<=y1;++cy)
+    for(int cx=x0;cx<=x1;++cx){
+        float px=(cx+.5f)*to_px,py=(cy+.5f)*to_px;
+        if(!living_point_in_tri(px,py,a,c,b)&&!living_point_in_tri(px,py,b,c,d))
+            continue;
+        ++hits;
         if(!living_cover[cy*LIVING_COVER_N+cx])return 0;
     }
-    return 1;
+    return hits>0;
 }
 
 void living_draw_volume(const living_camera_t *camera,

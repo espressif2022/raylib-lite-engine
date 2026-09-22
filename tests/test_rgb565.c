@@ -45,6 +45,11 @@ int main(void)
             assert(mosaico_shade_g_lut[level][c] == (uint8_t)((unsigned)c * light >> 8));
     }
 
+    /* Exhaustive oracle: all RGB565 colors and every supported light value. */
+    for (unsigned light = 0; light <= 256U; ++light)
+        for (unsigned p = 0; p < 65536U; ++p)
+            assert(mosaico_shade565((uint16_t)p, light) == shade_mul((uint16_t)p, light));
+
     static const unsigned lights[] = {0, 1, 15, 16, 17, 128, 160, 240, 255, 256, 300};
     for (size_t li = 0; li < sizeof(lights) / sizeof(lights[0]); ++li) {
         unsigned light = lights[li];

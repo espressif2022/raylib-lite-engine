@@ -212,7 +212,8 @@ static const mosaico_game_app_config_t s_config = {
     .window_title = "Sky Hop",
     .canvas_bind = GSP_SKY_HOP_BIND_GAME_CANVAS,
     .touch_points = 2,
-    .target_fps = 30,
+    .target_fps = CONFIG_SKY_HOP_TARGET_FPS,
+    .logic_hz = 30,
 #ifdef CONFIG_SKY_HOP_DRAWBUF_LINES
     .drawbuf_lines = CONFIG_SKY_HOP_DRAWBUF_LINES,
 #endif

@@ -14,7 +14,7 @@
 #define LAST_ZONE_COLUMN_WIDTH 4
 #define LAST_ZONE_SCREEN 480
 #define LAST_ZONE_EDGE_RAY_BUDGET 64
-#define LAST_ZONE_MAX_WALL_SAMPLES LAST_ZONE_SCREEN
+#define LAST_ZONE_MAX_WALL_SAMPLES (LAST_ZONE_SCREEN * 2)
 #define LAST_ZONE_HORIZON 205
 #define LAST_ZONE_CAMERA_PLANE 0.577350269f /* tan(60 degrees / 2) */
 #define LAST_ZONE_FLOOR_SCALE 165.0f
@@ -546,10 +546,8 @@ static void cast_wall_sample(const last_zone_game_t *game, int screen_x, int hor
 static bool wall_boundary(const last_zone_wall_sample_t *a,
                           const last_zone_wall_sample_t *b)
 {
-    if (a->wall != b->wall || a->side != b->side ||
-        a->map_x != b->map_x || a->map_y != b->map_y)
-        return true;
-    return fabsf(a->depth - b->depth) > .22f;
+    return a->wall != b->wall || a->side != b->side ||
+           a->map_x != b->map_x || a->map_y != b->map_y;
 }
 
 static void interp_wall(const last_zone_wall_sample_t *a,
@@ -785,7 +783,21 @@ static bool wall_run_match(const last_zone_wall_sample_t *a,
     return dt <= 1;
 }
 
-static int wall_dest_width(int x)
+static int wall_u_texel(const last_zone_wall_sample_t *sample, int tex_span)
+{
+    float u = sample->u + (float)sample->shift / 48.0f;
+    u -= floorf(u);
+    if (u < 0.0f) u += 1.0f;
+    if (sample->wall == 4) u *= 0.26f;
+    else if (sample->wall == 2) u = 0.42f + u * 0.50f;
+    if (tex_span < 1) tex_span = 1;
+    int texel = (int)(u * (float)tex_span);
+    if (texel < 0) texel = 0;
+    if (texel >= tex_span) texel = tex_span - 1;
+    return texel;
+}
+
+static int wall_dest_width(int x, int tex_span)
 {
     const last_zone_wall_sample_t *sample = &s_pixels[x];
     if (sample->wall == 2 || sample->wall == 4) return 1;
@@ -796,7 +808,41 @@ static int wall_dest_width(int x)
         wall_run_match(sample, &s_pixels[x + 2]) &&
         wall_run_match(sample, &s_pixels[x + 3]))
         return 4;
+    if (wall_u_texel(sample, tex_span) != wall_u_texel(&s_pixels[x + 1], tex_span))
+        return 1;
     return 2;
+}
+
+static int wall_tex_span(const MosaicoSpriteFrame *material)
+{
+    if (!material) return 1;
+    float inner = material->source.width - 8.0f;
+    if (inner < 4.0f) inner = material->source.width;
+    int span = (int)inner - 1;
+    return span < 1 ? 1 : span;
+}
+
+static void wall_column_phase(int dest_y, float origin, float span, int src_h,
+                              int *phase_16, int *step_16)
+{
+    if (span < 1.0f) span = 1.0f;
+    if (src_h < 1) src_h = 1;
+    float scale = (float)src_h / span;
+    int step = (int)(scale * 65536.0f);
+    if (step < 1) step = 1;
+    *step_16 = step;
+    *phase_16 = (int)(((float)dest_y + 0.5f - origin) * scale * 65536.0f);
+}
+
+static mosaico_raycast_wall_t wall_column(int screen_x, int dest_y, int width,
+                                          int height, int src_x, int src_y,
+                                          int src_w, int src_h, unsigned light,
+                                          float origin, float span)
+{
+    int phase = 0, step = 0;
+    wall_column_phase(dest_y, origin, span, src_h, &phase, &step);
+    return (mosaico_raycast_wall_t){screen_x, dest_y, width, height,
+        src_x, src_y, src_w, src_h, light, phase, step};
 }
 
 static void draw_walls(const last_zone_game_t *game, MosaicoAtlas materials,
@@ -812,11 +858,11 @@ static void draw_walls(const last_zone_game_t *game, MosaicoAtlas materials,
             ++x;
             continue;
         }
-        int width = wall_dest_width(x);
         int mat = 0;
         if (wall == 2 || wall == 4) mat = 1;
         else if (wall == 3) mat = 2;
         const MosaicoSpriteFrame *material = frames[mat];
+        int width = wall_dest_width(x, wall_tex_span(material));
         if (!material) {
             x += width;
             continue;
@@ -838,6 +884,9 @@ static void draw_walls(const last_zone_game_t *game, MosaicoAtlas materials,
         int height = sample->height;
         if (height < 1) height = 1;
         int bottom = top + height;
+        float true_h = 330.0f / sample->depth;
+        if (true_h < 1.0f) true_h = 1.0f;
+        float true_top = (float)horizon - true_h * 0.5f;
         float src_w = (float)width;
         Rectangle src = {material->source.x + inset + u * (inner - src_w),
                          material->source.y + inset, src_w,
@@ -865,38 +914,44 @@ static void draw_walls(const last_zone_game_t *game, MosaicoAtlas materials,
             int open_top = top + band;
             int open_bot = bottom - band;
             if (open_bot <= open_top + 2 || open_bot <= horizon) {
-                Mosaico2DDrawColumn(materials.texture, src, screen_x, top,
-                                    width, height, light);
+                s_wall_batch[batch++] = wall_column(screen_x, top, width, height,
+                    (int)src.x, (int)src.y, (int)src.width, (int)src.height, light,
+                    true_top, true_h);
             } else {
-                Mosaico2DDrawColumn(materials.texture,
-                    (Rectangle){src.x, src.y, src.width, src.height * 0.22f},
-                    screen_x, top, width, band, light);
+                float band_span = true_h * ((float)band / (float)height);
+                s_wall_batch[batch++] = wall_column(screen_x, top, width, band,
+                    (int)src.x, (int)src.y, (int)src.width, (int)(src.height * .22f), light,
+                    true_top, band_span);
                 int haze_top = open_top < horizon ? horizon : open_top;
                 if (open_bot > haze_top)
                     DrawRectangle(screen_x, haze_top, width,
                                   open_bot - haze_top, layout_look(game)->haze);
                 int sill_h = bottom - open_bot;
                 if (sill_h < 1) sill_h = 1;
-                Mosaico2DDrawColumn(materials.texture,
-                    (Rectangle){src.x, src.y + src.height * 0.78f, src.width, src.height * 0.22f},
-                    screen_x, open_bot, width, sill_h, light);
+                float sill_span = true_h * ((float)sill_h / (float)height);
+                s_wall_batch[batch++] = wall_column(screen_x, open_bot, width, sill_h,
+                    (int)src.x, (int)(src.y + src.height * .78f), (int)src.width,
+                    (int)(src.height * .22f), light, true_top + true_h - sill_span, sill_span);
             }
-            draw_wall_footing(screen_x, width, top, bottom);
+            /* Footings follow the deferred texture pass, preserving layer order. */
             x += width;
             continue;
         }
         if (batch < LAST_ZONE_MAX_WALL_SAMPLES) {
-            s_wall_batch[batch++] = (mosaico_raycast_wall_t){
-                screen_x, top, width, height,
-                (int)src.x, (int)src.y, (int)src.width, (int)src.height, light};
+            s_wall_batch[batch++] = wall_column(screen_x, top, width, height,
+                (int)src.x, (int)src.y, (int)src.width, (int)src.height, light,
+                true_top, true_h);
         }
         x += width;
     }
     if (batch) Mosaico2DDrawRaycastWalls(materials.texture, s_wall_batch, batch);
     for (int x = 0; x < LAST_ZONE_SCREEN; ) {
         const last_zone_wall_sample_t *sample = &s_pixels[x];
-        int width = wall_dest_width(x);
-        if (sample->wall == 1 || sample->wall == 3)
+        int mat = 0;
+        if (sample->wall == 2 || sample->wall == 4) mat = 1;
+        else if (sample->wall == 3) mat = 2;
+        int width = wall_dest_width(x, wall_tex_span(frames[mat]));
+        if (sample->wall == 1 || sample->wall == 2 || sample->wall == 3)
             draw_wall_footing(sample->screen_x, width, sample->top, sample->bottom);
         x += sample->wall ? width : 1;
     }

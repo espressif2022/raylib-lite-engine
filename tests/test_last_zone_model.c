@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "last_zone_game.h"
+#include "last_zone_benchmark.h"
 
 static void assert_mission_reachable(last_zone_game_t *game)
 {
@@ -43,6 +44,21 @@ static void assert_mission_reachable(last_zone_game_t *game)
 
 int main(void)
 {
+    {
+        last_zone_game_t a={0},b={0};last_zone_reset(&a);last_zone_reset(&b);
+        int stalled=0,longest=0,moving=0;
+        for(int tick=0;tick<3600;++tick){
+            float x=a.x,y=a.y;
+            last_zone_benchmark_input(&a);last_zone_benchmark_input(&b);
+            last_zone_update(&a);last_zone_update(&b);
+            assert(last_zone_state_hash(&a)==last_zone_state_hash(&b));
+            if(a.phase==LAST_ZONE_PHASE_PLAYING&&fabsf(a.x-x)+fabsf(a.y-y)<.001f)++stalled;
+            else {if(stalled>longest)longest=stalled;stalled=0;++moving;}
+        }
+        if(stalled>longest)longest=stalled;
+        assert(longest<120);assert(moving>1000);
+    }
+
     static const uint8_t expected_enemies[LAST_ZONE_LAYOUTS] = {5, 7, 8, 8, 9};
     static const uint8_t expected_elites[LAST_ZONE_LAYOUTS] = {0, 0, 2, 0, 3};
     static const uint8_t expected_ammo[LAST_ZONE_LAYOUTS] = {20, 18, 17, 17, 16};

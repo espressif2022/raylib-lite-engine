@@ -36,9 +36,10 @@ typedef struct {
     int x0, y0, x1, y1;
 } tomb_vis_t;
 typedef struct {
-    mosaico_textured_vertex_t a, b, c;
+    mosaico_textured_vertex_t a, b, c, d;
     unsigned light;
     float depth;
+    uint8_t corners;
 } tomb_draw_t;
 
 static tomb_draw_t s_draw[MAX_DRAW];
@@ -160,23 +161,30 @@ static int cmp_depth(const void *a, const void *b)
     return 0;
 }
 
-static bool push_tri(mosaico_textured_vertex_t a, mosaico_textured_vertex_t b,
-                     mosaico_textured_vertex_t c, unsigned light, float depth)
+static bool push_surface(const mosaico_textured_vertex_t *v, int n,
+                         unsigned light, float depth)
 {
-    float min_x=a.x<b.x?a.x:b.x;if(c.x<min_x)min_x=c.x;
-    float max_x=a.x>b.x?a.x:b.x;if(c.x>max_x)max_x=c.x;
-    float min_y=a.y<b.y?a.y:b.y;if(c.y<min_y)min_y=c.y;
-    float max_y=a.y>b.y?a.y:b.y;if(c.y>max_y)max_y=c.y;
+    float min_x=v[0].x,max_x=v[0].x,min_y=v[0].y,max_y=v[0].y;
+    for(int i=1;i<n;++i){
+        if(v[i].x<min_x)min_x=v[i].x;
+        if(v[i].x>max_x)max_x=v[i].x;
+        if(v[i].y<min_y)min_y=v[i].y;
+        if(v[i].y>max_y)max_y=v[i].y;
+    }
     if(max_x<0.0f||min_x>=480.0f||max_y<0.0f||min_y>=480.0f)return true;
     /* Screen Y is down, so world-front CCW becomes clockwise here. */
-    float area=(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
+    float area=(v[1].x-v[0].x)*(v[2].y-v[0].y)-(v[1].y-v[0].y)*(v[2].x-v[0].x);
     if(area>=0.0f)return true;
     if(s_draw_count>=MAX_DRAW)return false;
-    s_draw[s_draw_count].a=a;
-    s_draw[s_draw_count].b=b;
-    s_draw[s_draw_count].c=c;
-    s_draw[s_draw_count].light=light>256u?256u:light;
-    s_draw[s_draw_count].depth=depth;
+    tomb_draw_t *slot=&s_draw[s_draw_count];
+    slot->a=v[0];
+    slot->b=v[1];
+    /* Quad ABI is a--b / c--d, perimeter a,b,d,c. */
+    slot->c=n==4?v[3]:v[2];
+    slot->d=n==4?v[2]:v[2];
+    slot->corners=(uint8_t)n;
+    slot->light=light>256u?256u:light;
+    slot->depth=depth;
     ++s_draw_count;
     return true;
 }
@@ -275,13 +283,25 @@ static bool push_view_quad_flat(const tomb_clip_t *poly, float bias)
         p[i].y=sy;
         p[i].u=clipped[i].u;
         p[i].v=clipped[i].v;
+        p[i].q=1.0f/clipped[i].vz;
         vzs[i]=clipped[i].vz;
+    }
+    float light_sum=0.0f,depth_sum=0.0f;
+    for(int i=0;i<4;++i){
+        light_sum+=poly[i].light;
+        float z=poly[i].vz<NEAR_Z?NEAR_Z:poly[i].vz;
+        depth_sum+=z;
+    }
+    unsigned lit=(unsigned)(light_sum*0.25f+0.5f);
+    if(n==4){
+        float depth=depth_sum*0.25f+bias;
+        return push_surface(p,4,lit,depth);
     }
     bool ok=true;
     for(int i=1;i<n-1;++i){
-        unsigned lit=(unsigned)((clipped[0].light+clipped[i].light+clipped[i+1].light)/3.0f);
         float depth=(vzs[0]+vzs[i]+vzs[i+1])/3.0f+bias;
-        if(!push_tri(p[0],p[i],p[i+1],lit,depth))ok=false;
+        mosaico_textured_vertex_t tri[3]={p[0],p[i],p[i+1]};
+        if(!push_surface(tri,3,lit,depth))ok=false;
     }
     return ok;
 }
@@ -329,9 +349,14 @@ static void draw_buffered(MosaicoWallAtlas textures)
 {
     if(s_draw_count<=0)return;
     qsort(s_draw,(size_t)s_draw_count,sizeof(s_draw[0]),cmp_depth);
-    for(int i=0;i<s_draw_count;++i)
-        Mosaico2DDrawIndexedTexturedTriangle(textures,s_draw[i].a,s_draw[i].b,
-                                             s_draw[i].c,s_draw[i].light);
+    for(int i=0;i<s_draw_count;++i){
+        if(s_draw[i].corners==4)
+            Mosaico2DDrawIndexedTexturedQuad(textures,s_draw[i].a,s_draw[i].b,
+                                             s_draw[i].c,s_draw[i].d,s_draw[i].light);
+        else
+            Mosaico2DDrawIndexedTexturedTriangle(textures,s_draw[i].a,s_draw[i].b,
+                                                 s_draw[i].c,s_draw[i].light);
+    }
 }
 
 static int floor_int(float value)
@@ -448,7 +473,7 @@ static void emit_room_faces(const tomb_room_t *room)
             w[c]=room->vertices[face->vertex[c]];
             lights[c]=face->light[c];
         }
-        push_quad(w,u,v,face->texture,lights,0.0f,SUBDIVIDE_NEAR_LEVELS);
+        push_quad(w,u,v,face->texture,lights,0.0f,0);
     }
 }
 

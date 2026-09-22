@@ -81,6 +81,7 @@ static int initialize(void *value,const char *asset_root)
        load_atlas(&s->atlases.ocean,"ocean.atlas")||
        load_atlas(&s->atlases.sunrise,"sunrise.atlas")||
        load_atlas(&s->atlases.rainforest,"rainforest.atlas"))return -1;
+    (void)Mosaico2DCacheTextureLight(s->atlases.ocean.texture,232);
     living_world_reset(&s->world);
     s->loaded_volumes=UINT8_MAX;
     if(acquire_volumes(s,s->world.scene))return -1;

@@ -13,6 +13,7 @@
 #include "mosaico_rgb565.h"
 
 static uint16_t *s_pixels;
+static uint32_t s_primitive_pixels,s_primitive_runs,s_clear_pixels;
 static size_t s_stride;
 static Camera2D s_camera;
 static bool s_camera_active;
@@ -84,13 +85,25 @@ static inline uint16_t rgb565(Color c)
  * blend used by put_pixel; quantizing alpha would change layered UI output. */
 typedef struct {
     uint16_t pixel;
-    unsigned alpha, inverse, red, green, blue;
+    unsigned alpha, inverse, red, green, blue, red_blue;
 } span_paint_t;
 
 static span_paint_t span_paint(Color c)
 {
     return (span_paint_t){rgb565(c), c.a, 255U-c.a,
-                          c.r*c.a, c.g*c.a, c.b*c.a};
+                          c.r*c.a, c.g*c.a, c.b*c.a, ((uint32_t)c.r*c.a<<16)|(c.b*c.a)};
+}
+
+static inline uint16_t blend_span_pixel(unsigned old, const span_paint_t *paint)
+{
+    /* Two independent 16-bit lanes. Each channel numerator is at
+     * most 65025, so neither multiplication nor the exact /255
+     * correction can carry into the adjacent channel. */
+    uint32_t rb = (((old&0xf800U)<<8)|((old&31U)<<3))*paint->inverse + paint->red_blue;
+    rb = (rb + 0x00010001U + ((rb>>8)&0x00ff00ffU))>>8;
+    unsigned g = (((old>>5)&63U)<<2)*paint->inverse + paint->green;
+    g = (g + 1U + (g>>8))>>8;
+    return (uint16_t)(((rb&0x00f80000U)>>8)|((g&0xfcU)<<3)|((rb&0xf8U)>>3));
 }
 
 static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
@@ -106,7 +119,11 @@ static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
     if (x0 >= x1) return;
     uint16_t *dst = s_pixels + (size_t)y*s_stride + x0;
     int count = x1-x0;
+    s_primitive_pixels+=(uint32_t)count;++s_primitive_runs;
     if (paint->alpha == 255) {
+        /* Long opaque spans use the existing S31 eight-pixel PIE stores.
+         * Keep tiny glyph and ray fragments on the inline scalar path. */
+        if(count>=32){mosaico_fill_rgb565(dst,paint->pixel,(size_t)count);return;}
         uint16_t pixel = paint->pixel;
         uint32_t pair = (uint32_t)pixel | ((uint32_t)pixel << 16);
         if ((uintptr_t)dst & 3U) { *dst++ = pixel; --count; }
@@ -114,11 +131,7 @@ static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
         if (count) *dst = pixel;
     } else {
         for (int i = 0; i < count; ++i) {
-            unsigned old = dst[i];
-            unsigned r = ((old >> 11)*8U*paint->inverse + paint->red)/255U;
-            unsigned g = (((old >> 5)&63U)*4U*paint->inverse + paint->green)/255U;
-            unsigned b = ((old&31U)*8U*paint->inverse + paint->blue)/255U;
-            dst[i] = (uint16_t)(((r&0xf8U)<<8) | ((g&0xfcU)<<3) | (b>>3));
+            dst[i] = blend_span_pixel(dst[i], paint);
         }
     }
 }
@@ -129,6 +142,7 @@ static inline void put_pixel(int x, int y, Color color)
             (unsigned)y >= MOSAICO_GAME_HEIGHT) return;
     if (s_scissor_active && (x < s_scissor_x0 || y < s_scissor_y0 ||
             x >= s_scissor_x1 || y >= s_scissor_y1)) return;
+    if(color.a){++s_primitive_pixels;++s_primitive_runs;}
     uint16_t *dst = &s_pixels[(size_t)y*s_stride + x];
     if (color.a == 255) {
         *dst = rgb565(color);
@@ -264,6 +278,7 @@ void MosaicoFastBeginDrawing(void)
     mosaico_game_2d_set_target(s_pixels, s_stride, MOSAICO_GAME_WIDTH,
                                MOSAICO_GAME_HEIGHT);
     mosaico_game_2d_reset_raster_stats();
+    s_primitive_pixels=s_primitive_runs=s_clear_pixels=0;
 }
 
 bool MosaicoFastFrameAvailable(void) { return s_pixels != NULL; }
@@ -280,7 +295,10 @@ void MosaicoFastConsumeInputEdges(void)
 
 void MosaicoFastEndDrawing(void)
 {
-    if (s_pixels) (void)mosaico_raylib_port_present_frame();
+    if (s_pixels) {
+        mosaico_game_2d_note_primitives(s_primitive_pixels,s_primitive_runs,s_clear_pixels);
+        (void)mosaico_raylib_port_present_frame();
+    }
     s_pixels = NULL;
     s_stride = 0;
     mosaico_game_2d_set_target(NULL, 0, 0, 0);
@@ -353,6 +371,7 @@ void MosaicoFastDrawTextureEx(Texture2D texture, Vector2 position,
 void MosaicoFastClearBackground(Color color)
 {
     if (!s_pixels) return;
+    s_clear_pixels+=(uint32_t)MOSAICO_GAME_WIDTH*MOSAICO_GAME_HEIGHT;
     uint16_t px = rgb565(color);
     if (s_stride == (size_t)MOSAICO_GAME_WIDTH) {
         mosaico_fill_rgb565(s_pixels, px,
@@ -392,7 +411,21 @@ void MosaicoFastDrawRectangle(int x, int y, int width, int height, Color color)
         if (y1 > s_scissor_y1) y1 = s_scissor_y1;
     }
     if (x0 >= x1 || y0 >= y1) return;
+    if (!color.a) return;
     span_paint_t paint = span_paint(color);
+    if (x1-x0 == 1) {
+        /* Jelly caps and vertical gradients use one-pixel columns. Bounds
+         * are already clipped above; avoid redoing span setup for every row. */
+        uint16_t *dst = s_pixels + (size_t)y0*s_stride + x0;
+        s_primitive_pixels += (uint32_t)(y1-y0);
+        s_primitive_runs += (uint32_t)(y1-y0);
+        if (color.a == 255) {
+            for (int yy=y0; yy<y1; ++yy, dst+=s_stride) *dst=paint.pixel;
+        } else {
+            for (int yy=y0; yy<y1; ++yy, dst+=s_stride) *dst=blend_span_pixel(*dst,&paint);
+        }
+        return;
+    }
     for (int yy=y0; yy<y1; ++yy) fill_span(yy, x0, x1, &paint);
 }
 

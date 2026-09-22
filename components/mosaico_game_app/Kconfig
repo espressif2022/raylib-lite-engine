@@ -1,0 +1,11 @@
+menu "Mosaico game loop placement"
+config MOSAICO_GAME_LOOP_CPU1
+    bool "Run gameplay and rendering loop on CPU1"
+    depends on !FREERTOS_UNICORE
+    default n
+    help
+        Finish startup and the first display flush on the calling task, then
+        run input, fixed updates and rendering on a dedicated CPU1 task.
+        The caller waits until the loop exits. Uses an additional task stack
+        equal to CONFIG_ESP_MAIN_TASK_STACK_SIZE. Benchmark before enabling.
+endmenu
