@@ -13,8 +13,11 @@
 static const char *TAG = "raylib_shooter";
 static shooter_game_t s_game;
 static MosaicoAtlas s_atlas;
+#if !CONFIG_RAYLIB_SHOOTER_BENCHMARK_MODE
+/* The replay build drives the ship from the tick and never reads live input. */
 static bool s_input;
 static float s_imu_x, s_imu_y;
+#endif
 
 extern const uint8_t _binary_shooter_atlas_start[];
 extern const uint8_t _binary_shooter_atlas_end[];
