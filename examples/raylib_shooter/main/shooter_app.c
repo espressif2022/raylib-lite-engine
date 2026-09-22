@@ -42,6 +42,10 @@ static esp_err_t after_healthy(void)
 
 static void on_event(const mosaico_device_event_t *event)
 {
+#if CONFIG_RAYLIB_SHOOTER_BENCHMARK_MODE
+    (void)event; /* The fixed replay must not be perturbed by live input. */
+    return;
+#else
     if (event->type == MOSAICO_DEVICE_EVENT_IMU) {
         const float x = event->x / 1000.0f;
         const float y = event->y / 1000.0f;
@@ -55,13 +59,20 @@ static void on_event(const mosaico_device_event_t *event)
     shooter_game_set_pointer(&s_game, (float)event->x, (float)event->y, event->pressed);
     if (before != SHOOTER_PLAYING && s_game.phase == SHOOTER_PLAYING)
         (void)game_audio_play(GAME_AUDIO_START);
+#endif
 }
 
 static bool idle(void)
 {
+#if CONFIG_RAYLIB_SHOOTER_BENCHMARK_MODE
+    /* The replay taps from on_update, which never runs while idling, so the
+     * benchmark would otherwise stall forever on the start screen. */
+    return false;
+#else
     bool skip = s_game.phase != SHOOTER_PLAYING && !s_input;
     s_input = false;
     return skip;
+#endif
 }
 
 static void on_update(void)
@@ -69,8 +80,22 @@ static void on_update(void)
     uint32_t old_score = s_game.score, old_shots = s_game.shots_fired;
     uint8_t old_lives = s_game.lives;
     shooter_phase_t old_phase = s_game.phase;
+#if CONFIG_RAYLIB_SHOOTER_BENCHMARK_MODE
+    /* Fixed 240-tick replay. Tapping out of the non-playing phases keeps a
+     * long capture inside gameplay instead of parked on a start or game over
+     * screen, and the synthetic tilt sweeps the ship across the field. */
+    static uint32_t bench_tick;
+    const uint32_t bench_phase = bench_tick++ % 240U;
+    if (s_game.phase != SHOOTER_PLAYING) {
+        shooter_game_set_pointer(&s_game, 240.0f, 240.0f, true);
+        shooter_game_set_pointer(&s_game, 240.0f, 240.0f, false);
+    }
+    const float x = bench_phase < 120U ? 0.7f : -0.7f;
+    const float y = ((bench_phase / 60U) & 1U) ? 0.5f : -0.5f;
+#else
     const float x = fabsf(s_imu_x) > 0.10f ? s_imu_x : 0.0f;
     const float y = fabsf(s_imu_y) > 0.10f ? s_imu_y : 0.0f;
+#endif
     shooter_game_move(&s_game, x * 10.0f, y * 10.0f);
     shooter_game_update(&s_game);
     if (s_game.shots_fired > old_shots) (void)game_audio_play(GAME_AUDIO_SHOT);

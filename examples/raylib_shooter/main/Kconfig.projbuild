@@ -1,0 +1,12 @@
+menu "Mosaico Strike benchmark"
+
+config RAYLIB_SHOOTER_BENCHMARK_MODE
+    bool "Run deterministic performance replay"
+    default n
+    help
+        Drives the shooter from a fixed input sequence instead of the IMU and
+        ignores touch, so raster and frame-time samples are comparable
+        between builds. Use this only for repeatable device benchmarks, not
+        normal gameplay.
+
+endmenu

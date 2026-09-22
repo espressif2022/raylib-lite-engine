@@ -13,6 +13,7 @@
 | 组件职责与启动顺序 | [components](../components/README.md) |
 | 2.5D / 2D 绘制对照 | [游戏绘制总表](game-drawing-inventory.zh-CN.md) |
 | Sky Hop 真机性能矩阵 | [Sky Hop 性能测试](sky-hop-performance.zh-CN.md) |
+| 渲染瓶颈实测基线与优化路线 | [渲染优化计划](render-optimization-plan.zh-CN.md) |
 | Host 单元测试 | [tests](../tests/README.md) |
 | Agent 工作流 | [mosaico-game-development](skills/mosaico-game-development/SKILL.md) |
 

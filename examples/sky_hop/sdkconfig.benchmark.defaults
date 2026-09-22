@@ -1,0 +1,7 @@
+# Deterministic replay for device performance baselines. Append after the
+# normal defaults:
+#   idf.py --preview -B build_bench \
+#     -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.benchmark.defaults" \
+#     set-target esp32s31 build
+# This build ignores touch input, so do not ship it.
+CONFIG_SKY_HOP_BENCHMARK_MODE=y

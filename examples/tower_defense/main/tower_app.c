@@ -101,6 +101,10 @@ static esp_err_t after_healthy(void)
 
 static void on_event(const mosaico_device_event_t *event)
 {
+#if CONFIG_TOWER_DEFENSE_BENCHMARK_MODE
+    (void)event; /* The fixed replay must not be perturbed by live input. */
+    return;
+#else
     if (event->type != MOSAICO_DEVICE_EVENT_POINTER) return;
     s_input = true;
     tower_phase_t before = s_game.phase;
@@ -111,13 +115,20 @@ static void on_event(const mosaico_device_event_t *event)
         (void)tower_audio_play(TOWER_AUDIO_START);
     if (before != s_game.phase)
         tower_audio_set_music(s_game.phase == TOWER_PAUSED, s_game.phase == TOWER_GAME_OVER);
+#endif
 }
 
 static bool idle(void)
 {
+#if CONFIG_TOWER_DEFENSE_BENCHMARK_MODE
+    /* The replay taps from on_update, which never runs while idling, so the
+     * benchmark would otherwise stall forever on the start screen. */
+    return false;
+#else
     bool skip = s_game.phase != TOWER_PLAYING && !s_input;
     s_input = false;
     return skip;
+#endif
 }
 
 static void on_update(void)
@@ -132,6 +143,20 @@ static void on_update(void)
         enemy_x[i] = s_game.enemies[i].x;
         enemy_y[i] = s_game.enemies[i].y;
     }
+#if CONFIG_TOWER_DEFENSE_BENCHMARK_MODE
+    /* Fixed replay. Tapping out of the non-playing phases keeps a long
+     * capture inside gameplay, and placing a tower on a cycling spot every
+     * 90 ticks keeps enough turrets alive for the waves to stay busy. */
+    if (s_game.phase != TOWER_PLAYING) {
+        tower_game_set_pointer(&s_game, 240.0f, 400.0f, true);
+        tower_game_set_pointer(&s_game, 240.0f, 400.0f, false);
+    } else if (s_game.tick % 90U == 0U) {
+        const float x = 100.0f + (float)((s_game.tick / 90U) % 4U) * 90.0f;
+        const float y = 140.0f + (float)((s_game.tick / 90U) % 3U) * 90.0f;
+        tower_game_set_pointer(&s_game, x, y, true);
+        tower_game_set_pointer(&s_game, x, y, false);
+    }
+#endif
     tower_game_update(&s_game);
     for (size_t i = 0; i < TOWER_MAX_ENEMIES; ++i) {
         if (enemy_before[i] && !s_game.enemies[i].active && s_game.base_hp == hp_before)

@@ -1,0 +1,12 @@
+menu "Tower Defense benchmark"
+
+config TOWER_DEFENSE_BENCHMARK_MODE
+    bool "Run deterministic performance replay"
+    default n
+    help
+        Drives Tower Defense from a fixed input sequence derived from the
+        logic tick and ignores touch, so raster and frame-time samples are
+        comparable between builds. Use this only for repeatable device
+        benchmarks, not normal gameplay.
+
+endmenu
