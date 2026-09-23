@@ -156,7 +156,11 @@ static void run_game_loop(const mosaico_game_app_config_t *config,int target_fps
         int64_t now_us = esp_timer_get_time();
         int64_t elapsed_us = now_us - previous_us;
         logic_credit += elapsed_us * logic_hz;
-        render_credit += elapsed_us * target_fps;
+        /* Modules can select their presentation rate through SetTargetFPS().
+         * Keep gameplay on logic_hz while honoring that rate dynamically. */
+        int render_fps = GetFPS();
+        if (render_fps <= 0) render_fps = target_fps;
+        render_credit += elapsed_us * render_fps;
         previous_us = now_us;
         /* Bound catch-up to three updates: avoid a spiral after long stalls.
          * Preserve the fractional phase when discarding excessive backlog. */
