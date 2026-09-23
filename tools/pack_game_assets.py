@@ -603,7 +603,7 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
         raise ValueError("asset payload limit must be positive")
     output.mkdir(parents=True, exist_ok=True)
     for stale in output.iterdir():
-        if stale.is_file() and stale.suffix in {".atlas", ".wall", ".map", ".sound"}:
+        if stale.is_file() and stale.suffix in {".atlas", ".wall", ".map", ".sound", ".jpg"}:
             stale.unlink()
     report: list[dict] = []
     identifiers: set[str] = set()
@@ -635,6 +635,16 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
         source_map = _source_file(source, str(item["source"]))
         destination = _output_file(output, str(item["output"]), ".map")
         report.append(write_tilemap(source_map, destination))
+
+    for item in manifest.get("files", []):
+        source_name = str(item["source"])
+        output_name = str(item.get("output", Path(source_name).name))
+        if Path(output_name).name != output_name or Path(output_name).suffix.lower() != ".jpg":
+            raise ValueError(f"raw file output must be a .jpg filename: {output_name}")
+        payload = _source_file(source, source_name).read_bytes()
+        destination = output / output_name
+        destination.write_bytes(payload)
+        report.append({"file": output_name, "type": "jpeg", "bytes": len(payload)})
 
     for item in manifest.get("sounds", []):
         pattern = str(item["source"])
