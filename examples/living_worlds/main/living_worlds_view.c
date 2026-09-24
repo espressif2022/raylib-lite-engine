@@ -3,6 +3,11 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef ESP_PLATFORM
+#include "esp_timer.h"
+#else
+#include <time.h>
+#endif
 #include "mosaico_raylib_fast.h"
 #include "sunrise_depth.h"
 #include "sunrise_volume.h"
@@ -990,13 +995,41 @@ static void draw_scene_button(int x,const char *label,bool selected)
     DrawText(label,x+8,435,10,text);
 }
 
+static int64_t view_now_us(void)
+{
+#ifdef ESP_PLATFORM
+    return esp_timer_get_time();
+#else
+    struct timespec now;
+    timespec_get(&now, TIME_UTC);
+    return (int64_t)now.tv_sec * 1000000 + now.tv_nsec / 1000;
+#endif
+}
+
+static int measured_fps(void)
+{
+    static int64_t started_us;
+    static int frames;
+    static int fps;
+    int64_t now=view_now_us();
+    if(!started_us)started_us=now;
+    ++frames;
+    int64_t elapsed=now-started_us;
+    if(elapsed>=1000000){
+        uint32_t us=elapsed>100000000LL?100000000u:(uint32_t)elapsed;
+        uint32_t n=frames>4000?4000u:(uint32_t)frames;
+        fps=(int)((n*1000000u)/us);
+        started_us=now;
+        frames=0;
+    }
+    return fps;
+}
+
 static void draw_overlay(const living_world_t *world)
 {
     DrawRectangle(16,16,448,39,(Color){0,22,36,145});
-    const char *title=world->scene==LIVING_SCENE_AURORA?"AURORA":
-                      world->scene==LIVING_SCENE_SUNRISE?"SUNRISE":
-                      world->scene==LIVING_SCENE_RAINFOREST?"RAINFOREST":"OCEAN";
-    DrawText(title,29,26,16,(Color){218,250,242,255});
+    DrawText(TextFormat("FPS: %d",measured_fps()),29,26,16,
+             (Color){218,250,242,255});
     const char *fx=world->effects_level==0?"FX CALM":
                    (world->effects_level==2?"FX VIVID":"FX LIVING");
     DrawText(fx,260,31,8,(Color){156,220,211,230});
