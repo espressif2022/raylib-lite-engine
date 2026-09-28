@@ -19,7 +19,7 @@ python3 -m pip install Pillow
 python3 tools/game_cli.py sim examples/sky_hop
 ```
 
-浏览器预览地址为 `http://127.0.0.1:8460/`。独立原生示例需要显式的产品与 BSP 依赖；生产固件的板级策略由产品仓库负责。设备 ELF 游戏由外部 SDK 构建、打包和安装。
+浏览器预览地址为 `http://127.0.0.1:8460/`。独立原生示例只依赖 BSP（`MOSAICO_BSP_ROOT`），ESP-Mosaico 板级端口在 `ports/esp_mosaico/`；生产固件的产品策略由产品仓库负责。设备 ELF 游戏由外部 SDK 构建、打包和安装。
 
 ## 仓库目录
 

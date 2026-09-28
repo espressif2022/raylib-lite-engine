@@ -13,15 +13,10 @@
 #include "mosaico_game_assets.h"
 #include "mosaico_game_module.h"
 #include "raylib_lite_game_app.h"
+#include "raylib_lite_native_hooks.h"
 
 #ifndef MOSAICO_NATIVE_TARGET_FPS
 #define MOSAICO_NATIVE_TARGET_FPS 0
-#endif
-
-#if defined(MOSAICO_NATIVE_IRIS)
-#include "esp_iris.h"
-#include "iris_ota_support.h"
-#include "nvs_flash.h"
 #endif
 
 static const char *TAG = "native_game";
@@ -91,11 +86,7 @@ static raylib_lite_result_t first_present(void *user)
         ESP_LOGE(TAG, "start board input: %s", esp_err_to_name(error));
         return to_runner_result(error);
     }
-#if defined(MOSAICO_NATIVE_IRIS)
-    error = esp_iris_mark_healthy();
-    if (error != ESP_OK)
-        ESP_LOGW(TAG, "mark Iris application healthy: %s", esp_err_to_name(error));
-#endif
+    raylib_lite_native_first_present();
     return RAYLIB_LITE_OK;
 }
 
@@ -166,19 +157,6 @@ static void game_stop(void *user)
     mosaico_game_assets_unmount();
 }
 
-esp_err_t mosaico_game_example_native_start(void)
-{
-#if defined(MOSAICO_NATIVE_IRIS)
-    esp_err_t error = esp_iris_boot_probe();
-    if (error != ESP_OK)
-        ESP_LOGW(TAG, "Iris boot probe: %s", esp_err_to_name(error));
-    error = nvs_flash_init();
-    if (error != ESP_OK) return error;
-    iris_ota_support_start();
-#endif
-    return ESP_OK;
-}
-
 static esp_err_t cleanup_board(mosaico_board_platform_t *board)
 {
     if (!board) return ESP_OK;
@@ -193,9 +171,8 @@ static esp_err_t cleanup_board(mosaico_board_platform_t *board)
 
 void app_main(void)
 {
-    esp_err_t error = mosaico_game_example_native_start();
-    if (error != ESP_OK) {
-        ESP_LOGE(TAG, "native startup: %s", esp_err_to_name(error));
+    if (!raylib_lite_native_boot()) {
+        ESP_LOGE(TAG, "native startup hook failed");
         return;
     }
 
@@ -207,7 +184,7 @@ void app_main(void)
         .drawbuf_count = 2,
     };
     mosaico_board_platform_t *board = NULL;
-    error = mosaico_board_platform_create(&board_config, &board);
+    esp_err_t error = mosaico_board_platform_create(&board_config, &board);
     if (error != ESP_OK) {
         ESP_LOGE(TAG, "create board platform: %s", esp_err_to_name(error));
         if (board)

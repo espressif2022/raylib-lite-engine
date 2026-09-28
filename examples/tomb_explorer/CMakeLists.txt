@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
 set(CONFIGDEP_ENABLE OFF CACHE BOOL "Use IDF configdep" FORCE)
-set(MOSAICO_NATIVE_IRIS OFF CACHE BOOL "Direct native application" FORCE)
 set(SDKCONFIG_DEFAULTS
     "${CMAKE_CURRENT_LIST_DIR}/../../cmake/sdkconfig.native-direct.defaults"
     "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")

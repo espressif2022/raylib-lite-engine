@@ -47,13 +47,32 @@ class GameCliTests(unittest.TestCase):
         for command in ("create", "sim", "build"):
             self.assertIn(command, output)
 
-    def test_host_and_native_entries_live_under_examples(self) -> None:
+    def test_list_reports_host_and_native_games(self) -> None:
+        payload = json.loads(subprocess.check_output([
+            sys.executable, str(CLI), "list", "--json", "--target", "native",
+        ], cwd=ENGINE))
+        self.assertEqual(payload["command"], "list")
+        games = {game["name"]: game for game in payload["games"]}
         for name in ("raylib_shooter", "sky_hop", "tower_defense",
                      "living_worlds", "last_zone_extraction", "tomb_explorer"):
-            root = ENGINE / "examples" / name
-            self.assertTrue((root / "game.sim.json").is_file())
-            self.assertTrue((root / "CMakeLists.txt").is_file())
-            self.assertTrue((root / "iris/CMakeLists.txt").is_file())
+            with self.subTest(game=name):
+                self.assertEqual(games[name]["targets"], ["host", "native"])
+                self.assertEqual(Path(games[name]["path"]), ENGINE / "examples" / name)
+
+    def test_create_accepts_listed_games_and_rejects_unknown_templates(self) -> None:
+        for template in ("sky-hop", "sky_hop"):
+            payload = json.loads(subprocess.check_output([
+                sys.executable, str(CLI), "create", "cli_probe", "--json",
+                "--template", template, "--dry-run",
+            ], cwd=ENGINE))
+            self.assertEqual(payload["status"], "dry_run")
+        self.assertFalse((ENGINE / "examples/cli_probe").exists())
+        invalid = subprocess.run([
+            sys.executable, str(CLI), "create", "cli_probe", "--template", "missing",
+            "--dry-run",
+        ], cwd=ENGINE, text=True, capture_output=True)
+        self.assertEqual(invalid.returncode, 2)
+        self.assertIn("unknown template", invalid.stderr)
 
     @unittest.skipUnless(shutil.which("cmake"), "CMake is required")
     def test_external_module_build_is_independent_of_idf(self) -> None:

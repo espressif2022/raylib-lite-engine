@@ -55,11 +55,17 @@ def _parser() -> argparse.ArgumentParser:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     commands = parser.add_subparsers(dest="command", required=True)
+    listing = commands.add_parser("list", help="List engine games and their build targets")
+    listing.add_argument("--json", action="store_true", help="Emit one machine-readable result")
+    listing.add_argument("--target", choices=("host", "native"),
+                         help="Only list games that support this target")
     for name in ("create", "new"):
         create = commands.add_parser(name, help="Create a game from a project template")
         create.add_argument("destination")
         create.add_argument("--json", action="store_true", help="Emit one machine-readable result")
-        create.add_argument("--template", choices=tuple(TEMPLATES), default="shooter")
+        create.add_argument("--template", default="shooter",
+                            help="Alias (" + ", ".join(TEMPLATES) + ") or a game from `list --target host`")
+        create.add_argument("--dry-run", action="store_true", help="Validate without copying")
     for name in ("sim", "run"):
         sim = commands.add_parser(name, help="Run the shared-source RGB565 simulator")
         sim.add_argument("project", nargs="?")
@@ -103,6 +109,31 @@ def _emit_json(status: str, **fields: object) -> None:
     print(json.dumps({"schema": "mosaico-game-cli/v1", "status": status, **fields}))
 
 
+def engine_games() -> list[dict[str, object]]:
+    """Games under examples/ with the targets their project files declare."""
+    games = []
+    for project in sorted((ENGINE_ROOT / "examples").iterdir()):
+        top = project / "CMakeLists.txt"
+        host = (project / "game.sim.json").is_file()
+        native = ((project / "main/CMakeLists.txt").is_file() and top.is_file() and
+                  "raylib_lite_native_project.cmake" in top.read_text(encoding="utf-8"))
+        if host or native:
+            targets = [name for name, ok in (("host", host), ("native", native)) if ok]
+            games.append({"name": project.name, "path": str(project), "targets": targets})
+    return games
+
+
+def _list(arguments: argparse.Namespace) -> int:
+    games = [game for game in engine_games()
+             if not arguments.target or arguments.target in game["targets"]]
+    if arguments.json:
+        _emit_json("succeeded", command="list", games=games)
+    else:
+        for game in games:
+            print(f"{game['name']}\t{','.join(game['targets'])}")
+    return 0
+
+
 def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
             repository: Path) -> int:
     raw = Path(arguments.destination)
@@ -119,10 +150,15 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
         parser.error("game name must start with a letter and contain letters, digits, or '_'")
     if destination.exists():
         parser.error(f"project already exists: {destination}")
-    source_name = TEMPLATES[arguments.template]
+    source_name = TEMPLATES.get(arguments.template, arguments.template)
+    if not any(game["name"] == source_name and "host" in game["targets"]
+               for game in engine_games()):
+        parser.error(f"unknown template: {arguments.template}")
     source = ENGINE_ROOT / "examples" / source_name
-    if not (source / "game.sim.json").is_file():
-        parser.error(f"template missing: {source}")
+    if arguments.dry_run:
+        _emit_json("dry_run", command="create", project=str(destination),
+                   template=arguments.template)
+        return 0
     shutil.copytree(source, destination, ignore=shutil.ignore_patterns(
         "build", "build-*", "managed_components", "dependencies.lock",
         "sdkconfig", "assets", ".codex-runs", "pc"
@@ -258,6 +294,8 @@ def main(argv: Optional[Sequence[str]] = None, *, repository: Path) -> int:
             _emit_json("failed", error="usage", exit_code=2)
         return int(error.code)
     try:
+        if arguments.command == "list":
+            return _list(arguments)
         if arguments.command in {"create", "new"}:
             return _create(parser, arguments, repository)
         project = _selected_project(parser, arguments, repository)

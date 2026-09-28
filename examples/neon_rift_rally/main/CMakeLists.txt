@@ -15,14 +15,5 @@ target_include_directories(${COMPONENT_LIB} SYSTEM PRIVATE
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
     MOSAICO_GAME_NATIVE=1 MOSAICO_NATIVE_TARGET_FPS=30)
 
-if(MOSAICO_NATIVE_IRIS)
-    target_compile_definitions(${COMPONENT_LIB} PRIVATE MOSAICO_NATIVE_IRIS=1)
-    target_include_directories(${COMPONENT_LIB} PRIVATE
-        "${MOSAICO_UTILS_ROOT}/ESP-Iris/components/esp_iris/include"
-        "${MOSAICO_RECOVERY_COMPONENT_DIR}/include")
-    target_link_libraries(${COMPONENT_LIB} PRIVATE
-        idf::esp_iris idf::esp_mosaico_app_recovery)
-endif()
-
 include("${RAYLIB_LITE_ENGINE_ROOT}/cmake/raylib_lite_native_assets.cmake")
 raylib_lite_native_embed_assets("${CMAKE_CURRENT_LIST_DIR}/..")

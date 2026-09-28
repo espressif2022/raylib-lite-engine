@@ -11,4 +11,4 @@ Choose checks from the files changed. Report which checks ran and which device p
 | Audio cue or haptic mapping | Run the related model/audio tests; check repeated event consumption and cleanup; listen or feel on the target device when hardware is available |
 | Board adapter or display path | Build the affected target; capture device startup, input, present, and shutdown results when hardware is available |
 
-Keep game models and shared views independent of ESP-IDF/BSP headers. Device-only benchmark adapters are explicit exceptions in the boundary test. Use separate build directories for Host, direct native, Iris native, and lobby ELF outputs. Flashing, installing, or publishing require their own authorization; a build instruction does not authorize them.
+Keep game models and shared views independent of ESP-IDF/BSP headers. Device-only benchmark adapters are explicit exceptions in the boundary test. Use separate build directories for Host, direct native, and lobby ELF outputs. Flashing, installing, or publishing require their own authorization; a build instruction does not authorize them.

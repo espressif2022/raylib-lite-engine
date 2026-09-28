@@ -43,7 +43,6 @@ Use these public APIs before adding a game-local helper. If a helper is needed b
 | `mosaico_game_ui` | fixed retained panel/label/button tree and two tracked pointers | menus, layout engines, or board input |
 | `mosaico_game_fx` | fixed-capacity tweens, easing, and particle pools | heap allocation or rendering policy |
 | `mosaico_game_save` | versioned save and debounce contracts with ESP NVS implementation | game migration policy |
-| `mosaico_iris_ota_size_check` | override app-size checking for the Iris/Recovery OTA layout | generic engine runtime or non-Iris builds |
 
 ## Public API rules
 
@@ -72,8 +71,7 @@ The engine provides generic `raylib_lite_game_app_t` and
 can use `examples/common/native_module_main.c`; a product can compose its own
 entry point and platform services. The runner does not select a board or
 create an RTOS task. See [reusable design principles](../docs/reference-designs.EN.md)
-for the ownership boundary. `mosaico_iris_ota_size_check` is registered only
-for the Iris native path through the native-project helper.
+for the ownership boundary.
 
 Asset source conversion is a build-time concern owned by
 `tools/pack_game_assets.py`. Runtime components consume packed files from a read-only asset partition,

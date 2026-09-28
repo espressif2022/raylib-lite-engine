@@ -6,13 +6,6 @@ idf_component_register(
     REQUIRES mosaico_board_platform mosaico_game_app mosaico_game_assets
              mosaico_game_2d esp_driver_jpeg mosaico_raylib_fast
              mosaico_raylib_port raylib)
-if(MOSAICO_NATIVE_IRIS)
-    target_compile_definitions(${COMPONENT_LIB} PRIVATE MOSAICO_NATIVE_IRIS=1)
-    target_include_directories(${COMPONENT_LIB} PRIVATE
-        "${MOSAICO_UTILS_ROOT}/ESP-Iris/components/esp_iris/include"
-        "${MOSAICO_RECOVERY_COMPONENT_DIR}/include")
-    target_link_libraries(${COMPONENT_LIB} PRIVATE idf::esp_iris idf::esp_mosaico_app_recovery)
-endif()
 
 set(asset_source "${CMAKE_CURRENT_LIST_DIR}/../assets_src")
 set(asset_output "${CMAKE_CURRENT_BINARY_DIR}/living_worlds_assets")

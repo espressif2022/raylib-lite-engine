@@ -68,13 +68,15 @@ Standalone example firmware can be built from supported example directories;
 production board policy belongs to the product repository. Documentation index:
 [docs/README.EN.md](docs/README.EN.md). Host ABI:
 [host/README.md](host/README.md).
-The Mosaico device examples accept explicit `MOSAICO_PRODUCT_ROOT`,
-`MOSAICO_BSP_ROOT` paths. Iris product integration is documented in Vibe. Host
-simulation requires none of those product checkouts.
+The Mosaico device examples depend only on the BSP (`MOSAICO_BSP_ROOT`); the
+ESP-Mosaico board port lives in `ports/esp_mosaico/`. Iris product integration
+is documented in Vibe. Host simulation needs neither.
 
 ## Repository layout
 
 - `components/`: reusable game modules and ESP-IDF service implementations.
+- `ports/esp_mosaico/`: ESP-Mosaico board platform and audio output on top of
+  the BSP.
 - `cmake/`: ESP-IDF component registration for device firmware.
 - `examples/`: seven reference games, including Neon Rift Rally, plus a
   dedicated render benchmark and shared native-example glue.

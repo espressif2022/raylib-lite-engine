@@ -13,7 +13,7 @@ Reference games for Raylib Lite Engine. Start with `python3 tools/game_cli.py cr
 | [neon_rift_rally](neon_rift_rally/README.md) | Deterministic panoramic racing | ✓ | ✓ | — |
 | [render_benchmark](render_benchmark/README.md) | Raster acceptance and optional display preview | Dedicated Host test | Dedicated device project | — |
 
-“Lobby ELF SDK” means a matching project in the external `esp-mosaico-elf-game-sdk`. Existing `examples/<game>/iris/` directories are compatibility integration samples; Iris/Recovery build policy, Gateway, flashing, and updates are maintained by `esp-mosaico-vibe`, not by this engine matrix. SDK-only examples such as `snake`, `tilt`, and `maze_evil` are not part of this repository. `render_benchmark` uses its own Host/CMake and ESP-IDF entry points, not `game.sim.json`.
+“Lobby ELF SDK” means a matching project in the external `esp-mosaico-elf-game-sdk`. The Iris native adapter (`mosaico.py game build --target iris`), Gateway, flashing, and updates are maintained by `esp-mosaico-vibe`. SDK-only examples such as `snake`, `tilt`, and `maze_evil` are not part of this repository. `render_benchmark` uses its own Host/CMake and ESP-IDF entry points, not `game.sim.json`.
 
 Shared native-example glue lives in [common](common/README.md): the firmware entry point and timed haptic helper. Game-specific input, cues, and resource policy stay in each game.
 

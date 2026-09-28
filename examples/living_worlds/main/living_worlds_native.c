@@ -11,6 +11,7 @@
 #include "mosaico_game_2d.h"
 #include "mosaico_game_assets.h"
 #include "raylib_lite_game_app.h"
+#include "raylib_lite_native_hooks.h"
 #include "living_worlds_view.h"
 #include "living_worlds_world.h"
 
@@ -280,9 +281,11 @@ fail:
 static raylib_lite_result_t app_first_present(void *user)
 {
     living_worlds_native_t *state = user;
-    return state->board &&
-           mosaico_board_platform_start_input(state->board) == ESP_OK
-        ? RAYLIB_LITE_OK : RAYLIB_LITE_PLATFORM_ERROR;
+    if (!state->board ||
+            mosaico_board_platform_start_input(state->board) != ESP_OK)
+        return RAYLIB_LITE_PLATFORM_ERROR;
+    raylib_lite_native_first_present();
+    return RAYLIB_LITE_OK;
 }
 
 static void app_event(void *user, const raylib_lite_input_event_t *event)

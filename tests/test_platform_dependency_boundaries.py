@@ -134,7 +134,7 @@ int main(void) {{ return ESP_OK; }}
                     with self.subTest(path=path.relative_to(ENGINE)):
                         self.assertIsNone(forbidden.search(path.read_text()))
 
-    def test_reference_examples_have_host_direct_and_iris_entries(self) -> None:
+    def test_reference_examples_have_host_and_direct_entries(self) -> None:
         for directory in (
             "raylib_shooter", "tower_defense", "sky_hop", "living_worlds",
             "last_zone_extraction", "tomb_explorer",
@@ -143,9 +143,34 @@ int main(void) {{ return ESP_OK; }}
             with self.subTest(example=directory):
                 self.assertTrue((root / "CMakeLists.txt").is_file())
                 self.assertTrue((root / "main/CMakeLists.txt").is_file())
-                self.assertTrue((root / "iris/CMakeLists.txt").is_file())
                 self.assertTrue((root / "main/idf_component.yml").is_file())
                 self.assertTrue((root / "game.sim.json").is_file())
+
+    def test_native_examples_need_only_the_bsp(self) -> None:
+        for component in ("mosaico_board_platform", "mosaico_game_audio", "platform_esp_audio"):
+            with self.subTest(component=component):
+                self.assertTrue((ENGINE / "ports/esp_mosaico" / component / "CMakeLists.txt").is_file())
+        resolver = (ENGINE / "cmake/raylib_lite_native_project.cmake").read_text()
+        self.assertNotIn("MOSAICO_PRODUCT_ROOT", resolver)
+        self.assertIn("raylib_lite_esp_add_port()", resolver)
+
+    def test_native_games_expose_only_the_neutral_lifecycle_hooks(self) -> None:
+        product = re.compile(r"iris|MOSAICO_NATIVE_PRODUCT|esp_mosaico_app", re.IGNORECASE)
+        for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
+            with self.subTest(path=cmake.relative_to(ENGINE)):
+                self.assertIsNone(product.search(cmake.read_text()))
+        entries = {
+            "examples/common/native_module_main.c": ("raylib_lite_native_boot()",
+                                                     "raylib_lite_native_first_present()"),
+            "examples/living_worlds/main/main.c": ("raylib_lite_native_boot()",),
+            "examples/living_worlds/main/living_worlds_native.c": (
+                "raylib_lite_native_first_present()",),
+        }
+        for relative, calls in entries.items():
+            text = (ENGINE / relative).read_text()
+            for call in calls:
+                with self.subTest(path=relative, call=call):
+                    self.assertIn(call, text)
 
 
 if __name__ == "__main__":

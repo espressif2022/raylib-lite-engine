@@ -2,11 +2,7 @@
 #include "esp_log.h"
 #include "mosaico_board_platform.h"
 #include "living_worlds_native.h"
-#ifdef MOSAICO_NATIVE_IRIS
-#include "esp_iris.h"
-#include "iris_ota_support.h"
-#include "nvs_flash.h"
-#endif
+#include "raylib_lite_native_hooks.h"
 
 static const char *TAG = "living_worlds";
 
@@ -24,11 +20,10 @@ static esp_err_t clean_board(mosaico_board_platform_t *board)
 
 void app_main(void)
 {
-#ifdef MOSAICO_NATIVE_IRIS
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_iris_boot_probe());
-    ESP_ERROR_CHECK(nvs_flash_init());
-    iris_ota_support_start();
-#endif
+    if (!raylib_lite_native_boot()) {
+        ESP_LOGE(TAG, "native startup hook failed");
+        return;
+    }
     const mosaico_board_platform_config_t config = {
         .touch_points = 1,
         .enable_imu = false,

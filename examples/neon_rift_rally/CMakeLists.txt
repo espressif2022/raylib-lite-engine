@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
-# Direct-native example project. Product launchers can reuse the same main/
-# sources through their own board integration when MOSAICO_NATIVE_IRIS is on.
+# Direct-native example project. Product integrations supply their own hooks.
 set(CONFIGDEP_ENABLE OFF CACHE BOOL "Use IDF configdep" FORCE)
-set(MOSAICO_NATIVE_IRIS OFF CACHE BOOL "Direct native application" FORCE)
 set(SDKCONFIG_DEFAULTS
     "${CMAKE_CURRENT_LIST_DIR}/../../cmake/sdkconfig.native-direct.defaults"
     "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
