@@ -22,7 +22,10 @@ python3 tools/game_cli.py sim examples/<name> --headless --frames 300
 Browser preview is `http://127.0.0.1:8460/`. Use `--listen 0.0.0.0` for LAN.
 Each example declares Host sources in `game.sim.json`.
 
-Device builds are ordinary ESP-IDF projects and do not use ESP-Iris. The
-`factory` app slot is 5MB. See the
-[documentation index](../docs/README.md) and
-[Host simulator](../host/README.md).
+The gameplay models, views, assets, and Host `game_module.c` files are
+engine-owned. Product-specific app factories, device audio and asset setup are
+owned by the product repository. These directories intentionally contain no
+ESP-IDF project, board launcher, GSP scene, sdkconfig, or partition table.
+Products integrate the reusable sources through an external board launcher.
+See the [launcher retirement result](../docs/platform-mosaico-launcher-retirement.zh-CN.md),
+[documentation index](../docs/README.md), and [Host simulator](../host/README.md).

@@ -5,8 +5,9 @@ runtime for embedded RGB565 displays. It combines a deterministic fixed-step
 runtime, optimized software rasterizer, asset pipeline and native Host
 simulator. It is not affiliated with or endorsed by the raylib project.
 
-The project currently targets ESP-IDF and provides an ESP-Mosaico port for
-display, touch, IMU and audio integration. The public APIs retain their
+The engine contains shared game code, a PC Host backend, and its ESP-IDF
+integration. Board startup and device services belong to the product
+repository. The public APIs retain their
 `mosaico_*` names during the repository split so existing games remain source
 compatible; neutral `raylite_*` APIs will be introduced through versioned
 compatibility aliases rather than a flag-day rename.
@@ -20,33 +21,32 @@ compatibility aliases rather than a flag-day rename.
   column-major INDEX8 assets for ray columns and row-major INDEX8 assets for
   mesh spans. Textured convex quads use one edge walk and one continuous span
   per scanline, with a build-time 16-level RGB565 light table.
-- Fixed-step update scheduling and non-blocking, latest-wins presentation.
+- Fixed-step update scheduling with explicit display backpressure.
 - Keyboard, pointer, two-point touch and IMU input.
 - Atlas, tilemap and PCM/IMA-ADPCM asset compilation.
 - Scene stack, retained UI, tween/particle pools and versioned saves.
 - Versioned native Host ABI with deterministic replay and browser preview.
 
-## ESP-IDF integration
+## Build paths
 
-Add the repository to the application and include its integration file before
-the ESP-IDF `project()` call:
+The engine has three consumers: statically linked native firmware, device ELF
+modules, and the PC Host simulator. Their boundaries and example commands are
+in [the build matrix](docs/build-matrix.zh-CN.md).
+
+For ESP-IDF firmware, include the engine integration helper before IDF's
+`project()` call and select the component paths there:
 
 ```cmake
-set(RAYLIB_LITE_ROOT "${CMAKE_CURRENT_LIST_DIR}/components/raylib-lite-engine")
-include("${RAYLIB_LITE_ROOT}/cmake/mosaico_game_sdk.cmake")
+set(RAYLIB_LITE_ENGINE_ROOT "/path/to/raylib-lite-engine")
+include("${RAYLIB_LITE_ENGINE_ROOT}/cmake/raylib_lite_esp.cmake")
 mosaico_game_sdk_add_components(RAYLIB AUDIO TILEMAP SCENE UI FX SAVE)
 ```
 
-Platform-owned dependencies are explicit. This engine does not depend on
-ESP-Iris. Examples pull `esp-mosaico-bsp` with the Component Manager from
-https://github.com/esp-mosaico/esp-mosaico-bsp. An application may provide:
-
-```cmake
-set(MOSAICO_GAME_GSPC_FETCHER "/path/to/fetch_gspc.py" CACHE FILEPATH "")
-```
-
-If no fetcher is configured, `mosaico_game_sdk_configure_gsp_compiler()` looks
-for `gspc` or `gspc-dev` on `PATH`.
+The engine supplies portable game services and RGB565 software rendering; the
+product supplies board/BSP components, the video backend, and the
+`platform_esp_audio` implementation when audio is selected.
+These services are shared by native firmware and the ELF launcher. ELF game
+modules use the versioned runtime ABI and do not link ESP-IDF services.
 
 ## Examples
 
@@ -62,20 +62,18 @@ python3 tools/game_cli.py sim examples/last_zone_extraction --headless --frames 
 python3 tools/game_cli.py sim examples/tomb_explorer --headless --frames 8
 ```
 
-Device firmware is a normal ESP-IDF project. The Component Manager clones
-`esp-mosaico-bsp` from Git. Example `factory` slots are 5MB on 16MB flash so
-`idf.py flash` can hold the larger games. Documentation index:
+Device firmware is built in a product repository. Documentation index:
 [docs/README.md](docs/README.md). Host ABI:
 [host/README.md](host/README.md).
 
 ## Repository layout
 
-- `components/`: ESP-IDF runtime, renderer and reusable game modules.
+- `components/`: reusable game modules and ESP-IDF service implementations.
+- `cmake/`: ESP-IDF component registration for device firmware.
 - `examples/`: Sky Hop, Tower Defense, Raylib Shooter, Living Worlds, Last Zone,
   and Tomb Explorer reference games.
 - `host/`: native Host ABI, RGB565 renderer bridge and browser simulator.
 - `tools/`: game CLI, asset compiler, and performance analysis tools.
-- `cmake/`: application and example integration helpers.
 - `docs/`: game development guides and the mosaico-game-development skill.
 
 ## Versioning

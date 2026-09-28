@@ -23,10 +23,9 @@ python3 tools/game_cli.py sim examples/tower_defense
 python3 tools/game_cli.py sim examples/tower_defense --headless --frames 300
 python3 tools/game_cli.py sim examples/tower_defense --headless \
   --scenario replay.json --state-output artifacts/tower-state.json
-
-# 真机：普通 ESP-IDF，idf.py flash 写入 5MB factory
-idf.py -C examples/tower_defense set-target esp32s31 build flash monitor
 ```
+
+真机入口由外部产品仓库提供；本目录不是 ESP-IDF 工程。
 
 非 headless 预览地址为 `http://127.0.0.1:8460/`；局域网预览可加
 `--listen 0.0.0.0`。

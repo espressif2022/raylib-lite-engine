@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include "raylib_lite_clock.h"
 #include "mosaico_raylib_fast.h"
 #include "sunrise_depth.h"
 #include "sunrise_volume.h"
@@ -49,7 +50,9 @@ static void draw_panorama_band(MosaicoAtlas panorama,float source_x,float source
         float second=source_width-first;
         DrawTexturePro(panorama.texture,
                        (Rectangle){0,source_y,second,source_height},
-                       (Rectangle){first_dest,dest_y,480-first_dest,dest_height},
+                       /* DrawTexturePro truncates the fractional destination
+                        * width. Extend the wrapped half to cover pixel 479. */
+                       (Rectangle){first_dest,dest_y,481-first_dest,dest_height},
                        (Vector2){0,0},0,WHITE);
     }
 }
@@ -864,24 +867,28 @@ static uint32_t sunrise_particle_hash(uint32_t value)
     value*=0x846ca68bU;value^=value>>16;return value;
 }
 
+typedef struct { float cz,sz,cy,sy,cx,sx; } sunrise_seed_rotation_t;
+
 static void sunrise_seed_point(const living_sunrise_seed_t *seed,
+                               const sunrise_seed_rotation_t *rotation,
                                float x,float y,float z,float *wx,float *wy,float *wz)
 {
-    float cz=cosf(seed->rz),sz=sinf(seed->rz);
-    float x1=x*cz-y*sz,y1=x*sz+y*cz;
-    float cy=cosf(seed->ry),sy=sinf(seed->ry);
-    float x2=x1*cy+z*sy,z2=-x1*sy+z*cy;
-    float cx=cosf(seed->rx),sx=sinf(seed->rx);
-    float y2=y1*cx-z2*sx,z3=y1*sx+z2*cx;
+    float x1=x*rotation->cz-y*rotation->sz;
+    float y1=x*rotation->sz+y*rotation->cz;
+    float x2=x1*rotation->cy+z*rotation->sy;
+    float z2=-x1*rotation->sy+z*rotation->cy;
+    float y2=y1*rotation->cx-z2*rotation->sx;
+    float z3=y1*rotation->sx+z2*rotation->cx;
     *wx=seed->x+x2;*wy=seed->y+y2;*wz=seed->z+z3;
 }
 
 static bool sunrise_seed_project(const sunrise_camera_t *camera,
                                  const living_sunrise_seed_t *seed,
+                                 const sunrise_seed_rotation_t *rotation,
                                  float x,float y,float z,Vector2 *screen)
 {
     float wx,wy,wz;
-    sunrise_seed_point(seed,x,y,z,&wx,&wy,&wz);
+    sunrise_seed_point(seed,rotation,x,y,z,&wx,&wy,&wz);
     return sunrise_project_xyz(camera,wx,wy,wz,screen);
 }
 
@@ -899,9 +906,11 @@ static void draw_dandelion_seed_3d(const sunrise_camera_t *camera,
                                    int spokes)
 {
     const float rad=seed->radius;
+    const sunrise_seed_rotation_t rotation={cosf(seed->rz),sinf(seed->rz),
+        cosf(seed->ry),sinf(seed->ry),cosf(seed->rx),sinf(seed->rx)};
     Vector2 root,base,husk;
-    if(!sunrise_seed_project(camera,seed,0,0,0,&root)||
-       !sunrise_seed_project(camera,seed,.005f,-rad*1.5f,0,&base))return;
+    if(!sunrise_seed_project(camera,seed,&rotation,0,0,0,&root)||
+       !sunrise_seed_project(camera,seed,&rotation,.005f,-rad*1.5f,0,&base))return;
     if(root.x<-40||root.x>520||root.y<18||root.y>508)return;
     float dx=root.x-base.x,dy=root.y-base.y;
     float apparent=sqrtf(dx*dx+dy*dy);
@@ -911,15 +920,16 @@ static void draw_dandelion_seed_3d(const sunrise_camera_t *camera,
     float silk_w=fmaxf(1.08f,fminf(2.05f,1.02f+apparent*.055f));
     if(spokes>16&&apparent<9.0f)spokes=14;
     DrawLineEx(root,base,stem_w,sunrise_seed_tint(111,70,24,.62f,fade));
-    if(sunrise_seed_project(camera,seed,0,-rad*1.7f,0,&husk))
+    if(sunrise_seed_project(camera,seed,&rotation,0,-rad*1.7f,0,&husk))
         DrawCircle((int)husk.x,(int)husk.y,apparent>8.0f?2:1,
                    sunrise_seed_tint(139,78,22,.55f,fade));
     for(int i=0;i<spokes;++i){
         float angle=6.2831853f*i/(float)spokes;
         float ca=cosf(angle),sa=sinf(angle);
         Vector2 bend,tip;
-        if(!sunrise_seed_project(camera,seed,ca*rad*.45f,rad*.31f,sa*rad*.45f,&bend)||
-           !sunrise_seed_project(camera,seed,ca*rad,rad*(.49f+.06f*sinf(i*2.0f)),sa*rad,&tip))
+        if(!sunrise_seed_project(camera,seed,&rotation,ca*rad*.45f,rad*.31f,sa*rad*.45f,&bend)||
+           !sunrise_seed_project(camera,seed,&rotation,ca*rad,
+                rad*(.49f+.06f*sinf(i*2.0f)),sa*rad,&tip))
             continue;
         DrawLineEx(root,bend,silk_w,sunrise_seed_tint(203,170,121,.48f,fade));
         DrawLineEx(bend,tip,silk_w,sunrise_seed_tint(239,218,165,.58f,fade));
@@ -990,13 +1000,30 @@ static void draw_scene_button(int x,const char *label,bool selected)
     DrawText(label,x+8,435,10,text);
 }
 
+static int measured_fps(void)
+{
+    static int64_t started_us;
+    static int frames;
+    static int fps;
+    int64_t now=(int64_t)raylib_lite_time_us();
+    if(!started_us)started_us=now;
+    ++frames;
+    int64_t elapsed=now-started_us;
+    if(elapsed>=1000000){
+        /* 32-bit divide: the ELF libc allowlist has no __divdi3. */
+        uint32_t us=elapsed>100000000LL?100000000u:(uint32_t)elapsed;
+        uint32_t n=frames>4000?4000u:(uint32_t)frames;
+        fps=(int)((n*1000000u)/us);
+        started_us=now;
+        frames=0;
+    }
+    return fps;
+}
+
 static void draw_overlay(const living_world_t *world)
 {
     DrawRectangle(16,16,448,39,(Color){0,22,36,145});
-    const char *title=world->scene==LIVING_SCENE_AURORA?"AURORA":
-                      world->scene==LIVING_SCENE_SUNRISE?"SUNRISE":
-                      world->scene==LIVING_SCENE_RAINFOREST?"RAINFOREST":"OCEAN";
-    DrawText(title,29,26,16,(Color){218,250,242,255});
+    DrawText(TextFormat("FPS: %d",measured_fps()),29,26,16,(Color){218,250,242,255});
     const char *fx=world->effects_level==0?"FX CALM":
                    (world->effects_level==2?"FX VIVID":"FX LIVING");
     DrawText(fx,260,31,8,(Color){156,220,211,230});
@@ -1012,7 +1039,8 @@ void living_worlds_view_render(const living_world_t *world,
 {
     if(!world||!atlases)return;
     BeginDrawing();
-    ClearBackground((Color){1,28,44,255});
+    /* All scene backgrounds cover the canvas for their supported camera
+     * ranges, so a full PSRAM clear would only add 230,400 writes. */
     if(world->scene==LIVING_SCENE_AURORA){
         living_aurora_draw(&world->aurora,world->yaw,world->pitch,world->effects_level,
             atlases->aurora,atlases->aurora_ice_front,atlases->aurora_ice_side,

@@ -5,8 +5,11 @@
     {"config": "weapon.json", "source": "weapon.png", "output": "weapon.atlas"},
     {"config": "controls.json", "source": "controls.png", "output": "controls.atlas"},
     {"config": "environment.json", "source": "tactical_panoramas.png", "output": "environment.atlas"},
-    {"config": "materials.json", "source": "tactical_materials.png", "output": "materials.atlas"},
+    {"config": "floor.json", "source": "tactical_materials.png", "output": "floor.atlas"},
     {"config": "props.json", "source": "props.png", "output": "props.atlas"}
+  ],
+  "wall_atlases": [
+    {"config": "walls.json", "source": "tactical_materials.png", "output": "walls.wall"}
   ],
     "sounds": [
     {"source": "rifle.wav"},

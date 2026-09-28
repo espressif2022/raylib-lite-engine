@@ -21,9 +21,13 @@ the closest example:
 - `examples/last_zone_extraction` for raycast walls and a campaign shooter;
 - `examples/tomb_explorer` for portal rooms and INDEX8 textured triangles.
 
-Keep gameplay state and `update()` logic in C files that compile without ESP-IDF.
-Device firmware uses a thin `main.c` that calls `mosaico_game_app_run()`; put
-board-specific assets, zones, audio, and callbacks in `<game>_app.c`.
+Keep gameplay state, `update()` logic, and shared rendering in C files that
+compile without ESP-IDF. Device firmware belongs to an external product
+repository. The product owns game-specific app glue such as
+`sky_hop_app_create()`, `shooter_app_create()`, or `tower_app_create()`; those
+fill the generic engine `raylib_lite_game_app_t` using the product's platform
+and services. The engine owns the generic app lifecycle and runner, but no
+board-selecting launcher.
 
 For local simulation, add `game.sim.json` (`schema` + `sources` only) and keep
 the Raylib renderer in a shared `<game>_view.c`. Use `game_module.c` only for
@@ -37,19 +41,21 @@ python3 tools/game_cli.py sim examples/<name>
 python3 tools/game_cli.py sim examples/<name> --headless --scenario <json>
 ```
 
-For component selection and supported API details, read
+For the native firmware, ELF module, and Host build boundaries, read
+[the build matrix](../../build-matrix.zh-CN.md). ESP-IDF component registration
+is provided by `raylib-lite-engine/cmake/raylib_lite_esp.cmake`.
+The engine CLI can dispatch explicit builds but does not fetch platform
+dependencies. For supported API details, read
 [references/tech-stack.md](references/tech-stack.md). For assets or audio,
 [references/content-pipeline.md](references/content-pipeline.md). For touch,
 [references/touch-input.md](references/touch-input.md).
 
 ## Implement
 
-```cmake
-include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/mosaico_game_example.cmake")
-mosaico_game_sdk_configure_gsp_compiler()
-mosaico_game_sdk_add_components(RAYLIB AUDIO TILEMAP)
-project(<name> VERSION 0.1.0)
-```
+Add gameplay/view sources to `game.sim.json`. For static device firmware, the
+product integrates engine components through the engine's ESP-IDF helper.
+For device ELF games, build against the SDK runtime ABI. Do not add ESP-IDF
+project files under `examples/`.
 
 Use only the compatibility surface in
 [mosaico_raylib_fast.h](../../../components/mosaico_raylib_fast/include/mosaico_raylib_fast.h).
@@ -59,10 +65,7 @@ Use only the compatibility surface in
 1. Compile the gameplay model with the Host C compiler using `-Wall -Wextra -Werror`.
 2. Run `python3 -m unittest discover -s tests -v`.
 3. Run `python3 tools/game_cli.py sim examples/<name> --headless`.
-4. Device builds are ordinary ESP-IDF flashes of `examples/<name>`; they do
-   not use ESP-Iris. Example `factory` partitions are 5MB.
+4. Validate devices through the external board/product launcher.
 
 Do not claim device or audio success from a successful Host build alone.
-`examples/sky_hop/main/CMakeLists.txt` is the mmap `game_assets` reference;
-Last Zone, Living Worlds, and Tomb embed packed files with
-`target_add_binary_data`.
+Asset placement and flash partition policy belong to the product firmware.

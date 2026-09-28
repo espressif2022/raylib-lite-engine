@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "mosaico_game_module.h"
 #include "mosaico_raylib_fast.h"
-#include "mosaico_raylib_port.h"
+#include "raylib_lite_host_video.h"
 
 typedef struct {
     const mosaico_game_module_v1_t *module;
@@ -37,6 +37,7 @@ void mosaico_host_game_destroy_v1(void *value)
     module_instance_t *instance = value;
     if (!instance) return;
     if (instance->module->shutdown) instance->module->shutdown(instance->state);
+    raylib_lite_host_video_shutdown();
     free(instance->state);
     free(instance);
 }
@@ -69,10 +70,13 @@ int mosaico_host_game_render_rgb565_v1(void *value, uint16_t *pixels,
     module_instance_t *instance = value;
     if (!instance || !pixels || stride_pixels < instance->module->descriptor.width)
         return -1;
-    mosaico_host_raylib_set_target(pixels, stride_pixels,
-        instance->module->descriptor.width, instance->module->descriptor.height);
+    if (raylib_lite_host_video_set_target(
+            pixels, stride_pixels, instance->module->descriptor.width,
+            instance->module->descriptor.height) != RAYLIB_LITE_OK) {
+        return -1;
+    }
     int result = instance->module->render(instance->state);
-    mosaico_host_raylib_clear_target();
+    raylib_lite_host_video_clear_target();
     return result;
 }
 

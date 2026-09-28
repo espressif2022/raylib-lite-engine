@@ -23,6 +23,8 @@ static int s_screen_width = MOSAICO_GAME_WIDTH;
 static int s_screen_height = MOSAICO_GAME_HEIGHT;
 static int s_target_fps = 30;
 static uint64_t s_presented_frames;
+static raylib_lite_result_t s_last_acquire = RAYLIB_LITE_NOT_READY;
+static raylib_lite_result_t s_last_present = RAYLIB_LITE_NOT_READY;
 static bool s_scissor_active;
 static int s_scissor_x0, s_scissor_y0, s_scissor_x1, s_scissor_y1;
 #define MOSAICO_FAST_KEY_COUNT 512
@@ -108,9 +110,9 @@ static inline uint16_t blend_span_pixel(unsigned old, const span_paint_t *paint)
 
 static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
 {
-    if (!s_pixels || !paint->alpha || (unsigned)y >= MOSAICO_GAME_HEIGHT) return;
+    if (!s_pixels || !paint->alpha || (unsigned)y >= (unsigned)s_screen_height) return;
     if (x0 < 0) x0 = 0;
-    if (x1 > MOSAICO_GAME_WIDTH) x1 = MOSAICO_GAME_WIDTH;
+    if (x1 > s_screen_width) x1 = s_screen_width;
     if (s_scissor_active) {
         if (y < s_scissor_y0 || y >= s_scissor_y1) return;
         if (x0 < s_scissor_x0) x0 = s_scissor_x0;
@@ -138,8 +140,8 @@ static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
 
 static inline void put_pixel(int x, int y, Color color)
 {
-    if (!s_pixels || (unsigned)x >= MOSAICO_GAME_WIDTH ||
-            (unsigned)y >= MOSAICO_GAME_HEIGHT) return;
+    if (!s_pixels || (unsigned)x >= (unsigned)s_screen_width ||
+            (unsigned)y >= (unsigned)s_screen_height) return;
     if (s_scissor_active && (x < s_scissor_x0 || y < s_scissor_y0 ||
             x >= s_scissor_x1 || y >= s_scissor_y1)) return;
     if(color.a){++s_primitive_pixels;++s_primitive_runs;}
@@ -164,6 +166,8 @@ void MosaicoFastInitWindow(int width, int height, const char *title)
     s_window_ready = true;
     s_window_should_close = false;
     s_presented_frames = 0;
+    s_last_acquire = RAYLIB_LITE_NOT_READY;
+    s_last_present = RAYLIB_LITE_NOT_READY;
     memset(s_key_down, 0, sizeof(s_key_down));
     memset(s_key_pressed, 0, sizeof(s_key_pressed));
     memset(s_key_released, 0, sizeof(s_key_released));
@@ -274,20 +278,31 @@ void MosaicoFastBeginDrawing(void)
 {
     s_pixels = NULL;
     s_stride = 0;
-    (void)mosaico_raylib_port_begin_frame(&s_pixels, &s_stride);
-    mosaico_game_2d_set_target(s_pixels, s_stride, MOSAICO_GAME_WIDTH,
-                               MOSAICO_GAME_HEIGHT);
+    s_last_acquire = mosaico_raylib_port_begin_frame(&s_pixels, &s_stride);
+    s_last_present = RAYLIB_LITE_NOT_READY;
+    uint16_t backend_width = 0, backend_height = 0;
+    mosaico_raylib_port_get_dimensions(&backend_width, &backend_height);
+    if (backend_width && backend_height) {
+        s_screen_width = backend_width;
+        s_screen_height = backend_height;
+    }
+    mosaico_game_2d_set_target(s_pixels, s_stride, s_screen_width,
+                               s_screen_height);
     mosaico_game_2d_reset_raster_stats();
     s_primitive_pixels=s_primitive_runs=s_clear_pixels=0;
 }
 
 bool MosaicoFastFrameAvailable(void) { return s_pixels != NULL; }
+raylib_lite_result_t MosaicoFastGetLastAcquireResult(void)
+{ return s_last_acquire; }
+raylib_lite_result_t MosaicoFastGetLastPresentResult(void)
+{ return s_last_present; }
 
 uint16_t *MosaicoFastGetFramebuffer(int *width, int *height,
                                     size_t *stride_pixels)
 {
-    if (width) *width = MOSAICO_GAME_WIDTH;
-    if (height) *height = MOSAICO_GAME_HEIGHT;
+    if (width) *width = s_screen_width;
+    if (height) *height = s_screen_height;
     if (stride_pixels) *stride_pixels = s_stride;
     return s_pixels;
 }
@@ -306,14 +321,14 @@ void MosaicoFastEndDrawing(void)
 {
     if (s_pixels) {
         mosaico_game_2d_note_primitives(s_primitive_pixels,s_primitive_runs,s_clear_pixels);
-        (void)mosaico_raylib_port_present_frame();
+        s_last_present = mosaico_raylib_port_present_frame();
     }
     s_pixels = NULL;
     s_stride = 0;
     mosaico_game_2d_set_target(NULL, 0, 0, 0);
     s_camera_active = false;
     s_scissor_active = false;
-    ++s_presented_frames;
+    if (s_last_present == RAYLIB_LITE_OK) ++s_presented_frames;
     MosaicoFastConsumeInputEdges();
 }
 
@@ -321,8 +336,8 @@ void MosaicoFastBeginScissorMode(int x, int y, int width, int height)
 {
     s_scissor_x0 = x < 0 ? 0 : x;
     s_scissor_y0 = y < 0 ? 0 : y;
-    s_scissor_x1 = x + width > MOSAICO_GAME_WIDTH ? MOSAICO_GAME_WIDTH : x + width;
-    s_scissor_y1 = y + height > MOSAICO_GAME_HEIGHT ? MOSAICO_GAME_HEIGHT : y + height;
+    s_scissor_x1 = x + width > s_screen_width ? s_screen_width : x + width;
+    s_scissor_y1 = y + height > s_screen_height ? s_screen_height : y + height;
     s_scissor_active = width > 0 && height > 0 &&
         s_scissor_x0 < s_scissor_x1 && s_scissor_y0 < s_scissor_y1;
     mosaico_game_2d_set_clip(s_scissor_x0, s_scissor_y0,
@@ -332,7 +347,7 @@ void MosaicoFastBeginScissorMode(int x, int y, int width, int height)
 void MosaicoFastEndScissorMode(void)
 {
     s_scissor_active = false;
-    mosaico_game_2d_set_clip(0, 0, MOSAICO_GAME_WIDTH, MOSAICO_GAME_HEIGHT);
+    mosaico_game_2d_set_clip(0, 0, s_screen_width, s_screen_height);
 }
 
 Texture2D MosaicoFastLoadTexture(const char *asset_path)
@@ -380,16 +395,16 @@ void MosaicoFastDrawTextureEx(Texture2D texture, Vector2 position,
 void MosaicoFastClearBackground(Color color)
 {
     if (!s_pixels) return;
-    s_clear_pixels+=(uint32_t)MOSAICO_GAME_WIDTH*MOSAICO_GAME_HEIGHT;
+    s_clear_pixels+=(uint32_t)s_screen_width*(uint32_t)s_screen_height;
     uint16_t px = rgb565(color);
-    if (s_stride == (size_t)MOSAICO_GAME_WIDTH) {
+    if (s_stride == (size_t)s_screen_width) {
         mosaico_fill_rgb565(s_pixels, px,
-            (size_t)MOSAICO_GAME_WIDTH * (size_t)MOSAICO_GAME_HEIGHT);
+            (size_t)s_screen_width * (size_t)s_screen_height);
         return;
     }
-    for (int y = 0; y < MOSAICO_GAME_HEIGHT; ++y)
+    for (int y = 0; y < s_screen_height; ++y)
         mosaico_fill_rgb565(s_pixels + (size_t)y * s_stride, px,
-            (size_t)MOSAICO_GAME_WIDTH);
+            (size_t)s_screen_width);
 }
 
 void MosaicoFastDrawPixel(int x, int y, Color color)
@@ -411,8 +426,8 @@ void MosaicoFastDrawRectangle(int x, int y, int width, int height, Color color)
     if (!s_pixels || width <= 0 || height <= 0) return;
     int x0 = x < 0 ? 0 : x;
     int y0 = y < 0 ? 0 : y;
-    int x1 = x + width > MOSAICO_GAME_WIDTH ? MOSAICO_GAME_WIDTH : x + width;
-    int y1 = y + height > MOSAICO_GAME_HEIGHT ? MOSAICO_GAME_HEIGHT : y + height;
+    int x1 = x + width > s_screen_width ? s_screen_width : x + width;
+    int y1 = y + height > s_screen_height ? s_screen_height : y + height;
     if (s_scissor_active) {
         if (x0 < s_scissor_x0) x0 = s_scissor_x0;
         if (y0 < s_scissor_y0) y0 = s_scissor_y0;
@@ -700,8 +715,8 @@ void MosaicoFastDrawTriangle(Vector2 av, Vector2 bv, Vector2 cv, Color color)
     int maxy=ay>by?(ay>cy?ay:cy):(by>cy?by:cy);
     if(minx<0) minx=0;
     if(miny<0) miny=0;
-    if(maxx>=MOSAICO_GAME_WIDTH) maxx=MOSAICO_GAME_WIDTH-1;
-    if(maxy>=MOSAICO_GAME_HEIGHT) maxy=MOSAICO_GAME_HEIGHT-1;
+    if(maxx>=s_screen_width) maxx=s_screen_width-1;
+    if(maxy>=s_screen_height) maxy=s_screen_height-1;
     if(s_scissor_active){
         if(minx<s_scissor_x0)minx=s_scissor_x0;
         if(miny<s_scissor_y0)miny=s_scissor_y0;
@@ -709,11 +724,24 @@ void MosaicoFastDrawTriangle(Vector2 av, Vector2 bv, Vector2 cv, Color color)
         if(maxy>=s_scissor_y1)maxy=s_scissor_y1-1;
     }
     int area=edge(ax,ay,bx,by,cx,cy);
-    for(int y=miny;y<=maxy;++y) for(int x=minx;x<=maxx;++x){
-        int w0=edge(bx,by,cx,cy,x,y), w1=edge(cx,cy,ax,ay,x,y);
-        int w2=edge(ax,ay,bx,by,x,y);
-        if((area>=0&&w0>=0&&w1>=0&&w2>=0)||
-           (area<0&&w0<=0&&w1<=0&&w2<=0)) put_pixel(x,y,color);
+    if(!area||!color.a||minx>maxx||miny>maxy)return;
+    span_paint_t paint=span_paint(color);
+    /* A filled triangle intersects each scanline in one contiguous interval.
+     * Find that interval with edge tests, then use the shared span writer so
+     * opaque interiors take the S31 PIE bulk-store path.  This keeps exact
+     * legacy edge inclusion while turning thousands of framebuffer writes
+     * into a few dozen cache-friendly runs. */
+    for(int y=miny;y<=maxy;++y){
+        int first=-1,last=-1;
+        for(int x=minx;x<=maxx;++x){
+            int w0=edge(bx,by,cx,cy,x,y),w1=edge(cx,cy,ax,ay,x,y);
+            int w2=edge(ax,ay,bx,by,x,y);
+            bool inside=(area>=0&&w0>=0&&w1>=0&&w2>=0)||
+                        (area<0&&w0<=0&&w1<=0&&w2<=0);
+            if(inside){if(first<0)first=x;last=x;}
+            else if(first>=0)break;
+        }
+        if(first>=0)fill_span(y,first,last+1,&paint);
     }
 }
 

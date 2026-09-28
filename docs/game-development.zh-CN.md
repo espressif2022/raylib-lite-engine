@@ -2,9 +2,9 @@
 
 [返回文档索引](README.md) · [Host 仿真](../host/README.md)
 
-参考游戏由本仓库维护。Host 与设备编译同一份玩法和绘制代码；PC 预览适合验证
-状态、输入和像素结果。本仓库不依赖 ESP-Iris，也不走 ESP-Mosaico Vibe 的
-`mosaico.py game` 或 `tools/gsp-sim`。LCD 时序、触摸手感和音频仍需真机验收。
+参考游戏由本仓库维护。仓内示例用于 Host 验证状态、输入和像素结果，并向外部
+产品提供可复用的玩法模型、view、资源和 `game_module.c`。ESP-IDF 工程、BSP、presenter 条带显示、设备资源和音频集成，以及 Sky Hop、Raylib Shooter、Tower Defense 的
+`*_app_create()` 产品 glue 由产品仓库维护；LCD 时序、触摸手感和音频仍需产品真机验收。
 
 ## 选择参考项目
 
@@ -25,8 +25,12 @@
 - 玩法模型使用可由主机 C 编译器编译的 C 源码，避免依赖 ESP-IDF、BSP 或 FreeRTOS。
 - `<game>_view.c` 同时进入设备构建和 Host 清单，以相同的 Raylib 兼容调用绘制。
 - `game_module.c` 只负责 Host 生命周期与输入映射。
-- 设备 `main.c` 调用 `mosaico_game_app_run()`；资源、触区、音频和玩法回调放在
-  项目自己的设备适配文件中。
+- 通用玩法不包含设备 `main.c` 或产品专用 app wrapper。engine 提供通用
+  `raylib_lite_game_app_t` 和 `raylib_lite_game_app_run()`；产品仓库中的
+  `sky_hop_app_create()`、`shooter_app_create()`、`tower_app_create()` 把产品资源、
+  持久化和生命周期策略组装成该通用配置，再交给 board launcher。Engine 留下
+  的 `game_module.c` 用于 Host 生命周期和输入映射。本仓库不提供隐式选择 Mosaico
+  板卡的兼容入口。
 
 项目根目录用 `game.sim.json` 声明 Host 要编译的源码。Host 只认这两个字段：
 
@@ -46,7 +50,9 @@
 [`mosaico_host_game.h`](../host/include/mosaico_host_game.h) 里的 `tick_hz`。
 浏览器预览会监视 `main/*.[ch]`、`game.sim.json` 和 `assets_src` 并热重载。
 
-CMake 能力选择见示例工程和 [mosaico_game_sdk.cmake](../cmake/mosaico_game_sdk.cmake)。
+ESP-IDF 组件能力选择由 engine 的
+`cmake/raylib_lite_esp.cmake` 提供。engine 不包含 IDF 工程集成 helper；三条构建
+路径与调用方式见[构建矩阵](build-matrix.zh-CN.md)。
 兼容 API 以 [mosaico_raylib_fast.h](../components/mosaico_raylib_fast/include/mosaico_raylib_fast.h)
 为准，不把完整桌面 Raylib 的能力视为设备已支持的能力。
 
@@ -83,22 +89,15 @@ python3 tools/game_cli.py sim examples/tower_defense --headless \
 
 回放事件使用非负、递增或相同的 `frame` 序号。
 
-## 构建与真机验证
+## 产品集成与真机验证
 
-示例是普通 ESP-IDF 工程，不经过 ESP-Iris 或 Recovery。板级支持由组件管理器从
-https://github.com/esp-mosaico/esp-mosaico-bsp.git 拉取。GSP 场景编译器可选
-`MOSAICO_GAME_GSPC_FETCHER`，或 PATH 上的 `gspc` / `gspc-dev`，版本对齐
-espressif/esp-gsp 1.4.0。
+仓内示例不再是 ESP-IDF 工程，不能直接 `idf.py -C examples/<name>` 构建或烧录。
+产品仓库选择 board adapter，构造 video/clock/input/audio backend，通过产品专用
+`*_app_create()` 组装通用 app 配置，并复用玩法/view 源码。当前 Mosaico 集成和
+真机配置以 `esp-mosaico-vibe` 为准。
 
-16MB flash 上 `factory` 为 5MB（`0x20000`），以便 `idf.py flash` 装下
-Living Worlds（约 3.8MB）和 Last Zone（约 2.1MB）。带 `game_assets` 的示例把
-该分区留在 `0xf00000`。
-
-```sh
-idf.py -C examples/sky_hop set-target esp32s31 build flash monitor
-# 或
-python3 tools/game_cli.py build examples/sky_hop
-```
+兼容 launcher 的退场范围和 Wave B/C 清单见
+[Mosaico launcher 退场计划](platform-mosaico-launcher-retirement.zh-CN.md)。
 
 Sky Hop 的固定场景和性能矩阵见 [Sky Hop 性能测试](sky-hop-performance.zh-CN.md)。
 2.5D 射线柱 / 体积网格 / INDEX8 房间对照见

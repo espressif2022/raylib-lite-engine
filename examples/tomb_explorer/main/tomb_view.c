@@ -2,14 +2,10 @@
 #include "tomb_view.h"
 #include "assets_ids.h"
 #include "mosaico_raylib_fast.h"
+#include "raylib_lite_clock.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#if defined(ESP_PLATFORM)
-#include "esp_timer.h"
-#else
-#include <time.h>
-#endif
 
 #define NEAR_Z 0.12f
 #define FOV 1.25f
@@ -56,11 +52,7 @@ typedef struct {
 
 static uint64_t view_now_us(void)
 {
-#if defined(ESP_PLATFORM)
-    return (uint64_t)esp_timer_get_time();
-#else
-    return (uint64_t)clock()*1000000ULL/(uint64_t)CLOCKS_PER_SEC;
-#endif
+    return raylib_lite_time_us();
 }
 
 static tomb_xf_t xf_mul(tomb_xf_t a, tomb_xf_t b)

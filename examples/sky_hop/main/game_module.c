@@ -1,10 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <stdio.h>
-#include "host_asset_runtime.h"
+#if defined(MOSAICO_GAME_ELF)
 #include "mosaico_game_module.h"
+#include "mosaico_runtime_v1.h"
+#else
+#include "mosaico_game_module.h"
+#if !defined(MOSAICO_GAME_NATIVE)
+#include "host_asset_runtime.h"
+#endif
+#endif
 #include "mosaico_raylib_fast.h"
 #include "platform_game.h"
 #include "sky_hop_view.h"
+
+#if defined(MOSAICO_GAME_ELF)
+#define SKY_HOP_ABI MOSAICO_HOST_GAME_ABI
+#else
+#define SKY_HOP_ABI MOSAICO_HOST_GAME_ABI_V1
+#endif
 
 typedef struct {
     platform_game_t game;
@@ -28,14 +41,22 @@ static sky_hop_view_t view_of(sky_hop_module_state_t *state)
     };
 }
 
-static int initialize(void *value, const char *asset_root)
+static int initialize(void *value
+#if !defined(MOSAICO_GAME_ELF)
+                      , const char *asset_root
+#endif
+)
 {
     sky_hop_module_state_t *state = value;
+#if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
     mosaico_host_assets_set_root(asset_root);
+#endif
     state->atlas = LoadMosaicoAtlas("tower.atlas");
     if (!state->atlas.texture.id) return -1;
+#if !defined(MOSAICO_GAME_NATIVE)
     InitWindow(480, 480, "Sky Hop");
     SetTargetFPS(30);
+#endif
     platform_game_reset(&state->game);
     mosaico_particle_pool_init(&state->pool, state->particles, SKY_HOP_PARTICLE_COUNT);
     sky_hop_overlay_sync(&state->overlay, state->game.phase);
@@ -121,14 +142,23 @@ static int state_json(const void *value, char *output, size_t capacity)
 }
 
 static const mosaico_game_module_v1_t s_module = {
-    .descriptor = {MOSAICO_HOST_GAME_ABI_V1, "sky_hop", "Sky Hop", 480, 480, 30, 2},
+    .descriptor = {SKY_HOP_ABI, "sky_hop", "Sky Hop", 480, 480, 30, 2},
     .state_size = sizeof(sky_hop_module_state_t),
     .initialize = initialize, .shutdown = shutdown, .input = input,
     .update = update, .render = render, .state_hash = state_hash,
     .state_json = state_json,
 };
 
+#if defined(MOSAICO_GAME_ELF)
+MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
+mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+{
+    g_mosaico_rt = runtime;
+    return &s_module;
+}
+#else
 const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
 {
     return &s_module;
 }
+#endif

@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "esp_err.h"
+#include "../../raylib_lite_platform/include/raylib_lite_compat.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

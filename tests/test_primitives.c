@@ -7,7 +7,7 @@
 #include <string.h>
 #include <time.h>
 #include "mosaico_raylib_fast.h"
-#include "mosaico_raylib_port.h"
+#include "raylib_lite_host_video.h"
 
 #define W 480
 #define STRIDE 487
@@ -34,9 +34,12 @@ static void draw(int kind, int x, int y, int r, Color c)
 
 int main(void)
 {
-    mosaico_host_raylib_set_target(pixels,STRIDE,W,W);
+    assert(raylib_lite_host_video_set_target(pixels,STRIDE,W,W) ==
+           RAYLIB_LITE_OK);
     InitWindow(W,W,"primitive regression");
     BeginDrawing();
+    assert(MosaicoFastGetLastAcquireResult() == RAYLIB_LITE_OK);
+    assert(MosaicoFastGetLastPresentResult() == RAYLIB_LITE_NOT_READY);
     for (int kind=0;kind<4;++kind) for (int trial=0;trial<256;++trial) {
         for (int i=0;i<STRIDE*W;++i) pixels[i]=reference[i]=(uint16_t)(i*997U+trial);
         int cx=(trial*37)%600-60,cy=(trial*53)%600-60,r=trial%101;
@@ -69,5 +72,9 @@ int main(void)
                (double)(clock()-start)*1000/CLOCKS_PER_SEC/500);
     }
     EndDrawing();
+    assert(MosaicoFastGetLastPresentResult() == RAYLIB_LITE_OK);
+    assert(fabs(MosaicoFastGetTime() - 1.0 / 30.0) < 0.000001);
+    raylib_lite_host_video_clear_target();
+    raylib_lite_host_video_shutdown();
     return 0;
 }

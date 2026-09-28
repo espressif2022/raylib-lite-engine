@@ -3,26 +3,26 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include "esp_err.h"
-#include "esp_gsp.h"
-#include "mosaico_game.h"
+#include "raylib_lite_video.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-esp_err_t mosaico_raylib_port_init(esp_gsp_handle_t gsp, uint16_t canvas_bind);
+raylib_lite_result_t mosaico_raylib_port_init_backend(
+    const raylib_lite_video_backend_t *backend);
 void mosaico_raylib_port_deinit(void);
-esp_err_t mosaico_raylib_port_copy_latest(uint16_t *out_pixels,
-                                          size_t pixel_capacity);
-esp_err_t mosaico_raylib_port_begin_frame(uint16_t **out_pixels,
-                                          size_t *out_stride_pixels);
-mosaico_game_frame_result_t mosaico_raylib_port_try_begin_frame(
+
+raylib_lite_result_t mosaico_raylib_port_begin_frame(
     uint16_t **out_pixels, size_t *out_stride_pixels);
-esp_err_t mosaico_raylib_port_present_frame(void);
-void mosaico_raylib_port_display_flush(const uint16_t *pixels, uint16_t x,
-                                       uint16_t y, uint16_t width,
-                                       uint16_t height);
+raylib_lite_result_t mosaico_raylib_port_present_frame(void);
+void mosaico_raylib_port_discard_frame(void);
+raylib_lite_result_t mosaico_raylib_port_last_acquire_result(void);
+raylib_lite_result_t mosaico_raylib_port_last_present_result(void);
+
+raylib_lite_result_t mosaico_raylib_port_flush(uint32_t timeout_ms);
+raylib_lite_result_t mosaico_raylib_port_copy_latest(
+    uint16_t *out_pixels, size_t pixel_capacity);
 void mosaico_raylib_port_get_dimensions(uint16_t *width, uint16_t *height);
 
 #ifdef __cplusplus

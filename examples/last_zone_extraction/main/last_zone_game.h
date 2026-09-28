@@ -99,7 +99,8 @@ typedef struct {
     bool left, right, forward, backward, fire_held, fire_pressed, fire_released, best_updated;
     bool last_pickup,last_alert,sprinting,sprint_held,holding_breath;
     bool spotted,barrel_used,armor_hit,last_blast;
-    uint8_t sfx,sfx_hold,step_beat;
+    uint8_t sfx,sfx_hold,step_beat,step_ticks;
+    uint32_t sfx_serial;
     last_zone_fire_result_t last_fire;
     float move_forward, move_strafe, turn_input;
     float perf_logic_fps,perf_display_fps,perf_render_ms;

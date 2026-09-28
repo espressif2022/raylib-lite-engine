@@ -1,12 +1,6 @@
 dependencies:
-  idf: ">=6.1"
+  idf: ">=6.2"
   georgik/raylib: "==6.0.0~2"
-  espressif/esp-gsp: "==1.4.0"
   espressif/esp_mmap_assets: "^2.0.0"
-  lvgl/lvgl:
-    # Keep esp_lvgl_adapter compatible.
-    version: "==9.5.0"
-  esp-mosaico-bsp:
-    git: https://github.com/esp-mosaico/esp-mosaico-bsp.git
-    path: components/esp-mosaico-bsp
-    version: master
+  espressif/esp_display_present: "==1.0.2"
+  lvgl/lvgl: "==9.5.0"

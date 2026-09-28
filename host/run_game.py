@@ -179,7 +179,9 @@ class GenericHostRuntime:
         sources = [
             *project_sources,
             ENGINE_ROOT / "host/host_module_bridge.c",
-            ENGINE_ROOT / "host/host_raylib_port.c",
+            ENGINE_ROOT / "host/host_video_backend.c",
+            ENGINE_ROOT / "host/host_clock.c",
+            ENGINE_ROOT / "components/mosaico_raylib_port/mosaico_raylib_port.c",
             ENGINE_ROOT / "host/host_asset_runtime.c",
             ENGINE_ROOT / "components/mosaico_game_2d/mosaico_game_2d.c",
             ENGINE_ROOT / "components/mosaico_game_2d/mosaico_rgb565.c",
@@ -188,6 +190,8 @@ class GenericHostRuntime:
             ENGINE_ROOT / "components/mosaico_game_tilemap/mosaico_game_tilemap.c",
         ]
         includes = [ENGINE_ROOT / "host/include", ENGINE_ROOT / "host",
+                    ENGINE_ROOT / "components/mosaico_raylib_port/include",
+                    ENGINE_ROOT / "components/raylib_lite_platform/include",
                     ENGINE_ROOT / "components/mosaico_game_assets/include",
                     ENGINE_ROOT / "components/mosaico_game_2d/include",
                     ENGINE_ROOT / "components/mosaico_raylib_fast/include",
@@ -458,7 +462,7 @@ img{width:480px;height:480px;max-width:100%;aspect-ratio:1/1;object-fit:contain;
 #state{margin-top:10px;color:#9ee;white-space:pre-wrap;height:4.8em;overflow:hidden;line-height:1.35}
 .hint{color:#fff;margin-top:8px}.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}button,select{background:#17364b;color:#dff;border:1px solid #299fad;border-radius:6px;padding:6px 10px}
 </style></head><body><main><div class=tools><button id=pause>Pause</button><button id=step>Step</button><button id=reset>Reset</button><button id=shot>Screenshot</button><button id=record>Record</button><select id=speed><option>.25</option><option>.5</option><option selected>1</option><option>2</option></select></div><img id=screen tabindex=0 draggable=false><div id=state></div>
-<div class=hint>Keyboard: A/D turn, W/S walk, Shift sprint, Q/E strafe, F fire · Touch: left stick, right look, FIRE ring</div></main>
+<div class=hint id=hint>Keyboard controls depend on the running game.</div></main>
 <script>
 const held=new Set(), pointers=new Map(), img=document.querySelector('#screen'), state=document.querySelector('#state'), sfxCache={};
 let busy=false, phase='start',paused=false,armedSfx='';
@@ -480,6 +484,7 @@ async function control(command){await fetch('/api/v1/control',{method:'POST',hea
 async function tick(){if(busy)return;busy=true;
  try{const res=await fetch('/api/v1/frame');const meta=JSON.parse(res.headers.get('X-Mosaico-State'));const blob=await res.blob();
  phase=meta.phase;if(meta.sfx&&meta.sfx!==armedSfx)playSfx(meta.sfx);armedSfx=meta.sfx||'';const old=img.src,url=URL.createObjectURL(blob);img.onload=()=>{if(old.startsWith('blob:'))URL.revokeObjectURL(old);img.onload=null};img.src=url;
+ document.querySelector('#hint').textContent=meta.game_id==='neon_rift_rally'?'Keyboard: A/D steer · W throttle · S brake · Space nitro · Shift drift · Enter restart':'Keyboard: A/D move · W/Space action · S back · Shift sprint · Q/E strafe · F fire';
  paused=meta.simulation.paused;const fields=Object.entries(meta).filter(([k])=>!['simulation','reload_error','title'].includes(k)).map(([k,v])=>`${k}=${v}`).join('  ');
  state.textContent=`${meta.title||meta.game_id||'Mosaico game'}\nLogic ${meta.simulation.logic_fps.toFixed(1)} Hz  Raster ${meta.host_render_ms.toFixed(2)} ms  PNG ${meta.host_encode_ms.toFixed(2)} ms\n${fields}`}
  finally{busy=false}}

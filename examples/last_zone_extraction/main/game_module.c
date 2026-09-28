@@ -5,21 +5,71 @@
 #include <stdlib.h>
 #include <time.h>
 #include "mosaico_game_module.h"
+#if !defined(MOSAICO_GAME_NATIVE)
 #include "host_asset_runtime.h"
+#endif
 #include "mosaico_raylib_fast.h"
 #include "last_zone_game.h"
 #include "last_zone_view.h"
+#if defined(MOSAICO_GAME_NATIVE)
+#include "mosaico_game_audio.h"
+#include "native_feedback.h"
+#endif
 
 typedef struct {
     last_zone_game_t game;
-    MosaicoAtlas enemies,weapon,environment,materials,controls,props;
+    MosaicoAtlas enemies,weapon,environment,floor,controls,props;
+    MosaicoWallAtlas walls;
     bool paused,left,right,forward,backward,fire,sprint,strafe_left,strafe_right;
     int32_t joystick_track,look_track,fire_track,radar_track,look_x,look_y;
     int32_t radar_dx,radar_dy,stick_x,stick_y;
     float move_forward,move_strafe;
+#if defined(MOSAICO_GAME_NATIVE)
+    Sound sounds[12];
+    Music music;
+    uint32_t played_sfx_serial;
+#endif
 } last_zone_module_t;
 
 #define JOYSTICK_RADIUS 64
+
+#if defined(MOSAICO_GAME_NATIVE)
+static const char *const SFX_PATHS[12]={NULL,"rifle.sound","impact.sound",
+    "empty.sound","confirm.sound","alert.sound","pickup.sound","step_l.sound",
+    "step_r.sound","hurt.sound","explode.sound","extract.sound"};
+
+static void feedback_init(last_zone_module_t *state)
+{
+    InitAudioDevice();
+    if(IsAudioDeviceReady()){
+        for(unsigned i=1;i<12;++i)state->sounds[i]=LoadSound(SFX_PATHS[i]);
+        state->music=LoadMusicStream("music.sound");
+        SetMusicVolume(state->music,.20f);
+        PlayMusicStream(state->music);
+    }
+    mosaico_native_feedback_init();
+}
+
+static void feedback_event(last_zone_module_t *state)
+{
+    const uint8_t cue=state->game.sfx;
+    if(!cue||cue>=12||state->played_sfx_serial==state->game.sfx_serial)return;
+    state->played_sfx_serial=state->game.sfx_serial;
+    if(state->sounds[cue].frameCount)PlaySound(state->sounds[cue]);
+    switch(cue){
+    case 1: mosaico_native_feedback_pattern(82,28,38,18,24);break;
+    case 3: mosaico_native_feedback_pulse(24,24);break;
+    case 4: mosaico_native_feedback_pulse(42,38);break;
+    case 6: mosaico_native_feedback_pattern(25,24,36,24,28);break;
+    case 7:
+    case 8: mosaico_native_feedback_pulse(16,16);break;
+    case 9: mosaico_native_feedback_pulse(78,85);break;
+    case 10:mosaico_native_feedback_pattern(100,90,72,32,115);break;
+    case 11:mosaico_native_feedback_pattern(48,55,72,45,90);break;
+    default:break;
+    }
+}
+#endif
 
 static void update_joystick(last_zone_module_t *state,int x,int y)
 {
@@ -53,17 +103,23 @@ static void clear_tracks(last_zone_module_t *state)
 static int initialize(void *value,const char *asset_root)
 {
     last_zone_module_t *state=value;
+#if !defined(MOSAICO_GAME_NATIVE)
     mosaico_host_assets_set_root(asset_root);
+#endif
     state->enemies=LoadMosaicoAtlas("enemy.atlas");
     state->weapon=LoadMosaicoAtlas("weapon.atlas");
     state->controls=LoadMosaicoAtlas("controls.atlas");
     state->environment=LoadMosaicoAtlas("environment.atlas");
-    state->materials=LoadMosaicoAtlas("materials.atlas");
+    state->floor=LoadMosaicoAtlas("floor.atlas");
+    state->walls=LoadMosaicoWallAtlas("walls.wall");
     state->props=LoadMosaicoAtlas("props.atlas");
     if(!state->enemies.texture.id||!state->weapon.texture.id||!state->controls.texture.id||
        !state->environment.texture.id||
-       !state->materials.texture.id||!state->props.texture.id)return -1;
+       !state->floor.texture.id||!state->walls.descriptor||!state->props.texture.id)return -1;
     last_zone_reset(&state->game);
+#if defined(MOSAICO_GAME_NATIVE)
+    feedback_init(state);
+#endif
     const char *layout=getenv("LAST_ZONE_SIM_LAYOUT");
     if(layout){
         int selected=atoi(layout);
@@ -73,13 +129,25 @@ static int initialize(void *value,const char *asset_root)
         }
     }
     clear_tracks(state);
-    InitWindow(480,480,"Last Zone: Extraction");SetTargetFPS(30);return 0;
+#if !defined(MOSAICO_GAME_NATIVE)
+    InitWindow(480,480,"Last Zone: Extraction");SetTargetFPS(30);
+#endif
+    return 0;
 }
 static void shutdown(void *value){last_zone_module_t *state=value;if(state){
+#if defined(MOSAICO_GAME_NATIVE)
+    mosaico_native_feedback_stop();
+    if(IsAudioDeviceReady()){
+        StopMusicStream(state->music);UnloadMusicStream(state->music);
+        for(unsigned i=1;i<12;++i)if(state->sounds[i].frameCount)UnloadSound(state->sounds[i]);
+        CloseAudioDevice();
+    }
+#endif
     UnloadMosaicoAtlas(state->enemies);UnloadMosaicoAtlas(state->weapon);
     UnloadMosaicoAtlas(state->controls);
     UnloadMosaicoAtlas(state->environment);
-    UnloadMosaicoAtlas(state->materials);
+    UnloadMosaicoAtlas(state->floor);
+    UnloadMosaicoWallAtlas(state->walls);
     UnloadMosaicoAtlas(state->props);}}
 static void input(void *value,const mosaico_host_input_v1_t *event)
 {
@@ -157,11 +225,15 @@ static void update(void *value)
     last_zone_set_fire_held(&state->game,state->fire||state->fire_track>=0);
     if(state->look_track<0)last_zone_settle_look(&state->game);
     last_zone_update(&state->game);
+#if defined(MOSAICO_GAME_NATIVE)
+    feedback_event(state);
+    UpdateMusicStream(state->music);
+#endif
 }
 static int render(void *value){last_zone_module_t *state=value;
     struct timespec started,ended;timespec_get(&started,TIME_UTC);
     last_zone_view_render(&state->game,state->enemies,state->weapon,state->environment,
-                          state->materials,state->controls,state->props);
+                          state->floor,state->walls,state->controls,state->props);
     timespec_get(&ended,TIME_UTC);
     float elapsed=(float)(ended.tv_sec-started.tv_sec)*1000.0f+
                   (float)(ended.tv_nsec-started.tv_nsec)/1000000.0f;

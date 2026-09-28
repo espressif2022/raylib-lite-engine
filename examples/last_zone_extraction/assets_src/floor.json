@@ -1,0 +1,11 @@
+{
+  "image": "tactical_materials.png",
+  "columns": 4,
+  "rows": 1,
+  "output_columns": 1,
+  "output_cell": 128,
+  "alpha_mode": "opaque",
+  "frames": [
+    {"name": "floor_dirt", "source_index": 3}
+  ]
+}

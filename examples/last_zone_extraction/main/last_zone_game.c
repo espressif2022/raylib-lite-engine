@@ -658,6 +658,7 @@ static void emit_sfx(last_zone_game_t *game,uint8_t id)
 {
     game->sfx=id;
     game->sfx_hold=5;
+    ++game->sfx_serial;
 }
 
 const char *last_zone_sfx_name(const last_zone_game_t *game)
@@ -797,11 +798,17 @@ void last_zone_update(last_zone_game_t *game)
         wish_x=(cosf(game->angle)*forward-sinf(game->angle)*strafe)*speed;
         wish_y=(sinf(game->angle)*forward+cosf(game->angle)*strafe)*speed;
         game->move_phase+=game->sprinting?.62f:.44f*length;
-        uint8_t beat=(uint8_t)(game->move_phase);
-        if(beat!=game->step_beat){
-            game->step_beat=beat;
-            if(!game->sfx)emit_sfx(game,(uint8_t)(7U+(beat&1U)));
+        /* Audio cadence is independent of the visual bob phase. The previous
+         * integer phase crossing produced up to 13 step events/s, most of
+         * which were hidden by sfx_hold and sounded intermittent. */
+        if(game->step_ticks)--game->step_ticks;
+        if(!game->step_ticks&&!game->sfx){
+            game->step_beat^=1U;
+            emit_sfx(game,(uint8_t)(7U+game->step_beat));
+            game->step_ticks=game->sprinting?8U:12U;
         }
+    }else{
+        game->step_ticks=0;
     }
     if(game->sprinting)game->look_kick+=sinf(game->move_phase)*2.4f;
     game->vel_x=game->vel_x*.18f+wish_x*.82f;

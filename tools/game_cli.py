@@ -32,9 +32,11 @@ def _inside_any(value: str, *roots: Path) -> Path:
         project = None
         for root in roots:
             resolved = (root / candidate).resolve()
-            if (resolved / "CMakeLists.txt").is_file() or project is None:
+            if ((resolved / "game.sim.json").is_file() or
+                    (resolved / "CMakeLists.txt").is_file() or project is None):
                 project = resolved
-                if (resolved / "CMakeLists.txt").is_file():
+                if ((resolved / "game.sim.json").is_file() or
+                        (resolved / "CMakeLists.txt").is_file()):
                     break
         assert project is not None
     for root in roots:
@@ -67,11 +69,14 @@ def _parser() -> argparse.ArgumentParser:
         sim.add_argument("--port", type=int, default=8460)
         sim.add_argument("--scenario", "--replay", dest="replay")
         sim.add_argument("--state-output")
-    build = commands.add_parser("build", help="Build the game as ESP-IDF firmware")
+    build = commands.add_parser("build", help="Build an external native firmware or ELF project")
     build.add_argument("project", nargs="?")
     build.add_argument("--project", dest="project_option")
+    build.add_argument("--target", choices=("native", "elf"), default="native")
+    build.add_argument("--build-dir", help="Build output directory (default: PROJECT/build)")
+    build.add_argument("--toolchain", help="CMake toolchain file for an ELF module")
     build.add_argument("--clean", action="store_true",
-                       help="Discard the generated ESP-IDF build directory first")
+                       help="Discard the matching generated CMake build directory first")
     build.add_argument("--idf-path", help="ESP-IDF checkout to use for this build")
     return parser
 
@@ -81,12 +86,13 @@ def _selected_project(parser: argparse.ArgumentParser, arguments: argparse.Names
     value = arguments.project_option or arguments.project
     if not value:
         parser.error("a project path is required")
-    try:
-        project = _inside_any(value, repository, ENGINE_ROOT)
-    except ValueError as error:
-        parser.error(str(error))
-    if not (project / "CMakeLists.txt").is_file():
-        parser.error(f"not a Raylib Lite Engine game project: {project}")
+    # Projects belong to the caller, including standalone product and module
+    # repositories. Only template creation is restricted to workspace roots.
+    candidate = Path(value).expanduser()
+    project = candidate.resolve() if candidate.is_absolute() else (repository / candidate).resolve()
+    required = "game.sim.json" if arguments.command in {"sim", "run"} else "CMakeLists.txt"
+    if not (project / required).is_file():
+        parser.error(f"game project is missing {required}: {project}")
     return project
 
 
@@ -108,7 +114,7 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
         parser.error(f"project already exists: {destination}")
     source_name = TEMPLATES[arguments.template]
     source = ENGINE_ROOT / "examples" / source_name
-    if not (source / "CMakeLists.txt").is_file():
+    if not (source / "game.sim.json").is_file():
         parser.error(f"template missing: {source}")
     shutil.copytree(source, destination, ignore=shutil.ignore_patterns(
         "build", "build-*", "managed_components", "dependencies.lock",
@@ -145,15 +151,47 @@ def _simulate(arguments: argparse.Namespace, project: Path, repository: Path) ->
         return 130
 
 
-def _build(project: Path, clean: bool = False, idf_path: Optional[str] = None) -> int:
+def _build(project: Path, clean: bool = False, idf_path: Optional[str] = None,
+           target: str = "native", build_dir: Optional[str] = None,
+           toolchain: Optional[str] = None) -> int:
     env = os.environ.copy()
+    output = Path(build_dir).expanduser().resolve() if build_dir else project / "build"
+    if output == project or output in project.parents:
+        raise ValueError("build output must not be the project or its parent")
+    cache = output / "CMakeCache.txt"
+    cache_lines = cache.read_text().splitlines() if cache.is_file() else []
+    if clean and output.exists():
+        expected = f"CMAKE_HOME_DIRECTORY:INTERNAL={project}"
+        if expected not in cache_lines:
+            raise ValueError("--clean requires a CMake build directory for this project")
+    if target != "elf" and toolchain:
+        raise ValueError("--toolchain is only supported with --target elf")
+    toolchain_path = None
+    if target == "elf":
+        cached_toolchain = next((line.split("=", 1)[1] for line in cache_lines
+                                 if line.startswith("CMAKE_TOOLCHAIN_FILE:") and "=" in line), None)
+        selected_toolchain = toolchain or cached_toolchain
+        if selected_toolchain:
+            toolchain_path = Path(selected_toolchain).expanduser().resolve()
+            if not toolchain_path.is_file():
+                raise ValueError(f"toolchain file not found: {toolchain_path}")
+        elif clean or not cache_lines:
+            raise ValueError("an initial ELF build requires --toolchain from its module SDK")
+    if clean and output.exists():
+        shutil.rmtree(output)
+    if target == "elf":
+        env.pop("IDF_PATH", None)
+        command = ["cmake", "-S", str(project), "-B", str(output)]
+        if toolchain_path:
+            command.append(f"-DCMAKE_TOOLCHAIN_FILE={toolchain_path}")
+        result = subprocess.call(command, env=env)
+        return result or subprocess.call(["cmake", "--build", str(output)], env=env)
+    env.setdefault("RAYLIB_LITE_ENGINE_ROOT", str(ENGINE_ROOT))
     if idf_path:
         env["IDF_PATH"] = str(Path(idf_path).expanduser().resolve())
-    if clean:
-        shutil.rmtree(project / "build", ignore_errors=True)
-    idf_py = shutil.which("idf.py", path=env.get("PATH"))
+    idf_py = None if idf_path else shutil.which("idf.py", path=env.get("PATH"))
     if idf_py:
-        command = [idf_py, "-C", str(project), "build"]
+        command = [idf_py, "-C", str(project), "-B", str(output), "build"]
     else:
         idf_root = env.get("IDF_PATH")
         if not idf_root:
@@ -164,7 +202,8 @@ def _build(project: Path, clean: bool = False, idf_path: Optional[str] = None) -
         if not idf_script.is_file():
             print(f"game_cli: idf.py not found: {idf_script}", file=sys.stderr)
             return 3
-        command = [sys.executable, str(idf_script), "-C", str(project), "build"]
+        command = [sys.executable, str(idf_script), "-C", str(project),
+                   "-B", str(output), "build"]
     return subprocess.call(command, env=env)
 
 
@@ -176,7 +215,12 @@ def main(argv: Optional[Sequence[str]] = None, *, repository: Path) -> int:
     project = _selected_project(parser, arguments, repository)
     if arguments.command in {"sim", "run"}:
         return _simulate(arguments, project, repository)
-    return _build(project, arguments.clean, arguments.idf_path)
+    try:
+        return _build(project, arguments.clean, arguments.idf_path,
+                      arguments.target, arguments.build_dir, arguments.toolchain)
+    except (ValueError, OSError) as error:
+        print(f"game_cli: {error}", file=sys.stderr)
+        return 3
 
 
 if __name__ == "__main__":

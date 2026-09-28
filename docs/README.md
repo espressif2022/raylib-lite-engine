@@ -2,15 +2,18 @@
 
 [返回 README](../README.md)
 
-本仓库是独立的游戏运行时，不依赖 ESP-Iris 或 ESP-Mosaico Vibe。Host 仿真和
-真机烧录都在本仓库完成。
+本仓库是独立的游戏运行时，不依赖 ESP-Iris 或 ESP-Mosaico Vibe。仓内参考游戏
+用于 Host 仿真；真机工程、板级配置和烧录由外部产品仓库负责。
 
 | 要做的事 | 文档 |
 | --- | --- |
-| Host 仿真、`game.sim.json`、真机 `idf.py` | [游戏开发：从 Host 仿真到真机](game-development.zh-CN.md) |
+| Host 仿真、`game.sim.json`、产品真机集成 | [游戏开发：从 Host 仿真到真机](game-development.zh-CN.md) |
 | Host ABI、热重载、回放事件 | [Host 仿真](../host/README.md) |
+| ESP-IDF native、设备 ELF、PC Host 三条构建路径 | [构建矩阵与平台边界](build-matrix.zh-CN.md) |
 | 选示例、复制工程 | [examples](../examples/README.md) |
 | 组件职责与启动顺序 | [components](../components/README.md) |
+| 平台壳从引擎拆出（设计历史与当前状态） | [平台拆分](platform-split.zh-CN.md) |
+| 旧 Mosaico launcher 与设备示例退场 | [launcher 退场结果](platform-mosaico-launcher-retirement.zh-CN.md) |
 | 2.5D / 2D 绘制对照 | [游戏绘制总表](game-drawing-inventory.zh-CN.md) |
 | 墙和 micropixel 的重合度、不超预算的画法 | [墙体绘制方案](wall-rendering-design.zh-CN.md) |
 | Living Worlds 四场景优化 | [Living Worlds 优化](living-worlds-optimization.zh-CN.md) |

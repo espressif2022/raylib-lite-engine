@@ -3,8 +3,14 @@
 #include <math.h>
 #include <stdio.h>
 #include "mosaico_game_module.h"
+#if !defined(MOSAICO_GAME_NATIVE)
 #include "host_asset_runtime.h"
+#endif
 #include "mosaico_raylib_fast.h"
+#if defined(MOSAICO_GAME_NATIVE)
+#include "mosaico_game.h"
+#include "native_feedback.h"
+#endif
 #include "tomb_game.h"
 #include "tomb_view.h"
 
@@ -48,14 +54,21 @@ static void clear_tracks(tomb_module_t *state)
 static int initialize(void *value, const char *asset_root)
 {
     tomb_module_t *state=value;
+#if !defined(MOSAICO_GAME_NATIVE)
     mosaico_host_assets_set_root(asset_root);
+#endif
     state->textures=LoadMosaicoWallAtlas("textures.wall");
     state->controls=LoadMosaicoAtlas("controls.atlas");
     if(!state->textures.descriptor||!state->controls.texture.id)return -1;
     tomb_reset(&state->game);
     clear_tracks(state);
+#if defined(MOSAICO_GAME_NATIVE)
+    mosaico_native_feedback_init();
+#endif
+#if !defined(MOSAICO_GAME_NATIVE)
     InitWindow(480,480,"Tomb Explorer");
     SetTargetFPS(30);
+#endif
     return 0;
 }
 
@@ -63,6 +76,9 @@ static void shutdown(void *value)
 {
     tomb_module_t *state=value;
     if(!state)return;
+#if defined(MOSAICO_GAME_NATIVE)
+    mosaico_native_feedback_stop();
+#endif
     UnloadMosaicoWallAtlas(state->textures);
     UnloadMosaicoAtlas(state->controls);
 }
@@ -127,18 +143,36 @@ static void update(void *value)
     if(state->left||state->right)
         tomb_set_look(&state->game,((state->right?1.0f:0.0f)-(state->left?1.0f:0.0f))*0.06f,0.0f);
     tomb_set_jump(&state->game,state->jump||state->jump_track>=0);
+#if defined(MOSAICO_GAME_NATIVE)
+    const bool was_grounded=state->game.grounded;
+    const float fall_speed=state->game.vertical_speed;
+#endif
     tomb_update(&state->game);
+#if defined(MOSAICO_GAME_NATIVE)
+    if(was_grounded&&!state->game.grounded&&state->game.vertical_speed>0.0f)
+        mosaico_native_feedback_pulse(34,34);
+    else if(!was_grounded&&state->game.grounded){
+        const uint8_t strength=fall_speed<-3.0f?72:45;
+        mosaico_native_feedback_pattern(strength,42,(uint8_t)(strength/2),18,28);
+    }
+#endif
 }
 
 static int render(void *value)
 {
     tomb_module_t *state=value;
+    float display_fps=(float)GetFPS();
+#if defined(MOSAICO_GAME_NATIVE)
+    mosaico_game_stats_t stats;
+    MosaicoGameGetStats(&stats);
+    display_fps=stats.display_fps;
+#endif
     tomb_hud_input_t input={
         .stick_active=state->joystick_track>=0,
         .jump_active=state->jump||state->jump_track>=0,
         .stick_x=state->stick_x,
         .stick_y=state->stick_y,
-        .display_fps=(float)GetFPS(),
+        .display_fps=display_fps,
     };
     tomb_view_render(&state->game,state->textures,state->controls,&input);
     return 0;

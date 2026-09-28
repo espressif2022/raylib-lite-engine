@@ -5,6 +5,9 @@
 `host/run_game.py` 把示例的玩法/绘制 C 源码编成本机共享库，按 RGB565 出帧。
 浏览器只显示这帧。入口是仓库根目录的 `python3 tools/game_cli.py sim`。
 
+Host 显示实现通过 `raylib_lite_video_backend_t` 接入通用 framebuffer port；
+调用方仍通过 v1 Host ABI 提供 RGB565 缓冲区，因此现有回放、截图和校验值接口不变。
+
 需要主机 `cc`/`gcc`/`clang` 和 Pillow。不需要 ESP-IDF、ESP-Iris、GSP 场景编译器
 或 `tools/gsp-sim`。
 

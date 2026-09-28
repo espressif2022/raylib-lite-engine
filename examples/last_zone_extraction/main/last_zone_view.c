@@ -2,11 +2,8 @@
 #include "last_zone_view.h"
 #include <math.h>
 #include <stdlib.h>
-#include <time.h>
-#ifdef ESP_PLATFORM
-#include "esp_timer.h"
-#endif
 #include "assets_ids.h"
+#include "raylib_lite_clock.h"
 #include "mosaico_raylib_fast.h"
 #include "mosaico_rgb565.h"
 
@@ -78,13 +75,7 @@ static const MosaicoSpriteFrame *s_material_frames[4];
 
 static int64_t view_now_us(void)
 {
-#ifdef ESP_PLATFORM
-    return esp_timer_get_time();
-#else
-    struct timespec ts;
-    timespec_get(&ts, TIME_UTC);
-    return (int64_t)ts.tv_sec * 1000000LL + (int64_t)(ts.tv_nsec / 1000);
-#endif
+    return (int64_t)raylib_lite_time_us();
 }
 
 void last_zone_view_get_stats(last_zone_view_stats_t *stats)
@@ -845,7 +836,7 @@ static mosaico_raycast_wall_t wall_column(int screen_x, int dest_y, int width,
         src_x, src_y, src_w, src_h, light, phase, step};
 }
 
-static void draw_walls(const last_zone_game_t *game, MosaicoAtlas materials,
+static void draw_walls(const last_zone_game_t *game, MosaicoWallAtlas walls,
                        const MosaicoSpriteFrame *frames[4])
 {
     float flash = game->weapon_recoil;
@@ -944,7 +935,7 @@ static void draw_walls(const last_zone_game_t *game, MosaicoAtlas materials,
         }
         x += width;
     }
-    if (batch) Mosaico2DDrawRaycastWalls(materials.texture, s_wall_batch, batch);
+    if (batch) Mosaico2DDrawIndexedRaycastWalls(walls, s_wall_batch, batch);
     for (int x = 0; x < LAST_ZONE_SCREEN; ) {
         const last_zone_wall_sample_t *sample = &s_pixels[x];
         int mat = 0;
@@ -957,14 +948,16 @@ static void draw_walls(const last_zone_game_t *game, MosaicoAtlas materials,
     }
 }
 
-static void load_material_frames(MosaicoAtlas materials)
+static void load_material_frames(MosaicoAtlas floor,MosaicoWallAtlas walls)
 {
     static const mosaico_asset_id_t material_ids[] = {MOSAICO_ASSET_ID_WALL_CONCRETE,
         MOSAICO_ASSET_ID_WALL_BRICK, MOSAICO_ASSET_ID_WALL_CONTAINER,
         MOSAICO_ASSET_ID_FLOOR_DIRT};
     for (int i = 0; i < 4; ++i) {
-        if (mosaico_game_2d_atlas_get_frame(materials, material_ids[i],
-                                            &s_material_copies[i]) == ESP_OK)
+        esp_err_t err=i==3?
+            mosaico_game_2d_atlas_get_frame(floor,material_ids[i],&s_material_copies[i]):
+            mosaico_game_2d_wall_atlas_get_frame(walls,material_ids[i],&s_material_copies[i]);
+        if (err == ESP_OK)
             s_material_frames[i] = &s_material_copies[i];
         else
             s_material_frames[i] = NULL;
@@ -1339,13 +1332,13 @@ static void draw_phase_overlay(const last_zone_game_t *game)
 
 void last_zone_view_render(const last_zone_game_t *game, MosaicoAtlas enemies,
                            MosaicoAtlas weapon, MosaicoAtlas environment,
-                           MosaicoAtlas materials, MosaicoAtlas controls,
+                           MosaicoAtlas floor,MosaicoWallAtlas walls,MosaicoAtlas controls,
                            MosaicoAtlas props)
 {
     if (!game) return;
     mosaico_shade_lut_init();
     s_view_stats = (last_zone_view_stats_t){0};
-    load_material_frames(materials);
+    load_material_frames(floor,walls);
     int64_t t0 = view_now_us();
     BeginDrawing();
     int64_t t1 = view_now_us();
@@ -1353,9 +1346,9 @@ void last_zone_view_render(const last_zone_game_t *game, MosaicoAtlas enemies,
     int64_t t2 = view_now_us();
     draw_panorama(game, environment, panorama_height(game));
     int64_t t3 = view_now_us();
-    draw_floor(game, materials, s_material_frames[3] ? s_material_frames[3] : s_material_frames[1]);
+    draw_floor(game, floor, s_material_frames[3]);
     int64_t t4 = view_now_us();
-    draw_walls(game, materials, s_material_frames);
+    draw_walls(game, walls, s_material_frames);
     int64_t t5 = view_now_us();
     int64_t t6 = t5;
     draw_extract(game);

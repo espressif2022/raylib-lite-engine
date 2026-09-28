@@ -294,7 +294,11 @@ def write_wall_atlas(source: Path, manifest: dict, destination: Path) -> dict:
     output_cell = int(manifest.get("output_cell", 64))
     if output_cell <= 0 or output_cell > 65535:
         raise ValueError("invalid wall atlas output_cell")
-    width, height = columns * output_cell, rows * output_cell
+    output_columns = int(manifest.get("output_columns", columns))
+    if output_columns <= 0 or output_columns > len(frames_config):
+        raise ValueError("invalid wall atlas output_columns")
+    output_rows = max(1, math.ceil(len(frames_config) / output_columns))
+    width, height = output_columns * output_cell, output_rows * output_cell
     resampling = getattr(Image, "Resampling", Image)
     if preserve:
         palette = list(raw.getpalette() or [])
@@ -310,7 +314,7 @@ def write_wall_atlas(source: Path, manifest: dict, destination: Path) -> dict:
         if crop.size != (output_cell, output_cell):
             crop = crop.resize((output_cell, output_cell),
                                resampling.NEAREST if preserve else resampling.LANCZOS)
-        col, row = index % columns, index // columns
+        col, row = index % output_columns, index // output_columns
         x, y = col * output_cell, row * output_cell
         atlas.paste(crop, (x, y))
         identifier = asset_id(str(item["name"]))
@@ -388,7 +392,11 @@ def write_wall_atlas(source: Path, manifest: dict, destination: Path) -> dict:
     output_cell = int(manifest.get("output_cell", 64))
     if output_cell <= 0 or output_cell > 65535:
         raise ValueError("invalid wall atlas output_cell")
-    width, height = columns * output_cell, rows * output_cell
+    output_columns = int(manifest.get("output_columns", columns))
+    if output_columns <= 0 or output_columns > len(frames_config):
+        raise ValueError("invalid wall atlas output_columns")
+    output_rows = max(1, math.ceil(len(frames_config) / output_columns))
+    width, height = output_columns * output_cell, output_rows * output_cell
     resampling = getattr(Image, "Resampling", Image)
     if preserve:
         palette = list(raw.getpalette() or [])
@@ -404,7 +412,7 @@ def write_wall_atlas(source: Path, manifest: dict, destination: Path) -> dict:
         if crop.size != (output_cell, output_cell):
             crop = crop.resize((output_cell, output_cell),
                                resampling.NEAREST if preserve else resampling.LANCZOS)
-        col, row = index % columns, index // columns
+        col, row = index % output_columns, index // output_columns
         x, y = col * output_cell, row * output_cell
         atlas.paste(crop, (x, y))
         identifier = asset_id(str(item["name"]))

@@ -2,12 +2,25 @@
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>
-#include "host_asset_runtime.h"
-#include "mosaico_game_2d.h"
+#if defined(MOSAICO_GAME_ELF)
 #include "mosaico_game_module.h"
+#include "mosaico_runtime_v1.h"
+#else
+#include "mosaico_game_module.h"
+#if !defined(MOSAICO_GAME_NATIVE)
+#include "host_asset_runtime.h"
+#endif
+#endif
+#include "mosaico_game_2d.h"
 #include "mosaico_raylib_fast.h"
 #include "shooter_game.h"
 #include "shooter_view.h"
+
+#if defined(MOSAICO_GAME_ELF)
+#define RAYLIB_SHOOTER_ABI MOSAICO_HOST_GAME_ABI
+#else
+#define RAYLIB_SHOOTER_ABI MOSAICO_HOST_GAME_ABI_V1
+#endif
 
 typedef struct {
     shooter_game_t game;
@@ -16,15 +29,23 @@ typedef struct {
     float imu_x, imu_y;
 } shooter_module_state_t;
 
-static int initialize(void *value,const char *asset_root)
+static int initialize(void *value
+#if !defined(MOSAICO_GAME_ELF)
+                      , const char *asset_root
+#endif
+)
 {
     shooter_module_state_t *state=value;
+#if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
     mosaico_host_assets_set_root(asset_root);
+#endif
     state->atlas=LoadMosaicoAtlas("shooter.atlas");
     if(!state->atlas.texture.id)return -1;
     shooter_game_reset(&state->game,0x4d4f5341U);
+#if !defined(MOSAICO_GAME_NATIVE)
     InitWindow(480,480,"Mosaico Strike");
     SetTargetFPS(30);
+#endif
     return 0;
 }
 
@@ -98,11 +119,20 @@ static int state_json(const void *value,char *output,size_t capacity)
 }
 
 static const mosaico_game_module_v1_t s_module={
-    .descriptor={MOSAICO_HOST_GAME_ABI_V1,"raylib_shooter","Mosaico Strike",480,480,30,1},
+    .descriptor={RAYLIB_SHOOTER_ABI,"raylib_shooter","Mosaico Strike",480,480,30,1},
     .state_size=sizeof(shooter_module_state_t),
     .initialize=initialize,.shutdown=shutdown,.input=input,.update=update,.render=render,
     .state_hash=state_hash,.state_json=state_json,
 };
 
+#if defined(MOSAICO_GAME_ELF)
+MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
+mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+{
+    g_mosaico_rt = runtime;
+    return &s_module;
+}
+#else
 const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
 { return &s_module; }
+#endif

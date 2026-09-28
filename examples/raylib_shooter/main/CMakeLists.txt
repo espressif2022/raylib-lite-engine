@@ -1,24 +1,17 @@
+file(GLOB example_sources "${CMAKE_CURRENT_LIST_DIR}/*.c")
 idf_component_register(
-    SRCS "main.c" "shooter_app.c" "shooter_game.c" "shooter_view.c" "game_audio.c"
+    SRCS ${example_sources} "${RAYLIB_LITE_ENGINE_ROOT}/examples/common/native_module_main.c"
     INCLUDE_DIRS "."
-    REQUIRES mosaico_game_app mosaico_game_assets mosaico_game_2d
-             mosaico_raylib_fast mosaico_raylib_port raylib esp-gsp)
-
-set(GAME_ASSET_OUTPUT "${CMAKE_CURRENT_LIST_DIR}/../assets/generated")
-target_add_binary_data(${COMPONENT_LIB} "${GAME_ASSET_OUTPUT}/shooter.atlas" BINARY
-    RENAME_TO shooter_atlas)
-target_include_directories(${COMPONENT_LIB} PRIVATE "${GAME_ASSET_OUTPUT}")
-
-set(canvas_png "${CMAKE_CURRENT_BINARY_DIR}/canvas_480.png")
-execute_process(
-    COMMAND "${PYTHON}" "${CMAKE_CURRENT_LIST_DIR}/make_canvas_png.py" "${canvas_png}"
-    RESULT_VARIABLE canvas_result)
-if(NOT canvas_result EQUAL 0)
-    message(FATAL_ERROR "Could not generate Raylib Canvas placeholder")
+    REQUIRES mosaico_board_platform mosaico_game_app mosaico_game_assets
+             mosaico_game_2d mosaico_raylib_fast mosaico_raylib_port raylib mosaico_game)
+target_include_directories(${COMPONENT_LIB} SYSTEM PRIVATE "${RAYLIB_LITE_ENGINE_ROOT}/host/include")
+target_compile_definitions(${COMPONENT_LIB} PRIVATE MOSAICO_GAME_NATIVE=1)
+if(MOSAICO_NATIVE_IRIS)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE MOSAICO_NATIVE_IRIS=1)
+    target_include_directories(${COMPONENT_LIB} PRIVATE
+        "${MOSAICO_VIBE_PATH}/submodule/esp-mosaico-utils/ESP-Iris/components/esp_iris/include"
+        "${MOSAICO_VIBE_PATH}/components/esp_mosaico_app_recovery/include")
+    target_link_libraries(${COMPONENT_LIB} PRIVATE idf::esp_iris idf::esp_mosaico_app_recovery)
 endif()
-set(CANVAS_IMAGE "${canvas_png}")
-configure_file("${CMAKE_CURRENT_LIST_DIR}/scene.json.in"
-               "${CMAKE_CURRENT_BINARY_DIR}/scene.json" @ONLY)
-gsp_add_bundle(${COMPONENT_LIB}
-    SCENES "${CMAKE_CURRENT_BINARY_DIR}/scene.json"
-    PIXEL_FORMAT rgb565)
+include("${RAYLIB_LITE_ENGINE_ROOT}/cmake/raylib_lite_native_assets.cmake")
+raylib_lite_native_embed_assets("${CMAKE_CURRENT_LIST_DIR}/..")

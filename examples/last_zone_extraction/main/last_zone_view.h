@@ -21,6 +21,6 @@ typedef struct {
 
 void last_zone_view_render(const last_zone_game_t *game,MosaicoAtlas enemies,
                            MosaicoAtlas weapon,MosaicoAtlas environment,
-                           MosaicoAtlas materials,MosaicoAtlas controls,
+                           MosaicoAtlas floor,MosaicoWallAtlas walls,MosaicoAtlas controls,
                            MosaicoAtlas props);
 void last_zone_view_get_stats(last_zone_view_stats_t *stats);

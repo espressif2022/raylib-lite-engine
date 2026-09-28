@@ -13,6 +13,12 @@ The screenshot is a Host RGB565 frame of the Dock mission.
 
 截图为 Dock 关卡的 Host RGB565 画面。
 
+墙体、纹理布局、压缩和真机优化迭代记录见
+[`../../docs/wall-rendering-optimization-history.zh-CN.md`](../../docs/wall-rendering-optimization-history.zh-CN.md)。
+
+原生声音与震动事件链见
+[`../../docs/native-feedback-history.zh-CN.md`](../../docs/native-feedback-history.zh-CN.md)。
+
 ## Play / 玩法
 
 - Tap the briefing to deploy or redeploy. / 点击简报部署或重新部署。
@@ -51,7 +57,6 @@ progress and per-mission bests.
 # Host 仿真：本仓库根目录，主机 C 编译器 + Pillow
 python3 tools/game_cli.py sim examples/last_zone_extraction
 python3 tools/game_cli.py sim examples/last_zone_extraction --headless --frames 90
-
-# 真机：普通 ESP-IDF，idf.py flash 写入 5MB factory
-idf.py -C examples/last_zone_extraction set-target esp32s31 build flash monitor
 ```
+
+本目录可作为 ESP-IDF native 工程构建；直接烧录会替换当前启动器固件。

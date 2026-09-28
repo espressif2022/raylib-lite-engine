@@ -1,10 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <stdio.h>
-#include "host_asset_runtime.h"
+#if defined(MOSAICO_GAME_ELF)
 #include "mosaico_game_module.h"
+#include "mosaico_runtime_v1.h"
+#else
+#include "mosaico_game_module.h"
+#if !defined(MOSAICO_GAME_NATIVE)
+#include "host_asset_runtime.h"
+#endif
+#endif
 #include "mosaico_raylib_fast.h"
 #include "tower_game.h"
 #include "tower_view.h"
+
+#if defined(MOSAICO_GAME_ELF)
+#define TOWER_DEFENSE_ABI MOSAICO_HOST_GAME_ABI
+#else
+#define TOWER_DEFENSE_ABI MOSAICO_HOST_GAME_ABI_V1
+#endif
 
 typedef struct {
     tower_game_t game;
@@ -25,16 +38,24 @@ static tower_view_t view_of(tower_module_state_t *state)
     };
 }
 
-static int initialize(void *value, const char *asset_root)
+static int initialize(void *value
+#if !defined(MOSAICO_GAME_ELF)
+                      , const char *asset_root
+#endif
+)
 {
     tower_module_state_t *state = value;
+#if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
     mosaico_host_assets_set_root(asset_root);
+#endif
     state->atlas = LoadMosaicoAtlas("tower.atlas");
     state->map = LoadMosaicoTilemap("level01.map");
     if (!state->atlas.texture.id || !state->map) return -1;
     (void)tower_view_apply_map(&state->game, state->map);
+#if !defined(MOSAICO_GAME_NATIVE)
     InitWindow(480, 480, "Circuit Keep");
     SetTargetFPS(30);
+#endif
     tower_game_reset(&state->game, 0x544f5745U);
     return 0;
 }
@@ -107,15 +128,15 @@ static int state_json(const void *value, char *output, size_t capacity)
     static const char *phases[] = {"start", "playing", "paused", "game_over"};
     const char *phase = (unsigned)game->phase < 4 ? phases[game->phase] : "unknown";
     return snprintf(output, capacity,
-        "{\"wave\":%u,\"score\":%lu,\"credits\":%u,\"base_hp\":%u,\"kills\":%u,"
+        "{\"wave\":%u,\"score\":%lu,\"credits\":%u,\"base_hp\":%u,\"kills\":%lu,"
         "\"phase\":\"%s\",\"tick\":%lu,\"state_hash\":\"%08lx\"}",
         game->wave, (unsigned long)game->score, game->credits, game->base_hp,
-        game->kills, phase, (unsigned long)game->tick,
+        (unsigned long)game->kills, phase, (unsigned long)game->tick,
         (unsigned long)tower_game_state_hash(game));
 }
 
 static const mosaico_game_module_v1_t s_module = {
-    .descriptor = {MOSAICO_HOST_GAME_ABI_V1, "tower_defense", "Circuit Keep",
+    .descriptor = {TOWER_DEFENSE_ABI, "tower_defense", "Circuit Keep",
                    480, 480, 30, 1},
     .state_size = sizeof(tower_module_state_t),
     .initialize = initialize, .shutdown = shutdown, .input = input,
@@ -123,7 +144,16 @@ static const mosaico_game_module_v1_t s_module = {
     .state_json = state_json,
 };
 
+#if defined(MOSAICO_GAME_ELF)
+MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
+mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+{
+    g_mosaico_rt = runtime;
+    return &s_module;
+}
+#else
 const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
 {
     return &s_module;
 }
+#endif

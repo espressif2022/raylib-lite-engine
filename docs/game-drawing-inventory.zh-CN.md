@@ -16,13 +16,13 @@ micropixel 只作为 Tomb / INDEX8 网格的外部对标，不是所有游戏的
 
 | 路径 | 代表游戏 | 内核入口 | 纹理 |
 |---|---|---|---|
-| 射线柱 | Last Zone | `Mosaico2DDrawIndexedRaycastWalls` + `DrawFloorRows` | MSW1 列主序 `.wall` INDEX8 |
+| 射线柱 | Last Zone | `Mosaico2DDrawIndexedRaycastWalls` + `DrawFloorRows` | 墙为 MSW1 列主序 INDEX8；地板为 RGB565 |
 | RGB565 网格 | Living Worlds | `Mosaico2DDrawTexturedQuad` / `Triangle` | `.atlas` / JPEG→RGB565 |
 | INDEX8 网格 | Tomb Explorer | 目前只用 `Mosaico2DDrawIndexedTexturedTriangle` | MSW2 行主序 `.wall` INDEX8 |
 
 其余游戏（Sky Hop、Tower Defense、Shooter）是 2D Atlas + 代码图元，不走墙柱或网格内核。
 
-引擎里已有凸四边形 INDEX8 扫描线（`Mosaico2DDrawIndexedTexturedQuad`），**没有任何游戏在调用它**。Tomb 拆成三角；Living Worlds 走的是 RGB565 Quad（内部再拆两个仿射三角）。
+Tomb 已使用凸四边形 INDEX8 扫描线（`Mosaico2DDrawIndexedTexturedQuad`）；近裁后产生的非四边形才走三角。Living Worlds 的 RGB565 Quad 也使用单次边链扫描。
 
 ## 2. 共用栈
 
@@ -33,7 +33,7 @@ micropixel 只作为 Tomb / INDEX8 网格的外部对标，不是所有游戏的
        |-- mosaico_game_2d 快路径 (墙柱 / 地板行 / RGB565 三角四边形 / INDEX8 三角四边形)
   -> 480x480 RGB565
        Host: python3 tools/game_cli.py sim -> 浏览器 / PNG
-       设备: PSRAM framebuffer -> GSP Canvas -> LCD
+       设备: PSRAM framebuffer -> esp_display_present 条带提交 -> LCD
 ```
 
 循环：项目 `logic_hz` 固定更新，`target_fps` 限制显示；慢帧丢画面，不加速玩法。未设 `logic_hz` 时默认等于 `target_fps`。
@@ -48,14 +48,14 @@ micropixel 只作为 Tomb / INDEX8 网格的外部对标，不是所有游戏的
 | `DrawSolidRaycastWalls` | 窗洞 haze | — | — | — |
 | `DrawFloorRows` | 地板 | — | — | — |
 | `DrawIndexedTexturedTriangle` | — | — | **全部世界网格** | — |
-| `DrawIndexedTexturedQuad` | — | — | 引擎有，**未调用** | — |
+| `DrawIndexedTexturedQuad` | — | — | **未裁剪四边形主路径** | — |
 | `DrawTexturedQuad`（RGB565，内部两三角） | — | 深度网格 / 水流 / 极光天 | — | — |
 | `DrawTexturedTriangle`（RGB565） | — | 体积 mesh | — | — |
 | `DrawTexturePro` / Atlas 帧 | 精灵、全景、枪、控件 | 丛林全景条 | HUD 控件 | **主路径** |
 | `DrawMosaicoTilemapLayer` | — | — | — | Tower Defense |
 | Raylib 矩形/圆/线/字 | HUD | 粒子、HUD | HUD | HUD / 程序背景 |
 | `BeginScissorMode` | 无 | 无 | 门户 AABB | 视情况 |
-| `.wall` INDEX8 | MSW1 512×128，cell 128 | 无 | MSW2 5×2，cell 64 | 无 |
+| `.wall` INDEX8 | MSW1 384×128，3 个 128 方块 | 无 | MSW2 5×2，cell 64 | 无 |
 | 记录 ABI（Guest 画单 / Host 执行） | 无 | 无 | 无 | 无 |
 
 ## 4. 项目一览
@@ -90,7 +90,7 @@ micropixel 只作为 Tomb / INDEX8 网格的外部对标，不是所有游戏的
 |---|---|---|---|---|
 | 世界模型 | 24×24 格 Wolf3D 式 DDA，不是网格房间 | 不能表示斜面、高低差房间、门户连通 | Tomb 扇区高度；micropixel MeshRenderer | `last_zone_view.c` `raycast_world` |
 | 墙提交 | 1 px 柱批处理，最多 960 sample | 近墙仍是竖条；门曾用每列 3 次 `DrawRectangle` 打爆帧率，已改成门纹理 | 无多边形 QUAD | `Mosaico2DDrawIndexedRaycastWalls`；`prepare_sprites.py` 注释 |
-| `.wall` | 默认列主序 MSW1，4×128 砖，512×128 | 与 Tomb 的行主序图集不能混用同一采样内核假设 | micropixel 每槽 64×64 POT | `assets_src/walls.json` |
+| `.wall` | 列主序 MSW1，3×128 砖，384×128；地板独立 RGB565 | 与 Tomb 的行主序图集不能混用同一采样内核假设 | micropixel 每槽 64×64 POT | `assets_src/walls.json`、`assets_src/floor.json` |
 | 光 | `300/(1+depth×0.18)`，量化 16 档；侧面/窗/门有系数 | 整柱一档，无 Gouraud | Tomb 烘焙顶点再平均；micropixel `LightFor` | `distance_light` |
 | 遮挡 | 列深度缓冲 + 精灵 visible run；无 z-buffer、无 scissor | 精灵与墙交界是列级，不是像素级 | Tomb 门户剪刀；Living Worlds 32×32 cover | `column_visible` |
 | 地板 | 透视 `dist = 165/(y-horizon)`，16.16 UV | 隔行（y+=2）是有损档 | 渲染指南中的「两行共用」 | `draw_floor`；`docs/game-rendering-guide.zh-CN.md` |
@@ -117,7 +117,7 @@ micropixel 只作为 Tomb / INDEX8 网格的外部对标，不是所有游戏的
 | 技术点 | 本地 | 缺陷 | 对标 | 参考 |
 |---|---|---|---|---|
 | 纹理 | RGB565 Atlas / JPEG，`shade565(light256)` | 不走 INDEX8 LUT，带宽和着色都是 RGB565 像素 | Tomb/Last Zone 的 INDEX8 更省采样 | `Mosaico2DDrawTexturedQuad` |
-| Quad 内核 | 公开 Quad，**内部拆两个仿射三角** | 大面仿射扭曲；没有 Tomb 那种细分，也没有 INDEX8 Quad walker | Tomb 有细分但拆 INDEX8 三角；micropixel `DrawPolygon` 一次 QUAD | `mosaico_game_2d.c` `Mosaico2DDrawTexturedQuad` |
+| Quad 内核 | 公开 Quad，**内部拆两个仿射三角** | 大面仿射扭曲；没有与 Tomb INDEX8 Quad 对等的 RGB565 walker | Tomb 四角面走 INDEX8 Quad，裁剪/细分残片走三角；micropixel `DrawPolygon` 一次 QUAD | `mosaico_game_2d.c` `Mosaico2DDrawTexturedQuad` |
 | 几何来源 | 深度图网格 + 导入体积（u/v/light 写在 header） | 礁石侧面/背面故意不画，斜看会穿 | Tomb 过程生成封闭房间 | `living_worlds_volume.c`、`*_volume.h` |
 | 光 | 网格 256/248；海 `band_light` 232 或 256；体积烘焙面光 | 无距离衰减、无顶点 Gouraud | Last Zone 按深度衰减；micropixel `LightFor` | `living_worlds_ocean.c` |
 | 仿射 | 全景俯仰用 16 条带；雨林水面双波 UV | 大 Quad 仍会拧；Sunrise 面 110/111 用补丁 Quad 盖折叠 | Tomb `SUBDIVIDE_DEPTH_RATIO=1.6` | `draw_sunrise_ridge_patch` 注释 |
@@ -132,7 +132,7 @@ micropixel 只作为 Tomb / INDEX8 网格的外部对标，不是所有游戏的
 
 | 技术点 | 本地 | 缺陷 | 对标 | 参考 |
 |---|---|---|---|---|
-| 提交形状 | 未裁剪四面也拆两个 INDEX8 三角 | **未调用** `DrawIndexedTexturedQuad`；近裁后只扇三角 | `Flush`：4 点 → QUAD | `tomb_view.c` `draw_buffered` |
+| 提交形状 | 未裁剪四面走 INDEX8 Quad；近裁后扇三角 | 裁剪多边形仍可能增加三角 | `Flush`：4 点 → QUAD | `tomb_view.c` `draw_buffered` |
 | 细分 | 深度比 1.6，跨度 >120 px；近处房间最多 3 级 | 裁过的面仍可能再细分；大厅易打满 `MAX_DRAW=1024` | 对标裁过后不再细分，池 2048 | `should_subdivide` |
 | 光 | 烘焙顶点，提交时三点平均成一个 `light256` | 无 `LightFor` 距离变暗；无 Gouraud | `full=5`、`dark=40`、每顶点 light | `push_view_quad_flat` |
 | UV | 64 砖重定 + 0.51 inset，图集 320×128 非 POT | 不能套 micropixel bitmask wrap | 每槽 64×64 POT 环绕 | `face_uvs`；`textures.json` |
@@ -154,7 +154,7 @@ micropixel 流水线（仅 Tomb 对标，其它游戏不套）：Guest 出 TRIAN
 
 | 缺陷 | 影响谁 | 说明 |
 |---|---|---|
-| INDEX8 Quad 无人调用 | Tomb 本该受益 | walker 已写，tomb 仍付两次三角 setup |
+| INDEX8 Quad 的面积判定曾用 `double` | Tomb | 已换为 `float`，避免嵌入式 RISC-V 软件双精度；设备 render -9.7% |
 | RGB565 Quad = 两个仿射三角 | Living Worlds | 大深度网格会拧；没有与 INDEX8 Quad 对等的「一行一条 span」 |
 | 三角 / 四边形 / 墙柱三套 walker | 全部 2.5D | 3/4 顶点不能像 micropixel `DrawPolygon` 那样进同一个内核 |
 | 只有整图元 `light256` | 三条 2.5D | 没有顶点光插值 |
@@ -175,16 +175,16 @@ micropixel 流水线（仅 Tomb 对标，其它游戏不套）：Guest 出 TRIAN
 | Living Worlds | Sunrise 局部折叠 | 面 110/111 用 ridge patch 盖 |
 | Tomb | 大厅发黑、只剩地板 | 473 面 × 近细分打满 `MAX_DRAW` |
 | Tomb | 墓室左侧黑洞 | 门户 AABB / 近裁漏像素 + 不清屏 |
-| Tomb | 统计 quads=0 | `draw_buffered` 只调 Triangle |
+| Tomb | 四边面已提速，近裁时三角仍会增长 | 完整四边形走 Quad；近裁后的 n 边形仍扇切成 Triangle |
 | Tomb | 贴墙环视三角暴增 | 近裁成 n 边形后只扇三角 |
 | Tomb | 相机穿实心墙 | `place_camera` 只用房间归属 |
 | 共用 Host | Windows 打不开 Linux 预览 | 需 `--listen 0.0.0.0` |
-| 共用 | 没有一条游戏跑过 INDEX8 Quad | 内核与调用方脱节 |
+| 共用 | RGB565 与 INDEX8 的 Quad walker 尚未统一 | 两套扫描内核仍有维护与优化分叉 |
 
 ## 11. 不对齐、不抄的
 
 - micropixel Wasm、`HostSurface` 记录 ABI、`raster_svc`、Direct scanout。Tomb 可抄 MeshRenderer **算法**，不可把 firmware 画单栈搬进来。
-- `DrawPolygon` 的 POT bitmask wrap：Tomb 图集 320×128、Last Zone 墙图 512×128，都不满足「每槽 64×64 POT」。
+- `DrawPolygon` 的 POT bitmask wrap：Tomb 图集 320×128、Last Zone 墙图 384×128，都不满足「整图宽度 POT」；只能在明确的单砖局部坐标内采用掩码。
 - 用 Last Zone 墙柱去画 Tomb 房间，或用 Tomb INDEX8 三角去画 Last Zone 480 列，都是错配布局。
 - 把 Living Worlds 的 RGB565 网格「升级成 INDEX8」前，要先有行主序图集和 UV 仍落在砖内的保证。
 - Mosaic claw、micropixel runtime、把 GSP Hello World 当游戏模板、把 BSP 的 USB Serial/JTAG 当产品烧录。
@@ -193,7 +193,7 @@ micropixel 流水线（仅 Tomb 对标，其它游戏不套）：Guest 出 TRIAN
 
 1. **Last Zone**：继续墙柱 + 地板行；别改成网格。验收仍是 480 列、门/窗走墙内核。
 2. **Living Worlds**：瓶颈在 RGB565 Quad/三角数量和过绘制（Ocean/Sunrise）。要加速是减面、cover、或给 RGB565 Quad 做真正的一行 span；不是引进射线柱。
-3. **Tomb**：未裁剪四面改走已有 INDEX8 Quad；补距离光。不要把 micropixel wrap 套到非 POT 图集。
+3. **Tomb**：未裁剪四面已走 INDEX8 Quad；下一步优先误差驱动细分、固定点倒数与近裁残片控制。不要把 micropixel wrap 套到非 POT 图集。
 4. **2D 游戏**：保持 Atlas 快路径；性能矩阵仍以 Sky Hop 为准。
 
 ## 13. 索引

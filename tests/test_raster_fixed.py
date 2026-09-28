@@ -49,8 +49,8 @@ int main(void) {
     assert(tex.id);
     uint16_t before[33*32], after[33*32];
     for(unsigned light=0;light<=256;light+=16)for(int mirror=0;mirror<2;++mirror){
-        mosaico_textured_vertex_t a={-3,1,mirror?-70:0,3},
-            b={29,4,mirror?100:62,2},c={14,36,30,mirror?-80:60};
+        mosaico_textured_vertex_t a={-3,1,mirror?-70:0,3,0},
+            b={29,4,mirror?100:62,2,0},c={14,36,30,mirror?-80:60,0};
         assert(Mosaico2DCacheTextureLight(tex,256));
         memset(before,0xa5,sizeof before);memset(after,0xa5,sizeof after);
         mosaico_game_2d_set_target(before,33,32,32);

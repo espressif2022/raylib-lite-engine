@@ -8,18 +8,11 @@
 #ifndef CONFIG_MOSAICO_GAME_MAX_TEXTURES
 #define CONFIG_MOSAICO_GAME_MAX_TEXTURES 12
 #endif
-#if defined(ESP_PLATFORM)
-#include "esp_attr.h"
-#include "esp_log.h"
-#include "esp_heap_caps.h"
-#define M2D_HOT IRAM_ATTR
-#else
-#define M2D_HOT
-#endif
-#if defined(ESP_PLATFORM) && CONFIG_MOSAICO_GAME_RASTER_PROFILE
-#include "esp_timer.h"
-#define PROFILE_START(name) uint32_t name=(uint32_t)esp_timer_get_time()
-#define PROFILE_ADD(field,name) s_raster_stats.field+=(uint32_t)esp_timer_get_time()-(name)
+#include "raylib_lite_raster_config.h"
+#define M2D_HOT RAYLIB_LITE_RASTER_HOT
+#if defined(RAYLIB_LITE_RASTER_NOW_US)
+#define PROFILE_START(name) uint32_t name=(uint32_t)RAYLIB_LITE_RASTER_NOW_US()
+#define PROFILE_ADD(field,name) s_raster_stats.field+=(uint32_t)RAYLIB_LITE_RASTER_NOW_US()-(name)
 #else
 #define PROFILE_START(name) ((void)0)
 #define PROFILE_ADD(field,name) ((void)0)
@@ -57,49 +50,6 @@ void mosaico_game_2d_note_primitives(uint32_t pixels,uint32_t runs,uint32_t clea
  s_raster_stats.fb_pixels+=pixels+clear_pixels;
  s_raster_stats.fb_runs+=runs+(clear_pixels&&s_target_width>0?(clear_pixels/(uint32_t)s_target_width):0);
 }
-/* Strong override of the weak stub in mosaico_game_debug, so every game that
-   links the rasteriser reports store shape without its own logging code.
-   MosaicoFastBeginDrawing clears the counters each frame, so these describe
-   the frame that just finished rather than a running total. Store shape
-   alone does not measure cache misses or unique pixel coverage. */
-#if defined(ESP_PLATFORM)
-void mosaico_game_2d_log_raster_shape(const char*tag){
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster fb_runs=%lu fb_pixels=%lu tris=%lu/%lu quads=%lu/%lu",
-  (unsigned long)s_raster_stats.fb_runs,(unsigned long)s_raster_stats.fb_pixels,
-  (unsigned long)s_raster_stats.triangle_calls,(unsigned long)s_raster_stats.triangle_pixels,
-  (unsigned long)s_raster_stats.quad_calls,(unsigned long)s_raster_stats.quad_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path opaque_copy_calls=%lu opaque_copy_pixels=%lu",
-  (unsigned long)s_raster_stats.opaque_copy_calls,(unsigned long)s_raster_stats.opaque_copy_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path opaque_scale_calls=%lu opaque_scale_pixels=%lu",
-  (unsigned long)s_raster_stats.opaque_scale_calls,(unsigned long)s_raster_stats.opaque_scale_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path binary_alpha_calls=%lu binary_alpha_pixels=%lu",
-  (unsigned long)s_raster_stats.binary_alpha_calls,(unsigned long)s_raster_stats.binary_alpha_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path binary_copy_calls=%lu binary_copy_pixels=%lu",
-  (unsigned long)s_raster_stats.binary_copy_calls,(unsigned long)s_raster_stats.binary_copy_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path binary_scale_calls=%lu binary_scale_pixels=%lu",
-  (unsigned long)s_raster_stats.binary_scale_calls,(unsigned long)s_raster_stats.binary_scale_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path tile_row_calls=%lu tile_row_pixels=%lu",
-  (unsigned long)s_raster_stats.tile_row_calls,(unsigned long)s_raster_stats.tile_row_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path alpha_calls=%lu alpha_pixels=%lu",
-  (unsigned long)s_raster_stats.alpha_calls,(unsigned long)s_raster_stats.alpha_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path rotated_calls=%lu rotated_pixels=%lu",
-  (unsigned long)s_raster_stats.rotated_calls,(unsigned long)s_raster_stats.rotated_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path column_calls=%lu column_pixels=%lu",
-  (unsigned long)s_raster_stats.column_calls,(unsigned long)s_raster_stats.column_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path span_calls=%lu span_pixels=%lu",
-  (unsigned long)s_raster_stats.span_calls,(unsigned long)s_raster_stats.span_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path frame_lookup_hits=%lu frame_lookup_misses=%lu triangle_direct_pixels=%lu triangle_mirror_pixels=%lu",
-  (unsigned long)s_raster_stats.frame_lookup_hits,(unsigned long)s_raster_stats.frame_lookup_misses,
-  (unsigned long)s_raster_stats.triangle_direct_pixels,(unsigned long)s_raster_stats.triangle_mirror_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path primitive_pixels=%lu primitive_runs=%lu clear_pixels=%lu rgb_const_v_pixels=%lu rgb_vary_v_pixels=%lu",
-  (unsigned long)s_raster_stats.primitive_pixels,(unsigned long)s_raster_stats.primitive_runs,(unsigned long)s_raster_stats.clear_pixels,
-  (unsigned long)s_raster_stats.rgb_const_v_pixels,(unsigned long)s_raster_stats.rgb_vary_v_pixels);
- ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path indexed_const_v_pixels=%lu indexed_vary_v_pixels=%lu indexed_magnify_pixels=%lu indexed_minify_pixels=%lu triangle_setup_us=%lu triangle_raster_us=%lu",
-  (unsigned long)s_raster_stats.indexed_const_v_pixels,(unsigned long)s_raster_stats.indexed_vary_v_pixels,
-  (unsigned long)s_raster_stats.indexed_magnify_pixels,(unsigned long)s_raster_stats.indexed_minify_pixels,
-  (unsigned long)s_raster_stats.triangle_setup_us,(unsigned long)s_raster_stats.triangle_raster_us);
-}
-#endif
 void mosaico_game_2d_set_phase_us(uint32_t sky_us,uint32_t floor_us,uint32_t wall_us,
  uint32_t enemy_us,uint32_t hud_us){
  s_raster_stats.sky_us=sky_us;s_raster_stats.floor_us=floor_us;s_raster_stats.wall_us=wall_us;
@@ -160,11 +110,7 @@ bool Mosaico2DCacheTextureLight(Texture2D texture,unsigned light256)
  if(s->light_cache&&s->cached_light==light)return true;
  size_t count=(size_t)s->header->width*s->header->height;
  if(count>SIZE_MAX/sizeof(uint16_t))return false;
-#if defined(ESP_PLATFORM)
- uint16_t *cache=heap_caps_malloc(count*sizeof(uint16_t),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
-#else
- uint16_t *cache=malloc(count*sizeof(uint16_t));
-#endif
+ uint16_t *cache=RAYLIB_LITE_RASTER_ALLOC(count*sizeof(uint16_t));
  if(!cache)return false;
  mosaico_shade_rgb565(cache,s->rgb,count,light);
  free(s->light_cache);s->light_cache=cache;s->cached_light=light;
@@ -1147,10 +1093,13 @@ static void draw_indexed_quad_persp(const MosaicoWallAtlas *atlas,
  mosaico_textured_vertex_t p[4]={a,b,d,c};
  int top=0;
  float min_y=p[0].y,max_y=p[0].y,min_x=p[0].x,max_x=p[0].x;
- double area=0.0;
+ /* Screen-space coordinates are clipped to a 480x480 target. Float has ample
+  * precision for the degeneracy test and avoids software double arithmetic
+  * in every quad setup on embedded RISC-V targets. */
+ float area=0.0f;
  for(int i=0;i<4;++i){
   int j=(i+1)&3;
-  area+=(double)p[i].x*p[j].y-(double)p[j].x*p[i].y;
+  area+=p[i].x*p[j].y-p[j].x*p[i].y;
   if(p[i].y<min_y){min_y=p[i].y;top=i;}
   if(p[i].y>max_y)max_y=p[i].y;
   if(p[i].x<min_x)min_x=p[i].x;
@@ -1202,10 +1151,10 @@ static M2D_HOT void draw_indexed_quad_direct(const MosaicoWallAtlas *atlas,
  mosaico_textured_vertex_t p[4]={a,b,d,c};
  int top=0;
  float min_y=p[0].y,max_y=p[0].y,min_x=p[0].x,max_x=p[0].x;
- double area=0.0;
+ float area=0.0f;
  for(int i=0;i<4;++i){
   int j=(i+1)&3;
-  area+=(double)p[i].x*p[j].y-(double)p[j].x*p[i].y;
+  area+=p[i].x*p[j].y-p[j].x*p[i].y;
   if(p[i].y<min_y){min_y=p[i].y;top=i;}
   if(p[i].y>max_y)max_y=p[i].y;
   if(p[i].x<min_x)min_x=p[i].x;
@@ -1268,10 +1217,10 @@ static void draw_rgb_quad_direct(texture_slot_t *s,
  mosaico_textured_vertex_t p[4]={a,b,d,c};
  int top=0;
  float min_y=p[0].y,max_y=p[0].y,min_x=p[0].x,max_x=p[0].x;
- double area=0.0;
+ float area=0.0f;
  for(int i=0;i<4;++i){
   int j=(i+1)&3;
-  area+=(double)p[i].x*p[j].y-(double)p[j].x*p[i].y;
+  area+=p[i].x*p[j].y-p[j].x*p[i].y;
   if(p[i].y<min_y){min_y=p[i].y;top=i;}
   if(p[i].y>max_y)max_y=p[i].y;
   if(p[i].x<min_x)min_x=p[i].x;

@@ -5,17 +5,13 @@
 #include <string.h>
 #ifndef LIVING_WORLDS_SCENE_SIM_ONLY
 #include "mosaico_raylib_fast.h"
+#include "raylib_lite_clock.h"
 #include "ocean_depth.h"
 #include "ocean_left_volume.h"
 #include "ocean_right_volume.h"
 #include "living_worlds_ocean_draw.h"
 #include "living_worlds_volume.h"
-#ifdef ESP_PLATFORM
-#include "esp_timer.h"
-static uint32_t ocean_now_us(void){return (uint32_t)esp_timer_get_time();}
-#else
-static uint32_t ocean_now_us(void){return 0;}
-#endif
+static uint32_t ocean_now_us(void){return (uint32_t)raylib_lite_time_us();}
 static uint32_t water_setup_us;
 static living_ocean_draw_profile_t draw_profile;
 living_ocean_draw_profile_t living_ocean_draw_profile(void){return draw_profile;}
@@ -554,22 +550,50 @@ static void draw_ocean_jelly(const living_camera_t *camera,const ocean_jelly_t *
         }
     }
     int tentacles=jelly->id==0?10:7;
+    /* Every tentacle samples two sine waves at fixed angular increments.
+     * Advance them with the angle-addition recurrence instead of asking
+     * libm for two new sines at every point (up to 180 calls per jelly).
+     * The geometry, sample count and painter order remain unchanged. */
+    float wave_x_s=sinf(t*.95f),wave_x_c=cosf(t*.95f);
+    float wave_z_s=sinf(-t*.8f),wave_z_c=cosf(-t*.8f);
+    const float tentacle_step_s=.841470985f,tentacle_step_c=.540302306f;
+    const float point_x_step_s=-.634607080f,point_x_step_c=.772834946f;
+    const float point_z_step_s=.479425539f,point_z_step_c=.877582562f;
+    const float root_step_s=tentacles==10?.587785252f:.781831482f;
+    const float root_step_c=tentacles==10?.809016994f:.623489802f;
+    float root_s=0.0f,root_c=1.0f;
     for(int i=0;i<tentacles;++i){
-        float ang=i/(float)tentacles*6.2831853f;
-        float root_x=cosf(ang)*.24f,root_z=sinf(ang)*.22f;
+        float root_x=root_c*.24f,root_z=root_s*.22f;
         Vector2 last;bool has=false;
+        float point_x_s=wave_x_s,point_x_c=wave_x_c;
+        float point_z_s=wave_z_s,point_z_c=wave_z_c;
         for(int s=0;s<=8;++s){
             float f=s/8.0f;
             float wx,wy,wz;
-            jelly_world(jelly,&rotation,root_x+sinf(t*.95f-f*5.5f+i)*.18f*f,
-                        -.13f-f*3.1f,root_z+sinf(f*4.0f-t*.8f+i)*.23f*f,
+            jelly_world(jelly,&rotation,root_x+point_x_s*.18f*f,
+                        -.13f-f*3.1f,root_z+point_z_s*.23f*f,
                         &wx,&wy,&wz);
+            float next_s=point_x_s*point_x_step_c+point_x_c*point_x_step_s;
+            point_x_c=point_x_c*point_x_step_c-point_x_s*point_x_step_s;
+            point_x_s=next_s;
+            next_s=point_z_s*point_z_step_c+point_z_c*point_z_step_s;
+            point_z_c=point_z_c*point_z_step_c-point_z_s*point_z_step_s;
+            point_z_s=next_s;
             Vector2 screen;
             if(!ocean_project(camera,wx,wy,wz,&screen)){has=false;continue;}
             if(has)DrawLine((int)last.x,(int)last.y,(int)screen.x,(int)screen.y,
                             (Color){69,155,209,(unsigned char)(70+40*(1.0f-f))});
             last=screen;has=true;
         }
+        float next_s=wave_x_s*tentacle_step_c+wave_x_c*tentacle_step_s;
+        wave_x_c=wave_x_c*tentacle_step_c-wave_x_s*tentacle_step_s;
+        wave_x_s=next_s;
+        next_s=wave_z_s*tentacle_step_c+wave_z_c*tentacle_step_s;
+        wave_z_c=wave_z_c*tentacle_step_c-wave_z_s*tentacle_step_s;
+        wave_z_s=next_s;
+        next_s=root_s*root_step_c+root_c*root_step_s;
+        root_c=root_c*root_step_c-root_s*root_step_s;
+        root_s=next_s;
     }
 }
 

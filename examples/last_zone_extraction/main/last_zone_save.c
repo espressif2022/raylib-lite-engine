@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "last_zone_save.h"
 #include <string.h>
-#include "esp_timer.h"
+#include "raylib_lite_clock.h"
 #include "mosaico_game_save.h"
 
 #define LAST_ZONE_SAVE_VERSION 2U
@@ -11,7 +11,7 @@ static bool s_ready;
 
 static uint64_t now_ms(void)
 {
-    return (uint64_t)esp_timer_get_time() / 1000U;
+    return raylib_lite_time_us() / 1000U;
 }
 
 static esp_err_t migrate_v1(uint16_t old_version, const void *old_data, size_t old_size,

@@ -20,16 +20,15 @@ the next level, while completing level 4 finishes the run.
 优先读取 `game_assets` 分区；确认分区可用后可取消整包嵌入，以恢复约 300 KiB
 应用空间。
 
-## 构建与安装
+## Host 运行
 
 ```bash
 # Host 仿真：本仓库根目录，主机 C 编译器 + Pillow
 python3 tools/game_cli.py sim examples/sky_hop
 python3 tools/game_cli.py sim examples/sky_hop --headless --frames 300
-
-# 真机：普通 ESP-IDF，idf.py flash 写入 5MB factory
-idf.py -C examples/sky_hop set-target esp32s31 build flash monitor
 ```
+
+真机入口由外部产品仓库提供；本目录不是 ESP-IDF 工程。
 
 浏览器模拟器地址为 `http://127.0.0.1:8460/`。键盘使用 `A/D` 或方向键移动、
 空格跳跃、`P` 暂停、回车开始/进入下一关；触屏设备可同时按住底部移动键和跳跃键。

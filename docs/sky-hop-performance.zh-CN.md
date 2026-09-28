@@ -15,8 +15,10 @@ TE compose 缓冲数和 draw-buffer 行数。
 - `CONFIG_SKY_HOP_TE_COMPOSE_BUFFERS`：1、2。
 - `CONFIG_SKY_HOP_DRAWBUF_LINES`：10、34。
 
-用 `idf.py -C examples/sky_hop set-target esp32s31 build flash monitor` 构建与安装。
-保存覆盖完整 60 秒场景的串口日志。这是普通 ESP-IDF 烧录，不经过 ESP-Iris。
+从外部产品仓库构建 Sky Hop 固件并烧录，保存覆盖完整 60 秒场景的串口日志。
+engine 内的 `examples/sky_hop` 提供玩法模型、view 和 Host 场景。产品专用
+`sky_hop_app_create()`、设备资源挂载、存档迁移和板级配置属于外部产品工程。
+engine 示例目录不包含 ESP-IDF 工程或板级配置。
 
 ## 分析与判据
 

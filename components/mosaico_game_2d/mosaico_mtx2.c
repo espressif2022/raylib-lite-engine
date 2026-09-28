@@ -3,12 +3,8 @@
 
 #include "mosaico_rgb565.h"
 
-#if defined(ESP_PLATFORM)
-#include "esp_attr.h"
-#define MTX2_HOT IRAM_ATTR
-#else
-#define MTX2_HOT
-#endif
+#include "raylib_lite_raster_config.h"
+#define MTX2_HOT RAYLIB_LITE_RASTER_HOT
 
 /* Explicit little-endian loads: the payload is only guaranteed 4-byte aligned
  * and may live in memory-mapped flash. Both targets are little-endian, so
