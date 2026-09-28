@@ -24,6 +24,22 @@ class GameCliTests(unittest.TestCase):
         self.assertEqual(result["abi"], 1)
         self.assertEqual(result["game_id"], "raylib_shooter")
 
+    def test_json_mode_returns_one_object_for_finite_sim_and_errors(self) -> None:
+        result = subprocess.run([
+            sys.executable, str(CLI), "sim", "examples/raylib_shooter",
+            "--headless", "--frames", "2", "--json",
+        ], cwd=ENGINE, text=True, capture_output=True, check=True)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["schema"], "mosaico-game-cli/v1")
+        self.assertEqual(payload["result"]["frames"], 2)
+        self.assertEqual(len(result.stdout.splitlines()), 1)
+        invalid = subprocess.run([
+            sys.executable, str(CLI), "sim", "examples/raylib_shooter", "--json",
+        ], cwd=ENGINE, text=True, capture_output=True)
+        self.assertEqual(invalid.returncode, 2)
+        self.assertEqual(json.loads(invalid.stdout)["exit_code"], 2)
+        self.assertIn("requires --headless", invalid.stderr)
+
     def test_game_help_exposes_create_sim_and_build(self) -> None:
         output = subprocess.check_output([
             sys.executable, str(CLI), "--help",
@@ -59,7 +75,9 @@ add_library(game STATIC main.c)
                        "--target", "elf", "--toolchain", str(toolchain),
                        "--build-dir", str(output)]
             env = dict(os.environ, IDF_PATH="/not/an/idf")
-            subprocess.run(command, env=env, check=True, capture_output=True)
+            machine = subprocess.run(command + ["--json"], env=env, check=True,
+                                     capture_output=True, text=True)
+            self.assertEqual(json.loads(machine.stdout)["status"], "succeeded")
             self.assertTrue((output / "libgame.a").is_file())
             cached_command = command.copy()
             index = cached_command.index("--toolchain")

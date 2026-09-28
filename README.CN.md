@@ -8,7 +8,7 @@ Raylib Lite Engine 是面向嵌入式 RGB565 显示的轻量 Raylib 兼容游戏
 
 ## 从哪里开始
 
-1. 新建游戏：`python3 tools/game_cli.py create <name>`，按[游戏开发指南](docs/game-development.CN.md)组织共享源码。
+1. 新建游戏：按[快速入门](docs/quickstart.CN.md)看到第一个 Host 画面，再按[游戏开发指南](docs/game-development.CN.md)组织共享源码。
 2. 选择路径：查看[示例支持矩阵（English）](examples/README.md)和[构建路径](docs/build-matrix.CN.md)。Host、直烧原生固件、Iris 原生固件与大厅 ELF 游戏有不同入口。
 3. 设计输入、反馈、资产或绘制：查看[可复用设计方法](docs/reference-designs.CN.md)及其中链接的公共接口。
 
@@ -32,4 +32,4 @@ python3 tools/game_cli.py sim examples/sky_hop
 
 ## 版本与许可
 
-初期 `0.x` 版本保留现有 `mosaico_*` 源码兼容接口。Host ABI 与二进制资源格式分别带版本号，并拒绝不兼容输入。源码除另有标注外采用 Apache-2.0 许可。
+初期 `0.x` 版本保留现有 `mosaico_*` 源码兼容接口。Host ABI 与二进制资源格式分别带版本号，并拒绝不兼容输入。源码除另有标注外采用 Apache-2.0 许可，见 [LICENSE](LICENSE)；外部依赖见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。参与开发见[贡献指南](CONTRIBUTING.CN.md)。

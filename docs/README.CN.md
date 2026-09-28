@@ -2,7 +2,7 @@
 
 [English](README.EN.md) · [返回仓库 README](../README.CN.md)
 
-第一次使用：运行 `python3 tools/game_cli.py create <name>` → 用 Host 仿真运行 → 按游戏开发指南验证。引擎核心不绑定特定板卡；部分示例还提供显式依赖板级组件的原生固件工程。
+第一次使用：按[快速入门](quickstart.CN.md)创建游戏并看到 Host 画面，再按游戏开发指南验证。引擎核心不绑定特定板卡；部分示例还提供显式依赖板级组件的原生固件工程。
 
 ## 开发指南（按顺序读）
 
@@ -19,6 +19,10 @@
 | [示例索引（English）](../examples/README.md) | 示例与构建支持矩阵 |
 | [Host 仿真参考](../host/README.md) | Host ABI、修改后重编与回放 |
 | [组件参考（English）](../components/README.md) | 组件职责与生命周期 |
+| [音频与反馈设计](audio-design.CN.md) | 事件、资源、后端和设备试听契约 |
+| [新板卡移植契约](board-porting.CN.md) | 视频、时钟、输入、音频与真实设备验收 |
+| [Agent 命令接口](agent-cli.CN.md) | 有限命令的 JSON 输出、退出码与授权边界 |
+| [光栅内核契约](raster-kernels.CN.md) | 各 `Mosaico2DDraw*` 接口的纹理、光照、覆盖和错误行为 |
 | [render_benchmark 参考](../examples/render_benchmark/README.md) | 光栅基准测试与可选上屏预览 |
 | [测试参考（English）](../tests/README.md) | Host 单元测试 |
 | [Mosaico 游戏开发 Skill 中文说明](skills/mosaico-game-development/SKILL.CN.md) | Agent 专用工作流 |

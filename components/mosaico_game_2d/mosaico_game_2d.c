@@ -34,6 +34,7 @@ static uint16_t *s_target;static size_t s_stride;static int s_target_width,s_tar
 static int s_clip_x0,s_clip_y0,s_clip_x1,s_clip_y1;
 static MosaicoSpriteFrame s_frame_result;
 static mosaico_game_2d_raster_stats_t s_raster_stats;
+static uint32_t s_rejected_draw_calls;
 static texture_slot_t *texture_slot(Texture2D texture){if(!texture.id||texture.id>M2D_MAX_TEXTURES)return NULL;texture_slot_t *slot=&s_textures[texture.id-1];return slot->used?slot:NULL;}
 void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int height){s_target=pixels;s_stride=stride;s_target_width=width;s_target_height=height;s_clip_x0=0;s_clip_y0=0;s_clip_x1=width;s_clip_y1=height;}
 void mosaico_game_2d_set_clip(int x,int y,int width,int height){
@@ -43,8 +44,9 @@ void mosaico_game_2d_set_clip(int x,int y,int width,int height){
  if(width<=0||height<=0||s_clip_x0>s_clip_x1||s_clip_y0>s_clip_y1)
   s_clip_x1=s_clip_x0,s_clip_y1=s_clip_y0;
 }
-void mosaico_game_2d_reset_raster_stats(void){memset(&s_raster_stats,0,sizeof(s_raster_stats));}
+void mosaico_game_2d_reset_raster_stats(void){memset(&s_raster_stats,0,sizeof(s_raster_stats));s_rejected_draw_calls=0;}
 void mosaico_game_2d_get_raster_stats(mosaico_game_2d_raster_stats_t*out){if(out)*out=s_raster_stats;}
+uint32_t mosaico_game_2d_get_rejected_draw_calls(void){return s_rejected_draw_calls;}
 void mosaico_game_2d_note_primitives(uint32_t pixels,uint32_t runs,uint32_t clear_pixels){
  s_raster_stats.primitive_pixels+=pixels;s_raster_stats.primitive_runs+=runs;
  s_raster_stats.clear_pixels+=clear_pixels;
@@ -167,7 +169,8 @@ static inline int sample_next(sample_step_t*step){
  return value;
 }
 void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,Vector2 origin,float rotation,Color tint){
- texture_slot_t*s=texture_slot(texture);if(!s||!s_target||source.width==0||source.height==0||dest.width==0||dest.height==0||!tint.a)return;
+ texture_slot_t*s=texture_slot(texture);if(!s||!s_target||source.width==0||source.height==0||dest.width==0||dest.height==0){++s_rejected_draw_calls;return;}
+ if(!tint.a)return;
  bool fx=source.width<0,fy=source.height<0;float sw=fabsf(source.width),sh=fabsf(source.height),rad=rotation*0.01745329252f,cs=cosf(rad),sn=sinf(rad);int dw=(int)fabsf(dest.width),dh=(int)fabsf(dest.height),extent=dw>dh?dw:dh;bool identity=fabsf(rotation)<.001f;
  int x0=identity?(int)(dest.x-origin.x):(int)(dest.x-origin.x-extent),y0=identity?(int)(dest.y-origin.y):(int)(dest.y-origin.y-extent),x1=identity?x0+dw:(int)(dest.x+extent),y1=identity?y0+dh:(int)(dest.y+extent);
  if(x0<0)x0=0;
@@ -669,7 +672,7 @@ void Mosaico2DDrawTexturedTriangle(Texture2D texture,
  mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
  mosaico_textured_vertex_t c,unsigned light256)
 {
- texture_slot_t*s=texture_slot(texture);if(!s||!s_target)return;
+ texture_slot_t*s=texture_slot(texture);if(!s||!s_target){++s_rejected_draw_calls;return;}
  draw_textured_triangle_prepared(s,a,b,c,quantize_light(light256),false);
 }
 
@@ -681,7 +684,7 @@ void Mosaico2DDrawTexturedQuad(Texture2D texture,
  mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
  mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light256)
 {
- texture_slot_t*s=texture_slot(texture);if(!s||!s_target)return;
+ texture_slot_t*s=texture_slot(texture);if(!s||!s_target){++s_rejected_draw_calls;return;}
  unsigned light=quantize_light(light256);
  float max_u=s->header->width-1.0f,max_v=s->header->height-1.0f;
  fold_quad_uv(&a,&b,&c,&d,max_u,max_v);
@@ -1309,7 +1312,7 @@ void Mosaico2DDrawIndexedTexturedTriangle(MosaicoWallAtlas atlas,
  mosaico_textured_vertex_t c,unsigned light256)
 {
  if(!atlas.descriptor||!atlas.indices||!atlas.light_lut||!s_target||
-    !atlas.width||!atlas.height||atlas.light_levels!=16)return;
+    !atlas.width||!atlas.height||atlas.light_levels!=16){++s_rejected_draw_calls;return;}
  draw_indexed_triangle_prepared(&atlas,a,b,c,indexed_light_level(light256),false);
 }
 
@@ -1318,7 +1321,7 @@ void Mosaico2DDrawIndexedTexturedQuad(MosaicoWallAtlas atlas,
  mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light256)
 {
  if(!atlas.descriptor||!atlas.indices||!atlas.light_lut||!s_target||
-    !atlas.width||!atlas.height||atlas.light_levels!=16)return;
+    !atlas.width||!atlas.height||atlas.light_levels!=16){++s_rejected_draw_calls;return;}
  unsigned level=indexed_light_level(light256);
  float max_u=atlas.width-1.0f,max_v=atlas.height-1.0f;
  fold_quad_uv(&a,&b,&c,&d,max_u,max_v);
@@ -1336,7 +1339,8 @@ void Mosaico2DDrawIndexedTexturedQuad(MosaicoWallAtlas atlas,
 }
 void Mosaico2DDrawTileRow(Texture2D texture,const uint16_t*ids,size_t count,
  int tw,int th,int dx,int dy){
- texture_slot_t*s=texture_slot(texture);if(!s||!ids||!count||tw<=0||th<=0||!s_target)return;
+ texture_slot_t*s=texture_slot(texture);if(!count)return;
+ if(!s||!ids||tw<=0||th<=0||!s_target){++s_rejected_draw_calls;return;}
  if(s->alpha){for(size_t i=0;i<count;++i)if(ids[i])Mosaico2DDrawTexturePro(texture,
    (Rectangle){(float)((ids[i]-1U)*tw),0,(float)tw,(float)th},
    (Rectangle){(float)(dx+(int)i*tw),(float)dy,(float)tw,(float)th},
@@ -1367,7 +1371,7 @@ void Mosaico2DDrawColumn(Texture2D texture,Rectangle source,int dest_x,int dest_
  int dest_width,int dest_height,unsigned light256)
 {
  texture_slot_t *s=texture_slot(texture);
- if(!s||!s_target||s->alpha||dest_width<=0||dest_height<=0||source.width==0||source.height==0)return;
+ if(!s||!s_target||s->alpha||dest_width<=0||dest_height<=0||source.width==0||source.height==0){++s_rejected_draw_calls;return;}
  int isw=(int)fabsf(source.width),ish=(int)fabsf(source.height);
  if(isw<=0||ish<=0)return;
  int source_x=(int)source.x,source_y=(int)source.y;
@@ -1394,7 +1398,8 @@ void Mosaico2DDrawSpan(Texture2D texture,Rectangle source,int dest_y,int dest_x0
  int dest_x1,int u_16,int v_16,int du_16,int dv_16,unsigned light256)
 {
  texture_slot_t *s=texture_slot(texture);
- if(!s||!s_target||s->alpha||dest_x1<=dest_x0||source.width==0||source.height==0)return;
+ if(dest_x1<=dest_x0)return;
+ if(!s||!s_target||s->alpha||source.width==0||source.height==0){++s_rejected_draw_calls;return;}
  if(dest_y<s_clip_y0||dest_y>=s_clip_y1)return;
  int x0=dest_x0>s_clip_x0?dest_x0:s_clip_x0;
  int x1=dest_x1<s_clip_x1?dest_x1:s_clip_x1;
@@ -1430,7 +1435,8 @@ void Mosaico2DDrawFloorRows(Texture2D texture,Rectangle source,int dest_y,int de
  int du_16,int dv_16,unsigned light256,int row_repeat)
 {
  texture_slot_t *s=texture_slot(texture);
- if(!s||!s_target||s->alpha||column_width<=0||columns<=0||source.width==0||source.height==0)return;
+ if(columns<=0)return;
+ if(!s||!s_target||s->alpha||column_width<=0||source.width==0||source.height==0){++s_rejected_draw_calls;return;}
  if(row_repeat<1)row_repeat=1;
  if(row_repeat>2)row_repeat=2;
  if(dest_y>=s_clip_y1||dest_y+row_repeat-1<s_clip_y0)return;
@@ -1480,7 +1486,8 @@ void Mosaico2DDrawFloorRow(Texture2D texture,Rectangle source,int dest_y,int des
 }
 void Mosaico2DCopyScanline(int src_y,int dst_y)
 {
- if(!s_target||src_y==dst_y)return;
+ if(src_y==dst_y)return;
+ if(!s_target){++s_rejected_draw_calls;return;}
  if(src_y<s_clip_y0||src_y>=s_clip_y1||dst_y<s_clip_y0||dst_y>=s_clip_y1)return;
  int x0=s_clip_x0,x1=s_clip_x1;
  if(x0>=x1)return;
@@ -1502,7 +1509,8 @@ void Mosaico2DDrawRaycastWalls(Texture2D texture,const mosaico_raycast_wall_t *c
  int column_count)
 {
  texture_slot_t *s=texture_slot(texture);
- if(!s||!s_target||s->alpha||!columns||column_count<=0)return;
+ if(column_count<=0)return;
+ if(!s||!s_target||s->alpha||!columns){++s_rejected_draw_calls;return;}
  prepared_wall_t prepared[M2D_WALL_BLOCK];
  uint32_t drawn=0;
  bool any_rows=false;
@@ -1556,9 +1564,10 @@ void Mosaico2DDrawRaycastWalls(Texture2D texture,const mosaico_raycast_wall_t *c
 void Mosaico2DDrawIndexedRaycastWalls(MosaicoWallAtlas atlas,
  const mosaico_raycast_wall_t *columns,int column_count)
 {
+ if(column_count<=0)return;
  if(!atlas.descriptor||!atlas.indices||!atlas.light_lut||!s_target||
-    !columns||column_count<=0||!atlas.width||!atlas.height||
-    atlas.light_levels!=16)return;
+    !columns||!atlas.width||!atlas.height||
+    atlas.light_levels!=16){++s_rejected_draw_calls;return;}
  uint32_t drawn=0;
  bool any_rows=false;
  /* MSW1 is deliberately column-major: keep one texture column hot while the
@@ -1653,7 +1662,8 @@ void Mosaico2DDrawIndexedRaycastWalls(MosaicoWallAtlas atlas,
 void Mosaico2DDrawSolidRaycastWalls(const mosaico_solid_wall_t *columns,
  int column_count)
 {
- if(!s_target||!columns||column_count<=0)return;
+ if(column_count<=0)return;
+ if(!s_target||!columns){++s_rejected_draw_calls;return;}
  uint32_t drawn=0;
  bool any=false;
  for(int i=0;i<column_count;++i){

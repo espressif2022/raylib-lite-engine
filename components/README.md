@@ -7,6 +7,22 @@ components through this repository's `cmake/raylib_lite_esp.cmake` helper. See
 [`build-matrix.EN.md`](../docs/build-matrix.EN.md) for the three build
 paths.
 
+## Find a capability
+
+Use these public APIs before adding a game-local helper. If a helper is needed by a second game, compare its data and ownership contract before moving the reusable part into a component; camera and product policy remain with their owners.
+
+| Need | Start with | Public header or tool |
+| --- | --- | --- |
+| Fixed-step game loop and event queue | `raylib_lite_game_app_run`, runner input | [`raylib_lite_game_app.h`](mosaico_game_app/include/raylib_lite_game_app.h), [`raylib_lite_input.h`](raylib_lite_runner/include/raylib_lite_input.h) |
+| Touch or button to game action | `mosaico_action_*` | [`mosaico_game_action.h`](mosaico_game_input/include/mosaico_game_action.h) |
+| RGB565 shapes and compatible Raylib calls | fast drawing surface | [`mosaico_raylib_fast.h`](mosaico_raylib_fast/include/mosaico_raylib_fast.h) |
+| Texture, atlas, wall column, floor span, triangle or quad | `Mosaico2D*` | [`mosaico_game_2d.h`](mosaico_game_2d/include/mosaico_game_2d.h), [raster contract](../docs/raster-kernels.EN.md) |
+| Tile map lookup and drawing | `mosaico_game_tilemap_*` | [`mosaico_game_tilemap.h`](mosaico_game_tilemap/include/mosaico_game_tilemap.h) |
+| Asset packing and logical-name lookup | packer and `mosaico_game_asset_open` | [`mosaico_game_assets.h`](mosaico_game_assets/include/mosaico_game_assets.h), [`pack_game_assets.py`](../tools/pack_game_assets.py) |
+| Sound/music playback and PCM device service | `MosaicoAudio*`, platform audio | [`mosaico_game_audio.h`](mosaico_game_audio/include/mosaico_game_audio.h), [`raylib_lite_audio.h`](raylib_lite_platform/include/raylib_lite_audio.h) |
+| Scene stack, UI controls, or effects | component-specific APIs | [`scene`](mosaico_game_scene/include/), [`ui`](mosaico_game_ui/include/), [`fx`](mosaico_game_fx/include/) |
+| Host replay or target build | `game_cli.py sim/build` | [`game_cli.py`](../tools/game_cli.py), [build paths](../docs/build-matrix.EN.md) |
+
 ## Responsibilities
 
 | Component | Owns | Must not own |

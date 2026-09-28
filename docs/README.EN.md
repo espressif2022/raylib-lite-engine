@@ -2,7 +2,7 @@
 
 [简体中文](README.CN.md) · [Repository README](../README.EN.md)
 
-First use: run `python3 tools/game_cli.py create <name>`, try the Host simulator, then follow the game development guide. The engine core is independent of a specific board; some reference games also include native device projects with explicit board dependencies.
+First use: follow the [quickstart](quickstart.EN.md) to create a game and see it on Host, then use the game development guide. The engine core is independent of a specific board; some reference games also include native device projects with explicit board dependencies.
 
 ## Guides
 
@@ -19,6 +19,10 @@ First use: run `python3 tools/game_cli.py create <name>`, try the Host simulator
 | [Examples](../examples/README.md) | Example and build-support matrix |
 | [Host simulator (简体中文)](../host/README.md) | Host ABI, rebuild-on-change, and replay |
 | [Components](../components/README.md) | Component ownership and lifecycle |
+| [Audio and feedback design](audio-design.EN.md) | Events, assets, backends, and device listening |
+| [New-board porting contract](board-porting.EN.md) | Video, clock, input, audio, and device acceptance |
+| [Agent CLI](agent-cli.EN.md) | JSON output, exit codes, and operation scopes for finite commands |
+| [Raster-kernel contract](raster-kernels.EN.md) | Texture, light, coverage, and error behavior for each `Mosaico2DDraw*` API |
 | [render_benchmark](../examples/render_benchmark/README.md) | Raster benchmark and optional display preview |
 | [Tests](../tests/README.md) | Host unit tests |
 | [Mosaico game development skill](skills/mosaico-game-development/SKILL.EN.md) | Agent-specific workflow |

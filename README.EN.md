@@ -1,6 +1,6 @@
 # Raylib Lite Engine
 
-[简体中文](README.CN.md) · [Documentation](docs/README.EN.md)
+[简体中文](README.CN.md) · [quickstart](docs/quickstart.EN.md) · [Documentation](docs/README.EN.md)
 
 Raylib Lite Engine is an independent, lightweight Raylib-compatible game
 runtime for embedded RGB565 displays. It combines a deterministic fixed-step
@@ -89,4 +89,4 @@ versioned and reject incompatible inputs.
 
 ## License
 
-Source files are licensed under Apache-2.0 unless stated otherwise.
+Source files are licensed under Apache-2.0 unless stated otherwise; see [LICENSE](LICENSE). External dependencies are described in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). See the [contribution guide](CONTRIBUTING.EN.md) before changing the engine.

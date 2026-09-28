@@ -86,6 +86,8 @@ void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int hei
 void mosaico_game_2d_set_clip(int x,int y,int width,int height);
 void mosaico_game_2d_reset_raster_stats(void);
 void mosaico_game_2d_get_raster_stats(mosaico_game_2d_raster_stats_t *out_stats);
+/* Separate counter preserves the existing raster-stats struct layout. */
+uint32_t mosaico_game_2d_get_rejected_draw_calls(void);
 void mosaico_game_2d_set_phase_us(uint32_t sky_us, uint32_t floor_us, uint32_t wall_us,
                                   uint32_t enemy_us, uint32_t hud_us);
 MosaicoAtlas LoadMosaicoAtlas(const char *asset_path);

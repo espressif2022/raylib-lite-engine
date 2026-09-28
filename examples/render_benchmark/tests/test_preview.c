@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "render_preview.h"
+#include "mosaico_game_2d.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,6 +56,10 @@ int main(void){
  render_preview_tap(&state,-1,450);render_preview_tap(&state,480,450);
  assert(!memcmp(&before,&state,sizeof(state)));
  render_preview_draw(pixels,STRIDE,&state);
+ mosaico_game_2d_reset_raster_stats();
+ Mosaico2DDrawSolidRaycastWalls(NULL,0);
+ Mosaico2DDrawSolidRaycastWalls(NULL,1);
+ assert(mosaico_game_2d_get_rejected_draw_calls()==1);
  render_preview_shutdown();
  puts("preview scenes, frame padding, affine comparison and touch controls passed");
  return 0;

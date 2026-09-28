@@ -1,0 +1,12 @@
+# Third-party dependencies
+
+The root [LICENSE](LICENSE) applies to this repository's Apache-2.0-marked source unless a file says otherwise. It does not relicense external components, tools, or assets.
+
+| Dependency | How it is used | Where to check the resolved license and notice |
+| --- | --- | --- |
+| raylib and the `georgik/raylib` ESP component | Native example compatibility and rendering APIs | Versioned `examples/*/main/idf_component.yml`; the resolved component's license and raylib's upstream `LICENSE` |
+| ESP-IDF and Espressif managed components, including `esp_mmap_assets` and `esp_display_present` | Device builds | The product's dependency lock and each resolved component's license/notice |
+| Pillow | Host preview and asset conversion | Installed Python package metadata and upstream license |
+| Product BSP, Iris/Recovery, and external ELF game SDK | Optional device integrations | Their separate repositories and resolved revisions |
+
+`managed_components/` and build directories are generated dependency copies, not maintained source in this repository. A release or firmware package must collect the actual licenses/notices for the versions it ships. This inventory is a pointer to those sources, not a claim that every transitive dependency is listed here.

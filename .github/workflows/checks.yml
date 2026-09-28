@@ -1,0 +1,27 @@
+name: Host checks
+on:
+  push:
+  pull_request:
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Host dependency
+        run: python3 -m pip install Pillow
+      - name: Check maintained Markdown links
+        run: python3 tools/check_markdown_links.py
+      - name: Check whitespace
+        run: git diff --check HEAD^ HEAD
+      - name: Run Host tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Verify raster preview and rejection counter
+        run: |
+          cmake -S examples/render_benchmark -B /tmp/raster-preview-ci -DRENDER_BENCH_HOST=ON -DRENDER_BENCH_DISPLAY=ON
+          cmake --build /tmp/raster-preview-ci -j2
+          ctest --test-dir /tmp/raster-preview-ci --output-on-failure

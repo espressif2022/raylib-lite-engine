@@ -57,6 +57,14 @@ RGB565 帧缓冲的借出、提交、释放必须明确所有权；繁忙、失�
 | 环视深度网格和体积面 | RGB565 Quad 与 Triangle | [Living Worlds](../examples/living_worlds/README.md) | 深度层、动画缓存失效、全屏覆盖与清屏条件 |
 | 2D 精灵、tilemap、HUD | Atlas 与基础图元 | [Sky Hop](../examples/sky_hop/README.md)、[Tower Defense](../examples/tower_defense/README.md) | 源裁剪、缩放、旋转、tint、alpha 与叠加顺序 |
 
+**当前三维路径的约束。** INDEX8 三角形和 Quad 的顶点 `q > 0` 表示 `1/z`，会在水平段端点进行透视 UV 校正；`q == 0` 保留仿射采样。RGB565 三角形和 Quad 当前忽略 `q`，不能把这条能力推广到所有纹理格式。[光栅配置](../components/mosaico_game_2d/include/mosaico_wall_config.h)有 legacy、逐像素、固定段长、误差约束四种编译模式；legacy 模式才使用 `1/z` 比值 1.15 的分段启发式，专用 benchmark 默认尝试误差约束模式，不代表产品已采用它。新游戏应先设 UV 误差预算，再用相同场景分别验证画质、内核耗时和完整帧率。
+
+**光照与遮挡。** 当前三角形/Quad 的 `light256` 是一次 draw 的统一光照，没有按顶点插值。Tomb Explorer 将顶点光照汇总后按 draw 提交，并把面按深度从远到近排序绘制；该示例没有通用 Z 缓冲，深度排序对互相穿插的面仍需靠几何拆分或裁剪解决。Last Zone 另用逐列深度处理 billboard 遮挡；两条路径不可混称为引擎统一遮挡方案。
+
+**帧缓冲写入。** 不透明、范围内的 Quad 尽量按行合并成连续 span，减少分散写入；光栅统计中的 `fb_runs`/`fb_pixels` 可描述写入形态，但不是实际 PSRAM 总线事务或带宽。是否改善板端性能，必须在固定纹理位置、时钟与场景后用设备 benchmark 验证。接口的纹理布局、覆盖、裁剪和错误行为见[光栅内核契约](raster-kernels.CN.md)。
+
+**抽象门槛。** 第二个游戏若重复 DDA、逐列深度和 billboard 遮挡，或重复近平面裁剪、背面剔除、深度排序和门户 scissor，先比较坐标系、资源寿命与可见性语义；只有稳定的共用部分才从示例移入组件。按顶点插值光照，以及 WARP/Mode7 类逐行独立步进 span 属于候选能力：先建立独立像素参考、画质场景和板端成本，再决定是否加入公共 API。
+
 纹理布局按访问方向选择：墙柱可用列主序 INDEX8，水平 span 可用行主序；RGB565、INDEX8、压缩纹理由画质、内存和设备时间共同决定。非 2 的幂尺寸不能默认按位环绕。每层要声明覆盖、遮罩或 alpha 混合；RGB565 量化、舍入、stride padding 与资源寿命都属于像素契约。快路径必须对齐独立逐像素参考。
 
 ## 4. 验证设计是否可复用

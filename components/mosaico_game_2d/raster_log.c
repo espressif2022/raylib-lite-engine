@@ -26,6 +26,8 @@ void mosaico_game_2d_log_raster_shape(const char*tag){
   (unsigned long)s_raster_stats.rotated_calls,(unsigned long)s_raster_stats.rotated_pixels);
  ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path column_calls=%lu column_pixels=%lu",
   (unsigned long)s_raster_stats.column_calls,(unsigned long)s_raster_stats.column_pixels);
+ ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path rejected_draw_calls=%lu",
+  (unsigned long)mosaico_game_2d_get_rejected_draw_calls());
  ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path span_calls=%lu span_pixels=%lu",
   (unsigned long)s_raster_stats.span_calls,(unsigned long)s_raster_stats.span_pixels);
  ESP_LOGI(tag?tag:"mosaico_game_2d","raster_path frame_lookup_hits=%lu frame_lookup_misses=%lu triangle_direct_pixels=%lu triangle_mirror_pixels=%lu",
