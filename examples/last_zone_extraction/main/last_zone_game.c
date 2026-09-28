@@ -619,7 +619,7 @@ void last_zone_reset(last_zone_game_t *game)
     game->phase=LAST_ZONE_PHASE_START;
     place_layout(game,layout);
     game->explored[(int)game->y][(int)game->x]=1;
-    game->perf_logic_fps=game->perf_display_fps=30.0f;
+    game->perf_logic_fps=game->perf_display_fps=0.0f;
 }
 
 void last_zone_set_best(last_zone_game_t *game,uint32_t ticks)

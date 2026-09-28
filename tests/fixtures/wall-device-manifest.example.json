@@ -1,0 +1,29 @@
+{
+  "schema": "wall-device-input/v1",
+  "workload_source": "source/mosaico_wall_bench.c",
+  "environment": {
+    "board": "REPLACE_WITH_BOARD_AND_REVISION",
+    "chip": "REPLACE_WITH_CHIP",
+    "cpu_hz": null,
+    "psram_hz": null,
+    "toolchain": "REPLACE_WITH_COMPILER_VERSION_AND_FLAGS",
+    "idf_commit": "REPLACE_WITH_IDF_COMMIT",
+    "framebuffer_storage": "psram",
+    "texture_storage": "psram",
+    "lut_storage": "psram",
+    "display_active": false,
+    "raster_profile": false,
+    "power_mode": "REPLACE_WITH_CLOCK_POWER_CONFIGURATION",
+    "background_tasks": "REPLACE_WITH_TASK_CONFIGURATION"
+  },
+  "variants": {
+    "adaptive025": {
+      "audit_image": "adaptive025-audit.bin",
+      "timing_image": "adaptive025-timing.bin",
+      "audit_sdkconfig": "adaptive025-audit.sdkconfig",
+      "timing_sdkconfig": "adaptive025-timing.sdkconfig",
+      "audit_log": "adaptive025-audit.log",
+      "timing_logs": ["adaptive025-0.log", "adaptive025-1.log", "adaptive025-2.log"]
+    }
+  }
+}

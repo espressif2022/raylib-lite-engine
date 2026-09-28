@@ -22,9 +22,14 @@ ESP_IMPLEMENTATIONS = {
     "mosaico_game_save/mosaico_game_save.c",
     "mosaico_game_2d/mosaico_game_2d_esp.c",
     "mosaico_game_2d/mosaico_raster_bench.c",
+    "mosaico_game_2d/mosaico_wall_bench.c",
     "mosaico_game_2d/raster_log.c",
     "mosaico_game_2d/raster_esp_config.h",
     "raylib_lite_platform/clock_esp.c",
+}
+ESP_BENCHMARK_SOURCES = {
+    "benchmark_main.c", "core_bench.c", "render_preview.c",
+    "render_display_esp.c",
 }
 
 
@@ -122,7 +127,9 @@ int main(void) {{ return ESP_OK; }}
             for path in main.iterdir():
                 if path.suffix in {".c", ".h"}:
                     if path.name in {"main.c", "living_worlds_native.c",
-                                     "living_worlds_native.h"}:
+                                     "living_worlds_native.h"} or (
+                            main.parent.name == "render_benchmark" and
+                            path.name in ESP_BENCHMARK_SOURCES):
                         continue  # ESP-only entry and adapter, separate from gameplay.
                     with self.subTest(path=path.relative_to(ENGINE)):
                         self.assertIsNone(forbidden.search(path.read_text()))

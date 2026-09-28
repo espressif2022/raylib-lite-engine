@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "mosaico_game_2d.h"
-#if CONFIG_MOSAICO_GAME_RASTER_BENCHMARK
+#if defined(M2D_WALL_BENCHMARK)
+#include "esp_log.h"
+int mosaico_wall_benchmark(void);
+void mosaico_game_2d_run_benchmark(void)
+{
+    if(mosaico_wall_benchmark()!=0)ESP_LOGE("wall_bench","allocation failed; run invalid");
+}
+#elif CONFIG_MOSAICO_GAME_RASTER_BENCHMARK
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"

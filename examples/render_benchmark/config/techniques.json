@@ -1,0 +1,307 @@
+{
+  "schema": "render-techniques/v1",
+  "scope": "本地引擎相关技术路线；不是第三方框架排名",
+  "entries": [
+    {
+      "id": "wall_perspective",
+      "title": "透视校正",
+      "status": "implemented",
+      "suite": "wall",
+      "variants": [
+        "legacy",
+        "exact",
+        "fixed4",
+        "fixed8",
+        "fixed16",
+        "fixed32",
+        "adaptive0125",
+        "adaptive025",
+        "adaptive05"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "gate": "UV≤0.26、覆盖正确、稳定计时"
+    },
+    {
+      "id": "quad_triangle",
+      "title": "Quad / 三角形扫描",
+      "status": "implemented",
+      "suite": "wall",
+      "variants": [
+        "quad",
+        "triangles"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "gate": "同平面、同UV、相同覆盖与画质"
+    },
+    {
+      "id": "rgb565_index8",
+      "title": "RGB565 / INDEX8",
+      "status": "implemented",
+      "suite": "core",
+      "variants": [
+        "columns_rgb565",
+        "columns_index8_row",
+        "columns_index8_column",
+        "quad_rgb565",
+        "quad_index8"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "gate": "先要求同组输出完全相同，再比较耗时"
+    },
+    {
+      "id": "texture_layout",
+      "title": "纹理行主序 / 列主序",
+      "status": "implemented",
+      "suite": "core",
+      "variants": [
+        "columns_index8_row",
+        "columns_index8_column"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "gate": "相同纹理、采样、输出"
+    },
+    {
+      "id": "horizontal_span",
+      "title": "水平 span",
+      "status": "implemented",
+      "suite": "core",
+      "variants": [
+        "span_rgb565"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "gate": "独立整数采样参考"
+    },
+    {
+      "id": "copy_fill",
+      "title": "清屏、拷贝与批量写入",
+      "status": "implemented",
+      "suite": "core",
+      "variants": [
+        "copy_rgb565",
+        "fill_rgb565"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_rgb565.c",
+      "gate": "包括 framebuffer padding 的逐像素检查"
+    },
+    {
+      "id": "lighting",
+      "title": "RGB565 量化光照 / INDEX8 LUT",
+      "status": "implemented",
+      "suite": "core",
+      "variants": [
+        "shade_rgb565",
+        "columns_index8_row"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_rgb565.c",
+      "gate": "当前两组输入不同，不能直接互相算加速比"
+    },
+    {
+      "id": "mtx2",
+      "title": "MTX2 压缩纹理",
+      "status": "implemented",
+      "suite": "core",
+      "variants": [
+        "span_mtx2"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_mtx2.c",
+      "gate": "独立调色板解码参考；尚无同图RGB565性能对照"
+    },
+    {
+      "id": "trigonometry",
+      "title": "逐点 sinf / 正弦余弦递推",
+      "status": "implemented",
+      "suite": "core",
+      "variants": [
+        "sin_direct",
+        "sin_recurrence"
+      ],
+      "source": "examples/render_benchmark/main/core_bench.c",
+      "gate": "256点对 double sin 的最大误差≤1e-4；合成内核，不替代游戏测试"
+    },
+    {
+      "id": "pie",
+      "title": "标量 / S31 PIE",
+      "status": "device_selectable",
+      "suite": "core",
+      "variants": [
+        "RENDER_BENCH_PIE=OFF",
+        "RENDER_BENCH_PIE=ON"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_rgb565_pie.S",
+      "gate": "copy/fill 输出相同，固定同一硬件环境"
+    },
+    {
+      "id": "memory",
+      "title": "PSRAM / 内部 LUT",
+      "status": "device_selectable",
+      "suite": "wall",
+      "variants": [
+        "RENDER_BENCH_LUT_INTERNAL=OFF",
+        "RENDER_BENCH_LUT_INTERNAL=ON"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_wall_bench.c",
+      "gate": "同图同策略，内存位置作为独立维度；各自基线"
+    },
+    {
+      "id": "near_clip",
+      "title": "相机变换 / 近平面裁剪",
+      "status": "integration_pending",
+      "suite": "tomb",
+      "variants": [],
+      "source": "examples/tomb_explorer/main/tomb_view.c",
+      "gate": "跨近平面固定回放、覆盖与UV连续"
+    },
+    {
+      "id": "convex_polygon",
+      "title": "裁剪后凸多边形统一 walker",
+      "status": "candidate_pending",
+      "suite": "tomb",
+      "variants": [],
+      "source": null,
+      "gate": "与三角扇相同覆盖、UV连续；尚未实现"
+    },
+    {
+      "id": "visibility",
+      "title": "qsort / 深度桶 / 局部深度缓冲",
+      "status": "candidate_pending",
+      "suite": "tomb",
+      "variants": [],
+      "source": null,
+      "gate": "交叠墙与门户对深度缓冲参考；不假定简单排序总正确"
+    },
+    {
+      "id": "portal",
+      "title": "矩形 scissor / 多边形门户",
+      "status": "integration_pending",
+      "suite": "tomb",
+      "variants": [],
+      "source": "examples/tomb_explorer/main/tomb_view.c",
+      "gate": "相同可见像素、漏画率、overdraw"
+    },
+    {
+      "id": "dda",
+      "title": "DDA 射线、补射线与墙柱合并",
+      "status": "integration_pending",
+      "suite": "last_zone",
+      "variants": [],
+      "source": "examples/last_zone_extraction/main/last_zone_view.c",
+      "gate": "墙角命中正确、近墙移动稳定、射线预算"
+    },
+    {
+      "id": "floor",
+      "title": "地板行与遮挡",
+      "status": "integration_pending",
+      "suite": "last_zone",
+      "variants": [],
+      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "gate": "地板oracle、重复覆盖和完整帧耗时"
+    },
+    {
+      "id": "texture_overlay",
+      "title": "纹理叠加、透明度与着色",
+      "status": "integration_pending",
+      "suite": "2d",
+      "variants": [
+        "opaque_overlay",
+        "binary_alpha",
+        "fractional_alpha",
+        "global_alpha",
+        "tint",
+        "overlap_order"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "gate": "同背景同纹理逐像素对标标量混合；验证0/半透明/255、重叠顺序、边界与stride；再测板端成本"
+    },
+    {
+      "id": "texture_transform",
+      "title": "纹理裁剪、缩放、翻转与旋转",
+      "status": "host_partial",
+      "suite": "2d",
+      "variants": [
+        "source_clip",
+        "scale",
+        "flip_x",
+        "flip_y",
+        "rotate",
+        "origin"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "gate": "Host已有不透明缩放/翻转100例；仍需旋转/原点/透明纹理组合与板端同输入测试"
+    },
+    {
+      "id": "tile_and_scanline",
+      "title": "TileRow、CopyScanline 与遮挡组合",
+      "status": "integration_pending",
+      "suite": "2d",
+      "variants": [
+        "tile_row",
+        "copy_scanline",
+        "floor_row_occlusion"
+      ],
+      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "gate": "纹理边界、屏幕裁剪、行覆盖和遮挡后输出逐像素正确，再采集单核与整帧耗时"
+    },
+    {
+      "id": "primitive_alpha",
+      "title": "矩形、圆、椭圆等图形原语的 alpha 混合",
+      "status": "host_tested",
+      "suite": "2d",
+      "variants": [
+        "opaque",
+        "alpha_0_255",
+        "clip",
+        "stride"
+      ],
+      "source": "components/mosaico_raylib_fast/mosaico_raylib_fast.c",
+      "gate": "Host 1024 个标量参考用例已有；尚未纳入专用板端同输入性能/上屏验收"
+    },
+    {
+      "id": "sprites_alpha",
+      "title": "Atlas、缩放、透明与精灵",
+      "status": "integration_pending",
+      "suite": "2d",
+      "variants": [],
+      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "gate": "复用现有host oracle，再建立同输入板端suite"
+    },
+    {
+      "id": "numeric",
+      "title": "浮点 / 定点 / 倒数近似",
+      "status": "candidate_pending",
+      "suite": "wall",
+      "variants": [],
+      "source": null,
+      "gate": "溢出范围、最大误差和长序列漂移；当前不接近似倒数"
+    },
+    {
+      "id": "scene_cache",
+      "title": "种子旋转缓存 / 去重复清屏",
+      "status": "integration_pending",
+      "suite": "living_worlds",
+      "variants": [],
+      "source": "examples/living_worlds/main/living_worlds_view.c",
+      "gate": "按场景比较，缓存失效条件、覆盖完全才跳清屏"
+    },
+    {
+      "id": "display",
+      "title": "帧缓冲数量 / DMA / TE / 任务调度",
+      "status": "product_pending",
+      "suite": "display",
+      "variants": [],
+      "source": null,
+      "gate": "真实产品工程测逐帧延迟、吞吐、丢帧，不能用离屏microbench替代"
+    },
+    {
+      "id": "display_preview",
+      "title": "裸屏画质预览与同步 DMA 送屏",
+      "status": "device_selectable",
+      "suite": "preview",
+      "variants": [
+        "RENDER_BENCH_DISPLAY=ON",
+        "split/full"
+      ],
+      "source": "examples/render_benchmark/main/render_display_esp.c",
+      "gate": "Host 图像/控件/边界测试与 S31 构建已验证；屏幕、触摸和传输完成速率待设备实测，不计离屏分数"
+    }
+  ]
+}

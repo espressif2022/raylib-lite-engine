@@ -18,8 +18,8 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
 if(MOSAICO_NATIVE_IRIS)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE MOSAICO_NATIVE_IRIS=1)
     target_include_directories(${COMPONENT_LIB} PRIVATE
-        "${MOSAICO_VIBE_PATH}/submodule/esp-mosaico-utils/ESP-Iris/components/esp_iris/include"
-        "${MOSAICO_VIBE_PATH}/components/esp_mosaico_app_recovery/include")
+        "${MOSAICO_UTILS_ROOT}/ESP-Iris/components/esp_iris/include"
+        "${MOSAICO_RECOVERY_COMPONENT_DIR}/include")
     target_link_libraries(${COMPONENT_LIB} PRIVATE
         idf::esp_iris idf::esp_mosaico_app_recovery)
 endif()

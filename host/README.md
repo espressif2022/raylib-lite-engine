@@ -1,6 +1,6 @@
 # Host 仿真
 
-[返回文档索引](../docs/README.md)
+[返回文档索引](../docs/README.CN.md)
 
 `host/run_game.py` 把示例的玩法/绘制 C 源码编成本机共享库，按 RGB565 出帧。
 浏览器只显示这帧。入口是仓库根目录的 `python3 tools/game_cli.py sim`。
@@ -23,8 +23,17 @@ Host 显示实现通过 `raylib_lite_video_backend_t` 接入通用 framebuffer p
 ```
 
 `sources` 必须落在该示例目录内。`game_module.c` 实现
-[`mosaico_host_game.h`](include/mosaico_host_game.h) 的 v1 ABI（`tick_hz`、
-输入、update、RGB565 render、可选 state JSON）。
+[`mosaico_host_game.h`](include/mosaico_host_game.h) 的 v1 ABI。最小模块按以下顺序提供入口；可从[射击示例的 game_module.c](../examples/raylib_shooter/main/game_module.c)复制完整骨架，再替换状态和绘制：
+
+| 入口 | 职责 |
+| --- | --- |
+| `mosaico_host_game_v1` | 返回版本、尺寸、`tick_hz` 和触点数描述符 |
+| `create_v1` / `destroy_v1` | 创建/释放游戏状态与资源 |
+| `input_v1` / `update_v1` | 接收语义输入并按固定节拍更新 |
+| `render_rgb565_v1` | 写入调用方提供的 RGB565 缓冲，使用像素 stride |
+| `state_json_v1` | 输出回放检查所需的状态 JSON |
+
+实际导出符号均有 `mosaico_host_game_` 前缀，完整签名以头文件为准。`state_hash_v1` 也在 ABI 头中声明；当前 Host runner 读取描述符、状态 JSON 和画面，不靠哈希代替这些检查。
 
 启动时 `run_game.py` 会：
 
@@ -57,6 +66,5 @@ headless 把最后一帧写到 `examples/<name>/build-host/frame.png`。
 
 ## 和真机的边界
 
-Host 能对的是玩法、输入映射和像素。LCD 时序、触摸手感、ES8311 音频、分区和
-`idf.py flash` 只在设备上验收。设备 `factory` 为 5MB，见
-[游戏开发指南](../docs/game-development.zh-CN.md)。
+Host 能验证玩法、输入映射和像素。LCD 时序、物理触摸、音频后端、分区资源与
+烧录只在设备路径中验收；构建与验收边界见[构建路径](../docs/build-matrix.CN.md)。

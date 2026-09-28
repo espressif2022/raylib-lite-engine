@@ -159,3 +159,16 @@ practical consequence for integration is that MTX2 must amortize palette decode
 across the four scanlines a block row covers, so a per-scanline sampler should
 not be wired into the draw paths directly. Encoder quality is measured
 separately and is not asserted here.
+
+## Wall perspective acceptance
+
+```sh
+python3 -m unittest tests.test_wall_benchmark -v
+python3 tools/wall_benchmark.py --output artifacts/wall-benchmark/run-001
+```
+
+The matrix compiles the actual C rasterizer in separate audit/timing builds.
+It checks all sampled UVs and framebuffer coverage against independent plane
+equations, then runs interleaved timings. Failed quality or unstable timings
+cannot receive a total score. The versioned scoring policy is defined in `tools/wall_benchmark.py`;
+record its policy version with each Host or device result.

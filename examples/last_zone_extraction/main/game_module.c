@@ -12,6 +12,7 @@
 #include "last_zone_game.h"
 #include "last_zone_view.h"
 #if defined(MOSAICO_GAME_NATIVE)
+#include "mosaico_game.h"
 #include "mosaico_game_audio.h"
 #include "native_feedback.h"
 #endif
@@ -29,6 +30,8 @@ typedef struct {
     Music music;
     uint32_t played_sfx_serial;
 #endif
+    uint64_t fps_window_us;
+    uint32_t fps_window_frames;
 } last_zone_module_t;
 
 #define JOYSTICK_RADIUS 64
@@ -42,11 +45,17 @@ static void feedback_init(last_zone_module_t *state)
 {
     InitAudioDevice();
     if(IsAudioDeviceReady()){
-        for(unsigned i=1;i<12;++i)state->sounds[i]=LoadSound(SFX_PATHS[i]);
+        for(unsigned i=1;i<12;++i){
+            state->sounds[i]=LoadSound(SFX_PATHS[i]);
+            if(!state->sounds[i].frameCount)
+                fprintf(stderr,"last_zone_audio: failed to load %s\n",SFX_PATHS[i]);
+        }
         state->music=LoadMusicStream("music.sound");
-        SetMusicVolume(state->music,.20f);
-        PlayMusicStream(state->music);
-    }
+        if(state->music.frameCount){
+            SetMusicVolume(state->music,.20f);
+            PlayMusicStream(state->music);
+        }else fprintf(stderr,"last_zone_audio: failed to load music.sound\n");
+    }else fprintf(stderr,"last_zone_audio: audio device unavailable\n");
     mosaico_native_feedback_init();
 }
 
@@ -56,13 +65,15 @@ static void feedback_event(last_zone_module_t *state)
     if(!cue||cue>=12||state->played_sfx_serial==state->game.sfx_serial)return;
     state->played_sfx_serial=state->game.sfx_serial;
     if(state->sounds[cue].frameCount)PlaySound(state->sounds[cue]);
+    if(cue==1&&(state->game.last_fire==NEON_FIRE_HIT||
+                state->game.last_fire==NEON_FIRE_KILL)&&
+            state->sounds[2].frameCount)
+        PlaySound(state->sounds[2]);
     switch(cue){
     case 1: mosaico_native_feedback_pattern(82,28,38,18,24);break;
     case 3: mosaico_native_feedback_pulse(24,24);break;
     case 4: mosaico_native_feedback_pulse(42,38);break;
     case 6: mosaico_native_feedback_pattern(25,24,36,24,28);break;
-    case 7:
-    case 8: mosaico_native_feedback_pulse(16,16);break;
     case 9: mosaico_native_feedback_pulse(78,85);break;
     case 10:mosaico_native_feedback_pattern(100,90,72,32,115);break;
     case 11:mosaico_native_feedback_pattern(48,55,72,45,90);break;
@@ -138,7 +149,9 @@ static void shutdown(void *value){last_zone_module_t *state=value;if(state){
 #if defined(MOSAICO_GAME_NATIVE)
     mosaico_native_feedback_stop();
     if(IsAudioDeviceReady()){
-        StopMusicStream(state->music);UnloadMusicStream(state->music);
+        if(state->music.frameCount){
+            StopMusicStream(state->music);UnloadMusicStream(state->music);
+        }
         for(unsigned i=1;i<12;++i)if(state->sounds[i].frameCount)UnloadSound(state->sounds[i]);
         CloseAudioDevice();
     }
@@ -232,12 +245,30 @@ static void update(void *value)
 }
 static int render(void *value){last_zone_module_t *state=value;
     struct timespec started,ended;timespec_get(&started,TIME_UTC);
+#if defined(MOSAICO_GAME_NATIVE)
+    mosaico_game_stats_t stats={0};
+    MosaicoGameGetStats(&stats);
+    last_zone_set_performance(&state->game,stats.logic_fps,stats.display_fps,
+                              state->game.perf_render_ms);
+#else
+    uint64_t now_us=(uint64_t)started.tv_sec*1000000ULL+
+                    (uint64_t)started.tv_nsec/1000ULL;
+    if(!state->fps_window_us)state->fps_window_us=now_us;
+    ++state->fps_window_frames;
+    uint64_t window_us=now_us-state->fps_window_us;
+    if(window_us>=1000000ULL){
+        float fps=(float)state->fps_window_frames*1000000.0f/(float)window_us;
+        last_zone_set_performance(&state->game,fps,fps,state->game.perf_render_ms);
+        state->fps_window_us=now_us;
+        state->fps_window_frames=0;
+    }
+#endif
     last_zone_view_render(&state->game,state->enemies,state->weapon,state->environment,
                           state->floor,state->walls,state->controls,state->props);
     timespec_get(&ended,TIME_UTC);
     float elapsed=(float)(ended.tv_sec-started.tv_sec)*1000.0f+
                   (float)(ended.tv_nsec-started.tv_nsec)/1000000.0f;
-    last_zone_set_performance(&state->game,30.0f,30.0f,elapsed);return 0;}
+    state->game.perf_render_ms=elapsed;return 0;}
 static uint32_t state_hash(const void *value)
 {return last_zone_state_hash(&((const last_zone_module_t*)value)->game);}
 static int state_json(const void *value,char *output,size_t capacity)

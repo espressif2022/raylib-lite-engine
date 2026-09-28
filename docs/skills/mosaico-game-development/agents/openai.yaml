@@ -1,4 +1,4 @@
 interface:
   display_name: "Mosaico Game Development"
-  short_description: "Build and validate ESP-Mosaico Raylib games"
-  default_prompt: "Create or extend an ESP-Mosaico game using the repository Game SDK and recovery-safe workflow."
+  short_description: "Build and validate Raylib Lite Engine games"
+  default_prompt: "Develop a Raylib Lite Engine game with portable shared sources; use the Host simulator, choose direct native, Iris native, or lobby ELF from the build matrix, and report the validation path."

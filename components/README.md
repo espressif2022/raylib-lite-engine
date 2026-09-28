@@ -1,10 +1,10 @@
-# Game SDK component conventions
+# Raylib Lite Engine component conventions
 
 The components in this directory are the shared engine implementation. They
 are not published as independent ESP Component Registry packages. Host builds
 compile their needed sources directly; ESP-IDF products register device
 components through this repository's `cmake/raylib_lite_esp.cmake` helper. See
-[`build-matrix.zh-CN.md`](../docs/build-matrix.zh-CN.md) for the three build
+[`build-matrix.EN.md`](../docs/build-matrix.EN.md) for the three build
 paths.
 
 ## Responsibilities
@@ -27,6 +27,7 @@ paths.
 | `mosaico_game_ui` | fixed retained panel/label/button tree and two tracked pointers | menus, layout engines, or board input |
 | `mosaico_game_fx` | fixed-capacity tweens, easing, and particle pools | heap allocation or rendering policy |
 | `mosaico_game_save` | versioned save and debounce contracts with ESP NVS implementation | game migration policy |
+| `mosaico_iris_ota_size_check` | override app-size checking for the Iris/Recovery OTA layout | generic engine runtime or non-Iris builds |
 
 ## Public API rules
 
@@ -51,23 +52,17 @@ configuration lives in this repository's `Kconfig` files;
 game-specific tuning belongs in the product's `sdkconfig.defaults`. Platform
 registration maps those choices to the shared source configuration.
 The engine provides generic `raylib_lite_game_app_t` and
-`raylib_lite_game_app_run()` lifecycle/runner types. Product-specific
-`sky_hop_app_create()`, `shooter_app_create()`, and `tower_app_create()` glue
-is owned by the product repository, along with backend construction, device
-tasks, power/display/touch/IMU/audio startup, and teardown. The runner does not
-select a board or create an RTOS task.
-
-Board-specific launchers are not part of this repository. Product repositories
-compose a game-specific app creator with `raylib_lite_platform_t`, own device
-workers and teardown, and call the generic runner. ESP-specific service
-implementations and component registration are in this repository. The ownership split is documented in
-[`platform-mosaico-launcher-retirement.zh-CN.md`](../docs/platform-mosaico-launcher-retirement.zh-CN.md).
+`raylib_lite_game_app_run()` lifecycle/runner types. A standalone example
+can use `examples/common/native_module_main.c`; a product can compose its own
+entry point and platform services. The runner does not select a board or
+create an RTOS task. See [reusable design principles](../docs/reference-designs.EN.md)
+for the ownership boundary. `mosaico_iris_ota_size_check` is registered only
+for the Iris native path through the native-project helper.
 
 Asset source conversion is a build-time concern owned by
-`tools/pack_game_assets.py`. Runtime components consume packed files from the
-read-only `game_assets` partition and/or
-`mosaico_game_asset_register_memory()` (32 slots). Partition assets take
-precedence when both stores contain the same name. Embedding a complete game
-pack is an explicit project tradeoff because it consumes the 5MB `factory`
-slot. Host simulation uses the packed files under `assets/generated` and does
-not mount a flash partition.
+`tools/pack_game_assets.py`. Runtime components consume packed files from a read-only asset partition,
+an in-memory module image, or `mosaico_game_asset_register_memory()` (currently
+32 slots). Lookup prefers a mounted partition, then a mounted image, then
+registered memory when names overlap. Whether a complete pack is embedded or
+stored in a partition depends on the product's partition table and capacity
+budget. Host simulation reads generated files and does not mount device flash.

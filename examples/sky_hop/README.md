@@ -4,7 +4,7 @@ Sky Hop is a four-level scrolling platform game. Level data is kept in the
 host-testable gameplay model: progress, score, and remaining lives carry into
 the next level, while completing level 4 finishes the run.
 
-原创横版平台跳跃 Demo，用于验证 Mosaico Raylib Game SDK。
+原创横版平台跳跃 Demo，用于验证 Raylib Lite Engine 的玩法与设备接口。
 
 ## 操作
 
@@ -28,7 +28,8 @@ python3 tools/game_cli.py sim examples/sky_hop
 python3 tools/game_cli.py sim examples/sky_hop --headless --frames 300
 ```
 
-真机入口由外部产品仓库提供；本目录不是 ESP-IDF 工程。
+本目录提供独立 ESP-IDF native 工程，需显式配置板级依赖后构建。产品固件的
+板级策略和 app glue 由外部产品仓库维护。
 
 浏览器模拟器地址为 `http://127.0.0.1:8460/`。键盘使用 `A/D` 或方向键移动、
 空格跳跃、`P` 暂停、回车开始/进入下一关；触屏设备可同时按住底部移动键和跳跃键。
@@ -36,5 +37,6 @@ python3 tools/game_cli.py sim examples/sky_hop --headless --frames 300
 不需要在网页端重复实现。Host 与设备共享 RGB565 view，浏览器直接显示 C 渲染结果；音频、LCD 时序和
 物理输入仍需真机验证。
 
-开发与回放流程见[游戏开发指南](../../docs/game-development.zh-CN.md)，
-固定 60 秒场景、配置矩阵与判据见[Sky Hop 性能测试](../../docs/sky-hop-performance.zh-CN.md)。
+开发与回放流程见[游戏开发指南](../../docs/game-development.CN.md)，
+性能比较应固定输入、场景、构建和板卡配置，并保留原始日志；
+通用方法见[可复用设计方法](../../docs/reference-designs.CN.md)。

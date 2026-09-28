@@ -13,11 +13,8 @@ The screenshot is a Host RGB565 frame of the Dock mission.
 
 截图为 Dock 关卡的 Host RGB565 画面。
 
-墙体、纹理布局、压缩和真机优化迭代记录见
-[`../../docs/wall-rendering-optimization-history.zh-CN.md`](../../docs/wall-rendering-optimization-history.zh-CN.md)。
-
-原生声音与震动事件链见
-[`../../docs/native-feedback-history.zh-CN.md`](../../docs/native-feedback-history.zh-CN.md)。
+墙体、纹理布局与性能验收见
+[可复用设计方法](../../docs/reference-designs.CN.md)，其中也定义原生声音与震动事件的职责。
 
 ## Play / 玩法
 

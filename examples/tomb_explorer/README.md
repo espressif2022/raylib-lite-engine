@@ -23,13 +23,8 @@ crypt, and pool.
 
 The screenshot is a Host RGB565 frame of the hall. / 截图为大厅的 Host RGB565 画面。
 
-绘制路径、与 Last Zone / Living Worlds 的对照以及 micropixel 对标见
-[`docs/game-drawing-inventory.zh-CN.md`](../../docs/game-drawing-inventory.zh-CN.md)。
-当前墙体内核实验与真机数据见
-[`../../docs/wall-rendering-optimization-history.zh-CN.md`](../../docs/wall-rendering-optimization-history.zh-CN.md)。
-
-原生震动反馈与声音资产边界见
-[`../../docs/native-feedback-history.zh-CN.md`](../../docs/native-feedback-history.zh-CN.md)。
+绘制路径、墙体透视与验收方法见
+[可复用设计方法](../../docs/reference-designs.CN.md)，其中也定义声音与震动事件的职责。
 
 五间房间：入口、斜坡走廊、带雕带大厅、墓室、水池。
 

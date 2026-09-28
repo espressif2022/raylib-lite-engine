@@ -95,5 +95,5 @@ The deterministic model owns track-local motion, jumping, checkpoints, laps,
 nitro and semantic event flags. The renderer samples the exact same procedural
 track function, so collision and perspective geometry cannot drift apart.
 
-Implementation and device measurements are recorded in
-`docs/neon-rift-rally-history.zh-CN.md`.
+For repeatable device measurements, record the firmware hash, display
+configuration, fixed input sequence, and raw logs alongside each result.

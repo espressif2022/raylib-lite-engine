@@ -25,7 +25,7 @@ python3 tools/game_cli.py sim examples/tower_defense --headless \
   --scenario replay.json --state-output artifacts/tower-state.json
 ```
 
-真机入口由外部产品仓库提供；本目录不是 ESP-IDF 工程。
+本目录提供独立 ESP-IDF 原生固件工程；生产固件的板级策略由外部产品仓库决定。
 
 非 headless 预览地址为 `http://127.0.0.1:8460/`；局域网预览可加
 `--listen 0.0.0.0`。

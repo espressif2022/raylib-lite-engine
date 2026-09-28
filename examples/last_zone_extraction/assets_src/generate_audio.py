@@ -29,21 +29,6 @@ def rifle():
         result.append(.56 * crack + .46 * body + .20 * pressure + echo)
     return result
 
-def bolt():
-    rng = random.Random(308); count = int(RATE * .28); result = []
-    events = ((.000, 2350, .28), (.055, 980, .24), (.142, 720, .22), (.218, 1880, .30))
-    for i in range(count):
-        t = i / RATE; value = 0.0
-        for start, freq, gain in events:
-            if t < start: continue
-            local = t - start
-            if local > .055: continue
-            click = rng.uniform(-1, 1) * math.exp(-local * 72.0)
-            ring = math.sin(2 * math.pi * freq * local) * math.exp(-local * 46.0)
-            value += gain * (.58 * click + .42 * ring)
-        result.append(value)
-    return result
-
 def impact():
     rng = random.Random(762); count = int(RATE * .11); result = []; low = 0.0
     for i in range(count):
@@ -140,7 +125,6 @@ def music():
     return result
 
 save("rifle.wav", rifle())
-save("bolt.wav", bolt())
 save("impact.wav", impact())
 save("confirm.wav", confirm())
 save("hurt.wav", hurt())

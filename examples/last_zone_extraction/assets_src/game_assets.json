@@ -13,7 +13,6 @@
   ],
     "sounds": [
     {"source": "rifle.wav"},
-    {"source": "bolt.wav"},
     {"source": "impact.wav"},
     {"source": "confirm.wav"},
     {"source": "hurt.wav"},

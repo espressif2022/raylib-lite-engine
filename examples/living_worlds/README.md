@@ -34,17 +34,18 @@ python3 tools/game_cli.py sim examples/living_worlds
 python3 tools/game_cli.py sim examples/living_worlds --headless --frames 300
 ```
 
-本目录也是独立 ESP-IDF native 工程。需要同一工作区中的
-`esp-mosaico-game`（板级条带送屏）和 `esp-mosaico-vibe`（BSP）；
-如路径不同，可在 CMake 配置时设置 `MOSAICO_GAME_PATH` 和 `MOSAICO_VIBE_PATH`。
+本目录也是独立 ESP-IDF native 工程。设备构建需要产品平台组件和 BSP，
+配置时传入 `MOSAICO_PRODUCT_ROOT` 和 `MOSAICO_BSP_ROOT`；Iris 版本还需
+`MOSAICO_UTILS_ROOT`。Host 仿真不需要这些依赖。
 
 ```bash
+export MOSAICO_PRODUCT_ROOT=/path/to/product
+export MOSAICO_BSP_ROOT=/path/to/bsp
 cd examples/living_worlds
 idf.py build
-# 直接烧录 native 固件时：idf.py -p /dev/ttyACM0 flash monitor
 ```
 
-直接烧录会替换当前启动器固件；启动器中的 ELF 版本仍由 Game SDK 打包安装。
+直接烧录会替换当前启动器固件；大厅 ELF 版本仍由外部 `esp-mosaico-elf-game-sdk` 打包安装。
 下列数据是早期历史真机基线，不是当前条带送屏 native 工程的验收值。
 同设备旧 GSP 版本的雨林日志显示 `display=19.6–20.7 FPS`、
 `render=46.8–52.3 ms`。2026-09-24 的 CPU 条带 native 版本在修复调度器等待、

@@ -1124,8 +1124,12 @@ static void draw_bearing_marker(float bearing, Color color, const char *label)
 
 static void draw_fps(const last_zone_game_t *game)
 {
-    int fps = game->perf_display_fps > 0.5f ? (int)(game->perf_display_fps + 0.5f) : 0;
-    DrawText(TextFormat("FPS %d", fps), 8, 6, 16, (Color){255, 220, 72, 255});
+    if(game->perf_display_fps<=0.0f)
+        DrawText("FPS --",8,6,16,(Color){255,220,72,255});
+    else{
+        int fps=(int)(game->perf_display_fps+0.5f);
+        DrawText(TextFormat("FPS %d",fps),8,6,16,(Color){255,220,72,255});
+    }
 }
 
 static void draw_status_hud(const last_zone_game_t *game)
