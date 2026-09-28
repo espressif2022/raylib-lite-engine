@@ -2,48 +2,30 @@
 
 [Documentation index](README.EN.md) · [简体中文](build-matrix.CN.md) · [Game development](game-development.EN.md)
 
-Shared gameplay and view sources can target the paths below when the corresponding project integration exists. Choose the artifact first. An `iris/` project produces native firmware with Iris and Recovery; it is not a device ELF module. See the [example support matrix](../examples/README.md) for available entries.
+The engine maintains integration boundaries for three artifacts: PC Host, generic native firmware, and device ELF games. Choose the artifact, then consult the [example support matrix](../examples/README.md). Iris/Recovery, Gateway sessions, device ownership, flashing, and updates are product workflows maintained in `esp-mosaico-vibe/docs/project-gateway.md`, `docs/game-development.md`, and its CLI guide. Existing `examples/<game>/iris/` directories are compatibility integration entries, not a separate engine runtime.
 
-| Target | Entry point and artifact | Requirements | Validate |
+| Artifact | Engine entry | External requirements | Validate here |
 | --- | --- | --- | --- |
-| PC Host | `python3 tools/game_cli.py sim examples/<game>`; local process and browser preview | Host C compiler, Pillow | Gameplay, deterministic replay, RGB565 pixels |
-| Direct native firmware | `examples/<game>/CMakeLists.txt`; flashable firmware | ESP-IDF, explicit product and BSP component paths | Board, assets, interaction, audio, and display output |
-| Iris native firmware | `examples/<game>/iris/CMakeLists.txt`; firmware with Iris and Recovery | Direct native requirements plus Iris and Recovery | Startup, recovery integration, and device behavior |
-| Lobby ELF game | External `esp-mosaico-elf-game-sdk` CMake project produces `game.bin`; `esp-mosaico-game` loads its contained ELF | `esp-mosaico-elf-game-sdk`, versioned runtime ABI, compatible lobby firmware already installed | ABI, host services, assets, installation, and updates |
+| PC Host | `python3 tools/game_cli.py sim examples/<game>` | C compiler, Pillow | Gameplay, deterministic replay, RGB565 pixels |
+| Native firmware | `examples/<game>/CMakeLists.txt` | ESP-IDF and board components explicitly supplied by the caller | Shared-source integration; the product accepts device behavior |
+| ELF game | External `esp-mosaico-elf-game-sdk` project produces `game.bin` | Module SDK and compatible runtime ABI | ABI, shared sources, assets; the product accepts installation |
 
-## Native project integration
+## Native firmware integration
 
-The direct and Iris example projects include [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake). It reads explicit board and BSP paths and calls [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake) to register engine components. `iris/` also enables `MOSAICO_NATIVE_IRIS` and adds Iris and Recovery dependencies. Each game's `main/CMakeLists.txt` registers its sources; [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) can embed assets. The helper does not select a board or flash a device.
+The example top-level CMake includes [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake), which calls [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake) to register engine components. The game's `main/CMakeLists.txt` registers sources, and [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) can embed assets. Engine helpers do not select a board or manage Gateway or device writes. The existing `MOSAICO_NATIVE_IRIS` branch retains compatibility dependency wiring; Vibe owns Recovery behavior and product policy.
 
-Direct native examples require `MOSAICO_PRODUCT_ROOT` and `MOSAICO_BSP_ROOT`. Iris native examples also require `MOSAICO_UTILS_ROOT`. For a direct Sky Hop build after loading the ESP-IDF environment:
+The caller supplies `MOSAICO_PRODUCT_ROOT` and `MOSAICO_BSP_ROOT` for a generic native example. After loading ESP-IDF, build Sky Hop as an example artifact:
 
 ```sh
 export MOSAICO_PRODUCT_ROOT=/path/to/product
 export MOSAICO_BSP_ROOT=/path/to/bsp
 idf.py -C examples/sky_hop -B /tmp/sky-hop-native build
-# After checking the artifact, flash the intended device:
-# idf.py -C examples/sky_hop -B /tmp/sky-hop-native -p <PORT> flash monitor
 ```
 
-> Use a separate build directory for each target and configuration. Never share `sdkconfig`, CMake caches, display settings, or compiler flags.
+The `iris/` compatibility examples also refer to external Iris/Recovery components. Product build settings, partitions, device selection, flashing, and recovery belong to `esp-mosaico-vibe`. Use separate build directories; do not share `sdkconfig` or CMake caches across targets.
 
-## Build and install a lobby ELF game
+## ELF game integration
 
-Validate the shared gameplay and view in the engine Host simulator first. Then select the corresponding wrapper project in `esp-mosaico-elf-game-sdk`. For Sky Hop (see the [example support matrix](../examples/README.md) for other SDK wrappers):
+Validate shared gameplay with engine Host first, then select the wrapper project in `esp-mosaico-elf-game-sdk`. Engine `tools/game_cli.py build --target elf` only dispatches CMake for an external SDK project and needs the SDK `--toolchain` initially; it does not turn a native project into ELF. The SDK documents module packaging and ABI. `esp-mosaico-vibe` owns installation, updates, device identity, and Gateway operations.
 
-```sh
-cd /path/to/esp-mosaico-elf-game-sdk
-cmake -S examples/sky_hop -B build/sky_hop \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/mosaico-riscv32.cmake" \
-  -DRAYLIB_LITE_ENGINE_ROOT=/path/to/raylib-lite-engine
-cmake --build build/sky_hop
-# Installable artifact: build/sky_hop/game/game.bin
-cd /path/to/esp-mosaico-vibe
-python mosaico.py game install \
-  /path/to/esp-mosaico-elf-game-sdk/build/sky_hop/game/game.bin \
-  --device-id <DEVICE_ID>
-```
-
-The device must already run a compatible `esp-mosaico-game` lobby firmware. Use `game install` to update a game; update lobby firmware through the product firmware flow. `tools/game_cli.py build --target elf` only dispatches the SDK project's CMake build. Its first build needs the SDK `--toolchain`; it cannot convert a native `iris/` project into an ELF module. The SDK README is authoritative for packaging, ABI checks, and installation options.
-
-The dedicated [render_benchmark example](../examples/render_benchmark/README.md) has its own minimal device project. Display preview and offscreen scoring use separate configurations; this project does not use the game native helper.
+The dedicated [render_benchmark example](../examples/render_benchmark/README.md) has its own minimal device project. Display preview and offscreen scoring use separate configurations and do not use the game native helper.

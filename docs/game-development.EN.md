@@ -33,7 +33,7 @@ The browser preview supports input, pause, single stepping, screenshots, and rec
 
 ## 3. Validate on device
 
-Use [build paths](build-matrix.EN.md) to choose and build direct native firmware, Iris native firmware, or a lobby ELF game. On device, verify startup, assets, input, audio and haptics, actual display output, and shutdown cleanup. For performance comparisons, hold the input, scene, board, clocks, and build settings constant; save firmware identity and raw logs. Passing Host tests does not establish device acceptance.
+Use [build paths](build-matrix.EN.md) to choose generic native or ELF integration and build the artifact. Follow `esp-mosaico-vibe` documentation for Iris/Gateway installation and acceptance. On device, verify startup, assets, input, audio and haptics, actual display output, and shutdown cleanup. For performance comparisons, hold the input, scene, board, clocks, and build settings constant; save firmware identity and raw logs. Passing Host tests does not establish device acceptance.
 
 ## 4. Before submitting
 

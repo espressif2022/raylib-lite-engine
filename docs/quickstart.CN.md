@@ -18,4 +18,4 @@ python3 tools/game_cli.py sim examples/hello_game
 python3 tools/game_cli.py sim examples/hello_game --headless --frames 30
 ```
 
-之后修改 `examples/hello_game/main/` 中的共享模型与视图，再按[开发指南](game-development.CN.md)做固定输入回放。[构建路径](build-matrix.CN.md)说明直烧原生固件、Iris 原生固件和大厅 ELF 游戏；Host 能运行不代表这些设备路径已验收。安装和发布由各产品或外部 SDK 负责，`game_cli.py` 当前只负责创建、仿真和构建。
+之后修改 `examples/hello_game/main/` 中的共享模型与视图，再按[开发指南](game-development.CN.md)做固定输入回放。[构建路径](build-matrix.CN.md)说明通用原生固件和 ELF 接入；Iris 产品路径由 `esp-mosaico-vibe` 说明；Host 能运行不代表这些设备路径已验收。安装和发布由各产品或外部 SDK 负责，`game_cli.py` 当前只负责创建、仿真和构建。

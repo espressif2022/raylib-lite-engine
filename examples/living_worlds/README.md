@@ -35,8 +35,7 @@ python3 tools/game_cli.py sim examples/living_worlds --headless --frames 300
 ```
 
 本目录也是独立 ESP-IDF native 工程。设备构建需要产品平台组件和 BSP，
-配置时传入 `MOSAICO_PRODUCT_ROOT` 和 `MOSAICO_BSP_ROOT`；Iris 版本还需
-`MOSAICO_UTILS_ROOT`。Host 仿真不需要这些依赖。
+配置时传入 `MOSAICO_PRODUCT_ROOT` 和 `MOSAICO_BSP_ROOT`。现存 `iris/` 为兼容集成示例；Iris/Recovery 构建与设备操作以 `esp-mosaico-vibe` 文档为准。Host 仿真不需要板级依赖。
 
 ```bash
 export MOSAICO_PRODUCT_ROOT=/path/to/product

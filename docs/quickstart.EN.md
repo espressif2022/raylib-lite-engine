@@ -18,4 +18,4 @@ For finite automated acceptance, check `frames` and `game_id` in the output:
 python3 tools/game_cli.py sim examples/hello_game --headless --frames 30
 ```
 
-Then edit the shared model and view in `examples/hello_game/main/` and follow the [development guide](game-development.EN.md) for deterministic replay. [Build paths](build-matrix.EN.md) covers direct native firmware, Iris native firmware, and lobby ELF games. A successful Host run does not accept those device paths. Installation and publication belong to their products or external SDKs; `game_cli.py` currently creates, simulates, and builds only.
+Then edit the shared model and view in `examples/hello_game/main/` and follow the [development guide](game-development.EN.md) for deterministic replay. [Build paths](build-matrix.EN.md) covers generic native firmware and ELF integration; `esp-mosaico-vibe` documents the Iris product path. A successful Host run does not accept those device paths. Installation and publication belong to their products or external SDKs; `game_cli.py` currently creates, simulates, and builds only.

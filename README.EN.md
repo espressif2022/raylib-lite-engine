@@ -31,7 +31,8 @@ compatibility aliases rather than a flag-day rename.
 ## Build paths
 
 The engine has three consumers: statically linked native firmware, device ELF
-modules, and the PC Host simulator. Their boundaries and example commands are
+modules, and the PC Host simulator. Iris/Gateway product workflows are maintained
+in `esp-mosaico-vibe`. Their boundaries and example commands are
 in [the build matrix](docs/build-matrix.EN.md).
 
 For ESP-IDF firmware, include the engine integration helper before IDF's
@@ -68,7 +69,7 @@ production board policy belongs to the product repository. Documentation index:
 [docs/README.EN.md](docs/README.EN.md). Host ABI:
 [host/README.md](host/README.md).
 The Mosaico device examples accept explicit `MOSAICO_PRODUCT_ROOT`,
-`MOSAICO_BSP_ROOT`, and (for Iris builds) `MOSAICO_UTILS_ROOT` paths. Host
+`MOSAICO_BSP_ROOT` paths. Iris product integration is documented in Vibe. Host
 simulation requires none of those product checkouts.
 
 ## Repository layout

@@ -2,7 +2,7 @@
 
 [简体中文](board-porting.CN.md) · [Build paths](build-matrix.EN.md)
 
-There is no second-board acceptance result in this repository. Keeping game models and the generic rasterizer unchanged is a porting goal, not yet cross-board evidence. Choose a direct-native or Iris-native path, connect the new BSP and product components in a separate build directory, and keep panel/touch adaptation out of shared gameplay.
+There is no second-board acceptance result in this repository. Keeping game models and the generic rasterizer unchanged is a porting goal, not yet cross-board evidence. Connect the new BSP and product components in a separate build directory. `esp-mosaico-vibe` owns Iris/Recovery product integration. Keep panel/touch adaptation out of shared gameplay.
 
 | Service | Contract to implement | Critical checks |
 | --- | --- | --- |

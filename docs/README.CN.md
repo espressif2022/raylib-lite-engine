@@ -9,7 +9,7 @@
 | 指南 | 解决的问题 |
 | --- | --- |
 | [游戏开发指南](game-development.CN.md) | 组织游戏源码并验证改动 |
-| [构建路径](build-matrix.CN.md) | 选择 Host、直烧原生固件、Iris 原生固件或大厅 ELF 游戏 |
+| [构建路径](build-matrix.CN.md) | 选择 Host、通用原生固件或 ELF 接入；Iris 产品流程见 Vibe 仓库 |
 | [可复用设计方法](reference-designs.CN.md) | 设计平台、输入、反馈、资产与绘制 |
 
 ## 参考资料（按需查）

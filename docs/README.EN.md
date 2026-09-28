@@ -9,7 +9,7 @@ First use: follow the [quickstart](quickstart.EN.md) to create a game and see it
 | Read in order | Purpose |
 | --- | --- |
 | [Game development](game-development.EN.md) | Organize game sources and validate a change |
-| [Build paths](build-matrix.EN.md) | Choose Host, direct native, Iris native, or lobby ELF output |
+| [Build paths](build-matrix.EN.md) | Choose Host, generic native, or ELF integration; Vibe owns Iris product workflows |
 | [Reusable design principles](reference-designs.EN.md) | Design platform, input, feedback, assets, and rendering |
 
 ## Reference material

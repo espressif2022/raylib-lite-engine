@@ -9,7 +9,7 @@ Raylib Lite Engine 是面向嵌入式 RGB565 显示的轻量 Raylib 兼容游戏
 ## 从哪里开始
 
 1. 新建游戏：按[快速入门](docs/quickstart.CN.md)看到第一个 Host 画面，再按[游戏开发指南](docs/game-development.CN.md)组织共享源码。
-2. 选择路径：查看[示例支持矩阵（English）](examples/README.md)和[构建路径](docs/build-matrix.CN.md)。Host、直烧原生固件、Iris 原生固件与大厅 ELF 游戏有不同入口。
+2. 选择路径：查看[示例支持矩阵（English）](examples/README.md)和[构建路径](docs/build-matrix.CN.md)。引擎说明 Host、通用原生固件与 ELF 接入；Iris/Gateway 的产品流程由 `esp-mosaico-vibe` 维护。
 3. 设计输入、反馈、资产或绘制：查看[可复用设计方法](docs/reference-designs.CN.md)及其中链接的公共接口。
 
 在仓库根目录运行已有示例的 Host 仿真：
