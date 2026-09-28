@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "esp_err.h"
+#include "../../raylib_lite_platform/include/raylib_lite_compat.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,6 +28,10 @@ typedef struct {
     int max_files;
     uint16_t checksum;
     bool mmap_enable;
+    /* In-memory MMAP blob from an ELF bundle. When set, mount parses this
+     * image instead of a flash partition. */
+    const uint8_t *image;
+    size_t image_size;
 } mosaico_asset_store_config_t;
 
 const mosaico_asset_t *mosaico_game_asset_find(const mosaico_asset_t *assets,size_t count,mosaico_asset_id_t id);

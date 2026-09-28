@@ -16,6 +16,17 @@ class ColumnTests(unittest.TestCase):
             temp = Path(directory)
             pixels = struct.pack('<64H', *[(i * 997 + 123) & 65535 for i in range(64)])
             (temp / 'test.atlas').write_bytes(struct.pack('<4sHHHHII', b'MSA1', 8, 8, 0, 0, 128, 0) + pixels)
+            light_lut = struct.pack('<4096H', *[
+                (level * 257 + index * 997 + 31) & 65535
+                for level in range(16) for index in range(256)])
+            indices = bytes(y * 8 + x for x in range(8) for y in range(8))
+            (temp / 'test.wall').write_bytes(
+                struct.pack('<4sHHHHII', b'MSW1', 8, 8, 0, 16, 256, 64) +
+                light_lut + indices)
+            row_indices = bytes(y * 8 + x for y in range(8) for x in range(8))
+            (temp / 'test_row.wall').write_bytes(
+                struct.pack('<4sHHHHII', b'MSW2', 8, 8, 0, 16, 256, 64) +
+                light_lut + row_indices)
             source = os.environ.get('M2D_TEST_SOURCE', str(ROOT / 'components/mosaico_game_2d/mosaico_game_2d.c'))
             command = [os.environ.get('CC', 'cc'), '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror']
             command += shlex.split(os.environ.get('CFLAGS', ''))

@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-/* Raylib-compatible 2D API backed by the ESP-Mosaico RGB565 surface. Keep the
+/* Raylib-compatible 2D API backed by a platform-provided RGB565 surface. Keep the
  * mapping explicit: unsupported upstream APIs fail at link time instead of
  * silently pulling a software OpenGL renderer into device firmware. */
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 #include "raylib.h"
+#include "raylib_lite_result.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,6 +54,8 @@ void MosaicoFastInjectImu(float x, float y, float z);
 void MosaicoFastBeginDrawing(void);
 bool MosaicoFastFrameAvailable(void);
 void MosaicoFastEndDrawing(void);
+raylib_lite_result_t MosaicoFastGetLastAcquireResult(void);
+raylib_lite_result_t MosaicoFastGetLastPresentResult(void);
 /* Consume one-shot edges after a logic tick; held input remains active. */
 void MosaicoFastConsumeInputEdges(void);
 void MosaicoFastBeginMode2D(Camera2D camera);
@@ -119,7 +125,10 @@ void MosaicoFastDrawTexturePro(Texture2D texture, Rectangle source,
 
 void MosaicoFastDrawText(const char *text, int x, int y, int font_size, Color color);
 int MosaicoFastMeasureText(const char *text, int font_size);
+const char *MosaicoFastTextFormatV(const char *format, va_list args);
 const char *MosaicoFastTextFormat(const char *format, ...);
+uint16_t *MosaicoFastGetFramebuffer(int *width, int *height,
+                                    size_t *stride_pixels);
 
 bool MosaicoFastCheckCollisionRecs(Rectangle first, Rectangle second);
 bool MosaicoFastCheckCollisionCircles(Vector2 first, float first_radius,

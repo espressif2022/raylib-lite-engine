@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+
+ENGINE = Path(__file__).resolve().parents[1]
+CLI = ENGINE / "tools/game_cli.py"
+
+
+class GameCliTests(unittest.TestCase):
+    def test_public_sim_command_runs_shared_source_project(self) -> None:
+        result = json.loads(subprocess.check_output([
+            sys.executable, str(CLI), "sim", "examples/raylib_shooter",
+            "--headless", "--frames", "3",
+        ], cwd=ENGINE))
+        self.assertEqual(result["frames"], 3)
+        self.assertEqual(result["abi"], 1)
+        self.assertEqual(result["game_id"], "raylib_shooter")
+
+    def test_game_help_exposes_create_sim_and_build(self) -> None:
+        output = subprocess.check_output([
+            sys.executable, str(CLI), "--help",
+        ], cwd=ENGINE, text=True)
+        for command in ("create", "sim", "build"):
+            self.assertIn(command, output)
+
+    def test_host_templates_live_under_examples(self) -> None:
+        for name in ("raylib_shooter", "sky_hop", "tower_defense",
+                     "living_worlds", "last_zone_extraction", "tomb_explorer"):
+            root = ENGINE / "examples" / name
+            self.assertTrue((root / "game.sim.json").is_file())
+            self.assertFalse((root / "CMakeLists.txt").exists())
+
+    @unittest.skipUnless(shutil.which("cmake"), "CMake is required")
+    def test_external_module_build_is_independent_of_idf(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "external game"
+            project.mkdir()
+            (project / "main.c").write_text("int answer(void) { return 42; }\n")
+            (project / "CMakeLists.txt").write_text('''cmake_minimum_required(VERSION 3.19)
+project(external_game C)
+if(DEFINED ENV{IDF_PATH})
+  message(FATAL_ERROR "ELF build must not inherit IDF_PATH")
+endif()
+add_library(game STATIC main.c)
+''')
+            toolchain = Path(directory) / "host-toolchain.cmake"
+            toolchain.write_text("set(CMAKE_SYSTEM_NAME Linux)\n")
+            output = Path(directory) / "module build"
+            command = [sys.executable, str(CLI), "build", str(project),
+                       "--target", "elf", "--toolchain", str(toolchain),
+                       "--build-dir", str(output)]
+            env = dict(os.environ, IDF_PATH="/not/an/idf")
+            subprocess.run(command, env=env, check=True, capture_output=True)
+            self.assertTrue((output / "libgame.a").is_file())
+            cached_command = command.copy()
+            index = cached_command.index("--toolchain")
+            del cached_command[index:index + 2]
+            invalid = subprocess.run(cached_command + [
+                "--clean", "--toolchain", str(project / "missing.cmake")],
+                env=env, capture_output=True)
+            self.assertEqual(invalid.returncode, 3)
+            self.assertTrue((output / "libgame.a").is_file())
+            subprocess.run(cached_command + ["--clean"], env=env, check=True,
+                           capture_output=True)
+            self.assertTrue((project / "main.c").is_file())
+            self.assertTrue((output / "libgame.a").is_file())
+
+    def test_clean_cannot_delete_an_unrelated_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "game"
+            project.mkdir()
+            (project / "CMakeLists.txt").write_text("# project fixture\n")
+            output = Path(directory) / "unrelated"
+            output.mkdir()
+            marker = output / "keep.txt"
+            marker.write_text("keep\n")
+            result = subprocess.run([
+                sys.executable, str(CLI), "build", str(project),
+                "--target", "elf", "--build-dir", str(output), "--clean",
+            ], text=True, capture_output=True)
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("--clean requires", result.stderr)
+            self.assertEqual(marker.read_text(), "keep\n")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,9 +1,13 @@
-set(srcs "mosaico_game_2d.c" "mosaico_rgb565.c")
+set(srcs "mosaico_game_2d_esp.c" "mosaico_rgb565.c" "mosaico_mtx2.c"
+    "mosaico_raster_bench.c")
 if(IDF_TARGET STREQUAL "esp32s31")
     list(APPEND srcs "mosaico_rgb565_pie.S")
 endif()
-idf_component_register(SRCS ${srcs} INCLUDE_DIRS "include" REQUIRES mosaico_game_assets raylib)
-target_compile_options(${COMPONENT_LIB} PRIVATE -O3 -funroll-loops)
+idf_component_register(SRCS ${srcs} INCLUDE_DIRS "include"
+    REQUIRES mosaico_game_assets raylib PRIV_REQUIRES esp_timer)
+target_compile_options(${COMPONENT_LIB} PRIVATE -O3 -funroll-loops
+    "$<$<COMPILE_LANGUAGE:C>:-include${CMAKE_CURRENT_LIST_DIR}/raster_esp_config.h>")
+target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_LIST_DIR}")
 if(IDF_TARGET STREQUAL "esp32s31")
     target_compile_definitions(${COMPONENT_LIB} PRIVATE MOSAICO_RGB565_PIE=1)
 endif()

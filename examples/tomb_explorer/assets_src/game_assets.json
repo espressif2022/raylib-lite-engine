@@ -1,0 +1,9 @@
+{
+  "schema": "mosaico-game-assets/v1",
+  "atlases": [
+    {"config": "controls.json", "source": "controls.png", "output": "controls.atlas"}
+  ],
+  "wall_atlases": [
+    {"config": "textures.json", "source": "textures.png", "output": "textures.wall"}
+  ]
+}

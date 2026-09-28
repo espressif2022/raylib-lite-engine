@@ -80,6 +80,21 @@ class RasterStats(ctypes.Structure):
         ("triangle_pixels", ctypes.c_uint32),
         ("triangle_direct_pixels", ctypes.c_uint32),
         ("triangle_mirror_pixels", ctypes.c_uint32),
+        ("quad_calls", ctypes.c_uint32),
+        ("quad_pixels", ctypes.c_uint32),
+        ("primitive_pixels", ctypes.c_uint32),
+        ("primitive_runs", ctypes.c_uint32),
+        ("clear_pixels", ctypes.c_uint32),
+        ("rgb_const_v_pixels", ctypes.c_uint32),
+        ("rgb_vary_v_pixels", ctypes.c_uint32),
+        ("indexed_const_v_pixels", ctypes.c_uint32),
+        ("indexed_vary_v_pixels", ctypes.c_uint32),
+        ("indexed_magnify_pixels", ctypes.c_uint32),
+        ("indexed_minify_pixels", ctypes.c_uint32),
+        ("triangle_setup_us", ctypes.c_uint32),
+        ("triangle_raster_us", ctypes.c_uint32),
+        ("fb_runs", ctypes.c_uint32),
+        ("fb_pixels", ctypes.c_uint32),
     ]
 
 def load_replay(path: Path | None) -> list[dict[str, object]]:
@@ -108,11 +123,9 @@ def load_replay(path: Path | None) -> list[dict[str, object]]:
         })
     return normalized
 
-def _rgb565_png_bytes(framebuffer: object, width: int, height: int) -> bytes:
-    # Pillow's raw decoder performs the RGB565 expansion in native code. The
-    # previous Python pixel loop cost 120-200 ms for a 480x480 frame and held
-    # the simulation lock long enough to stall the fixed 30 Hz game clock.
-    pixels = ctypes.string_at(ctypes.addressof(framebuffer), width * height * 2)
+def _rgb565_png_bytes(pixels: bytes, width: int, height: int) -> bytes:
+    # Pillow's raw decoder performs the RGB565 expansion in native code. Encode
+    # outside the simulation lock so input/update keep the 30 Hz game clock.
     image = Image.frombytes("RGB", (width, height), pixels, "raw", "BGR;16")
     output = io.BytesIO()
     image.save(output, format="PNG", compress_level=1)
@@ -166,7 +179,9 @@ class GenericHostRuntime:
         sources = [
             *project_sources,
             ENGINE_ROOT / "host/host_module_bridge.c",
-            ENGINE_ROOT / "host/host_raylib_port.c",
+            ENGINE_ROOT / "host/host_video_backend.c",
+            ENGINE_ROOT / "host/host_clock.c",
+            ENGINE_ROOT / "components/mosaico_raylib_port/mosaico_raylib_port.c",
             ENGINE_ROOT / "host/host_asset_runtime.c",
             ENGINE_ROOT / "components/mosaico_game_2d/mosaico_game_2d.c",
             ENGINE_ROOT / "components/mosaico_game_2d/mosaico_rgb565.c",
@@ -175,6 +190,8 @@ class GenericHostRuntime:
             ENGINE_ROOT / "components/mosaico_game_tilemap/mosaico_game_tilemap.c",
         ]
         includes = [ENGINE_ROOT / "host/include", ENGINE_ROOT / "host",
+                    ENGINE_ROOT / "components/mosaico_raylib_port/include",
+                    ENGINE_ROOT / "components/raylib_lite_platform/include",
                     ENGINE_ROOT / "components/mosaico_game_assets/include",
                     ENGINE_ROOT / "components/mosaico_game_2d/include",
                     ENGINE_ROOT / "components/mosaico_raylib_fast/include",
@@ -280,20 +297,27 @@ class GenericHostRuntime:
                       "raster": {name: getattr(raster, name)
                           for name, _ctype in RasterStats._fields_}})
         return value
-    def frame(self) -> bytes:
+    def snapshot_rgb565(self) -> tuple[bytes, int, int]:
         started = time.perf_counter_ns()
         status = self.api.mosaico_host_game_render_rgb565_v1(
             self.context, self.framebuffer, self.descriptor.width)
         if status: raise RuntimeError(f"host render failed: {status}")
         rendered = time.perf_counter_ns()
-        frame = _rgb565_png_bytes(self.framebuffer, self.descriptor.width,
-                                  self.descriptor.height)
-        encoded = time.perf_counter_ns()
+        width, height = self.descriptor.width, self.descriptor.height
+        pixels = ctypes.string_at(ctypes.addressof(self.framebuffer),
+                                  width * height * 2)
         self.last_render_ns = rendered - started
-        self.last_encode_ns = encoded - rendered
         self.render_ns += self.last_render_ns
-        self.encode_ns += self.last_encode_ns
         self.render_count += 1
+        return pixels, width, height
+    def note_encode_ns(self, encode_ns: int) -> None:
+        self.last_encode_ns = encode_ns
+        self.encode_ns += encode_ns
+    def frame(self) -> bytes:
+        pixels, width, height = self.snapshot_rgb565()
+        started = time.perf_counter_ns()
+        frame = _rgb565_png_bytes(pixels, width, height)
+        self.note_encode_ns(time.perf_counter_ns() - started)
         return frame
 
 class ReloadableHostRuntime:
@@ -339,6 +363,10 @@ class ReloadableHostRuntime:
         self.current.action(code, pressed)
     def pointer(self, *args: object) -> None: self.current.pointer(*args)
     def imu(self, *args: object) -> None: self.current.imu(*args)
+    def snapshot_rgb565(self) -> tuple[bytes, int, int]:
+        return self.current.snapshot_rgb565()
+    def note_encode_ns(self, encode_ns: int) -> None:
+        self.current.note_encode_ns(encode_ns)
     def frame(self) -> bytes: return self.current.frame()
     def metadata(self) -> dict[str, object]:
         return {**self.current.metadata(), "reload_error": self.reload_error,
@@ -476,11 +504,12 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                 "recording": simulation["recording"]}}
         def do_GET(self) -> None:
             if self.path.startswith("/api/v1/frame") or self.path.startswith("/frame"):
-                from urllib.parse import parse_qs, urlparse
-                values = parse_qs(urlparse(self.path).query)
-                flag = lambda name: values.get(name, ["0"])[0] == "1"
                 with runtime.lock:
-                    body, metadata = runtime.frame(), self.metadata()
+                    pixels, width, height = runtime.snapshot_rgb565()
+                    metadata = self.metadata()
+                encode_started = time.perf_counter_ns()
+                body = _rgb565_png_bytes(pixels, width, height)
+                runtime.note_encode_ns(time.perf_counter_ns() - encode_started)
                 content_type = "image/png"
             elif self.path.startswith("/api/v1/info"):
                 body = json.dumps({"abi": 1, "endpoints": ["info","state","frame","input","control","recording"],

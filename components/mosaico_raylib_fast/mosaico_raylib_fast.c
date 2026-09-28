@@ -13,6 +13,7 @@
 #include "mosaico_rgb565.h"
 
 static uint16_t *s_pixels;
+static uint32_t s_primitive_pixels,s_primitive_runs,s_clear_pixels;
 static size_t s_stride;
 static Camera2D s_camera;
 static bool s_camera_active;
@@ -22,6 +23,8 @@ static int s_screen_width = MOSAICO_GAME_WIDTH;
 static int s_screen_height = MOSAICO_GAME_HEIGHT;
 static int s_target_fps = 30;
 static uint64_t s_presented_frames;
+static raylib_lite_result_t s_last_acquire = RAYLIB_LITE_NOT_READY;
+static raylib_lite_result_t s_last_present = RAYLIB_LITE_NOT_READY;
 static bool s_scissor_active;
 static int s_scissor_x0, s_scissor_y0, s_scissor_x1, s_scissor_y1;
 #define MOSAICO_FAST_KEY_COUNT 512
@@ -84,20 +87,32 @@ static inline uint16_t rgb565(Color c)
  * blend used by put_pixel; quantizing alpha would change layered UI output. */
 typedef struct {
     uint16_t pixel;
-    unsigned alpha, inverse, red, green, blue;
+    unsigned alpha, inverse, red, green, blue, red_blue;
 } span_paint_t;
 
 static span_paint_t span_paint(Color c)
 {
     return (span_paint_t){rgb565(c), c.a, 255U-c.a,
-                          c.r*c.a, c.g*c.a, c.b*c.a};
+                          c.r*c.a, c.g*c.a, c.b*c.a, ((uint32_t)c.r*c.a<<16)|(c.b*c.a)};
+}
+
+static inline uint16_t blend_span_pixel(unsigned old, const span_paint_t *paint)
+{
+    /* Two independent 16-bit lanes. Each channel numerator is at
+     * most 65025, so neither multiplication nor the exact /255
+     * correction can carry into the adjacent channel. */
+    uint32_t rb = (((old&0xf800U)<<8)|((old&31U)<<3))*paint->inverse + paint->red_blue;
+    rb = (rb + 0x00010001U + ((rb>>8)&0x00ff00ffU))>>8;
+    unsigned g = (((old>>5)&63U)<<2)*paint->inverse + paint->green;
+    g = (g + 1U + (g>>8))>>8;
+    return (uint16_t)(((rb&0x00f80000U)>>8)|((g&0xfcU)<<3)|((rb&0xf8U)>>3));
 }
 
 static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
 {
-    if (!s_pixels || !paint->alpha || (unsigned)y >= MOSAICO_GAME_HEIGHT) return;
+    if (!s_pixels || !paint->alpha || (unsigned)y >= (unsigned)s_screen_height) return;
     if (x0 < 0) x0 = 0;
-    if (x1 > MOSAICO_GAME_WIDTH) x1 = MOSAICO_GAME_WIDTH;
+    if (x1 > s_screen_width) x1 = s_screen_width;
     if (s_scissor_active) {
         if (y < s_scissor_y0 || y >= s_scissor_y1) return;
         if (x0 < s_scissor_x0) x0 = s_scissor_x0;
@@ -106,7 +121,11 @@ static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
     if (x0 >= x1) return;
     uint16_t *dst = s_pixels + (size_t)y*s_stride + x0;
     int count = x1-x0;
+    s_primitive_pixels+=(uint32_t)count;++s_primitive_runs;
     if (paint->alpha == 255) {
+        /* Long opaque spans use the existing S31 eight-pixel PIE stores.
+         * Keep tiny glyph and ray fragments on the inline scalar path. */
+        if(count>=32){mosaico_fill_rgb565(dst,paint->pixel,(size_t)count);return;}
         uint16_t pixel = paint->pixel;
         uint32_t pair = (uint32_t)pixel | ((uint32_t)pixel << 16);
         if ((uintptr_t)dst & 3U) { *dst++ = pixel; --count; }
@@ -114,21 +133,18 @@ static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
         if (count) *dst = pixel;
     } else {
         for (int i = 0; i < count; ++i) {
-            unsigned old = dst[i];
-            unsigned r = ((old >> 11)*8U*paint->inverse + paint->red)/255U;
-            unsigned g = (((old >> 5)&63U)*4U*paint->inverse + paint->green)/255U;
-            unsigned b = ((old&31U)*8U*paint->inverse + paint->blue)/255U;
-            dst[i] = (uint16_t)(((r&0xf8U)<<8) | ((g&0xfcU)<<3) | (b>>3));
+            dst[i] = blend_span_pixel(dst[i], paint);
         }
     }
 }
 
 static inline void put_pixel(int x, int y, Color color)
 {
-    if (!s_pixels || (unsigned)x >= MOSAICO_GAME_WIDTH ||
-            (unsigned)y >= MOSAICO_GAME_HEIGHT) return;
+    if (!s_pixels || (unsigned)x >= (unsigned)s_screen_width ||
+            (unsigned)y >= (unsigned)s_screen_height) return;
     if (s_scissor_active && (x < s_scissor_x0 || y < s_scissor_y0 ||
             x >= s_scissor_x1 || y >= s_scissor_y1)) return;
+    if(color.a){++s_primitive_pixels;++s_primitive_runs;}
     uint16_t *dst = &s_pixels[(size_t)y*s_stride + x];
     if (color.a == 255) {
         *dst = rgb565(color);
@@ -150,6 +166,8 @@ void MosaicoFastInitWindow(int width, int height, const char *title)
     s_window_ready = true;
     s_window_should_close = false;
     s_presented_frames = 0;
+    s_last_acquire = RAYLIB_LITE_NOT_READY;
+    s_last_present = RAYLIB_LITE_NOT_READY;
     memset(s_key_down, 0, sizeof(s_key_down));
     memset(s_key_pressed, 0, sizeof(s_key_pressed));
     memset(s_key_released, 0, sizeof(s_key_released));
@@ -260,13 +278,34 @@ void MosaicoFastBeginDrawing(void)
 {
     s_pixels = NULL;
     s_stride = 0;
-    (void)mosaico_raylib_port_begin_frame(&s_pixels, &s_stride);
-    mosaico_game_2d_set_target(s_pixels, s_stride, MOSAICO_GAME_WIDTH,
-                               MOSAICO_GAME_HEIGHT);
+    s_last_acquire = mosaico_raylib_port_begin_frame(&s_pixels, &s_stride);
+    s_last_present = RAYLIB_LITE_NOT_READY;
+    uint16_t backend_width = 0, backend_height = 0;
+    mosaico_raylib_port_get_dimensions(&backend_width, &backend_height);
+    if (backend_width && backend_height) {
+        s_screen_width = backend_width;
+        s_screen_height = backend_height;
+    }
+    mosaico_game_2d_set_target(s_pixels, s_stride, s_screen_width,
+                               s_screen_height);
     mosaico_game_2d_reset_raster_stats();
+    s_primitive_pixels=s_primitive_runs=s_clear_pixels=0;
 }
 
 bool MosaicoFastFrameAvailable(void) { return s_pixels != NULL; }
+raylib_lite_result_t MosaicoFastGetLastAcquireResult(void)
+{ return s_last_acquire; }
+raylib_lite_result_t MosaicoFastGetLastPresentResult(void)
+{ return s_last_present; }
+
+uint16_t *MosaicoFastGetFramebuffer(int *width, int *height,
+                                    size_t *stride_pixels)
+{
+    if (width) *width = s_screen_width;
+    if (height) *height = s_screen_height;
+    if (stride_pixels) *stride_pixels = s_stride;
+    return s_pixels;
+}
 
 void MosaicoFastConsumeInputEdges(void)
 {
@@ -280,13 +319,16 @@ void MosaicoFastConsumeInputEdges(void)
 
 void MosaicoFastEndDrawing(void)
 {
-    if (s_pixels) (void)mosaico_raylib_port_present_frame();
+    if (s_pixels) {
+        mosaico_game_2d_note_primitives(s_primitive_pixels,s_primitive_runs,s_clear_pixels);
+        s_last_present = mosaico_raylib_port_present_frame();
+    }
     s_pixels = NULL;
     s_stride = 0;
     mosaico_game_2d_set_target(NULL, 0, 0, 0);
     s_camera_active = false;
     s_scissor_active = false;
-    ++s_presented_frames;
+    if (s_last_present == RAYLIB_LITE_OK) ++s_presented_frames;
     MosaicoFastConsumeInputEdges();
 }
 
@@ -294,8 +336,8 @@ void MosaicoFastBeginScissorMode(int x, int y, int width, int height)
 {
     s_scissor_x0 = x < 0 ? 0 : x;
     s_scissor_y0 = y < 0 ? 0 : y;
-    s_scissor_x1 = x + width > MOSAICO_GAME_WIDTH ? MOSAICO_GAME_WIDTH : x + width;
-    s_scissor_y1 = y + height > MOSAICO_GAME_HEIGHT ? MOSAICO_GAME_HEIGHT : y + height;
+    s_scissor_x1 = x + width > s_screen_width ? s_screen_width : x + width;
+    s_scissor_y1 = y + height > s_screen_height ? s_screen_height : y + height;
     s_scissor_active = width > 0 && height > 0 &&
         s_scissor_x0 < s_scissor_x1 && s_scissor_y0 < s_scissor_y1;
     mosaico_game_2d_set_clip(s_scissor_x0, s_scissor_y0,
@@ -305,7 +347,7 @@ void MosaicoFastBeginScissorMode(int x, int y, int width, int height)
 void MosaicoFastEndScissorMode(void)
 {
     s_scissor_active = false;
-    mosaico_game_2d_set_clip(0, 0, MOSAICO_GAME_WIDTH, MOSAICO_GAME_HEIGHT);
+    mosaico_game_2d_set_clip(0, 0, s_screen_width, s_screen_height);
 }
 
 Texture2D MosaicoFastLoadTexture(const char *asset_path)
@@ -353,15 +395,16 @@ void MosaicoFastDrawTextureEx(Texture2D texture, Vector2 position,
 void MosaicoFastClearBackground(Color color)
 {
     if (!s_pixels) return;
+    s_clear_pixels+=(uint32_t)s_screen_width*(uint32_t)s_screen_height;
     uint16_t px = rgb565(color);
-    if (s_stride == (size_t)MOSAICO_GAME_WIDTH) {
+    if (s_stride == (size_t)s_screen_width) {
         mosaico_fill_rgb565(s_pixels, px,
-            (size_t)MOSAICO_GAME_WIDTH * (size_t)MOSAICO_GAME_HEIGHT);
+            (size_t)s_screen_width * (size_t)s_screen_height);
         return;
     }
-    for (int y = 0; y < MOSAICO_GAME_HEIGHT; ++y)
+    for (int y = 0; y < s_screen_height; ++y)
         mosaico_fill_rgb565(s_pixels + (size_t)y * s_stride, px,
-            (size_t)MOSAICO_GAME_WIDTH);
+            (size_t)s_screen_width);
 }
 
 void MosaicoFastDrawPixel(int x, int y, Color color)
@@ -383,8 +426,8 @@ void MosaicoFastDrawRectangle(int x, int y, int width, int height, Color color)
     if (!s_pixels || width <= 0 || height <= 0) return;
     int x0 = x < 0 ? 0 : x;
     int y0 = y < 0 ? 0 : y;
-    int x1 = x + width > MOSAICO_GAME_WIDTH ? MOSAICO_GAME_WIDTH : x + width;
-    int y1 = y + height > MOSAICO_GAME_HEIGHT ? MOSAICO_GAME_HEIGHT : y + height;
+    int x1 = x + width > s_screen_width ? s_screen_width : x + width;
+    int y1 = y + height > s_screen_height ? s_screen_height : y + height;
     if (s_scissor_active) {
         if (x0 < s_scissor_x0) x0 = s_scissor_x0;
         if (y0 < s_scissor_y0) y0 = s_scissor_y0;
@@ -392,7 +435,21 @@ void MosaicoFastDrawRectangle(int x, int y, int width, int height, Color color)
         if (y1 > s_scissor_y1) y1 = s_scissor_y1;
     }
     if (x0 >= x1 || y0 >= y1) return;
+    if (!color.a) return;
     span_paint_t paint = span_paint(color);
+    if (x1-x0 == 1) {
+        /* Jelly caps and vertical gradients use one-pixel columns. Bounds
+         * are already clipped above; avoid redoing span setup for every row. */
+        uint16_t *dst = s_pixels + (size_t)y0*s_stride + x0;
+        s_primitive_pixels += (uint32_t)(y1-y0);
+        s_primitive_runs += (uint32_t)(y1-y0);
+        if (color.a == 255) {
+            for (int yy=y0; yy<y1; ++yy, dst+=s_stride) *dst=paint.pixel;
+        } else {
+            for (int yy=y0; yy<y1; ++yy, dst+=s_stride) *dst=blend_span_pixel(*dst,&paint);
+        }
+        return;
+    }
     for (int yy=y0; yy<y1; ++yy) fill_span(yy, x0, x1, &paint);
 }
 
@@ -658,8 +715,8 @@ void MosaicoFastDrawTriangle(Vector2 av, Vector2 bv, Vector2 cv, Color color)
     int maxy=ay>by?(ay>cy?ay:cy):(by>cy?by:cy);
     if(minx<0) minx=0;
     if(miny<0) miny=0;
-    if(maxx>=MOSAICO_GAME_WIDTH) maxx=MOSAICO_GAME_WIDTH-1;
-    if(maxy>=MOSAICO_GAME_HEIGHT) maxy=MOSAICO_GAME_HEIGHT-1;
+    if(maxx>=s_screen_width) maxx=s_screen_width-1;
+    if(maxy>=s_screen_height) maxy=s_screen_height-1;
     if(s_scissor_active){
         if(minx<s_scissor_x0)minx=s_scissor_x0;
         if(miny<s_scissor_y0)miny=s_scissor_y0;
@@ -789,14 +846,20 @@ int MosaicoFastMeasureText(const char *text, int font_size)
     return (int)strlen(text)*6*scale-scale;
 }
 
-const char *MosaicoFastTextFormat(const char *format, ...)
+const char *MosaicoFastTextFormatV(const char *format, va_list args)
 {
     static char buffers[2][64];
     static unsigned index;
     char *out = buffers[index++ & 1U];
+    vsnprintf(out, sizeof(buffers[0]), format ? format : "", args);
+    return out;
+}
+
+const char *MosaicoFastTextFormat(const char *format, ...)
+{
     va_list args;
     va_start(args, format);
-    vsnprintf(out, sizeof(buffers[0]), format, args);
+    const char *out = MosaicoFastTextFormatV(format, args);
     va_end(args);
     return out;
 }

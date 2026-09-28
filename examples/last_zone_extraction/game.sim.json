@@ -1,0 +1,8 @@
+{
+  "schema": "mosaico-game-sim/v1",
+  "sources": [
+    "main/game_module.c",
+    "main/last_zone_game.c",
+    "main/last_zone_view.c"
+  ]
+}

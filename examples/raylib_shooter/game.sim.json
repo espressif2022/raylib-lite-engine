@@ -1,0 +1,8 @@
+{
+  "schema": "mosaico-game-sim/v1",
+  "sources": [
+    "main/game_module.c",
+    "main/shooter_game.c",
+    "main/shooter_view.c"
+  ]
+}

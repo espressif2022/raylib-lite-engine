@@ -1,236 +1,152 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "mosaico_raylib_port.h"
 
-#include <stdatomic.h>
-#include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
-#include "esp_heap_caps.h"
-#include "esp_log.h"
-#include "sdkconfig.h"
-#include "esp_timer.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
-#include "mosaico_game.h"
-
-#define FRAME_BYTES ((size_t)MOSAICO_GAME_WIDTH * MOSAICO_GAME_HEIGHT * 2U)
-#define FRAME_COUNT CONFIG_MOSAICO_GAME_FRAMEBUFFER_COUNT
 
 typedef struct {
-    uint16_t *pixels;
-    atomic_bool borrowed;
-    int64_t submitted_us;
-} frame_slot_t;
+    raylib_lite_video_backend_t backend;
+    raylib_lite_video_info_t info;
+    raylib_lite_frame_t frame;
+    raylib_lite_result_t last_acquire;
+    raylib_lite_result_t last_present;
+    bool initialized;
+    bool frame_acquired;
+} raylib_port_state_t;
 
-static const char *TAG = "mosaico_raylib";
-static esp_gsp_handle_t s_gsp;
-static uint16_t s_bind;
-static frame_slot_t s_frames[FRAME_COUNT];
-static atomic_uint s_next;
-static uint16_t *s_latest;
-static SemaphoreHandle_t s_latest_mutex;
-static frame_slot_t *s_drawing_slot;
-static atomic_uint s_in_flight;
-static uint32_t s_acquire_us;
+static raylib_port_state_t s_port;
 
-static void release_frame(void *ctx)
+static void clear_frame(raylib_lite_frame_t *frame)
 {
-    frame_slot_t *slot = ctx;
-    uint32_t release_us = slot->submitted_us > 0
-        ? (uint32_t)(esp_timer_get_time() - slot->submitted_us) : 0;
-    atomic_store_explicit(&slot->borrowed, false, memory_order_release);
-    uint32_t in_flight = atomic_fetch_sub_explicit(
-        &s_in_flight, 1U, memory_order_acq_rel) - 1U;
-    MosaicoGameRecordDisplayRelease(release_us, in_flight);
+    memset(frame, 0, sizeof(*frame));
 }
 
-esp_err_t mosaico_raylib_port_init(esp_gsp_handle_t gsp, uint16_t canvas_bind)
+raylib_lite_result_t mosaico_raylib_port_init_backend(
+    const raylib_lite_video_backend_t *backend)
 {
-    if (!gsp) return ESP_ERR_INVALID_ARG;
-    if (s_gsp) return ESP_ERR_INVALID_STATE;
-    for (size_t i = 0; i < FRAME_COUNT; ++i) {
-        s_frames[i].pixels = heap_caps_malloc(
-            FRAME_BYTES, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (!s_frames[i].pixels) {
-            mosaico_raylib_port_deinit();
-            ESP_LOGE(TAG, "PSRAM framebuffer allocation failed (%u bytes)",
-                     (unsigned)FRAME_BYTES);
-            return ESP_ERR_NO_MEM;
-        }
-        memset(s_frames[i].pixels, 0, FRAME_BYTES);
-        atomic_init(&s_frames[i].borrowed, false);
+    if (!backend || !backend->get_info || !backend->acquire ||
+            !backend->present || !backend->discard || !backend->flush) {
+        return RAYLIB_LITE_INVALID_ARGUMENT;
     }
-    atomic_init(&s_next, 0);
-    atomic_init(&s_in_flight, 0);
-    /* The latest screenshot aliases one of the retained GSP frame slots.
-     * Keeping a third full-screen copy cost 450 KiB and one PSRAM memcpy on
-     * every frame. Access and slot rewrites are serialized by the mutex. */
-    s_latest = s_frames[0].pixels;
-    s_latest_mutex = xSemaphoreCreateMutex();
-    if (!s_latest_mutex) {
-        mosaico_raylib_port_deinit();
-        return ESP_ERR_NO_MEM;
+    if (s_port.initialized) return RAYLIB_LITE_INVALID_STATE;
+
+    raylib_lite_video_info_t info = {0};
+    raylib_lite_result_t result = backend->get_info(backend->context, &info);
+    if (result != RAYLIB_LITE_OK) return result;
+    if (!info.width || !info.height || info.stride_pixels < info.width ||
+            info.format != RAYLIB_LITE_PIXEL_RGB565_NATIVE) {
+        return RAYLIB_LITE_NOT_SUPPORTED;
     }
-    s_bind = canvas_bind;
-    s_gsp = gsp;
-    return ESP_OK;
+
+    s_port.backend = *backend;
+    s_port.info = info;
+    s_port.last_acquire = RAYLIB_LITE_NOT_READY;
+    s_port.last_present = RAYLIB_LITE_NOT_READY;
+    s_port.initialized = true;
+    return RAYLIB_LITE_OK;
 }
 
 void mosaico_raylib_port_deinit(void)
 {
-    if (s_gsp) {
-        (void)esp_gsp_canvas_stop(s_gsp, s_bind);
-        (void)esp_gsp_flush(s_gsp, 1000);
+    if (s_port.frame_acquired) {
+        s_port.backend.discard(s_port.backend.context, &s_port.frame);
     }
-    for (size_t i = 0; i < FRAME_COUNT; ++i) {
-        free(s_frames[i].pixels);
-        s_frames[i].pixels = NULL;
-        atomic_store_explicit(&s_frames[i].borrowed, false,
-                              memory_order_release);
-    }
-    s_latest = NULL;
-    if (s_latest_mutex) {
-        vSemaphoreDelete(s_latest_mutex);
-        s_latest_mutex = NULL;
-    }
-    s_gsp = NULL;
-    s_drawing_slot = NULL;
+    memset(&s_port, 0, sizeof(s_port));
 }
 
-esp_err_t mosaico_raylib_port_begin_frame(uint16_t **out_pixels,
-                                          size_t *out_stride_pixels)
-{
-    mosaico_game_frame_result_t result = mosaico_raylib_port_try_begin_frame(
-        out_pixels, out_stride_pixels);
-    if (result == MOSAICO_GAME_FRAME_ACCEPTED) return ESP_OK;
-    return result == MOSAICO_GAME_FRAME_BUSY ? ESP_ERR_TIMEOUT : ESP_FAIL;
-}
-
-mosaico_game_frame_result_t mosaico_raylib_port_try_begin_frame(
+raylib_lite_result_t mosaico_raylib_port_begin_frame(
     uint16_t **out_pixels, size_t *out_stride_pixels)
 {
-    int64_t started = esp_timer_get_time();
-    if (!out_pixels || !out_stride_pixels)
-        return MOSAICO_GAME_FRAME_DISPLAY_ERROR;
+    if (!out_pixels || !out_stride_pixels) {
+        s_port.last_acquire = RAYLIB_LITE_INVALID_ARGUMENT;
+        return s_port.last_acquire;
+    }
     *out_pixels = NULL;
     *out_stride_pixels = 0;
-    if (!s_gsp || !s_latest_mutex || s_drawing_slot) {
-        return MOSAICO_GAME_FRAME_DISPLAY_ERROR;
+    s_port.last_present = RAYLIB_LITE_NOT_READY;
+    if (!s_port.initialized || s_port.frame_acquired) {
+        s_port.last_acquire = RAYLIB_LITE_INVALID_STATE;
+        return s_port.last_acquire;
     }
 
-    if (xSemaphoreTake(s_latest_mutex, 0) != pdTRUE) {
-        MosaicoGameRecordRender((uint32_t)(esp_timer_get_time() - started), 0, 0,
-                                MOSAICO_GAME_FRAME_BUSY,
-                                atomic_load(&s_in_flight));
-        return MOSAICO_GAME_FRAME_BUSY;
+    raylib_lite_frame_t frame = {0};
+    raylib_lite_result_t result = s_port.backend.acquire(
+        s_port.backend.context, &frame);
+    if (result != RAYLIB_LITE_OK) {
+        s_port.last_acquire = result;
+        return result;
     }
 
-    unsigned first = atomic_fetch_add(&s_next, 1U) % FRAME_COUNT;
-    for (unsigned attempt = 0; attempt < FRAME_COUNT; ++attempt) {
-        frame_slot_t *slot = &s_frames[(first + attempt) % FRAME_COUNT];
-        if (slot->pixels == s_latest) continue;
-        bool expected = false;
-        if (!atomic_compare_exchange_strong(&slot->borrowed, &expected, true)) {
-            continue;
-        }
-        s_drawing_slot = slot;
-        *out_pixels = slot->pixels;
-        *out_stride_pixels = MOSAICO_GAME_WIDTH;
-        xSemaphoreGive(s_latest_mutex);
-        s_acquire_us = (uint32_t)(esp_timer_get_time() - started);
-        return MOSAICO_GAME_FRAME_ACCEPTED;
+    if (!frame.pixels || frame.width != s_port.info.width ||
+            frame.height != s_port.info.height ||
+            frame.stride_pixels < frame.width) {
+        s_port.backend.discard(s_port.backend.context, &frame);
+        s_port.last_acquire = RAYLIB_LITE_PLATFORM_ERROR;
+        return s_port.last_acquire;
     }
-    xSemaphoreGive(s_latest_mutex);
-    MosaicoGameRecordRender((uint32_t)(esp_timer_get_time() - started), 0, 0,
-                            MOSAICO_GAME_FRAME_BUSY,
-                            atomic_load(&s_in_flight));
-    return MOSAICO_GAME_FRAME_BUSY;
+
+    s_port.frame = frame;
+    s_port.frame_acquired = true;
+    *out_pixels = frame.pixels;
+    *out_stride_pixels = frame.stride_pixels;
+    s_port.last_acquire = RAYLIB_LITE_OK;
+    return RAYLIB_LITE_OK;
 }
 
-esp_err_t mosaico_raylib_port_present_frame(void)
+raylib_lite_result_t mosaico_raylib_port_present_frame(void)
 {
-    frame_slot_t *slot = s_drawing_slot;
-    if (!slot || !s_latest_mutex) return ESP_ERR_INVALID_STATE;
-
-    s_drawing_slot = NULL;
-
-    int64_t started = esp_timer_get_time();
-    slot->submitted_us = started;
-    uint32_t in_flight = atomic_fetch_add(&s_in_flight, 1U) + 1U;
-    esp_err_t err = esp_gsp_canvas_try_push(
-        s_gsp, s_bind, slot->pixels,
-        MOSAICO_GAME_WIDTH * sizeof(uint16_t), release_frame, slot);
-    uint32_t submit_us = (uint32_t)(esp_timer_get_time() - started);
-    mosaico_game_frame_result_t result = MOSAICO_GAME_FRAME_ACCEPTED;
-    if (err == ESP_OK) {
-        if (xSemaphoreTake(s_latest_mutex, 0) == pdTRUE) {
-            s_latest = slot->pixels;
-            xSemaphoreGive(s_latest_mutex);
-        }
-    } else {
-        in_flight = atomic_fetch_sub(&s_in_flight, 1U) - 1U;
-        atomic_store(&slot->borrowed, false);
-        result = err == ESP_ERR_TIMEOUT ? MOSAICO_GAME_FRAME_SUPERSEDED
-                                        : MOSAICO_GAME_FRAME_DISPLAY_ERROR;
+    if (!s_port.initialized || !s_port.frame_acquired) {
+        s_port.last_present = RAYLIB_LITE_INVALID_STATE;
+        return s_port.last_present;
     }
-    MosaicoGameRecordRender(s_acquire_us, 0, submit_us, result, in_flight);
-    return err;
+
+    /* present consumes the frame on every return path. Clear local ownership
+     * before calling out so even a backend error cannot leave a stale frame. */
+    s_port.frame_acquired = false;
+    raylib_lite_result_t result = s_port.backend.present(
+        s_port.backend.context, &s_port.frame);
+    clear_frame(&s_port.frame);
+    s_port.last_present = result;
+    return result;
 }
 
-esp_err_t mosaico_raylib_port_copy_latest(uint16_t *out_pixels,
-                                          size_t pixel_capacity)
+void mosaico_raylib_port_discard_frame(void)
 {
-    if (!out_pixels || pixel_capacity < FRAME_BYTES / sizeof(uint16_t)) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    if (!s_latest || !s_latest_mutex) return ESP_ERR_INVALID_STATE;
-    if (xSemaphoreTake(s_latest_mutex, 0) != pdTRUE) {
-        return ESP_ERR_TIMEOUT;
-    }
-    memcpy(out_pixels, s_latest, FRAME_BYTES);
-    xSemaphoreGive(s_latest_mutex);
-    return ESP_OK;
+    if (!s_port.initialized || !s_port.frame_acquired) return;
+    s_port.frame_acquired = false;
+    s_port.backend.discard(s_port.backend.context, &s_port.frame);
+    clear_frame(&s_port.frame);
 }
 
-void mosaico_raylib_port_display_flush(const uint16_t *pixels, uint16_t x,
-                                       uint16_t y, uint16_t width,
-                                       uint16_t height)
+raylib_lite_result_t mosaico_raylib_port_last_acquire_result(void)
 {
-    int64_t started = esp_timer_get_time();
-    bool dropped = true;
-    if (s_gsp && pixels && x == 0 && y == 0 &&
-            width == MOSAICO_GAME_WIDTH && height == MOSAICO_GAME_HEIGHT) {
-        unsigned first = atomic_fetch_add(&s_next, 1U) % FRAME_COUNT;
-        for (unsigned attempt = 0; attempt < FRAME_COUNT; ++attempt) {
-            frame_slot_t *slot = &s_frames[(first + attempt) % FRAME_COUNT];
-            bool expected = false;
-            if (!atomic_compare_exchange_strong(&slot->borrowed, &expected, true)) {
-                continue;
-            }
-            if (!s_latest_mutex ||
-                    xSemaphoreTake(s_latest_mutex, pdMS_TO_TICKS(10)) != pdTRUE) {
-                atomic_store(&slot->borrowed, false);
-                break;
-            }
-            memcpy(slot->pixels, pixels, FRAME_BYTES);
-            s_latest = slot->pixels;
-            xSemaphoreGive(s_latest_mutex);
-            esp_err_t err = esp_gsp_canvas_try_push(
-                s_gsp, s_bind, slot->pixels, width * sizeof(uint16_t),
-                release_frame, slot);
-            if (err == ESP_OK) {
-                dropped = false;
-            } else {
-                atomic_store(&slot->borrowed, false);
-            }
-            break;
-        }
-    }
-    uint32_t present_us = (uint32_t)(esp_timer_get_time() - started);
-    MosaicoGameRecordFrame(0, 0, present_us, dropped);
+    return s_port.initialized ? s_port.last_acquire : RAYLIB_LITE_NOT_READY;
+}
+
+raylib_lite_result_t mosaico_raylib_port_last_present_result(void)
+{
+    return s_port.initialized ? s_port.last_present : RAYLIB_LITE_NOT_READY;
+}
+
+raylib_lite_result_t mosaico_raylib_port_flush(uint32_t timeout_ms)
+{
+    if (!s_port.initialized) return RAYLIB_LITE_INVALID_STATE;
+    if (s_port.frame_acquired) return RAYLIB_LITE_INVALID_STATE;
+    return s_port.backend.flush(s_port.backend.context, timeout_ms);
+}
+
+raylib_lite_result_t mosaico_raylib_port_copy_latest(
+    uint16_t *out_pixels, size_t pixel_capacity)
+{
+    if (!out_pixels) return RAYLIB_LITE_INVALID_ARGUMENT;
+    if (!s_port.initialized) return RAYLIB_LITE_INVALID_STATE;
+    if (!s_port.backend.copy_latest) return RAYLIB_LITE_NOT_SUPPORTED;
+    return s_port.backend.copy_latest(s_port.backend.context, out_pixels,
+                                      pixel_capacity);
 }
 
 void mosaico_raylib_port_get_dimensions(uint16_t *width, uint16_t *height)
 {
-    if (width) *width = MOSAICO_GAME_WIDTH;
-    if (height) *height = MOSAICO_GAME_HEIGHT;
+    if (width) *width = s_port.initialized ? s_port.info.width : 0;
+    if (height) *height = s_port.initialized ? s_port.info.height : 0;
 }
