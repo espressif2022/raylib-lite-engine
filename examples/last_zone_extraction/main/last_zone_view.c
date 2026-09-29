@@ -16,7 +16,6 @@
 #define LAST_ZONE_CAMERA_PLANE 0.577350269f /* tan(60 degrees / 2) */
 #define LAST_ZONE_FLOOR_SCALE 165.0f
 #define LAST_ZONE_NEAR_WALL 3.6f
-#define LAST_ZONE_CAMERA_HEIGHT 0.5f
 
 typedef struct {
     const char *name;
@@ -64,10 +63,7 @@ static uint8_t s_wall_type[LAST_ZONE_COLUMNS];
 static int16_t s_wall_top[LAST_ZONE_COLUMNS];
 static last_zone_wall_sample_t s_anchors[LAST_ZONE_COLUMNS];
 static last_zone_wall_sample_t s_pixels[LAST_ZONE_SCREEN];
-static last_zone_wall_sample_t s_cover_samples[LAST_ZONE_COLUMNS];
 static float s_col_depth[LAST_ZONE_SCREEN];
-static float s_cover_depth[LAST_ZONE_SCREEN];
-static int16_t s_cover_top[LAST_ZONE_SCREEN];
 static mosaico_raycast_wall_t s_wall_batch[LAST_ZONE_MAX_WALL_SAMPLES];
 static float s_camera_dir_x;
 static float s_camera_dir_y;
@@ -203,42 +199,6 @@ static bool column_visible(int screen, float distance)
     return distance < depth + .10f;
 }
 
-static int column_visible_bottom(int screen,float distance,int bottom)
-{
-    if(!column_visible(screen,distance))return -1;
-    if(s_cover_depth[screen]+.10f<distance&&s_cover_top[screen]<bottom)
-        bottom=s_cover_top[screen];
-    return bottom;
-}
-
-static bool draw_occluded_sprite(MosaicoAtlas atlas,const MosaicoSpriteFrame *frame,
-                                 int left,int top,int width,int height,float distance,
-                                 Color tint)
-{
-    bool visible_any=false;
-    int full_bottom=top+height,run_start=-1,run_bottom=-1;
-    for(int x=0;x<=width;x+=4){
-        int bottom=x<width?column_visible_bottom(left+x,distance,full_bottom):-1;
-        if(run_start>=0&&(bottom!=run_bottom||x>=width)){
-            int run_end=x<width?x:width;
-            int run_width=run_end-run_start;
-            int visible_h=run_bottom-top;
-            float source_x=frame->source.x+
-                frame->source.width*(float)run_start/(float)width;
-            float source_w=frame->source.width*(float)run_width/(float)width;
-            float source_h=frame->source.height*(float)visible_h/(float)height;
-            DrawTexturePro(atlas.texture,
-                (Rectangle){source_x,frame->source.y,source_w,source_h},
-                (Rectangle){(float)(left+run_start),(float)top,(float)run_width,
-                            (float)visible_h},(Vector2){0,0},0,tint);
-            visible_any=true;
-            run_start=-1;
-        }
-        if(x<width&&bottom>top&&run_start<0){run_start=x;run_bottom=bottom;}
-    }
-    return visible_any;
-}
-
 static void draw_enemy_effect(const last_zone_game_t *game,
                               const last_zone_enemy_t *enemy)
 {
@@ -318,9 +278,27 @@ static void draw_enemies(const last_zone_game_t *game, MosaicoAtlas atlas)
         Color tint = corpse ? (Color){210, 186, 168, 255}
                     : (enemy->hit_flash ? (Color){255, 92, 64, 255}
                     : (enemy->elite ? (Color){186, 164, 228, 255} : WHITE));
-        int left = center - dest_w / 2, top = ground - dest_h;
-        bool visible_any=draw_occluded_sprite(atlas,frame,left,top,dest_w,dest_h,
-                                              distance,tint);
+        int left = center - dest_w / 2, top = ground - dest_h, run_start = -1;
+        bool visible_any = false;
+        for (int x = 0; x < dest_w + 4; x += 4) {
+            int screen = left + x;
+            bool visible = x < dest_w && column_visible(screen, distance);
+            if (visible) {
+                visible_any = true;
+                if (run_start < 0) run_start = x;
+            }
+            if (!visible && run_start >= 0) {
+                int run_end = x < dest_w ? x : dest_w, run_width = run_end - run_start;
+                float source_x = frame->source.x + frame->source.width * (float)run_start / dest_w;
+                float source_width = frame->source.width * (float)run_width / dest_w;
+                DrawTexturePro(atlas.texture,
+                    (Rectangle){source_x, frame->source.y, source_width, frame->source.height},
+                    (Rectangle){(float)(left + run_start), (float)top, (float)run_width,
+                                (float)dest_h},
+                    (Vector2){0, 0}, 0, tint);
+                run_start = -1;
+            }
+        }
         if (corpse) {
             if (visible_any || enemy->death_timer) draw_enemy_effect(game, enemy);
             continue;
@@ -364,11 +342,16 @@ static void draw_billboard_box(const last_zone_game_t *game, float world_x, floa
     if (size <= 0) return;
     size = size / 2 + inset;
     if (size < 10) size = 10;
-    int left = center - size / 2, top = ground - size;
-    for (int x=0;x<size;x+=4) {
-        int width=size-x<4?size-x:4;
-        int bottom=column_visible_bottom(left+x,distance,ground);
-        if(bottom>top)DrawRectangle(left+x,top,width,bottom-top,color);
+    int left = center - size / 2, top = ground - size, run_start = -1;
+    for (int x = 0; x < size + 4; x += 4) {
+        int screen = left + x;
+        bool visible = x < size && column_visible(screen, distance);
+        if (visible && run_start < 0) run_start = x;
+        if (!visible && run_start >= 0) {
+            int run_width = (x < size ? x : size) - run_start;
+            DrawRectangle(left + run_start, top, run_width, size, color);
+            run_start = -1;
+        }
     }
 }
 
@@ -385,8 +368,24 @@ static void draw_billboard_sprite(const last_zone_game_t *game, MosaicoAtlas atl
     size = (int)((float)size * scale);
     if (size < 12) size = 12;
     if (size > 120) size = 120;
-    int left = center - size / 2, top = ground - size;
-    draw_occluded_sprite(atlas,frame,left,top,size,size,distance,WHITE);
+    int left = center - size / 2, top = ground - size, run_start = -1;
+    for (int x = 0; x < size + 4; x += 4) {
+        int screen = left + x;
+        bool visible = x < size && column_visible(screen, distance);
+        if (visible) {
+            if (run_start < 0) run_start = x;
+        }
+        if (!visible && run_start >= 0) {
+            int run_end = x < size ? x : size, run_width = run_end - run_start;
+            float source_x = frame->source.x + frame->source.width * (float)run_start / size;
+            float source_width = frame->source.width * (float)run_width / size;
+            DrawTexturePro(atlas.texture,
+                (Rectangle){source_x, frame->source.y, source_width, frame->source.height},
+                (Rectangle){(float)(left + run_start), (float)top, (float)run_width, (float)size},
+                (Vector2){0, 0}, 0, WHITE);
+            run_start = -1;
+        }
+    }
 }
 
 static void draw_pickups(const last_zone_game_t *game, MosaicoAtlas props)
@@ -514,7 +513,7 @@ static void cast_wall_sample(const last_zone_game_t *game, int screen_x, int hor
             side = true;
         }
         uint8_t cell = last_zone_cell(game, map_x, map_y);
-        if (cell != LAST_ZONE_CELL_COVER && last_zone_blocks(game, map_x, map_y)) wall = cell ? cell : 1;
+        if (last_zone_blocks(game, map_x, map_y)) wall = cell ? cell : 1;
     }
     float distance = side ? side_y - delta_y : side_x - delta_x;
     if (!wall) distance = 64.0f;
@@ -533,50 +532,6 @@ static void cast_wall_sample(const last_zone_game_t *game, int screen_x, int hor
         .shift = (uint8_t)((map_x * 37 + map_y * 13) & 31),
     };
     project_wall(sample, horizon);
-}
-
-static void cast_cover_sample(const last_zone_game_t *game,int column,int horizon)
-{
-    int screen_x=column*LAST_ZONE_COLUMN_WIDTH;
-    float sample_x=(float)screen_x+LAST_ZONE_COLUMN_WIDTH*.5f;
-    float camera_x=sample_x/240.0f-1.0f;
-    float rx=s_camera_dir_x+s_camera_plane_x*camera_x;
-    float ry=s_camera_dir_y+s_camera_plane_y*camera_x;
-    int map_x=(int)game->x,map_y=(int)game->y;
-    int step_x=rx<0?-1:1,step_y=ry<0?-1:1;
-    float delta_x=fabsf(rx)<.000001f?1.0e30f:fabsf(1.0f/rx);
-    float delta_y=fabsf(ry)<.000001f?1.0e30f:fabsf(1.0f/ry);
-    float side_x=(rx<0?game->x-map_x:map_x+1.0f-game->x)*delta_x;
-    float side_y=(ry<0?game->y-map_y:map_y+1.0f-game->y)*delta_y;
-    bool side=false,hit=false;
-    for(int step=0;step<LAST_ZONE_WIDTH+LAST_ZONE_HEIGHT;++step){
-        if(side_x<side_y){side_x+=delta_x;map_x+=step_x;side=false;}
-        else{side_y+=delta_y;map_y+=step_y;side=true;}
-        uint8_t cell=last_zone_cell(game,map_x,map_y);
-        if(cell==LAST_ZONE_CELL_COVER){hit=true;break;}
-        if(last_zone_blocks(game,map_x,map_y))break;
-    }
-    last_zone_wall_sample_t *sample=&s_cover_samples[column];
-    *sample=(last_zone_wall_sample_t){.screen_x=(int16_t)screen_x,
-        .width=LAST_ZONE_COLUMN_WIDTH,.wall=hit?6U:0U};
-    if(!hit)return;
-    float distance=side?side_y-delta_y:side_x-delta_x;
-    if(distance<.08f)distance=.08f;
-    float world_hit=side?game->x+distance*rx:game->y+distance*ry;
-    float u=world_hit-floorf(world_hit);
-    if(u<0)u+=1.0f;
-    float cover=last_zone_cover_height(game,map_x,map_y);
-    float scale=330.0f/distance;
-    int top=(int)((float)horizon+(LAST_ZONE_CAMERA_HEIGHT-cover)*scale);
-    int bottom=(int)((float)horizon+LAST_ZONE_CAMERA_HEIGHT*scale);
-    if(top<0)top=0;
-    if(bottom>LAST_ZONE_SCREEN)bottom=LAST_ZONE_SCREEN;
-    if(bottom<=top){sample->wall=0;return;}
-    sample->depth=distance;sample->q=1.0f/distance;sample->u=u;sample->uq=u*sample->q;
-    sample->top=(int16_t)top;sample->bottom=(uint16_t)bottom;
-    sample->height=(int16_t)(bottom-top);sample->map_x=(int16_t)map_x;
-    sample->map_y=(int16_t)map_y;sample->side=side?1U:0U;
-    sample->shift=(uint8_t)((map_x*37+map_y*13)&31);
 }
 
 static bool wall_boundary(const last_zone_wall_sample_t *a,
@@ -703,20 +658,7 @@ static void raycast_world(const last_zone_game_t *game)
     qsort(gaps, (size_t)gap_count, sizeof(gaps[0]), wall_gap_cmp);
     for (int i = 0; i < gap_count; ++i)
         fill_gap(game, &gaps[i], horizon, &extra);
-    for (int x = 0; x < LAST_ZONE_SCREEN; ++x) {
-        s_col_depth[x] = s_pixels[x].depth;
-        s_cover_depth[x]=64.0f;
-        s_cover_top[x]=LAST_ZONE_SCREEN;
-    }
-    for(int column=0;column<LAST_ZONE_COLUMNS;++column){
-        cast_cover_sample(game,column,horizon);
-        const last_zone_wall_sample_t *cover=&s_cover_samples[column];
-        if(!cover->wall)continue;
-        for(int x=cover->screen_x;x<cover->screen_x+cover->width&&x<LAST_ZONE_SCREEN;++x){
-            s_cover_depth[x]=cover->depth;
-            s_cover_top[x]=cover->top;
-        }
-    }
+    for (int x = 0; x < LAST_ZONE_SCREEN; ++x) s_col_depth[x] = s_pixels[x].depth;
     for (int column = 0; column < LAST_ZONE_COLUMNS; ++column) {
         int x0 = column * LAST_ZONE_COLUMN_WIDTH;
         uint16_t bottom = s_pixels[x0].bottom;
@@ -732,7 +674,7 @@ static void raycast_world(const last_zone_game_t *game)
         s_wall_type[column] = wall;
     }
     s_view_stats.refined_columns = (uint16_t)extra;
-    s_view_stats.rays_cast = (uint16_t)(LAST_ZONE_COLUMNS * 2 + extra);
+    s_view_stats.rays_cast = (uint16_t)(LAST_ZONE_COLUMNS + extra);
 }
 
 static int floor_kind_at(const last_zone_game_t *game, float wx, float wy)
@@ -1006,46 +948,6 @@ static void draw_walls(const last_zone_game_t *game, MosaicoWallAtlas walls,
     }
 }
 
-static void draw_covers(const last_zone_game_t *game,MosaicoWallAtlas walls,
-                        const MosaicoSpriteFrame *material)
-{
-    if(!material)return;
-    int batch=0;
-    float inset=4.0f;
-    float inner=material->source.width-inset*2.0f;
-    float src_h=material->source.height-inset*2.0f;
-    if(inner<4.0f)inner=material->source.width;
-    if(src_h<4.0f)src_h=material->source.height;
-    for(int column=0;column<LAST_ZONE_COLUMNS;++column){
-        const last_zone_wall_sample_t *sample=&s_cover_samples[column];
-        if(!sample->wall)continue;
-        float u=sample->u+(float)sample->shift/48.0f;
-        u-=floorf(u);
-        int src_x=(int)(material->source.x+inset+u*(inner-1.0f));
-        unsigned light=distance_light(sample->depth,sample->side!=0,false,false,
-                                      u<.08f||u>.92f,game->weapon_recoil);
-        float span=330.0f*last_zone_cover_height(game,sample->map_x,sample->map_y)/
-                   sample->depth;
-        float origin=(float)view_horizon(game)+
-            (LAST_ZONE_CAMERA_HEIGHT-last_zone_cover_height(game,sample->map_x,
-                                                             sample->map_y))*
-            330.0f/sample->depth;
-        s_wall_batch[batch++]=wall_column(sample->screen_x,sample->top,sample->width,
-            sample->height,src_x,(int)(material->source.y+inset),1,(int)src_h,
-            light,origin,span);
-    }
-    if(batch)Mosaico2DDrawIndexedRaycastWalls(walls,s_wall_batch,batch);
-    for(int column=0;column<LAST_ZONE_COLUMNS;++column){
-        const last_zone_wall_sample_t *sample=&s_cover_samples[column];
-        if(!sample->wall)continue;
-        int rail=sample->height/12;
-        if(rail<2)rail=2;
-        if(rail>7)rail=7;
-        DrawRectangle(sample->screen_x,sample->top,sample->width,rail,
-                      sample->side?(Color){116,70,38,255}:(Color){178,104,50,255});
-    }
-}
-
 static void load_material_frames(MosaicoAtlas floor,MosaicoWallAtlas walls)
 {
     static const mosaico_asset_id_t material_ids[] = {MOSAICO_ASSET_ID_WALL_CONCRETE,
@@ -1122,7 +1024,6 @@ static void draw_radar(const last_zone_game_t *game)
             Color color = (Color){58, 42, 28, 255};
             if (cell == 4 && !game->door_open[my][mx]) color = (Color){220, 180, 60, 255};
             else if (cell == 5) color = (Color){80, 220, 200, 255};
-            else if (cell == LAST_ZONE_CELL_COVER) color = (Color){226, 116, 52, 255};
             else if (cell == 3) color = (Color){148, 92, 48, 255};
             else if (cell == 2) color = (Color){96, 140, 168, 255};
             else if (cell >= 1 && cell <= 3) color = (Color){186, 198, 208, 255};
@@ -1452,7 +1353,6 @@ void last_zone_view_render(const last_zone_game_t *game, MosaicoAtlas enemies,
     draw_floor(game, floor, s_material_frames[3]);
     int64_t t4 = view_now_us();
     draw_walls(game, walls, s_material_frames);
-    draw_covers(game,walls,s_material_frames[1]);
     int64_t t5 = view_now_us();
     int64_t t6 = t5;
     draw_extract(game);

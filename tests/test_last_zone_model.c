@@ -138,30 +138,6 @@ int main(void)
            LAST_ZONE_MOVE_Y - LAST_ZONE_MOVE_R - 8);
     assert(game.radar_x >= 4 && game.radar_x + LAST_ZONE_RADAR_SIZE <= 476);
 
-    game.layout = 0;
-    last_zone_reset(&game);
-    assert(last_zone_cell(&game, 5, 3) == LAST_ZONE_CELL_COVER);
-    assert(last_zone_blocks(&game, 5, 3));
-    assert(last_zone_cover_height(&game, 5, 3) > 0.4f);
-    last_zone_confirm(&game);
-    for (int i = 0; i < LAST_ZONE_ENEMIES; ++i) game.enemies[i].active = false;
-    last_zone_set_motion(&game, 1.0f, 0.0f, 0.0f);
-    for (int i = 0; i < 50; ++i) last_zone_update(&game);
-    assert(game.x < 4.91f);
-
-    game.layout = 0;
-    last_zone_reset(&game);
-    last_zone_confirm(&game);
-    for (int i = 1; i < LAST_ZONE_ENEMIES; ++i) game.enemies[i].active = false;
-    game.x = 2.5f;
-    game.y = 3.5f;
-    game.angle = 0.0f;
-    game.enemies[0].x = 6.5f;
-    game.enemies[0].y = 3.5f;
-    game.enemies[0].hp = 1;
-    game.enemies[0].active = true;
-    assert(last_zone_fire(&game) == NEON_FIRE_KILL);
-
     last_zone_reset(&game);
     last_zone_confirm(&game);
     for (int i = 1; i < LAST_ZONE_ENEMIES; ++i) game.enemies[i].active = false;

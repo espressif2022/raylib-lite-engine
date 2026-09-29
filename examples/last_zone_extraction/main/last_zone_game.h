@@ -34,8 +34,6 @@
 #define LAST_ZONE_RADAR_DEFAULT_X 88
 #define LAST_ZONE_RADAR_DEFAULT_Y 86
 #define LAST_ZONE_RADAR_SIZE 74
-#define LAST_ZONE_CELL_COVER 6
-#define LAST_ZONE_COVER_HEIGHT 0.44f
 
 typedef enum {
     LAST_ZONE_PHASE_START = 0,
@@ -131,9 +129,6 @@ void last_zone_update(last_zone_game_t *game);
 last_zone_fire_result_t last_zone_fire(last_zone_game_t *game);
 uint8_t last_zone_cell(const last_zone_game_t *game,int x,int y);
 bool last_zone_blocks(const last_zone_game_t *game,int x,int y);
-/* LAST_ZONE_CELL_COVER is solid waist-high cover. The return value is in wall-height units
- * where a full wall is 1.0 and the camera eye is at 0.5. */
-float last_zone_cover_height(const last_zone_game_t *game,int x,int y);
 bool last_zone_door_ahead(const last_zone_game_t *game);
 bool last_zone_near_closed_door(const last_zone_game_t *game);
 bool last_zone_pickup_visible(const last_zone_game_t *game,int index);

@@ -48,31 +48,6 @@ progress and per-mission bests.
 
 每关有独立的 360° 天际线。设备 NVS 保存战役进度和每关最好成绩。
 
-## Heightfield upgrade / 高度场升级
-
-The Dock mission now includes cell type `6`, a waist-high solid cover cell. A
-cover ray records the near vertical span and then continues to the opaque wall,
-so the renderer keeps the distant wall, floor, window, and panorama visible
-above it. Characters and props behind cover are clipped per screen column;
-movement is blocked while eye-level sight and shots pass over it.
-
-Dock 关已加入 `6` 号半高实体掩体。射线先记录近处的竖直掩体段，再继续寻找
-后方整墙，因此掩体上方仍能看到远墙、地面、窗和天际线。敌人及道具按屏幕列
-裁剪；移动会被挡住，视线和射击可从上方越过。
-
-This is the first, bounded step of the sector-height upgrade:
-
-1. **Implemented:** static low cover, two-depth wall projection, sprite clipping,
-   collision, sight/fire semantics, and Host/device-compatible rendering.
-2. **Next:** per-open-cell floor and ceiling heights, camera height following the
-   floor, step limits, and horizontal floor/ceiling spans.
-3. **Later:** moving lifts/vertical doors and height-aware AI navigation. Slopes
-   and stacked rooms stay outside this grid renderer.
-
-这是高度场升级的第一步。下一步再给可通行格加入地板/天花板高度、相机随地面
-升降、台阶限制和水平面投影；之后才加入升降台、上升门与高度感知 AI。斜坡和
-上下叠层不纳入这套格子渲染器。
-
 ## Run / 运行
 
 ```bash
