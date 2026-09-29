@@ -52,7 +52,8 @@ typedef struct {
     uint32_t tick;
     uint16_t shots,hits;
     uint8_t health,shot_flash,hit_flash;
-    bool terminal,won,paused;
+    float crane_phase;
+    bool power,terminal,won,paused;
     vd_enemy_t enemies[VD_ENEMIES];
 } vd_game_t;
 typedef struct {
@@ -67,7 +68,6 @@ static int s_face_count,s_faces_dropped;
 static float s_cam_x,s_cam_y,s_cam_z,s_sy,s_cy,s_sp,s_cp;
 
 static float clampf(float v,float lo,float hi){return v<lo?lo:(v>hi?hi:v);}
-static float angle_delta(float a){while(a>VD_PI)a-=2*VD_PI;while(a<-VD_PI)a+=2*VD_PI;return a;}
 
 static float stair_height(float z)
 {
@@ -82,7 +82,7 @@ static float stair_height(float z)
 static float floor_at(float x,float z)
 {
     if(x>=2.6f&&x<=7.4f&&z>=2.0f&&z<6.2f)return stair_height(z);
-    if(x>=2.6f&&x<=7.4f&&z>=6.2f&&z<=18.2f)return 1.2f;
+    if(x>=2.6f&&x<=7.4f&&z>=6.2f&&z<=20.2f)return 1.2f;
     return 0.0f;
 }
 
@@ -102,7 +102,7 @@ static bool solid_at(float x,float z)
     if(((x>-1.9f&&x<-1.25f)||(x>1.25f&&x<1.9f))&&
        z>18.2f&&z<18.55f)return true;
     /* The high deck side is climbable only through the stair footprint. */
-    if(x>=2.6f&&x<=7.4f&&z>=6.2f&&z<=18.2f)return false;
+    if(x>=2.6f&&x<=7.4f&&z>=6.2f&&z<=20.2f)return false;
     return false;
 }
 
@@ -126,7 +126,7 @@ static void reset_game(vd_game_t *g)
     const float pos[VD_ENEMIES][3]={{-3.5f,8.7f,0},{1.0f,15.0f,0},
         {4.8f,8.6f,1.2f},{5.8f,14.0f,1.2f},{-5.5f,17.2f,0}};
     for(int i=0;i<VD_ENEMIES;++i){
-        g->enemies[i]=(vd_enemy_t){pos[i][0],pos[i][1],pos[i][2],2,true,pos[i][2]>.5f};
+        g->enemies[i]=(vd_enemy_t){pos[i][0],pos[i][1],pos[i][2],2,false,pos[i][2]>.5f};
     }
 }
 
@@ -316,8 +316,8 @@ static void add_scene(const vd_game_t *g)
         add_floor(2.38f,z0,2.48f,z1,0,stripe);
         add_floor(2.48f,z0,8,z1,0,band);
     }
-    for(int i=0;i<9;++i){
-        float z=.8f+i*2.15f;
+    for(int i=0;i<8;++i){
+        float z=2.4f+i*2.15f;
         add_box(-.055f,z,.055f,z+1.05f,0,.028f,(Color){190,198,181,255});
     }
     /* Six broad steps turn right-hand movement into a readable route. */
@@ -327,6 +327,7 @@ static void add_scene(const vd_game_t *g)
         add_box(2.6f,z0,7.4f,z0+.055f,h,h+.025f,(Color){211,158,52,255});
     }
     add_box(2.6f,6.2f,7.4f,18.2f,0,1.2f,deck);
+    if(g->terminal)add_box(3.8f,18.0f,6.7f,20.2f,0,1.2f,(Color){91,98,82,255});
     for(int i=0;i<8;++i){
         float z0=6.25f+i*1.48f,z1=z0+1.42f;
         add_box(2.68f,z0,7.32f,z1,1.2f,1.216f,
@@ -355,19 +356,24 @@ static void add_scene(const vd_game_t *g)
     add_box(-6.9f,12.86f,7.0f,13.14f,3.82f,4.22f,crane);
     add_box(4.8f,12.72f,6.2f,13.28f,4.22f,4.82f,(Color){63,83,87,255});
     add_box(5.0f,12.68f,6.0f,12.74f,4.38f,4.70f,(Color){116,184,194,255});
-    add_box(.75f,12.93f,.85f,13.07f,1.75f,3.82f,(Color){45,52,51,255});
-    add_box(.55f,12.82f,1.05f,13.18f,1.55f,1.82f,(Color){63,69,65,255});
+    float cargo_y=1.55f+g->crane_phase*1.65f;
+    add_box(.75f,12.93f,.85f,13.07f,cargo_y+.27f,3.82f,(Color){45,52,51,255});
+    add_box(.35f,12.65f,1.25f,13.35f,cargo_y,cargo_y+.34f,(Color){63,89,94,255});
     /* Repeated lamps make depth and the two routes readable at a glance. */
     for(int i=0;i<4;++i){
         float z=3.7f+i*4.2f;
-        add_lamp(-5.8f,z,2.7f,steel,(Color){243,184,73,255});
+        add_lamp(-5.8f,z,2.7f,steel,g->power?(Color){243,184,73,255}:(Color){61,78,79,255});
     }
     /* A moored vessel beyond extraction keeps the doorway from facing empty sky. */
     add_box(-5.6f,22.0f,5.6f,25.5f,-.35f,.82f,(Color){42,61,70,255});
     add_box(-2.2f,22.7f,2.2f,24.6f,.82f,1.65f,(Color){173,181,169,255});
     add_box(-.8f,23.2f,.8f,24.2f,1.65f,2.35f,(Color){68,96,105,255});
 #endif
-        /* Terminal and extraction gate communicate the high-route objective. */
+    /* Shore power panel starts the exploration sequence. */
+    add_box(-1.45f,1.75f,-.75f,2.05f,0,1.15f,(Color){45,68,71,255});
+    add_box(-1.34f,1.68f,-.86f,1.76f,.38f,.92f,
+            g->power?(Color){52,211,154,255}:(Color){116,55,47,255});
+    /* Crane console and extraction gate communicate the high-route objective. */
     add_box(6.4f,15.0f,7.1f,15.65f,1.2f,2.15f,(Color){45,76,82,255});
     Color gate={54,76,80,255};
     add_box(-1.9f,18.2f,-1.25f,18.55f,0,2.2f,gate);
@@ -377,8 +383,7 @@ static void add_scene(const vd_game_t *g)
             g->terminal?(Color){45,214,154,255}:(Color){211,146,39,255});
     add_box(-1.05f,18.15f,-.78f,18.22f,.25f,1.48f,(Color){211,158,52,255});
     add_box(.78f,18.15f,1.05f,18.22f,.25f,1.48f,(Color){211,158,52,255});
-    for(int i=0;i<VD_ENEMIES;++i)if(g->enemies[i].active)
-        add_enemy_face(&g->enemies[i],g->tick,i);
+    (void)add_enemy_face;
 }
 
 static bool world_to_screen(float x,float y,float z,Vector2 *p,float *depth)
@@ -392,43 +397,15 @@ static bool world_to_screen(float x,float y,float z,Vector2 *p,float *depth)
 static int alive_count(const vd_game_t *g)
 {int n=0;for(int i=0;i<VD_ENEMIES;++i)if(g->enemies[i].active)++n;return n;}
 
-static bool inside_rect(float x,float z,float x0,float z0,float x1,float z1)
-{ return x>x0&&x<x1&&z>z0&&z<z1; }
-
-static bool shot_clear(const vd_game_t *g,const vd_enemy_t *e)
-{
-    static const float blockers[6][5]={
-        {-2.2f,5.1f,-.2f,7.4f,1.25f},{.3f,10.0f,2.2f,12.4f,1.05f},
-        {-4.8f,14.0f,-2.8f,16.2f,1.35f},{6.4f,15.0f,7.1f,15.65f,2.15f},
-        {-1.9f,18.2f,-1.25f,18.55f,2.2f},{1.25f,18.2f,1.9f,18.55f,2.2f}};
-    float eye=floor_at(g->x,g->z)+1.42f,target=e->y+.62f;
-    for(int step=1;step<32;++step){
-        float t=(float)step/32.0f,x=g->x+(e->x-g->x)*t,z=g->z+(e->z-g->z)*t;
-        float y=eye+(target-eye)*t;
-        for(int i=0;i<6;++i)
-            if(y<blockers[i][4]&&inside_rect(x,z,blockers[i][0],blockers[i][1],
-                                             blockers[i][2],blockers[i][3]))return false;
-        if(y<1.2f&&inside_rect(x,z,2.6f,6.2f,7.4f,18.2f))return false;
-    }
-    return true;
-}
-
 static void fire(vd_game_t *g)
 {
     if(g->won)return;
     g->shot_flash=3;
+    float power_dx=g->x+1.1f,power_dz=g->z-1.9f;
+    if(power_dx*power_dx+power_dz*power_dz<3.0f){g->power=true;return;}
     float terminal_dx=g->x-6.75f,terminal_dz=g->z-15.3f;
-    if(terminal_dx*terminal_dx+terminal_dz*terminal_dz<2.0f&&floor_at(g->x,g->z)>.9f){
-        g->terminal=true;return;
-    }
-    ++g->shots;int best=-1;float best_score=.11f;
-    for(int i=0;i<VD_ENEMIES;++i){vd_enemy_t *e=&g->enemies[i];if(!e->active)continue;
-        float dx=e->x-g->x,dz=e->z-g->z,d=sqrtf(dx*dx+dz*dz);
-        float a=fabsf(angle_delta(atan2f(dx,dz)-g->yaw));
-        float score=a-.25f/d;
-        if(score<best_score&&shot_clear(g,e)){best_score=score;best=i;}}
-    if(best>=0){vd_enemy_t *e=&g->enemies[best];++g->hits;g->hit_flash=5;
-        if(--e->hp==0)e->active=false;}
+    if(g->power&&terminal_dx*terminal_dx+terminal_dz*terminal_dz<2.0f&&
+       floor_at(g->x,g->z)>.9f){g->terminal=true;return;}
 }
 
 static void update_game(vd_game_t *g)
@@ -444,7 +421,8 @@ static void update_game(vd_game_t *g)
     if(movement_ok(g->x,g->z,g->x,nz))g->z=nz;
     float floor=floor_at(g->x,g->z);
     g->camera_y+=(floor+1.55f-g->camera_y)*.22f;
-    if(g->terminal&&alive_count(g)==0&&g->z>18.6f&&fabsf(g->x)<1.2f)g->won=true;
+    if(g->terminal)g->crane_phase+=(1.0f-g->crane_phase)*.08f;
+    if(g->terminal&&g->crane_phase>.92f&&g->z>18.6f&&g->x>3.6f&&g->x<6.9f)g->won=true;
     ++g->tick;
 }
 
@@ -478,58 +456,44 @@ static void draw_sky(const vd_game_t *g)
 static void draw_world_overlays(const vd_game_t *g)
 {
     Vector2 p;float d;
-    if(!g->terminal&&world_to_screen(6.75f,2.48f,15.3f,&p,&d)){
+    if(!g->power&&world_to_screen(-1.1f,1.35f,1.7f,&p,&d)){
+        DrawPoly(p,4,8,45,(Color){255,196,58,255});
+        DrawText("SHORE POWER",(int)p.x-43,(int)p.y-25,11,(Color){255,222,130,255});
+    }
+    if(g->power&&!g->terminal&&world_to_screen(6.75f,2.48f,15.3f,&p,&d)){
         int r=(int)clampf(62.0f/d,4,10);
         DrawPoly(p,4,(float)r,45,(Color){255,196,58,255});
         if(d<9)DrawText("TERMINAL",(int)p.x-30,(int)p.y-24,11,(Color){255,222,130,255});
     }
-    if(g->terminal&&alive_count(g)==0&&world_to_screen(0,1.45f,18.1f,&p,&d)){
+    if(g->terminal&&g->crane_phase>.92f&&world_to_screen(5.2f,2.05f,18.5f,&p,&d)){
         int pulse=8+(int)(g->tick%12u<6u);
         DrawPoly(p,4,(float)pulse,45,(Color){72,255,190,255});
         DrawText("EXTRACT",(int)p.x-27,(int)p.y-27,11,(Color){122,255,211,255});
-    }
-    for(int i=0;i<VD_ENEMIES;++i){
-        const vd_enemy_t *e=&g->enemies[i];
-        if(!e->active||!shot_clear(g,e)||
-           !world_to_screen(e->x,e->y+1.32f,e->z,&p,&d)||d>11)continue;
-        int w=(int)clampf(48.0f/d,8,20);
-        DrawRectangle((int)p.x-w/2,(int)p.y,w,3,(Color){34,35,35,220});
-        DrawRectangle((int)p.x-w/2,(int)p.y,w*(int)e->hp/2,3,(Color){255,93,72,255});
     }
 }
 
 static void draw_hud(const vd_game_t *g)
 {
     DrawRectangle(14,14,452,42,(Color){5,13,18,235});
-    DrawText("VERTICAL DOCK",28,24,18,(Color){226,234,218,255});
-    DrawText(TextFormat("HOSTILES %d",alive_count(g)),290,24,16,(Color){255,118,72,255});
-    for(int i=0;i<5;++i)
-        DrawRectangle(198+i*11,31,8,8,i<g->health?(Color){72,224,164,255}:(Color){42,62,62,255});
-    const char *objective=!g->terminal?"REACH HIGH CATWALK  >  ACTIVATE TERMINAL":
-        (alive_count(g)?"TERMINAL ONLINE  >  CLEAR HOSTILES":"EXTRACT AT NORTH GATE");
+    DrawText("NIGHT SHIFT: DOCK 17",28,24,18,(Color){226,234,218,255});
+    DrawText(g->power?"POWER ONLINE":"BLACKOUT",340,24,13,
+             g->power?(Color){82,255,196,255}:(Color){255,118,72,255});
+    const char *objective=!g->power?"RESTORE SHORE POWER":
+        (!g->terminal?"CLIMB CATWALK  >  START CRANE":"CARGO CLEAR  >  BOARD NORTH SHIP");
     DrawRectangle(62,64,356,26,(Color){8,20,24,225});
-    DrawText(objective,76,70,13,g->terminal?(Color){82,255,196,255}:(Color){255,210,92,255});
-    DrawLine(230,214,250,214,(Color){255,225,126,255});
-    DrawLine(240,204,240,224,(Color){255,225,126,255});
-    if(g->hit_flash){
-        DrawLine(226,200,234,208,(Color){255,88,68,255});
-        DrawLine(246,208,254,200,(Color){255,88,68,255});
-        DrawLine(226,228,234,220,(Color){255,88,68,255});
-        DrawLine(246,220,254,228,(Color){255,88,68,255});
-    }
-    float recoil=g->shot_flash?8.0f:0.0f;
-    DrawTriangle((Vector2){208,480},(Vector2){232,356+recoil},(Vector2){248,356+recoil},
-                 (Color){43,50,50,255});
-    DrawTriangle((Vector2){272,480},(Vector2){248,356+recoil},(Vector2){232,356+recoil},
-                 (Color){29,35,36,255});
-    DrawRectangle(235,338+(int)recoil,10,70,(Color){91,104,101,255});
-    DrawRectangle(238,326+(int)recoil,4,44,(Color){178,190,177,255});
-    DrawRectangle(218,405+(int)recoil,44,12,(Color){18,24,25,255});
-    if(g->shot_flash)
-        DrawTriangle((Vector2){240,322+recoil},(Vector2){230,342+recoil},
-                     (Vector2){250,342+recoil},(Color){255,205,76,255});
+    DrawText(objective,76,70,13,g->power?(Color){82,255,196,255}:(Color){255,210,92,255});
+    /* Small inspection reticle and a handheld maintenance reader replace combat UI. */
+    Color reticle=g->shot_flash?(Color){255,214,91,255}:(Color){176,214,204,255};
+    DrawLine(232,214,237,214,reticle);DrawLine(243,214,248,214,reticle);
+    DrawLine(240,206,240,211,reticle);DrawLine(240,217,240,222,reticle);
+    DrawRectangle(354,398,92,82,(Color){25,31,32,255});
+    DrawRectangle(364,408,72,48,(Color){32,67,68,255});
+    DrawText("DOCK 17",373,414,12,(Color){149,218,196,255});
+    DrawRectangle(373,434,14,7,g->power?(Color){61,224,161,255}:(Color){112,59,52,255});
+    DrawRectangle(393,434,14,7,g->terminal?(Color){61,224,161,255}:(Color){54,88,86,255});
+    DrawRectangle(413,434,14,7,g->won?(Color){61,224,161,255}:(Color){54,88,86,255});
     if(g->won){DrawRectangle(70,170,340,120,(Color){5,15,20,240});
-        DrawText("VERTICAL ROUTE SECURED",98,205,24,(Color){82,255,196,255});
+        DrawText("NIGHT SHIFT COMPLETE",108,205,24,(Color){82,255,196,255});
         DrawText("PRESS RESET TO REPLAY",132,246,16,(Color){230,236,220,255});}
 }
 
@@ -543,7 +507,7 @@ static void render_game(vd_game_t *g)
     Vector2 p;float d;
     if(world_to_screen(6.75f,2.25f,15.3f,&p,&d))DrawCircle((int)p.x,(int)p.y,clampf(50/d,3,10),
         g->terminal?(Color){72,255,190,255}:(Color){255,190,56,255});
-    if(g->terminal&&alive_count(g)==0&&world_to_screen(0,1.2f,18.1f,&p,&d))
+    if(g->terminal&&alive_count(g)==0&&world_to_screen(5.2f,1.9f,18.5f,&p,&d))
         DrawCircle((int)p.x,(int)p.y,clampf(70/d,4,13),(Color){72,255,190,255});
     draw_world_overlays(g);
     draw_hud(g);EndDrawing();
@@ -604,13 +568,13 @@ static uint32_t state_hash(const void *value)
 static int state_json(const void *value,char *out,size_t cap)
 {
     const vd_game_t *g=&((const vd_module_t*)value)->game;
-    return snprintf(out,cap,"{\"phase\":\"%s\",\"x\":%.2f,\"z\":%.2f,\"floor\":%.2f,\"alive\":%d,\"terminal\":%s,\"shots\":%u,\"hits\":%u,\"faces\":%d,\"faces_dropped\":%d,\"state_hash\":\"%08lx\"}",
+    return snprintf(out,cap,"{\"phase\":\"%s\",\"x\":%.2f,\"z\":%.2f,\"floor\":%.2f,\"alive\":%d,\"power\":%s,\"terminal\":%s,\"shots\":%u,\"hits\":%u,\"faces\":%d,\"faces_dropped\":%d,\"state_hash\":\"%08lx\"}",
         g->won?"won":"playing",g->x,g->z,floor_at(g->x,g->z),alive_count(g),
-        g->terminal?"true":"false",g->shots,g->hits,s_face_count,s_faces_dropped,
+        g->power?"true":"false",g->terminal?"true":"false",g->shots,g->hits,s_face_count,s_faces_dropped,
         (unsigned long)state_hash(value));
 }
 static const mosaico_game_module_v1_t s_module={
-    .descriptor={VD_ABI,"vertical_dock","Vertical Dock",480,480,30,2},
+    .descriptor={VD_ABI,"vertical_dock","Night Shift: Dock 17",480,480,30,2},
     .state_size=sizeof(vd_module_t),.initialize=initialize,.shutdown=shutdown,
     .input=input,.update=update,.render=render,.state_hash=state_hash,.state_json=state_json};
 #if defined(MOSAICO_GAME_ELF)

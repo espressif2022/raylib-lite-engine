@@ -6,5 +6,7 @@
   {"frame":74,"type":"action","code":2,"pressed":true},
   {"frame":267,"type":"action","code":2,"pressed":false},
   {"frame":268,"type":"action","code":6,"pressed":true},
-  {"frame":269,"type":"action","code":6,"pressed":false}
+  {"frame":269,"type":"action","code":6,"pressed":false},
+  {"frame":270,"type":"action","code":2,"pressed":true},
+  {"frame":326,"type":"action","code":2,"pressed":false}
 ]}

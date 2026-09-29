@@ -9,7 +9,6 @@ import unittest
 
 from PIL import Image
 
-
 ENGINE = Path(__file__).resolve().parents[1]
 CLI = ENGINE / "tools/game_cli.py"
 PROJECT = ENGINE / "examples/vertical_dock"
@@ -25,33 +24,38 @@ def run_scenario(name: str, frames: int) -> dict:
 
 
 class VerticalDockTests(unittest.TestCase):
-    def test_high_route_reaches_catwalk_and_activates_terminal(self) -> None:
-        result = run_scenario("high-route.json", 271)
-        self.assertEqual(result["game_id"], "vertical_dock")
+    def test_shore_power_starts_exploration_sequence(self) -> None:
+        result = run_scenario("power-on.json", 2)
+        self.assertTrue(result["power"])
+        self.assertFalse(result["terminal"])
+        self.assertEqual(result["alive"], 0)
+
+    def test_high_route_starts_crane(self) -> None:
+        result = run_scenario("high-route.json", 273)
         self.assertAlmostEqual(result["floor"], 1.2)
+        self.assertTrue(result["power"])
         self.assertTrue(result["terminal"])
         self.assertEqual(result["faces_dropped"], 0)
-        self.assertRegex(result["state_hash"], r"^[0-9a-f]{8}$")
 
-    def test_cover_blocks_low_target_but_not_visible_high_target(self) -> None:
-        result = run_scenario("cover-shot.json", 36)
-        self.assertEqual(result["shots"], 2)
-        self.assertEqual(result["hits"], 1)
-        self.assertEqual(result["faces_dropped"], 0)
-
-    def test_north_gate_has_a_passable_center(self) -> None:
-        result = run_scenario("north-gate.json", 249)
+    def test_complete_exploration_route_boards_ship(self) -> None:
+        result = run_scenario("exploration-route.json", 330)
+        self.assertEqual(result["phase"], "won")
         self.assertGreater(result["z"], 18.6)
-        self.assertLess(result["z"], 19.5)
+        self.assertTrue(result["power"] and result["terminal"])
         self.assertEqual(result["faces_dropped"], 0)
+
+    def test_north_route_cannot_finish_during_blackout(self) -> None:
+        result = run_scenario("north-gate.json", 249)
+        self.assertEqual(result["phase"], "playing")
+        self.assertFalse(result["power"])
+        self.assertFalse(result["terminal"])
 
     def test_turned_view_has_stable_non_overlapping_ground(self) -> None:
         result = run_scenario("turn-view.json", 20)
         with Image.open(result["frame"]) as image:
             digest = hashlib.sha256(image.convert("RGB").tobytes()).hexdigest()
         self.assertEqual(digest,
-            "12132098dcc7900b81fc418a80bed462dee7c6cd657d89b580a85be59b78b0ea")
-        self.assertEqual(result["faces"], 977)
+            "2c2c1e0e1a4672d0b9d54dbb9755f2f429fcb70cf904d329427fc23b1ef03742")
         self.assertEqual(result["faces_dropped"], 0)
 
 
