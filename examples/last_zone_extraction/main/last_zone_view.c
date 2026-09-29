@@ -17,7 +17,6 @@
 #define LAST_ZONE_FLOOR_SCALE 165.0f
 #define LAST_ZONE_NEAR_WALL 3.6f
 #define LAST_ZONE_CAMERA_HEIGHT 0.5f
-#define LAST_ZONE_MAX_HEIGHT_SPANS 6
 
 typedef struct {
     const char *name;
@@ -29,7 +28,6 @@ typedef struct {
 
 typedef struct {
     float depth, q, uq, u;
-    float z_bottom,z_top;
     int16_t top;
     int16_t height;
     uint16_t bottom;
@@ -67,8 +65,6 @@ static int16_t s_wall_top[LAST_ZONE_COLUMNS];
 static last_zone_wall_sample_t s_anchors[LAST_ZONE_COLUMNS];
 static last_zone_wall_sample_t s_pixels[LAST_ZONE_SCREEN];
 static last_zone_wall_sample_t s_cover_samples[LAST_ZONE_COLUMNS];
-static last_zone_wall_sample_t s_height_samples[LAST_ZONE_COLUMNS][LAST_ZONE_MAX_HEIGHT_SPANS];
-static uint8_t s_height_counts[LAST_ZONE_COLUMNS];
 static float s_col_depth[LAST_ZONE_SCREEN];
 static float s_cover_depth[LAST_ZONE_SCREEN];
 static int16_t s_cover_top[LAST_ZONE_SCREEN];
@@ -77,7 +73,6 @@ static float s_camera_dir_x;
 static float s_camera_dir_y;
 static float s_camera_plane_x;
 static float s_camera_plane_y;
-static float s_camera_z;
 static last_zone_view_stats_t s_view_stats;
 static MosaicoSpriteFrame s_material_copies[4];
 static const MosaicoSpriteFrame *s_material_frames[4];
@@ -193,9 +188,7 @@ static void project_sprite(const last_zone_game_t *game, float world_x, float wo
     *size = (int)(280.0f / distance);
     if (*size < 10) *size = 10;
     if (*size > 260) *size = 260;
-    float object_z=last_zone_floor_height(game,(int)world_x,(int)world_y);
-    *ground = (int)((float)view_horizon(game) +
-                    (s_camera_z-object_z)*330.0f/distance);
+    *ground = (int)((float)view_horizon(game) + 165.0f / distance);
     if (*ground > 480) *ground = 480;
     *distance_out = distance;
 }
@@ -483,11 +476,10 @@ static void project_wall(last_zone_wall_sample_t *sample, int horizon)
     sample->depth = distance;
     sample->q = 1.0f / distance;
     sample->uq = sample->u * sample->q;
-    float scale=330.0f/distance;
-    int top=(int)((float)horizon+(s_camera_z-sample->z_top)*scale);
-    int bottom=(int)((float)horizon+(s_camera_z-sample->z_bottom)*scale);
-    int height=bottom-top;
+    int height = (int)(330.0f / distance);
     if (height < 1) height = 1;
+    int top = horizon - height / 2;
+    int bottom = top + height;
     if (bottom > LAST_ZONE_SCREEN) bottom = LAST_ZONE_SCREEN;
     if (bottom < horizon) bottom = horizon;
     if (bottom < 0) bottom = 0;
@@ -510,7 +502,6 @@ static void cast_wall_sample(const last_zone_game_t *game, int screen_x, int hor
     float side_x = (rx < 0 ? game->x - map_x : map_x + 1.0f - game->x) * delta_x;
     float side_y = (ry < 0 ? game->y - map_y : map_y + 1.0f - game->y) * delta_y;
     uint8_t wall = 0;
-    float sector_floor=last_zone_floor_height(game,map_x,map_y);
     bool side = false;
     for (int step = 0; step < LAST_ZONE_WIDTH + LAST_ZONE_HEIGHT && !wall; ++step) {
         if (side_x < side_y) {
@@ -523,10 +514,7 @@ static void cast_wall_sample(const last_zone_game_t *game, int screen_x, int hor
             side = true;
         }
         uint8_t cell = last_zone_cell(game, map_x, map_y);
-        if (cell != LAST_ZONE_CELL_COVER && last_zone_blocks(game, map_x, map_y))
-            wall = cell ? cell : 1;
-        else if(cell!=LAST_ZONE_CELL_COVER)
-            sector_floor=last_zone_floor_height(game,map_x,map_y);
+        if (cell != LAST_ZONE_CELL_COVER && last_zone_blocks(game, map_x, map_y)) wall = cell ? cell : 1;
     }
     float distance = side ? side_y - delta_y : side_x - delta_x;
     if (!wall) distance = 64.0f;
@@ -536,8 +524,6 @@ static void cast_wall_sample(const last_zone_game_t *game, int screen_x, int hor
     *sample = (last_zone_wall_sample_t){
         .depth = distance,
         .u = u,
-        .z_bottom=0.0f,
-        .z_top=sector_floor+1.0f,
         .map_x = (int16_t)map_x,
         .map_y = (int16_t)map_y,
         .screen_x = (int16_t)screen_x,
@@ -591,53 +577,6 @@ static void cast_cover_sample(const last_zone_game_t *game,int column,int horizo
     sample->height=(int16_t)(bottom-top);sample->map_x=(int16_t)map_x;
     sample->map_y=(int16_t)map_y;sample->side=side?1U:0U;
     sample->shift=(uint8_t)((map_x*37+map_y*13)&31);
-}
-
-static void cast_height_samples(const last_zone_game_t *game,int column,int horizon)
-{
-    int screen_x=column*LAST_ZONE_COLUMN_WIDTH;
-    float sample_x=(float)screen_x+LAST_ZONE_COLUMN_WIDTH*.5f;
-    float camera_x=sample_x/240.0f-1.0f;
-    float rx=s_camera_dir_x+s_camera_plane_x*camera_x;
-    float ry=s_camera_dir_y+s_camera_plane_y*camera_x;
-    int map_x=(int)game->x,map_y=(int)game->y;
-    int step_x=rx<0?-1:1,step_y=ry<0?-1:1;
-    float delta_x=fabsf(rx)<.000001f?1.0e30f:fabsf(1.0f/rx);
-    float delta_y=fabsf(ry)<.000001f?1.0e30f:fabsf(1.0f/ry);
-    float side_x=(rx<0?game->x-map_x:map_x+1.0f-game->x)*delta_x;
-    float side_y=(ry<0?game->y-map_y:map_y+1.0f-game->y)*delta_y;
-    float current=last_zone_floor_height(game,map_x,map_y);
-    uint8_t count=0;
-    for(int step=0;step<LAST_ZONE_WIDTH+LAST_ZONE_HEIGHT;++step){
-        bool side;
-        if(side_x<side_y){side_x+=delta_x;map_x+=step_x;side=false;}
-        else{side_y+=delta_y;map_y+=step_y;side=true;}
-        uint8_t cell=last_zone_cell(game,map_x,map_y);
-        if(cell!=LAST_ZONE_CELL_COVER&&last_zone_blocks(game,map_x,map_y))break;
-        if(cell==LAST_ZONE_CELL_COVER)continue;
-        float next=last_zone_floor_height(game,map_x,map_y);
-        if(fabsf(next-current)<.001f)continue;
-        if(count>=LAST_ZONE_MAX_HEIGHT_SPANS)break;
-        float distance=side?side_y-delta_y:side_x-delta_x;
-        if(distance<.08f)distance=.08f;
-        float hit=side?game->x+distance*rx:game->y+distance*ry;
-        float u=hit-floorf(hit);if(u<0)u+=1.0f;
-        last_zone_wall_sample_t *sample=&s_height_samples[column][count++];
-        float z0=next<current?next:current,z1=next>current?next:current;
-        float scale=330.0f/distance;
-        int top=(int)((float)horizon+(s_camera_z-z1)*scale);
-        int bottom=(int)((float)horizon+(s_camera_z-z0)*scale);
-        if(top<0)top=0;
-        if(bottom>LAST_ZONE_SCREEN)bottom=LAST_ZONE_SCREEN;
-        *sample=(last_zone_wall_sample_t){.depth=distance,.q=1.0f/distance,
-            .uq=u/distance,.u=u,.z_bottom=z0,.z_top=z1,.top=(int16_t)top,
-            .height=(int16_t)(bottom-top),.bottom=(uint16_t)bottom,
-            .map_x=(int16_t)map_x,.map_y=(int16_t)map_y,
-            .screen_x=(int16_t)screen_x,.width=LAST_ZONE_COLUMN_WIDTH,.wall=7,
-            .side=side?1U:0U,.shift=(uint8_t)((map_x*37+map_y*13)&31)};
-        current=next;
-    }
-    s_height_counts[column]=count;
 }
 
 static bool wall_boundary(const last_zone_wall_sample_t *a,
@@ -735,8 +674,6 @@ static void raycast_world(const last_zone_game_t *game)
     int gap_count = 0;
     int horizon = view_horizon(game);
     int extra = 0;
-    s_camera_z=last_zone_floor_height(game,(int)game->x,(int)game->y)+
-               LAST_ZONE_CAMERA_HEIGHT;
     s_camera_dir_x = cosf(game->angle);
     s_camera_dir_y = sinf(game->angle);
     s_camera_plane_x = -s_camera_dir_y * LAST_ZONE_CAMERA_PLANE;
@@ -773,19 +710,11 @@ static void raycast_world(const last_zone_game_t *game)
     }
     for(int column=0;column<LAST_ZONE_COLUMNS;++column){
         cast_cover_sample(game,column,horizon);
-        cast_height_samples(game,column,horizon);
         const last_zone_wall_sample_t *cover=&s_cover_samples[column];
-        if(cover->wall)
-            for(int x=cover->screen_x;x<cover->screen_x+cover->width&&x<LAST_ZONE_SCREEN;++x){
-                s_cover_depth[x]=cover->depth;
-                s_cover_top[x]=cover->top;
-            }
-        if(s_height_counts[column]){
-            const last_zone_wall_sample_t *step=&s_height_samples[column][0];
-            for(int x=step->screen_x;x<step->screen_x+step->width&&x<LAST_ZONE_SCREEN;++x)
-                if(step->depth<s_cover_depth[x]){
-                    s_cover_depth[x]=step->depth;s_cover_top[x]=step->top;
-                }
+        if(!cover->wall)continue;
+        for(int x=cover->screen_x;x<cover->screen_x+cover->width&&x<LAST_ZONE_SCREEN;++x){
+            s_cover_depth[x]=cover->depth;
+            s_cover_top[x]=cover->top;
         }
     }
     for (int column = 0; column < LAST_ZONE_COLUMNS; ++column) {
@@ -803,7 +732,7 @@ static void raycast_world(const last_zone_game_t *game)
         s_wall_type[column] = wall;
     }
     s_view_stats.refined_columns = (uint16_t)extra;
-    s_view_stats.rays_cast = (uint16_t)(LAST_ZONE_COLUMNS * 3 + extra);
+    s_view_stats.rays_cast = (uint16_t)(LAST_ZONE_COLUMNS * 2 + extra);
 }
 
 static int floor_kind_at(const last_zone_game_t *game, float wx, float wy)
@@ -823,60 +752,55 @@ static int floor_kind_at(const last_zone_game_t *game, float wx, float wy)
     return 0;
 }
 
-static void draw_floor(const last_zone_game_t *game,MosaicoAtlas materials,
+static void draw_floor(const last_zone_game_t *game, MosaicoAtlas materials,
                        const MosaicoSpriteFrame *tile)
 {
-    if(!tile)return;
-    static int8_t levels[LAST_ZONE_COLUMNS];
-    static uint8_t kinds[LAST_ZONE_COLUMNS];
-    int horizon=view_horizon(game);
-    float cam_step=2.0f/(float)LAST_ZONE_COLUMNS;
-    for(int y=horizon+1;y<LAST_ZONE_SCREEN;y+=2){
-        float row=(float)(y-horizon);
-        for(int column=0;column<LAST_ZONE_COLUMNS;++column){
-            float camera_x=((float)column+.5f)*cam_step-1.0f;
-            float rx=s_camera_dir_x+s_camera_plane_x*camera_x;
-            float ry=s_camera_dir_y+s_camera_plane_y*camera_x;
-            float best=64.0f;int best_level=-1,best_kind=0;
-            for(int level=0;level<=LAST_ZONE_MAX_FLOOR_LEVEL;++level){
-                float z=(float)level*LAST_ZONE_FLOOR_STEP;
-                float vertical=s_camera_z-z;
-                if(vertical<=.01f)continue;
-                float distance=330.0f*vertical/row;
-                int sx=column*LAST_ZONE_COLUMN_WIDTH+LAST_ZONE_COLUMN_WIDTH/2;
-                if(distance>=best||distance>=s_col_depth[sx])continue;
-                float wx=game->x+rx*distance,wy=game->y+ry*distance;
-                int mx=(int)wx,my=(int)wy;
-                if(last_zone_blocks(game,mx,my)||
-                   last_zone_floor_level(game,mx,my)!=(uint8_t)level)continue;
-                best=distance;best_level=level;best_kind=floor_kind_at(game,wx,wy);
+    if (!tile) return;
+    int horizon = view_horizon(game);
+    float cam0 = (0.5f / (float)LAST_ZONE_COLUMNS) * 2.0f - 1.0f;
+    float cam_step = 2.0f / (float)LAST_ZONE_COLUMNS;
+    for (int y = horizon + 1; y < 480; y += 2) {
+        float dist = LAST_ZONE_FLOOR_SCALE / (float)(y - horizon);
+        float ray_x = s_camera_dir_x + s_camera_plane_x * cam0;
+        float ray_y = s_camera_dir_y + s_camera_plane_y * cam0;
+        float wx = game->x + ray_x * dist, wy = game->y + ray_y * dist;
+        float dwx = (s_camera_plane_x * cam_step) * dist;
+        float dwy = (s_camera_plane_y * cam_step) * dist;
+        int u_16 = (int)(wx * 128.0f * 65536.0f);
+        int v_16 = (int)(wy * 128.0f * 65536.0f);
+        int du_16 = (int)(dwx * 128.0f * 65536.0f);
+        int dv_16 = (int)(dwy * 128.0f * 65536.0f);
+        unsigned light = (unsigned)(220.0f / (1.0f + dist * 0.18f));
+        if (light < 118U) light = 118U;
+        if (light > 210U) light = 210U;
+        light += (unsigned)(game->weapon_recoil * 36.0f);
+        int run_kind = -1, run_start = 0;
+        for (int column = 0; column <= LAST_ZONE_COLUMNS; ++column) {
+            int kind = 0;
+            if (column < LAST_ZONE_COLUMNS)
+                kind = floor_kind_at(game, wx + dwx * (float)column,
+                                     wy + dwy * (float)column);
+            if (column == 0) {
+                run_kind = kind;
+                run_start = 0;
+                continue;
             }
-            levels[column]=(int8_t)best_level;kinds[column]=(uint8_t)best_kind;
-        }
-        for(int start=0;start<LAST_ZONE_COLUMNS;){
-            if(levels[start]<0){++start;continue;}
-            int level=levels[start],kind=kinds[start],end=start+1;
-            while(end<LAST_ZONE_COLUMNS&&levels[end]==level&&kinds[end]==kind)++end;
-            float z=(float)level*LAST_ZONE_FLOOR_STEP;
-            float distance=330.0f*(s_camera_z-z)/row;
-            float camera_x=((float)start+.5f)*cam_step-1.0f;
-            float rx=s_camera_dir_x+s_camera_plane_x*camera_x;
-            float ry=s_camera_dir_y+s_camera_plane_y*camera_x;
-            float wx=game->x+rx*distance,wy=game->y+ry*distance;
-            float dwx=s_camera_plane_x*cam_step*distance;
-            float dwy=s_camera_plane_y*cam_step*distance;
-            Rectangle src=tile->source;
-            if(kind==1)src.y+=64.0f;
-            src.width=64.0f;src.height=64.0f;
-            unsigned light=(unsigned)(220.0f/(1.0f+distance*.18f));
-            if(light<118U)light=118U;
-            if(light>210U)light=210U;
-            if(kind==2&&light<220U)light+=36U;
-            Mosaico2DDrawFloorRows(materials.texture,src,y,
-                start*LAST_ZONE_COLUMN_WIDTH,LAST_ZONE_COLUMN_WIDTH,end-start,NULL,
-                (int)(wx*128.0f*65536.0f),(int)(wy*128.0f*65536.0f),
-                (int)(dwx*128.0f*65536.0f),(int)(dwy*128.0f*65536.0f),light,2);
-            start=end;
+            if (column < LAST_ZONE_COLUMNS && kind == run_kind) continue;
+            Rectangle floor_src = tile->source;
+            if (run_kind == 1) floor_src.y += 64.0f;
+            floor_src.width = 64.0f;
+            floor_src.height = 64.0f;
+            unsigned run_light = light;
+            if (run_kind == 2) run_light += 36U;
+            if (run_light > 230U) run_light = 230U;
+            int columns = column - run_start;
+            Mosaico2DDrawFloorRows(materials.texture, floor_src, y,
+                                  run_start * LAST_ZONE_COLUMN_WIDTH, LAST_ZONE_COLUMN_WIDTH,
+                                  columns, s_wall_bottom + run_start,
+                                  u_16 + du_16 * run_start, v_16 + dv_16 * run_start,
+                                  du_16, dv_16, run_light, 2);
+            run_kind = kind;
+            run_start = column;
         }
     }
 }
@@ -1009,10 +933,9 @@ static void draw_walls(const last_zone_game_t *game, MosaicoWallAtlas walls,
         int height = sample->height;
         if (height < 1) height = 1;
         int bottom = top + height;
-        float true_h=(sample->z_top-sample->z_bottom)*330.0f/sample->depth;
+        float true_h = 330.0f / sample->depth;
         if (true_h < 1.0f) true_h = 1.0f;
-        float true_top=(float)horizon+(s_camera_z-sample->z_top)*
-                       330.0f/sample->depth;
+        float true_top = (float)horizon - true_h * 0.5f;
         float src_w = (float)width;
         Rectangle src = {material->source.x + inset + u * (inner - src_w),
                          material->source.y + inset, src_w,
@@ -1123,34 +1046,6 @@ static void draw_covers(const last_zone_game_t *game,MosaicoWallAtlas walls,
     }
 }
 
-static void draw_height_steps(MosaicoWallAtlas walls,
-                              const MosaicoSpriteFrame *material)
-{
-    if(!material)return;
-    int batch=0;
-    float inset=4.0f,inner=material->source.width-inset*2.0f;
-    float src_h=material->source.height-inset*2.0f;
-    if(inner<4.0f)inner=material->source.width;
-    if(src_h<4.0f)src_h=material->source.height;
-    for(int depth=LAST_ZONE_MAX_HEIGHT_SPANS-1;depth>=0;--depth)
-        for(int column=0;column<LAST_ZONE_COLUMNS;++column){
-            if(depth>=s_height_counts[column])continue;
-            const last_zone_wall_sample_t *sample=&s_height_samples[column][depth];
-            if(sample->height<=0||batch>=LAST_ZONE_MAX_WALL_SAMPLES)continue;
-            float u=sample->u+(float)sample->shift/48.0f;u-=floorf(u);
-            int src_x=(int)(material->source.x+inset+u*(inner-1.0f));
-            unsigned light=distance_light(sample->depth,sample->side!=0,false,false,
-                                          u<.08f||u>.92f,0);
-            float span=(sample->z_top-sample->z_bottom)*330.0f/sample->depth;
-            /* Heights are small and currently never clip at the top edge. */
-            float origin=(float)sample->top;
-            s_wall_batch[batch++]=wall_column(sample->screen_x,sample->top,
-                sample->width,sample->height,src_x,(int)(material->source.y+inset),
-                1,(int)src_h,light,origin,span);
-        }
-    if(batch)Mosaico2DDrawIndexedRaycastWalls(walls,s_wall_batch,batch);
-}
-
 static void load_material_frames(MosaicoAtlas floor,MosaicoWallAtlas walls)
 {
     static const mosaico_asset_id_t material_ids[] = {MOSAICO_ASSET_ID_WALL_CONCRETE,
@@ -1228,11 +1123,6 @@ static void draw_radar(const last_zone_game_t *game)
             if (cell == 4 && !game->door_open[my][mx]) color = (Color){220, 180, 60, 255};
             else if (cell == 5) color = (Color){80, 220, 200, 255};
             else if (cell == LAST_ZONE_CELL_COVER) color = (Color){226, 116, 52, 255};
-            else if (cell >= 7 && cell <= 9) {
-                uint8_t level=(uint8_t)(cell-6U);
-                color=(Color){(unsigned char)(76U+level*30U),
-                              (unsigned char)(116U+level*24U),156,255};
-            }
             else if (cell == 3) color = (Color){148, 92, 48, 255};
             else if (cell == 2) color = (Color){96, 140, 168, 255};
             else if (cell >= 1 && cell <= 3) color = (Color){186, 198, 208, 255};
@@ -1563,7 +1453,6 @@ void last_zone_view_render(const last_zone_game_t *game, MosaicoAtlas enemies,
     int64_t t4 = view_now_us();
     draw_walls(game, walls, s_material_frames);
     draw_covers(game,walls,s_material_frames[1]);
-    draw_height_steps(walls,s_material_frames[1]);
     int64_t t5 = view_now_us();
     int64_t t6 = t5;
     draw_extract(game);

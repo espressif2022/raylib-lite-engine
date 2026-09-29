@@ -50,32 +50,28 @@ progress and per-mission bests.
 
 ## Heightfield upgrade / 高度场升级
 
-Dock now starts with a three-step stair (`7`, `8`, and `9` map cells) leading
-through the former window wall onto a raised loading platform. These values are
-walkable floor levels at 0.10, 0.20, and 0.30 wall-height units.
+The Dock mission now includes cell type `6`, a waist-high solid cover cell. A
+cover ray records the near vertical span and then continues to the opaque wall,
+so the renderer keeps the distant wall, floor, window, and panorama visible
+above it. Characters and props behind cover are clipped per screen column;
+movement is blocked while eye-level sight and shots pass over it.
 
-Dock 出生区现在有三级楼梯，地图格 `7`、`8`、`9` 分别表示 0.10、0.20、
-0.30 个墙高单位的可通行地板。楼梯穿过原来的窗墙，连接到抬高的装卸平台。
+Dock 关已加入 `6` 号半高实体掩体。射线先记录近处的竖直掩体段，再继续寻找
+后方整墙，因此掩体上方仍能看到远墙、地面、窗和天际线。敌人及道具按屏幕列
+裁剪；移动会被挡住，视线和射击可从上方越过。
 
-The renderer resolves the nearest valid floor-plane intersection for every
-four-pixel screen column and draws every crossed height boundary as a vertical
-riser. The camera, full walls, enemies, and props use the floor height of their
-current cell. Movement can climb one level at a time; a two-level or higher
-vertical edge remains solid. The existing low-cover cell is retained as a
-separate height primitive.
+This is the first, bounded step of the sector-height upgrade:
 
-渲染器会为每个 4 像素屏幕列求最近的有效地板平面交点，并把射线经过的每个高度
-边界画成台阶立面。相机、整墙、敌人与道具都使用所在格的地板高度。移动一次只能
-上一级，直接跨越两级以上的边缘会被挡住；原有半高掩体仍作为另一种高度图元保留。
+1. **Implemented:** static low cover, two-depth wall projection, sprite clipping,
+   collision, sight/fire semantics, and Host/device-compatible rendering.
+2. **Next:** per-open-cell floor and ceiling heights, camera height following the
+   floor, step limits, and horizontal floor/ceiling spans.
+3. **Later:** moving lifts/vertical doors and height-aware AI navigation. Slopes
+   and stacked rooms stay outside this grid renderer.
 
-Current scope is connected height regions: stairs, platforms, roof-like areas,
-and pits. Per-cell ceiling heights, lifts, and rising doors are the next stage.
-Overlapping rooms at the same x/y position require a different portal-sector
-representation and are outside this grid-height format.
-
-当前范围是互相连通的高低区域，包括楼梯、平台、屋顶式区域和坑道。下一阶段是
-每格天花板高度、升降台和上升门。同一 x/y 位置上下重叠的房间需要另一套门户扇区
-表示，不属于当前格子高度格式。
+这是高度场升级的第一步。下一步再给可通行格加入地板/天花板高度、相机随地面
+升降、台阶限制和水平面投影；之后才加入升降台、上升门与高度感知 AI。斜坡和
+上下叠层不纳入这套格子渲染器。
 
 ## Run / 运行
 
