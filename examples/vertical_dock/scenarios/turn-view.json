@@ -1,0 +1,6 @@
+{
+  "events": [
+    {"frame": 0, "type": "action", "code": "right", "pressed": true},
+    {"frame": 18, "type": "action", "code": "right", "pressed": false}
+  ]
+}

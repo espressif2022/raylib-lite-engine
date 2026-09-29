@@ -304,14 +304,18 @@ static void add_scene(const vd_game_t *g)
     s_face_count=0;s_faces_dropped=0;
     Color asphalt={64,72,72,255},lane={72,82,80,255},steel={78,102,108,255};
     Color deck={116,104,76,255},orange={174,86,38,255},crate={102,70,42,255};
+    /* The ground is partitioned, not layered: overlapping near-coplanar quads
+       become unstable in a painter renderer when the camera turns. */
+    Color stripe={196,151,55,255};
     for(int i=0;i<10;++i){
         float z0=-.5f+i*2.08f,z1=z0+2.08f;
         Color band=i&1?asphalt:(Color){59,68,69,255};
-        add_floor(-8,z0,8,z1,0,band);
-        add_box(-2.35f,z0,2.35f,z1,0,.014f,lane);
+        add_floor(-8,z0,-2.48f,z1,0,band);
+        add_floor(-2.48f,z0,-2.38f,z1,0,stripe);
+        add_floor(-2.38f,z0,2.38f,z1,0,lane);
+        add_floor(2.38f,z0,2.48f,z1,0,stripe);
+        add_floor(2.48f,z0,8,z1,0,band);
     }
-    add_box(-2.48f,-.2f,-2.38f,19.5f,0,.026f,(Color){196,151,55,255});
-    add_box(2.38f,-.2f,2.48f,19.5f,0,.026f,(Color){196,151,55,255});
     for(int i=0;i<9;++i){
         float z=.8f+i*2.15f;
         add_box(-.055f,z,.055f,z+1.05f,0,.028f,(Color){190,198,181,255});

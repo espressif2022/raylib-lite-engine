@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import subprocess
 import sys
 import unittest
+
+from PIL import Image
 
 
 ENGINE = Path(__file__).resolve().parents[1]
@@ -40,6 +43,15 @@ class VerticalDockTests(unittest.TestCase):
         result = run_scenario("north-gate.json", 249)
         self.assertGreater(result["z"], 18.6)
         self.assertLess(result["z"], 19.5)
+        self.assertEqual(result["faces_dropped"], 0)
+
+    def test_turned_view_has_stable_non_overlapping_ground(self) -> None:
+        result = run_scenario("turn-view.json", 20)
+        with Image.open(result["frame"]) as image:
+            digest = hashlib.sha256(image.convert("RGB").tobytes()).hexdigest()
+        self.assertEqual(digest,
+            "12132098dcc7900b81fc418a80bed462dee7c6cd657d89b580a85be59b78b0ea")
+        self.assertEqual(result["faces"], 977)
         self.assertEqual(result["faces_dropped"], 0)
 
 
