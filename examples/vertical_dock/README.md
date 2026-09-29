@@ -11,6 +11,8 @@ and a 1.2 m catwalk in one continuous space.
 
 - solid 3D quads with near-plane clipping, back-face culling, surface subdivision,
   fog shading, and painter sorting;
+- dock-specific landmarks: ribbed container stacks, a gantry crane, route lamps,
+  a moored vessel, a side-mounted terminal, and a passable extraction arch;
 - step-aware movement: each 0.2 m rise is traversable, while the 1.2 m deck edge
   cannot be crossed directly;
 - actors at low and high elevations, with geometry and actors in one depth queue;
@@ -20,6 +22,7 @@ and a 1.2 m catwalk in one continuous space.
   hostiles, then return to the north extraction gate.
 
 - 实体四边形经过近平面裁剪、背面剔除、表面分段、雾化着色和画家排序；
+- 码头地标包括带加强筋的集装箱、龙门吊、路线灯、停泊船、高台侧置终端和可穿越撤离门；
 - 移动会逐级判断高度：0.2 米台阶可走，不能从地面直接跨上 1.2 米平台，也不能穿过栏杆跌落；
 - 高低层角色与场景进入同一个深度队列，避免角色直接盖在墙体前面；
 - 射击按高度检查货箱、平台、终端和撤离门的遮挡；
@@ -35,13 +38,15 @@ only a regression signal; it is not device FPS.
 耗时只能用于回归比较，不能当作板端帧率。
 
 For device A/B builds, `VERTICAL_DOCK_SUBDIVIDE_SURFACES=0` disables splitting;
-`VERTICAL_DOCK_FACE_SEGMENT=<meters>` changes the default 1.6 m split length.
+`VERTICAL_DOCK_FACE_SEGMENT=<meters>` changes the default 1.6 m split length, and
+`VERTICAL_DOCK_SCENE_DETAIL=0` removes decorative container ribs and landmarks.
 Compare the same camera route and record device frame time, `faces`, and
 `faces_dropped`; disabling splitting is expected to be faster but can produce
 incorrect overlap.
 
-板端 A/B 构建可用 `VERTICAL_DOCK_SUBDIVIDE_SURFACES=0` 关闭分段，或用
-`VERTICAL_DOCK_FACE_SEGMENT=<米>` 修改默认 1.6 米的分段长度。比较时必须使用同一
+板端 A/B 构建可用 `VERTICAL_DOCK_SUBDIVIDE_SURFACES=0` 关闭分段，用
+`VERTICAL_DOCK_FACE_SEGMENT=<米>` 修改默认 1.6 米的分段长度，或用
+`VERTICAL_DOCK_SCENE_DETAIL=0` 去掉装饰性集装箱加强筋和远景地标。比较时必须使用同一
 视角路线，并同时记录板端帧耗时、`faces` 和 `faces_dropped`。关闭分段通常更快，但
 可能重新出现大平面遮挡错误。
 

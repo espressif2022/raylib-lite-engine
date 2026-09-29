@@ -23,7 +23,7 @@ def run_scenario(name: str, frames: int) -> dict:
 
 class VerticalDockTests(unittest.TestCase):
     def test_high_route_reaches_catwalk_and_activates_terminal(self) -> None:
-        result = run_scenario("high-route.json", 264)
+        result = run_scenario("high-route.json", 271)
         self.assertEqual(result["game_id"], "vertical_dock")
         self.assertAlmostEqual(result["floor"], 1.2)
         self.assertTrue(result["terminal"])

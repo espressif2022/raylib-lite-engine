@@ -15,12 +15,15 @@
 #define VD_H 480
 #define VD_NEAR 0.10f
 #define VD_FOCAL 350.0f
-#define VD_MAX_FACES 1200
+#define VD_MAX_FACES 1400
 #ifndef VD_SUBDIVIDE_SURFACES
 #define VD_SUBDIVIDE_SURFACES 1
 #endif
 #ifndef VD_FACE_SEGMENT
 #define VD_FACE_SEGMENT 1.6f
+#endif
+#ifndef VD_SCENE_DETAIL
+#define VD_SCENE_DETAIL 1
 #endif
 #define VD_MAX_POLY 8
 #define VD_ENEMIES 5
@@ -90,8 +93,12 @@ static bool solid_at(float x,float z)
     if(x>-2.2f&&x<-.2f&&z>5.1f&&z<7.4f)return true;
     if(x>.3f&&x<2.2f&&z>10.0f&&z<12.4f)return true;
     if(x>-4.8f&&x<-2.8f&&z>14.0f&&z<16.2f)return true;
+#if VD_SCENE_DETAIL
+    if(x>-7.5f&&x<-5.1f&&z>3.0f&&z<9.3f)return true;
+    if(x>-7.2f&&x<-6.8f&&z>12.8f&&z<13.2f)return true;
+#endif
     /* Drawn objective geometry must also participate in movement collision. */
-    if(x>4.65f&&x<5.35f&&z>15.0f&&z<15.65f)return true;
+    if(x>6.4f&&x<7.1f&&z>15.0f&&z<15.65f)return true;
     if(((x>-1.9f&&x<-1.25f)||(x>1.25f&&x<1.9f))&&
        z>18.2f&&z<18.55f)return true;
     /* The high deck side is climbable only through the stair footprint. */
@@ -216,6 +223,28 @@ static void add_box(float x0,float z0,float x1,float z1,float y0,float y1,Color 
     }
 }
 
+static void add_container(float x0,float z0,float x1,float z1,float y0,float y1,Color c)
+{
+    add_box(x0,z0,x1,z1,y0,y1,c);
+#if VD_SCENE_DETAIL
+    Color rib={(unsigned char)(c.r*3/4),(unsigned char)(c.g*3/4),
+               (unsigned char)(c.b*3/4),255};
+    float width=x1-x0,depth=z1-z0;
+    for(int i=1;i<4;++i){
+        float x=x0+width*(float)i/4.0f;
+        add_box(x-.025f,z0-.018f,x+.025f,z0+.018f,y0+.08f,y1-.08f,rib);
+        add_box(x-.025f,z1-.018f,x+.025f,z1+.018f,y0+.08f,y1-.08f,rib);
+    }
+    (void)depth;
+#endif
+}
+
+static void add_lamp(float x,float z,float height,Color steel,Color light)
+{
+    add_box(x-.055f,z-.055f,x+.055f,z+.055f,0,height,steel);
+    add_box(x-.18f,z-.10f,x+.18f,z+.10f,height,height+.18f,light);
+}
+
 static void add_billboard(float x,float z,float y0,float y1,float center,float half,Color c)
 {
     float right_x=s_cy,right_z=-s_sy,cx=x+right_x*center,cz=z+right_z*center;
@@ -299,16 +328,41 @@ static void add_scene(const vd_game_t *g)
     }
     add_box(2.50f,6.4f,2.66f,18.0f,1.72f,1.88f,steel);
     add_box(7.34f,6.4f,7.50f,18.0f,1.72f,1.88f,steel);
-    /* Low-lane cargo creates cover and forces route decisions. */
-    add_box(-2.2f,5.1f,-.2f,7.4f,0,1.25f,crate);
-    add_box(.3f,10.0f,2.2f,12.4f,0,1.05f,orange);
-    add_box(-4.8f,14.0f,-2.8f,16.2f,0,1.35f,crate);
-    /* Terminal and extraction gate communicate the high-route objective. */
-    add_box(4.65f,15.0f,5.35f,15.65f,1.2f,2.15f,(Color){45,76,82,255});
+    /* Ribbed cargo creates readable cover instead of anonymous solid blocks. */
+    add_container(-2.2f,5.1f,-.2f,7.4f,0,1.25f,(Color){44,116,127,255});
+    add_container(.3f,10.0f,2.2f,12.4f,0,1.05f,orange);
+    add_container(-4.8f,14.0f,-2.8f,16.2f,0,1.35f,crate);
+#if VD_SCENE_DETAIL
+    /* Stacked off-route containers frame the dock and establish its scale. */
+    add_container(-7.5f,3.0f,-5.1f,5.9f,0,1.25f,(Color){49,105,119,255});
+    add_container(-7.5f,6.2f,-5.1f,9.3f,0,1.25f,(Color){157,72,42,255});
+    add_container(-7.4f,6.3f,-5.2f,9.2f,1.25f,2.45f,(Color){179,127,45,255});
+    /* A gantry crane is the dominant landmark shared by both elevations. */
+    Color crane={188,139,38,255};
+    add_box(-7.2f,12.8f,-6.8f,13.2f,0,4.25f,crane);
+    add_box(-6.9f,12.86f,7.0f,13.14f,3.82f,4.22f,crane);
+    add_box(.75f,12.93f,.85f,13.07f,1.75f,3.82f,(Color){45,52,51,255});
+    add_box(.55f,12.82f,1.05f,13.18f,1.55f,1.82f,(Color){63,69,65,255});
+    /* Repeated lamps make depth and the two routes readable at a glance. */
+    for(int i=0;i<4;++i){
+        float z=3.7f+i*4.2f;
+        add_lamp(-5.8f,z,2.7f,steel,(Color){243,184,73,255});
+    }
+    /* A moored vessel beyond extraction keeps the doorway from facing empty sky. */
+    add_box(-5.6f,22.0f,5.6f,25.5f,-.35f,.82f,(Color){42,61,70,255});
+    add_box(-2.2f,22.7f,2.2f,24.6f,.82f,1.65f,(Color){173,181,169,255});
+    add_box(-.8f,23.2f,.8f,24.2f,1.65f,2.35f,(Color){68,96,105,255});
+#endif
+        /* Terminal and extraction gate communicate the high-route objective. */
+    add_box(6.4f,15.0f,7.1f,15.65f,1.2f,2.15f,(Color){45,76,82,255});
     Color gate={54,76,80,255};
     add_box(-1.9f,18.2f,-1.25f,18.55f,0,2.2f,gate);
     add_box(1.25f,18.2f,1.9f,18.55f,0,2.2f,gate);
     add_box(-1.9f,18.2f,1.9f,18.55f,1.72f,2.2f,gate);
+    add_box(6.47f,14.94f,7.03f,15.02f,1.48f,1.94f,
+            g->terminal?(Color){45,214,154,255}:(Color){211,146,39,255});
+    add_box(-1.05f,18.15f,-.78f,18.22f,.25f,1.48f,(Color){211,158,52,255});
+    add_box(.78f,18.15f,1.05f,18.22f,.25f,1.48f,(Color){211,158,52,255});
     for(int i=0;i<VD_ENEMIES;++i)if(g->enemies[i].active)add_enemy_face(&g->enemies[i]);
 }
 
@@ -330,7 +384,7 @@ static bool shot_clear(const vd_game_t *g,const vd_enemy_t *e)
 {
     static const float blockers[6][5]={
         {-2.2f,5.1f,-.2f,7.4f,1.25f},{.3f,10.0f,2.2f,12.4f,1.05f},
-        {-4.8f,14.0f,-2.8f,16.2f,1.35f},{4.65f,15.0f,5.35f,15.65f,2.15f},
+        {-4.8f,14.0f,-2.8f,16.2f,1.35f},{6.4f,15.0f,7.1f,15.65f,2.15f},
         {-1.9f,18.2f,-1.25f,18.55f,2.2f},{1.25f,18.2f,1.9f,18.55f,2.2f}};
     float eye=floor_at(g->x,g->z)+1.42f,target=e->y+.62f;
     for(int step=1;step<32;++step){
@@ -347,7 +401,7 @@ static bool shot_clear(const vd_game_t *g,const vd_enemy_t *e)
 static void fire(vd_game_t *g)
 {
     if(g->won)return;
-    float terminal_dx=g->x-5.0f,terminal_dz=g->z-15.3f;
+    float terminal_dx=g->x-6.75f,terminal_dz=g->z-15.3f;
     if(terminal_dx*terminal_dx+terminal_dz*terminal_dz<2.0f&&floor_at(g->x,g->z)>.9f){
         g->terminal=true;return;
     }
@@ -419,7 +473,7 @@ static void render_game(vd_game_t *g)
     for(int i=0;i<s_face_count;++i)draw_face(&s_faces[i]);
     /* Terminal lamp and extraction lamp remain readable at long range. */
     Vector2 p;float d;
-    if(world_to_screen(5,2.25f,15.3f,&p,&d))DrawCircle((int)p.x,(int)p.y,clampf(50/d,3,10),
+    if(world_to_screen(6.75f,2.25f,15.3f,&p,&d))DrawCircle((int)p.x,(int)p.y,clampf(50/d,3,10),
         g->terminal?(Color){72,255,190,255}:(Color){255,190,56,255});
     if(g->terminal&&alive_count(g)==0&&world_to_screen(0,1.2f,18.1f,&p,&d))
         DrawCircle((int)p.x,(int)p.y,clampf(70/d,4,13),(Color){72,255,190,255});

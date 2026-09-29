@@ -1,10 +1,10 @@
 {
   "events": [
     {"frame": 0, "type": "action", "code": 9, "pressed": true},
-    {"frame": 65, "type": "action", "code": 9, "pressed": false},
-    {"frame": 65, "type": "action", "code": 2, "pressed": true},
-    {"frame": 258, "type": "action", "code": 2, "pressed": false},
-    {"frame": 259, "type": "action", "code": 6, "pressed": true},
-    {"frame": 260, "type": "action", "code": 6, "pressed": false}
+    {"frame": 72, "type": "action", "code": 9, "pressed": false},
+    {"frame": 72, "type": "action", "code": 2, "pressed": true},
+    {"frame": 265, "type": "action", "code": 2, "pressed": false},
+    {"frame": 266, "type": "action", "code": 6, "pressed": true},
+    {"frame": 267, "type": "action", "code": 6, "pressed": false}
   ]
 }
