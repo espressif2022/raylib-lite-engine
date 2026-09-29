@@ -22,7 +22,8 @@ static void assert_mission_reachable(last_zone_game_t *game)
             if (nx < 0 || ny < 0 || nx >= LAST_ZONE_WIDTH || ny >= LAST_ZONE_HEIGHT ||
                 seen[ny][nx]) continue;
             uint8_t cell = last_zone_cell(game, nx, ny);
-            if (cell != 0 && cell != 4 && cell != 5) continue;
+            if (cell != 0 && cell != 4 && cell != 5 &&
+                !(cell >= 7 && cell <= 9)) continue;
             seen[ny][nx] = 1; qx[tail] = nx; qy[tail++] = ny;
         }
     }
@@ -140,16 +141,19 @@ int main(void)
 
     game.layout = 0;
     last_zone_reset(&game);
-    assert(last_zone_cell(&game, 5, 3) == LAST_ZONE_CELL_COVER);
-    assert(last_zone_blocks(&game, 5, 3));
-    assert(last_zone_cover_height(&game, 5, 3) > 0.4f);
+    assert(last_zone_floor_level(&game, 4, 3) == 1);
+    assert(last_zone_floor_level(&game, 5, 3) == 2);
+    assert(last_zone_floor_level(&game, 6, 3) == 3);
+    assert(last_zone_floor_level(&game, 9, 3) == 3);
+    assert(!last_zone_blocks(&game, 4, 3));
+    assert(last_zone_floor_height(&game, 6, 3) > 0.29f);
     last_zone_confirm(&game);
     for (int i = 0; i < LAST_ZONE_ENEMIES; ++i) game.enemies[i].active = false;
     last_zone_set_motion(&game, 1.0f, 0.0f, 0.0f);
-    for (int i = 0; i < 50; ++i) last_zone_update(&game);
-    assert(game.x < 4.91f);
+    for (int i = 0; i < 60; ++i) last_zone_update(&game);
+    assert(game.x > 7.0f);
+    assert(last_zone_floor_level(&game, (int)game.x, (int)game.y) == 3);
 
-    game.layout = 0;
     last_zone_reset(&game);
     last_zone_confirm(&game);
     for (int i = 1; i < LAST_ZONE_ENEMIES; ++i) game.enemies[i].active = false;

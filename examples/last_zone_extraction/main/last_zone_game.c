@@ -7,12 +7,12 @@
 static const char s_maps[LAST_ZONE_LAYOUTS][LAST_ZONE_HEIGHT][LAST_ZONE_WIDTH + 1] = {
 {
     "111111111111111111111111",
-    "100000010000000000000001",
-    "100000020000000000000001",
-    "100006020000000000000001",
-    "100000010000100000000001",
-    "100030010000100000000001",
-    "100000010000100000000001",
+    "100000019999000000000001",
+    "100000029999000000000001",
+    "100078999999000000000001",
+    "100000019999100000000001",
+    "100030019999100000000001",
+    "100000019999100000000001",
     "111111001111100000000001",
     "100000000030000000000001",
     "100000000000200000000001",
@@ -169,7 +169,7 @@ static bool line_clear(const last_zone_game_t *game,float x0,float y0,float x1,f
     int steps=(int)(distance/.14f);
     for(int i=1;i<steps;++i)
         if(last_zone_cell(game,(int)(x0+dx*(float)i/steps),
-                          (int)(y0+dy*(float)i/steps))!=6&&
+                          (int)(y0+dy*(float)i/steps))!=LAST_ZONE_CELL_COVER&&
            last_zone_blocks(game,(int)(x0+dx*(float)i/steps),
                             (int)(y0+dy*(float)i/steps)))
             return false;
@@ -179,7 +179,7 @@ static bool line_clear(const last_zone_game_t *game,float x0,float y0,float x1,f
 static bool layout_open(const last_zone_game_t *game,int x,int y)
 {
     uint8_t cell=last_zone_cell(game,x,y);
-    return cell==0||cell==4||cell==5;
+    return cell==0||cell==4||cell==5||(cell>=7&&cell<=9);
 }
 
 static bool adjacent_cover(const last_zone_game_t *game,int x,int y)
@@ -222,11 +222,18 @@ static void pick_hold_cell(last_zone_game_t *game,int index,last_zone_enemy_t *e
     enemy->hold_y=(int8_t)best_y;
 }
 
-static bool blocked_at(const last_zone_game_t *game,float x,float y)
+static bool blocked_at(const last_zone_game_t *game,float from_x,float from_y,
+                       float x,float y)
 {
     const float r=.10f;
-    return last_zone_blocks(game,(int)(x-r),(int)y)||last_zone_blocks(game,(int)(x+r),(int)y)||
-           last_zone_blocks(game,(int)x,(int)(y-r))||last_zone_blocks(game,(int)x,(int)(y+r));
+    uint8_t from=last_zone_floor_level(game,(int)from_x,(int)from_y);
+    const int sx[4]={(int)(x-r),(int)(x+r),(int)x,(int)x};
+    const int sy[4]={(int)y,(int)y,(int)(y-r),(int)(y+r)};
+    for(int i=0;i<4;++i){
+        if(last_zone_blocks(game,sx[i],sy[i]))return true;
+        if(last_zone_floor_level(game,sx[i],sy[i])>from+1U)return true;
+    }
+    return false;
 }
 
 static void route_next(const last_zone_game_t *game,int sx,int sy,int gx,int gy,
@@ -320,14 +327,25 @@ uint8_t last_zone_cell(const last_zone_game_t *game,int x,int y)
 bool last_zone_blocks(const last_zone_game_t *game,int x,int y)
 {
     uint8_t cell=last_zone_cell(game,x,y);
-    if(cell==0||cell==5)return false;
+    if(cell==0||cell==5||(cell>=7&&cell<=9))return false;
     if(cell==4)return !game||!game->door_open[y][x];
     return true;
 }
 
 float last_zone_cover_height(const last_zone_game_t *game,int x,int y)
 {
-    return last_zone_cell(game,x,y)==6?LAST_ZONE_COVER_HEIGHT:0.0f;
+    return last_zone_cell(game,x,y)==LAST_ZONE_CELL_COVER?LAST_ZONE_COVER_HEIGHT:0.0f;
+}
+
+uint8_t last_zone_floor_level(const last_zone_game_t *game,int x,int y)
+{
+    uint8_t cell=last_zone_cell(game,x,y);
+    return cell>=7&&cell<=9?(uint8_t)(cell-6U):0U;
+}
+
+float last_zone_floor_height(const last_zone_game_t *game,int x,int y)
+{
+    return (float)last_zone_floor_level(game,x,y)*LAST_ZONE_FLOOR_STEP;
 }
 
 bool last_zone_door_ahead(const last_zone_game_t *game)
@@ -824,17 +842,17 @@ void last_zone_update(last_zone_game_t *game)
     if(fabsf(game->vel_x)<.002f)game->vel_x=0;
     if(fabsf(game->vel_y)<.002f)game->vel_y=0;
     float nx=game->x+game->vel_x,ny=game->y+game->vel_y;
-    if(!blocked_at(game,nx,game->y))game->x=nx;
+    if(!blocked_at(game,game->x,game->y,nx,game->y))game->x=nx;
     else{
         game->vel_x*=.18f;
-        if(!blocked_at(game,nx,game->y+.20f)){game->x=nx;game->y+=.10f;}
-        else if(!blocked_at(game,nx,game->y-.20f)){game->x=nx;game->y-=.10f;}
+        if(!blocked_at(game,game->x,game->y,nx,game->y+.20f)){game->x=nx;game->y+=.10f;}
+        else if(!blocked_at(game,game->x,game->y,nx,game->y-.20f)){game->x=nx;game->y-=.10f;}
     }
-    if(!blocked_at(game,game->x,ny))game->y=ny;
+    if(!blocked_at(game,game->x,game->y,game->x,ny))game->y=ny;
     else{
         game->vel_y*=.18f;
-        if(!blocked_at(game,game->x+.20f,ny)){game->y=ny;game->x+=.10f;}
-        else if(!blocked_at(game,game->x-.20f,ny)){game->y=ny;game->x-=.10f;}
+        if(!blocked_at(game,game->x,game->y,game->x+.20f,ny)){game->y=ny;game->x+=.10f;}
+        else if(!blocked_at(game,game->x,game->y,game->x-.20f,ny)){game->y=ny;game->x-=.10f;}
     }
     game->weapon_recoil*=.64f;
     if(game->weapon_recoil<.01f)game->weapon_recoil=0;
@@ -949,9 +967,9 @@ void last_zone_update(last_zone_game_t *game)
         float step=enemy->ai_state==LAST_ZONE_ENEMY_ENGAGE?.028f:.022f;
         float dx=cosf(heading)*step,dy=sinf(heading)*step;
         float nx=enemy->x+dx,ny=enemy->y+dy;
-        if(!blocked_at(game,nx,enemy->y))enemy->x=nx;
+        if(!blocked_at(game,enemy->x,enemy->y,nx,enemy->y))enemy->x=nx;
         else enemy->move_phase=(uint8_t)(enemy->move_phase+5U);
-        if(!blocked_at(game,enemy->x,ny))enemy->y=ny;
+        if(!blocked_at(game,enemy->x,enemy->y,enemy->x,ny))enemy->y=ny;
         else enemy->move_phase=(uint8_t)(enemy->move_phase+7U);
     }
     if(!game->sfx&&game->last_pickup)emit_sfx(game,6);
@@ -1054,8 +1072,8 @@ last_zone_fire_result_t last_zone_fire(last_zone_game_t *game)
     if(knock_length>.01f){
         float nx=enemy->x+knock_x/knock_length*.22f;
         float ny=enemy->y+knock_y/knock_length*.22f;
-        if(!blocked_at(game,nx,enemy->y))enemy->x=nx;
-        if(!blocked_at(game,enemy->x,ny))enemy->y=ny;
+        if(!blocked_at(game,enemy->x,enemy->y,nx,enemy->y))enemy->x=nx;
+        if(!blocked_at(game,enemy->x,enemy->y,enemy->x,ny))enemy->y=ny;
     }
     game->hit_marker=8;
     ++game->shots_hit;
