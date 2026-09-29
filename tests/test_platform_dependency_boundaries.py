@@ -137,7 +137,7 @@ int main(void) {{ return ESP_OK; }}
     def test_reference_examples_have_host_and_direct_entries(self) -> None:
         for directory in (
             "raylib_shooter", "tower_defense", "sky_hop", "living_worlds",
-            "last_zone_extraction", "tomb_explorer",
+            "last_zone_extraction", "tomb_raycast",
         ):
             root = ENGINE / "examples" / directory
             with self.subTest(example=directory):

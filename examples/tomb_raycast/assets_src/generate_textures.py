@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bake tomb-explorer INDEX8 tiles into an opaque 5x2 RGB PNG atlas."""
+"""Bake tomb-raycast INDEX8 tiles into an opaque 5x2 RGB PNG atlas."""
 import math
 import random
 from pathlib import Path
@@ -68,7 +68,7 @@ def texture(fn, seed):
         for x in range(SOURCE_SIZE):
             source[y * SOURCE_SIZE + x] = fn(
                 x, y, rng, smooth(grain, x, y), smooth(coarse, x, y))
-    # The original Tomb Explorer material contract is 64x64. Generate the art
+    # The original Tomb Raycast material contract is 64x64. Generate the art
     # at 128px so its procedural shapes stay unchanged, then take a stable
     # nearest sample. This cuts the random INDEX8 working set to one quarter.
     texels = bytearray(SIZE * SIZE)

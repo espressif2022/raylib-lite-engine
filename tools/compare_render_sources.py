@@ -39,7 +39,7 @@ def main():
     reports=[]
     original_layout=os.environ.get("LAST_ZONE_SIM_LAYOUT")
     try:
-        for game in ("living_worlds","last_zone_extraction","tomb_explorer","sky_hop"):
+        for game in ("living_worlds","last_zone_extraction","tomb_raycast","sky_hop"):
             for variant in range(5 if game=="last_zone_extraction" else 1):
                 if game=="last_zone_extraction":os.environ["LAST_ZONE_SIM_LAYOUT"]=str(variant)
                 with tempfile.TemporaryDirectory() as old_dir, tempfile.TemporaryDirectory() as new_dir:

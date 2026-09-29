@@ -7,16 +7,16 @@ import unittest
 
 
 ENGINE = Path(__file__).resolve().parents[1]
-PROJECT = ENGINE / "examples/tomb_explorer"
+PROJECT = ENGINE / "examples/tomb_raycast"
 
 
-class TombExplorerTests(unittest.TestCase):
+class TombRaycastTests(unittest.TestCase):
     def test_model_compiles_and_orbits(self) -> None:
         compiler = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
         self.assertIsNotNone(compiler, "a C compiler is required")
         with tempfile.TemporaryDirectory() as directory:
             executable = Path(directory) / (
-                "tomb-explorer-test.exe" if os.name == "nt" else "tomb-explorer-test"
+                "tomb-raycast-test.exe" if os.name == "nt" else "tomb-raycast-test"
             )
             subprocess.run([
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",

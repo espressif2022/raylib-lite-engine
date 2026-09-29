@@ -2,9 +2,15 @@
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>
+#include "raylib_lite_clock.h"
+#if defined(MOSAICO_GAME_ELF)
+#include "mosaico_game_module.h"
+#include "mosaico_runtime_v1.h"
+#else
 #include "mosaico_game_module.h"
 #if !defined(MOSAICO_GAME_NATIVE)
 #include "host_asset_runtime.h"
+#endif
 #endif
 #include "mosaico_raylib_fast.h"
 #if defined(MOSAICO_GAME_NATIVE)
@@ -14,6 +20,12 @@
 #include "tomb_game.h"
 #include "tomb_view.h"
 
+#if defined(MOSAICO_GAME_ELF)
+#define TOMB_RAYCAST_ABI MOSAICO_HOST_GAME_ABI
+#else
+#define TOMB_RAYCAST_ABI MOSAICO_HOST_GAME_ABI_V1
+#endif
+
 typedef struct {
     tomb_game_t game;
     MosaicoWallAtlas textures;
@@ -21,6 +33,11 @@ typedef struct {
     bool paused, left, right, forward, backward, jump, strafe_left, strafe_right;
     int32_t joystick_track, look_track, jump_track, look_x, look_y, stick_x, stick_y;
     float move_forward, move_strafe;
+#if defined(MOSAICO_GAME_ELF)
+    int64_t fps_started_us;
+    uint32_t fps_frames;
+    float display_fps;
+#endif
 } tomb_module_t;
 
 #define JOYSTICK_RADIUS 53
@@ -51,10 +68,14 @@ static void clear_tracks(tomb_module_t *state)
     tomb_set_jump(&state->game,false);
 }
 
-static int initialize(void *value, const char *asset_root)
+static int initialize(void *value
+#if !defined(MOSAICO_GAME_ELF)
+                      , const char *asset_root
+#endif
+)
 {
     tomb_module_t *state=value;
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
     mosaico_host_assets_set_root(asset_root);
 #endif
     state->textures=LoadMosaicoWallAtlas("textures.wall");
@@ -66,8 +87,13 @@ static int initialize(void *value, const char *asset_root)
     mosaico_native_feedback_init();
 #endif
 #if !defined(MOSAICO_GAME_NATIVE)
-    InitWindow(480,480,"Tomb Explorer");
+    InitWindow(480,480,"Tomb Raycast");
     SetTargetFPS(30);
+#endif
+#if defined(MOSAICO_GAME_ELF)
+    state->fps_started_us=raylib_lite_time_us();
+    state->fps_frames=0;
+    state->display_fps=0.0f;
 #endif
     return 0;
 }
@@ -87,6 +113,9 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
 {
     tomb_module_t *state=value;
     if(!state||!event)return;
+#if defined(TOMB_RAYCAST_BENCHMARK)
+    return;
+#endif
     if(event->type==MOSAICO_HOST_INPUT_CONTROL){
         if(event->code==MOSAICO_HOST_CONTROL_PAUSE)state->paused=true;
         else if(event->code==MOSAICO_HOST_CONTROL_RESUME)state->paused=false;
@@ -133,6 +162,13 @@ static void update(void *value)
 {
     tomb_module_t *state=value;
     if(!state||state->paused)return;
+#if defined(TOMB_RAYCAST_BENCHMARK)
+    const uint32_t phase=state->game.tick%300U;
+    state->move_forward=phase<225U?1.0f:0.25f;
+    state->move_strafe=phase<150U?0.0f:(phase<225U?0.7f:-0.7f);
+    tomb_set_look(&state->game,phase<150U?0.012f:-0.008f,0.0f);
+    tomb_set_jump(&state->game,state->game.tick%90U==11U);
+#endif
     float forward=state->move_forward;
     float strafe=state->move_strafe;
     if(state->forward||state->backward)
@@ -161,11 +197,22 @@ static void update(void *value)
 static int render(void *value)
 {
     tomb_module_t *state=value;
+#if defined(MOSAICO_GAME_ELF)
+    ++state->fps_frames;
+    int64_t now_us=raylib_lite_time_us();
+    if(now_us-state->fps_started_us>=1000000){
+        state->display_fps=(float)state->fps_frames;
+        state->fps_started_us=now_us;
+        state->fps_frames=0;
+    }
+    float display_fps=state->display_fps;
+#else
     float display_fps=(float)GetFPS();
 #if defined(MOSAICO_GAME_NATIVE)
     mosaico_game_stats_t stats;
     MosaicoGameGetStats(&stats);
     display_fps=stats.display_fps;
+#endif
 #endif
     tomb_hud_input_t input={
         .stick_active=state->joystick_track>=0,
@@ -188,6 +235,15 @@ static int state_json(const void *value, char *output, size_t capacity)
     const tomb_game_t *g=&((const tomb_module_t *)value)->game;
     static const char *names[]={"entrance","corridor","hall","crypt","pool"};
     const char *room=g->room<5?names[g->room]:"tomb";
+#if defined(MOSAICO_GAME_ELF)
+    return snprintf(output,capacity,
+        "{\"x100\":%d,\"y100\":%d,\"z100\":%d,\"yaw100\":%d,"
+        "\"room\":\"%s\",\"cam_room\":%u,\"grounded\":%s,"
+        "\"tick\":%lu,\"state_hash\":\"%08lx\"}",
+        (int)(g->x*100.0f),(int)(g->y*100.0f),(int)(g->z*100.0f),(int)(g->yaw*100.0f),
+        room,(unsigned)g->camera_room,g->grounded?"true":"false",
+        (unsigned long)g->tick,(unsigned long)tomb_state_hash(g));
+#else
     return snprintf(output,capacity,
         "{\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"yaw\":%.2f,\"camera_yaw\":%.2f,"
         "\"camera_pitch\":%.2f,\"room\":\"%s\",\"cam_room\":%u,"
@@ -195,11 +251,21 @@ static int state_json(const void *value, char *output, size_t capacity)
         g->x,g->y,g->z,g->yaw,g->camera_yaw,g->camera_pitch,room,(unsigned)g->camera_room,
         g->grounded?"true":"false",g->speed,(unsigned long)g->tick,
         (unsigned long)tomb_state_hash(g));
+#endif
 }
 
 static const mosaico_game_module_v1_t s_module={
-    .descriptor={MOSAICO_HOST_GAME_ABI_V1,"tomb_explorer","Tomb Explorer",480,480,30,2},
+    .descriptor={TOMB_RAYCAST_ABI,"tomb_raycast","Tomb Raycast",480,480,30,2},
     .state_size=sizeof(tomb_module_t),.initialize=initialize,.shutdown=shutdown,
     .input=input,.update=update,.render=render,.state_hash=state_hash,.state_json=state_json};
 
+#if defined(MOSAICO_GAME_ELF)
+MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
+mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+{
+    g_mosaico_rt=runtime;
+    return &s_module;
+}
+#else
 const mosaico_game_module_v1_t *mosaico_game_module_v1(void){return &s_module;}
+#endif

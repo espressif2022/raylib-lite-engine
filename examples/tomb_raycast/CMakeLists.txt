@@ -5,4 +5,4 @@ set(SDKCONFIG_DEFAULTS
     "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
 include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/raylib_lite_native_project.cmake")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(tomb_explorer VERSION 1.0.0)
+project(tomb_raycast VERSION 1.0.0)

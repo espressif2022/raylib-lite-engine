@@ -61,7 +61,7 @@ python3 -m pip install Pillow
 python3 tools/game_cli.py sim examples/sky_hop
 python3 tools/game_cli.py sim examples/living_worlds --headless --frames 300
 python3 tools/game_cli.py sim examples/last_zone_extraction --headless --frames 90
-python3 tools/game_cli.py sim examples/tomb_explorer --headless --frames 8
+python3 tools/game_cli.py sim examples/tomb_raycast --headless --frames 8
 ```
 
 Standalone example firmware can be built from supported example directories;

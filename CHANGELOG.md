@@ -12,7 +12,7 @@
 - Removed ESP-Iris from the engine and examples: no `esp_iris` manifest,
   no Recovery cmake, no screen-mirror RPC, and `mosaico_game_iris` is gone.
 - Imported Sky Hop, Tower Defense, Raylib Shooter, Living Worlds, Last Zone,
-  and Tomb Explorer from ESP-Mosaico Vibe into `examples/`, with Host CLI
+  and Tomb Raycast from ESP-Mosaico Vibe into `examples/`, with Host CLI
   templates and game-development guides.
 - Added MTX2 block textures: 4x4 texels per 8-byte block, a quarter of raw
   RGB565, with punch-through alpha and mipmaps. `tools/pack_game_assets.py`
@@ -23,7 +23,7 @@
   decode is amortized across the four scanlines a block row covers, so the
   sampler is not yet wired into the draw paths.
 - Added INDEX8 wall-atlas loading and textured triangle/quad/column draws so
-  Tomb Explorer can share Host and device assets.
+  Tomb Raycast can share Host and device assets.
 - Added opaque raycast column, span, floor-row and batched wall primitives.
 - Added deterministic `.wall` assets with column-major INDEX8 texels, 16-level
   RGB565 light tables and a shared Host/device batch raster path. MSW1 uses a

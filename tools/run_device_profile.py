@@ -31,7 +31,7 @@ def main():
         parser.error("seconds and repeats must be positive")
     jobs = []
     for game in args.games:
-        if game not in ("sky_hop", "tomb_explorer", "last_zone_extraction", "living_worlds"):
+        if game not in ("sky_hop", "tomb_raycast", "last_zone_extraction", "living_worlds"):
             parser.error(f"Unsupported game: {game}")
         build = ROOT / "examples" / game / "build_bench"
         directory = ROOT / "artifacts" / args.label / game

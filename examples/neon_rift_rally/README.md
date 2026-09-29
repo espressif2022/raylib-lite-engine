@@ -61,7 +61,7 @@ model and Host pointer checks with `tests/run_host_tests.sh`.
 ## Native project / 真机工程
 
 The example root is a direct ESP-IDF project using the same native structure as
-Last Zone and Tomb Explorer. Configure the Mosaico component and BSP paths if
+Last Zone and Tomb Raycast. Configure the Mosaico component and BSP paths if
 they are not adjacent to this checkout, then run `idf.py build` from this
 directory. `main/CMakeLists.txt` embeds the generated assets directory. The
 current firmware embeds nine compact `.sound` resources. Semantic events

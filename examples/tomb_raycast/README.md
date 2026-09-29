@@ -1,4 +1,4 @@
-# Tomb Explorer
+# Tomb Raycast
 
 PS1-style third-person rooms joined by portals, a low-polygon explorer, sector
 heights, and a follow camera. The Host RGB565 preview and the device share the
@@ -19,7 +19,7 @@ RGB565 预览与真机共用同一套 C 模型和透视纹理三角绘制。贴�
 The five rooms are entrance, sloping corridor, hall with a carved frieze,
 crypt, and pool.
 
-![Tomb Explorer](docs/screenshot.png)
+![Tomb Raycast](docs/screenshot.png)
 
 The screenshot is a Host RGB565 frame of the hall. / 截图为大厅的 Host RGB565 画面。
 
@@ -32,8 +32,8 @@ The screenshot is a Host RGB565 frame of the hall. / 截图为大厅的 Host RGB
 
 ```bash
 # Host 仿真：本仓库根目录，主机 C 编译器 + Pillow
-python3 tools/game_cli.py sim examples/tomb_explorer
-python3 tools/game_cli.py sim examples/tomb_explorer --headless --frames 8
+python3 tools/game_cli.py sim examples/tomb_raycast
+python3 tools/game_cli.py sim examples/tomb_raycast --headless --frames 8
 ```
 
 目录根部也是可独立构建的 ESP-IDF native 工程。配置板级组件路径后，

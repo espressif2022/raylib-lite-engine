@@ -24,7 +24,7 @@ class AudioFacadeTests(unittest.TestCase):
                 f"-I{ENGINE / 'components/mosaico_game_assets/include'}",
                 f"-I{PORT / 'platform_esp_audio/include'}",
                 f"-I{ENGINE / 'components/raylib_lite_platform/include'}",
-                f"-I{ENGINE / 'examples/tomb_explorer/managed_components/georgik__raylib/raylib/src'}",
+                f"-I{ENGINE / 'examples/tomb_raycast/managed_components/georgik__raylib/raylib/src'}",
                 f"-I{ENGINE / 'host/include'}",
                 str(ENGINE / "tests/test_audio_facade.c"),
                 str(audio / "mosaico_game_audio.c"),

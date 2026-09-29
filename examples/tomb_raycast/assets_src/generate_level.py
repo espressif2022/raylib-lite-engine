@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile assets_src/level.json into main/tomb_level_data.c for tomb_explorer.
+"""Compile assets_src/level.json into main/tomb_level_data.c for tomb_raycast.
 
 Rooms are sector grids. From the per-corner floor and ceiling heights the
 generator emits floor, ceiling, wall, step and ceiling-drop quads with baked
@@ -446,7 +446,7 @@ def main():
     if args.check:
         if not output.exists() or output.read_text() != text:
             raise SystemExit('stale: main/tomb_level_data.c')
-        print('tomb_explorer level up to date')
+        print('tomb_raycast level up to date')
         return
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists() and output.read_text() == text:

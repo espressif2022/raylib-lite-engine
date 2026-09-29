@@ -18,7 +18,7 @@ TEMPLATES = {
     "tower-defense": "tower_defense",
     "living-worlds": "living_worlds",
     "last-zone": "last_zone_extraction",
-    "tomb-explorer": "tomb_explorer",
+    "tomb-raycast": "tomb_raycast",
 }
 
 ENGINE_ROOT = Path(__file__).resolve().parents[1]

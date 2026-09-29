@@ -148,7 +148,7 @@
       "status": "integration_pending",
       "suite": "tomb",
       "variants": [],
-      "source": "examples/tomb_explorer/main/tomb_view.c",
+      "source": "examples/tomb_raycast/main/tomb_view.c",
       "gate": "跨近平面固定回放、覆盖与UV连续"
     },
     {
@@ -175,7 +175,7 @@
       "status": "integration_pending",
       "suite": "tomb",
       "variants": [],
-      "source": "examples/tomb_explorer/main/tomb_view.c",
+      "source": "examples/tomb_raycast/main/tomb_view.c",
       "gate": "相同可见像素、漏画率、overdraw"
     },
     {

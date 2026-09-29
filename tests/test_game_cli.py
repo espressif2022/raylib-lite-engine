@@ -54,7 +54,7 @@ class GameCliTests(unittest.TestCase):
         self.assertEqual(payload["command"], "list")
         games = {game["name"]: game for game in payload["games"]}
         for name in ("raylib_shooter", "sky_hop", "tower_defense",
-                     "living_worlds", "last_zone_extraction", "tomb_explorer"):
+                     "living_worlds", "last_zone_extraction", "tomb_raycast"):
             with self.subTest(game=name):
                 self.assertEqual(games[name]["targets"], ["host", "native"])
                 self.assertEqual(Path(games[name]["path"]), ENGINE / "examples" / name)
