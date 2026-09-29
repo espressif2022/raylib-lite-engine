@@ -11,8 +11,10 @@ and a 1.2 m catwalk in one continuous space.
 
 - solid 3D quads with near-plane clipping, back-face culling, surface subdivision,
   fog shading, and painter sorting;
-- dock-specific landmarks: ribbed container stacks, a gantry crane, route lamps,
-  a moored vessel, a side-mounted terminal, and a passable extraction arch;
+- dock-specific landmarks: ribbed container stacks, a gantry crane and cabin,
+  route lamps, a moored vessel, a side-mounted terminal, and a passable extraction arch;
+- layered shoreline, animated water, readable enemy armor, world-space objective
+  markers, recoil, muzzle flash, and hit confirmation without texture assets;
 - step-aware movement: each 0.2 m rise is traversable, while the 1.2 m deck edge
   cannot be crossed directly;
 - actors at low and high elevations, with geometry and actors in one depth queue;
@@ -22,19 +24,22 @@ and a 1.2 m catwalk in one continuous space.
   hostiles, then return to the north extraction gate.
 
 - 实体四边形经过近平面裁剪、背面剔除、表面分段、雾化着色和画家排序；
-- 码头地标包括带加强筋的集装箱、龙门吊、路线灯、停泊船、高台侧置终端和可穿越撤离门；
+- 码头地标包括带加强筋的集装箱、带操作舱的龙门吊、路线灯、停泊船、高台侧置终端和可穿越撤离门；
+- 不依赖贴图也提供分层岸线、动态水纹、敌人装甲轮廓、世界目标标记、武器后坐、枪口火焰和命中反馈；
 - 移动会逐级判断高度：0.2 米台阶可走，不能从地面直接跨上 1.2 米平台，也不能穿过栏杆跌落；
 - 高低层角色与场景进入同一个深度队列，避免角色直接盖在墙体前面；
 - 射击按高度检查货箱、平台、终端和撤离门的遮挡；
 - 任务路径为上楼、操作高层终端、清敌，再前往北侧撤离门。
 
-This is a solid-color geometry reference, not a textured art demo. Long surfaces
-are split before sorting because a single centroid is insufficient for mutually
-overlapping faces. `faces_dropped` in Host state must remain zero. Host timing is
+This is a solid-color geometry reference, not a textured art demo. Horizontal
+surfaces render double-sided because near-plane clipping can change their projected
+winding. Long surfaces are split before sorting because a single centroid is
+insufficient for mutually overlapping faces. `faces_dropped` in Host state must remain zero. Host timing is
 only a regression signal; it is not device FPS.
 
-这是纯色几何参考设计，不是贴图美术演示。长表面会先分段再排序，因为单个面中心
-不能正确处理相互穿插的大平面。Host 状态中的 `faces_dropped` 必须保持为 0。Host
+这是纯色几何参考设计，不是贴图美术演示。水平面采用双面绘制，避免近平面裁剪后
+投影绕序变化造成地坪穿透；长表面会先分段再排序，因为单个面中心不能正确处理相互
+穿插的大平面。Host 状态中的 `faces_dropped` 必须保持为 0。Host
 耗时只能用于回归比较，不能当作板端帧率。
 
 For device A/B builds, `VERTICAL_DOCK_SUBDIVIDE_SURFACES=0` disables splitting;
@@ -65,7 +70,7 @@ Touch uses the left half for movement and the right half for looking and firing.
 ## Stable Host acceptance / 固定 Host 验收
 
 ```sh
-python3 tools/game_cli.py sim examples/vertical_dock --headless --frames 264 \
+python3 tools/game_cli.py sim examples/vertical_dock --headless --frames 271 \
   --scenario examples/vertical_dock/scenarios/high-route.json --json
 python3 tools/game_cli.py sim examples/vertical_dock --headless --frames 36 \
   --scenario examples/vertical_dock/scenarios/cover-shot.json --json

@@ -51,7 +51,7 @@ typedef struct {
     float move,strafe,turn;
     uint32_t tick;
     uint16_t shots,hits;
-    uint8_t health;
+    uint8_t health,shot_flash,hit_flash;
     bool terminal,won,paused;
     vd_enemy_t enemies[VD_ENEMIES];
 } vd_game_t;
@@ -186,7 +186,7 @@ static void add_face(vd_vec3_t a,vd_vec3_t b,vd_vec3_t c,vd_vec3_t d,Color color
 }
 
 static void add_floor(float x0,float z0,float x1,float z1,float y,Color c)
-{ add_face((vd_vec3_t){x0,y,z0},(vd_vec3_t){x1,y,z0},(vd_vec3_t){x1,y,z1},(vd_vec3_t){x0,y,z1},c); }
+{ add_face((vd_vec3_t){x0,y,z0},(vd_vec3_t){x0,y,z1},(vd_vec3_t){x1,y,z1},(vd_vec3_t){x1,y,z0},c); }
 
 static void add_box(float x0,float z0,float x1,float z1,float y0,float y1,Color c)
 {
@@ -254,15 +254,20 @@ static void add_billboard(float x,float z,float y0,float y1,float center,float h
              (vd_vec3_t){cx-right_x*half,y1,cz-right_z*half},c);
 }
 
-static void add_enemy_face(const vd_enemy_t *e)
+static void add_enemy_face(const vd_enemy_t *e,uint32_t tick,int index)
 {
     Color body=e->high?(Color){238,116,54,255}:(Color){220,64,75,255};
-    Color dark={44,45,45,255},skin={240,190,119,255};
-    add_billboard(e->x,e->z,e->y+.30f,e->y+.88f,0,.23f,body);
-    add_billboard(e->x,e->z,e->y,e->y+.34f,-.12f,.075f,dark);
-    add_billboard(e->x,e->z,e->y,e->y+.34f,.12f,.075f,dark);
-    add_billboard(e->x,e->z,e->y+.88f,e->y+1.16f,0,.14f,skin);
-    add_billboard(e->x,e->z,e->y+.55f,e->y+.64f,.26f,.24f,dark);
+    Color dark={35,41,43,255},armor={70,80,78,255},visor={255,196,58,255};
+    float bob=sinf((float)(tick+index*13)*.09f)*.025f,y=e->y+bob;
+    /* Layered silhouette stays readable without texture assets. */
+    add_billboard(e->x,e->z,y+.32f,y+.88f,0,.24f,body);
+    add_billboard(e->x,e->z,y+.68f,y+.92f,0,.29f,armor);
+    add_billboard(e->x,e->z,y,y+.36f,-.13f,.07f,dark);
+    add_billboard(e->x,e->z,y,y+.36f,.13f,.07f,dark);
+    add_billboard(e->x,e->z,y+.88f,y+1.17f,0,.15f,dark);
+    add_billboard(e->x,e->z,y+1.01f,y+1.08f,0,.13f,visor);
+    add_billboard(e->x,e->z,y+.54f,y+.64f,.27f,.25f,dark);
+    add_billboard(e->x,e->z,y+.47f,y+.56f,.48f,.23f,armor);
 }
 
 static void sort_faces(void)
@@ -287,7 +292,9 @@ static void draw_face(const vd_face_t *f)
     for(int i=0;i<n;++i)p[i]=project(clipped[i]);
     float area=(p[1].x-p[0].x)*(p[2].y-p[0].y)-
                (p[1].y-p[0].y)*(p[2].x-p[0].x);
-    if(area>=0)return;
+    bool horizontal=fabsf(f->v[0].y-f->v[1].y)<.0001f&&
+                    fabsf(f->v[0].y-f->v[2].y)<.0001f;
+    if(area>=0&&!horizontal)return;
     Color c=shade(f->color,f->depth,1.0f);
     for(int i=1;i<n-1;++i)DrawTriangle(p[0],p[i],p[i+1],c);
 }
@@ -340,7 +347,10 @@ static void add_scene(const vd_game_t *g)
     /* A gantry crane is the dominant landmark shared by both elevations. */
     Color crane={188,139,38,255};
     add_box(-7.2f,12.8f,-6.8f,13.2f,0,4.25f,crane);
+    add_box(6.55f,12.8f,6.95f,13.2f,1.2f,4.25f,crane);
     add_box(-6.9f,12.86f,7.0f,13.14f,3.82f,4.22f,crane);
+    add_box(4.8f,12.72f,6.2f,13.28f,4.22f,4.82f,(Color){63,83,87,255});
+    add_box(5.0f,12.68f,6.0f,12.74f,4.38f,4.70f,(Color){116,184,194,255});
     add_box(.75f,12.93f,.85f,13.07f,1.75f,3.82f,(Color){45,52,51,255});
     add_box(.55f,12.82f,1.05f,13.18f,1.55f,1.82f,(Color){63,69,65,255});
     /* Repeated lamps make depth and the two routes readable at a glance. */
@@ -363,7 +373,8 @@ static void add_scene(const vd_game_t *g)
             g->terminal?(Color){45,214,154,255}:(Color){211,146,39,255});
     add_box(-1.05f,18.15f,-.78f,18.22f,.25f,1.48f,(Color){211,158,52,255});
     add_box(.78f,18.15f,1.05f,18.22f,.25f,1.48f,(Color){211,158,52,255});
-    for(int i=0;i<VD_ENEMIES;++i)if(g->enemies[i].active)add_enemy_face(&g->enemies[i]);
+    for(int i=0;i<VD_ENEMIES;++i)if(g->enemies[i].active)
+        add_enemy_face(&g->enemies[i],g->tick,i);
 }
 
 static bool world_to_screen(float x,float y,float z,Vector2 *p,float *depth)
@@ -401,6 +412,7 @@ static bool shot_clear(const vd_game_t *g,const vd_enemy_t *e)
 static void fire(vd_game_t *g)
 {
     if(g->won)return;
+    g->shot_flash=3;
     float terminal_dx=g->x-6.75f,terminal_dz=g->z-15.3f;
     if(terminal_dx*terminal_dx+terminal_dz*terminal_dz<2.0f&&floor_at(g->x,g->z)>.9f){
         g->terminal=true;return;
@@ -411,11 +423,14 @@ static void fire(vd_game_t *g)
         float a=fabsf(angle_delta(atan2f(dx,dz)-g->yaw));
         float score=a-.25f/d;
         if(score<best_score&&shot_clear(g,e)){best_score=score;best=i;}}
-    if(best>=0){vd_enemy_t *e=&g->enemies[best];++g->hits;if(--e->hp==0)e->active=false;}
+    if(best>=0){vd_enemy_t *e=&g->enemies[best];++g->hits;g->hit_flash=5;
+        if(--e->hp==0)e->active=false;}
 }
 
 static void update_game(vd_game_t *g)
 {
+    if(g->shot_flash)--g->shot_flash;
+    if(g->hit_flash)--g->hit_flash;
     if(g->paused||g->won)return;
     g->yaw+=g->turn*.055f;
     float speed=.075f,fx=sinf(g->yaw),fz=cosf(g->yaw),rx=cosf(g->yaw),rz=-sinf(g->yaw);
@@ -429,17 +444,54 @@ static void update_game(vd_game_t *g)
     ++g->tick;
 }
 
-static void draw_sky(void)
+static void draw_sky(const vd_game_t *g)
 {
     for(int y=0;y<240;y+=4){float t=(float)y/240.0f;
-        Color c={(unsigned char)(18+44*t),(unsigned char)(45+75*t),(unsigned char)(72+86*t),255};
+        Color c={(unsigned char)(14+54*t),(unsigned char)(35+88*t),(unsigned char)(63+102*t),255};
         DrawRectangle(0,y,VD_W,4,c);
     }
-    DrawCircle(392,72,30,(Color){242,191,103,255});
+    DrawCircle(392,72,32,(Color){244,185,91,255});
+    DrawCircle(392,72,23,(Color){255,207,116,255});
+    /* Layered shore silhouettes give the open end scale and depth. */
+    DrawTriangle((Vector2){0,194},(Vector2){82,126},(Vector2){174,194},
+                 (Color){40,75,91,255});
+    DrawTriangle((Vector2){92,194},(Vector2){210,143},(Vector2){318,194},
+                 (Color){49,87,99,255});
+    DrawTriangle((Vector2){250,194},(Vector2){382,119},(Vector2){480,194},
+                 (Color){43,77,92,255});
+    DrawRectangle(0,184,480,10,(Color){84,125,135,255});
     /* Water continues behind the dock so the extraction arch never opens to black. */
     DrawRectangle(0,194,VD_W,VD_H-194,(Color){42,78,96,255});
-    for(int y=202;y<VD_H;y+=8)
-        DrawRectangle(0,y,VD_W,2,(Color){70,124,143,255});
+    int wave=(int)(g->tick%16u);
+    for(int y=202;y<VD_H;y+=10){
+        int offset=((y/10)&1)?wave:16-wave;
+        for(int x=-32+offset;x<VD_W;x+=64)
+            DrawRectangle(x,y,34,2,(Color){74,130,147,255});
+    }
+    DrawRectangle(0,186,VD_W,18,(Color){113,154,158,42});
+}
+
+static void draw_world_overlays(const vd_game_t *g)
+{
+    Vector2 p;float d;
+    if(!g->terminal&&world_to_screen(6.75f,2.48f,15.3f,&p,&d)){
+        int r=(int)clampf(62.0f/d,4,10);
+        DrawPoly(p,4,(float)r,45,(Color){255,196,58,255});
+        if(d<9)DrawText("TERMINAL",(int)p.x-30,(int)p.y-24,11,(Color){255,222,130,255});
+    }
+    if(g->terminal&&alive_count(g)==0&&world_to_screen(0,1.45f,18.1f,&p,&d)){
+        int pulse=8+(int)(g->tick%12u<6u);
+        DrawPoly(p,4,(float)pulse,45,(Color){72,255,190,255});
+        DrawText("EXTRACT",(int)p.x-27,(int)p.y-27,11,(Color){122,255,211,255});
+    }
+    for(int i=0;i<VD_ENEMIES;++i){
+        const vd_enemy_t *e=&g->enemies[i];
+        if(!e->active||!shot_clear(g,e)||
+           !world_to_screen(e->x,e->y+1.32f,e->z,&p,&d)||d>11)continue;
+        int w=(int)clampf(48.0f/d,8,20);
+        DrawRectangle((int)p.x-w/2,(int)p.y,w,3,(Color){34,35,35,220});
+        DrawRectangle((int)p.x-w/2,(int)p.y,w*(int)e->hp/2,3,(Color){255,93,72,255});
+    }
 }
 
 static void draw_hud(const vd_game_t *g)
@@ -447,19 +499,31 @@ static void draw_hud(const vd_game_t *g)
     DrawRectangle(14,14,452,42,(Color){5,13,18,235});
     DrawText("VERTICAL DOCK",28,24,18,(Color){226,234,218,255});
     DrawText(TextFormat("HOSTILES %d",alive_count(g)),290,24,16,(Color){255,118,72,255});
+    for(int i=0;i<5;++i)
+        DrawRectangle(198+i*11,31,8,8,i<g->health?(Color){72,224,164,255}:(Color){42,62,62,255});
     const char *objective=!g->terminal?"REACH HIGH CATWALK  >  ACTIVATE TERMINAL":
         (alive_count(g)?"TERMINAL ONLINE  >  CLEAR HOSTILES":"EXTRACT AT NORTH GATE");
     DrawRectangle(62,64,356,26,(Color){8,20,24,225});
     DrawText(objective,76,70,13,g->terminal?(Color){82,255,196,255}:(Color){255,210,92,255});
     DrawLine(230,214,250,214,(Color){255,225,126,255});
     DrawLine(240,204,240,224,(Color){255,225,126,255});
-    DrawTriangle((Vector2){208,480},(Vector2){232,356},(Vector2){248,356},
+    if(g->hit_flash){
+        DrawLine(226,200,234,208,(Color){255,88,68,255});
+        DrawLine(246,208,254,200,(Color){255,88,68,255});
+        DrawLine(226,228,234,220,(Color){255,88,68,255});
+        DrawLine(246,220,254,228,(Color){255,88,68,255});
+    }
+    float recoil=g->shot_flash?8.0f:0.0f;
+    DrawTriangle((Vector2){208,480},(Vector2){232,356+recoil},(Vector2){248,356+recoil},
                  (Color){43,50,50,255});
-    DrawTriangle((Vector2){272,480},(Vector2){248,356},(Vector2){232,356},
+    DrawTriangle((Vector2){272,480},(Vector2){248,356+recoil},(Vector2){232,356+recoil},
                  (Color){29,35,36,255});
-    DrawRectangle(235,338,10,70,(Color){91,104,101,255});
-    DrawRectangle(238,326,4,44,(Color){178,190,177,255});
-    DrawRectangle(218,405,44,12,(Color){18,24,25,255});
+    DrawRectangle(235,338+(int)recoil,10,70,(Color){91,104,101,255});
+    DrawRectangle(238,326+(int)recoil,4,44,(Color){178,190,177,255});
+    DrawRectangle(218,405+(int)recoil,44,12,(Color){18,24,25,255});
+    if(g->shot_flash)
+        DrawTriangle((Vector2){240,322+recoil},(Vector2){230,342+recoil},
+                     (Vector2){250,342+recoil},(Color){255,205,76,255});
     if(g->won){DrawRectangle(70,170,340,120,(Color){5,15,20,240});
         DrawText("VERTICAL ROUTE SECURED",98,205,24,(Color){82,255,196,255});
         DrawText("PRESS RESET TO REPLAY",132,246,16,(Color){230,236,220,255});}
@@ -469,7 +533,7 @@ static void render_game(vd_game_t *g)
 {
     s_cam_x=g->x;s_cam_y=g->camera_y;s_cam_z=g->z;
     s_sy=sinf(g->yaw);s_cy=cosf(g->yaw);s_sp=sinf(g->pitch);s_cp=cosf(g->pitch);
-    BeginDrawing();draw_sky();add_scene(g);sort_faces();
+    BeginDrawing();draw_sky(g);add_scene(g);sort_faces();
     for(int i=0;i<s_face_count;++i)draw_face(&s_faces[i]);
     /* Terminal lamp and extraction lamp remain readable at long range. */
     Vector2 p;float d;
@@ -477,6 +541,7 @@ static void render_game(vd_game_t *g)
         g->terminal?(Color){72,255,190,255}:(Color){255,190,56,255});
     if(g->terminal&&alive_count(g)==0&&world_to_screen(0,1.2f,18.1f,&p,&d))
         DrawCircle((int)p.x,(int)p.y,clampf(70/d,4,13),(Color){72,255,190,255});
+    draw_world_overlays(g);
     draw_hud(g);EndDrawing();
 }
 
