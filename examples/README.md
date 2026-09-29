@@ -10,6 +10,7 @@ Reference games for Raylib Lite Engine. Start with `python3 tools/game_cli.py cr
 | [living_worlds](living_worlds/README.md) | Panoramic scenes and volume meshes | ✓ | ✓ | ✓ |
 | [last_zone_extraction](last_zone_extraction/README.md) | DDA wall columns and campaign shooter | ✓ | ✓ | ✓ |
 | [tomb_raycast](tomb_raycast/README.md) | Portal rooms and INDEX8 textured planes | ✓ | ✓ | ✓ |
+| [vertical_dock](vertical_dock/README.md) | Stairs, connected elevations, cover, and painter-sorted solid geometry | ✓ | ✓ | — |
 | [neon_rift_rally](neon_rift_rally/README.md) | Deterministic panoramic racing | ✓ | ✓ | — |
 | [render_benchmark](render_benchmark/README.md) | Raster acceptance and optional display preview | Dedicated Host test | Dedicated device project | — |
 

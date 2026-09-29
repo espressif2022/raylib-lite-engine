@@ -25,7 +25,7 @@ python3 tools/game_cli.py sim examples/sky_hop
 
 - `components/`：通用游戏组件和 ESP-IDF 服务实现。
 - `cmake/`：ESP-IDF 组件接入与示例构建辅助文件。
-- `examples/`：七个参考游戏、专用渲染测试和原生示例共享代码。
+- `examples/`：八个参考游戏、专用渲染测试和原生示例共享代码。
 - `host/`：Host ABI、RGB565 浏览器预览与固定输入回放。
 - `tools/`：游戏 CLI、资源打包与性能分析工具。
 - `docs/`：中英文开发、构建和可复用设计指南。

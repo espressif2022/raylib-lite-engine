@@ -62,6 +62,7 @@ python3 tools/game_cli.py sim examples/sky_hop
 python3 tools/game_cli.py sim examples/living_worlds --headless --frames 300
 python3 tools/game_cli.py sim examples/last_zone_extraction --headless --frames 90
 python3 tools/game_cli.py sim examples/tomb_raycast --headless --frames 8
+python3 tools/game_cli.py sim examples/vertical_dock
 ```
 
 Standalone example firmware can be built from supported example directories;
@@ -78,7 +79,7 @@ is documented in Vibe. Host simulation needs neither.
 - `ports/esp_mosaico/`: ESP-Mosaico board platform and audio output on top of
   the BSP.
 - `cmake/`: ESP-IDF component registration for device firmware.
-- `examples/`: seven reference games, including Neon Rift Rally, plus a
+- `examples/`: eight reference games, including Vertical Dock, plus a
   dedicated render benchmark and shared native-example glue.
 - `host/`: native Host ABI, RGB565 renderer bridge and browser simulator.
 - `tools/`: game CLI, asset compiler, and performance analysis tools.
