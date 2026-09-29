@@ -36,6 +36,12 @@ class VerticalDockTests(unittest.TestCase):
         self.assertEqual(result["hits"], 1)
         self.assertEqual(result["faces_dropped"], 0)
 
+    def test_north_gate_has_a_passable_center(self) -> None:
+        result = run_scenario("north-gate.json", 249)
+        self.assertGreater(result["z"], 18.6)
+        self.assertLess(result["z"], 19.5)
+        self.assertEqual(result["faces_dropped"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -90,6 +90,10 @@ static bool solid_at(float x,float z)
     if(x>-2.2f&&x<-.2f&&z>5.1f&&z<7.4f)return true;
     if(x>.3f&&x<2.2f&&z>10.0f&&z<12.4f)return true;
     if(x>-4.8f&&x<-2.8f&&z>14.0f&&z<16.2f)return true;
+    /* Drawn objective geometry must also participate in movement collision. */
+    if(x>4.65f&&x<5.35f&&z>15.0f&&z<15.65f)return true;
+    if(((x>-1.9f&&x<-1.25f)||(x>1.25f&&x<1.9f))&&
+       z>18.2f&&z<18.55f)return true;
     /* The high deck side is climbable only through the stair footprint. */
     if(x>=2.6f&&x<=7.4f&&z>=6.2f&&z<=18.2f)return false;
     return false;
@@ -301,7 +305,10 @@ static void add_scene(const vd_game_t *g)
     add_box(-4.8f,14.0f,-2.8f,16.2f,0,1.35f,crate);
     /* Terminal and extraction gate communicate the high-route objective. */
     add_box(4.65f,15.0f,5.35f,15.65f,1.2f,2.15f,(Color){45,76,82,255});
-    add_box(-1.9f,18.2f,1.9f,18.55f,0,2.2f,(Color){54,76,80,255});
+    Color gate={54,76,80,255};
+    add_box(-1.9f,18.2f,-1.25f,18.55f,0,2.2f,gate);
+    add_box(1.25f,18.2f,1.9f,18.55f,0,2.2f,gate);
+    add_box(-1.9f,18.2f,1.9f,18.55f,1.72f,2.2f,gate);
     for(int i=0;i<VD_ENEMIES;++i)if(g->enemies[i].active)add_enemy_face(&g->enemies[i]);
 }
 
@@ -321,15 +328,15 @@ static bool inside_rect(float x,float z,float x0,float z0,float x1,float z1)
 
 static bool shot_clear(const vd_game_t *g,const vd_enemy_t *e)
 {
-    static const float blockers[5][5]={
+    static const float blockers[6][5]={
         {-2.2f,5.1f,-.2f,7.4f,1.25f},{.3f,10.0f,2.2f,12.4f,1.05f},
         {-4.8f,14.0f,-2.8f,16.2f,1.35f},{4.65f,15.0f,5.35f,15.65f,2.15f},
-        {-1.9f,18.2f,1.9f,18.55f,2.2f}};
+        {-1.9f,18.2f,-1.25f,18.55f,2.2f},{1.25f,18.2f,1.9f,18.55f,2.2f}};
     float eye=floor_at(g->x,g->z)+1.42f,target=e->y+.62f;
     for(int step=1;step<32;++step){
         float t=(float)step/32.0f,x=g->x+(e->x-g->x)*t,z=g->z+(e->z-g->z)*t;
         float y=eye+(target-eye)*t;
-        for(int i=0;i<5;++i)
+        for(int i=0;i<6;++i)
             if(y<blockers[i][4]&&inside_rect(x,z,blockers[i][0],blockers[i][1],
                                              blockers[i][2],blockers[i][3]))return false;
         if(y<1.2f&&inside_rect(x,z,2.6f,6.2f,7.4f,18.2f))return false;
@@ -364,7 +371,7 @@ static void update_game(vd_game_t *g)
     if(movement_ok(g->x,g->z,g->x,nz))g->z=nz;
     float floor=floor_at(g->x,g->z);
     g->camera_y+=(floor+1.55f-g->camera_y)*.22f;
-    if(g->terminal&&alive_count(g)==0&&g->z>18.0f&&fabsf(g->x)<2.0f)g->won=true;
+    if(g->terminal&&alive_count(g)==0&&g->z>18.6f&&fabsf(g->x)<1.2f)g->won=true;
     ++g->tick;
 }
 
@@ -375,8 +382,10 @@ static void draw_sky(void)
         DrawRectangle(0,y,VD_W,4,c);
     }
     DrawCircle(392,72,30,(Color){242,191,103,255});
-    DrawRectangle(0,194,VD_W,46,(Color){62,111,137,255});
-    for(int y=202;y<240;y+=8)DrawRectangle(0,y,VD_W,2,(Color){91,148,164,255});
+    /* Water continues behind the dock so the extraction arch never opens to black. */
+    DrawRectangle(0,194,VD_W,VD_H-194,(Color){42,78,96,255});
+    for(int y=202;y<VD_H;y+=8)
+        DrawRectangle(0,y,VD_W,2,(Color){70,124,143,255});
 }
 
 static void draw_hud(const vd_game_t *g)
