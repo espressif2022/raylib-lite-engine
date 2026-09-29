@@ -44,6 +44,7 @@ static void unload_volumes(living_worlds_atlases_t *atlases)
     unload_atlas(&atlases->ocean_right_front);
     unload_atlas(&atlases->ocean_right_side);
     unload_atlas(&atlases->ocean_right_rear);
+    unload_atlas(&atlases->rainforest_falls);
 }
 
 static int acquire_volumes(module_state_t *s,uint8_t scene)
@@ -67,6 +68,8 @@ static int acquire_volumes(module_state_t *s,uint8_t scene)
             load_atlas(&s->atlases.ocean_right_front,"ocean_reef_right_front.atlas")||
             load_atlas(&s->atlases.ocean_right_side,"ocean_reef_right_side.atlas")||
             load_atlas(&s->atlases.ocean_right_rear,"ocean_reef_right_rear.atlas");
+    }else if(scene==LIVING_SCENE_RAINFOREST){
+        err=load_atlas(&s->atlases.rainforest_falls,"rainforest_falls.atlas");
     }
     if(err){unload_volumes(&s->atlases);return -1;}
     s->loaded_volumes=scene;

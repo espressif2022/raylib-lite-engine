@@ -4,6 +4,7 @@ idf_component_register(
          "living_worlds_volume.c" "living_worlds_view.c"
     INCLUDE_DIRS "."
     REQUIRES mosaico_board_platform mosaico_game_app mosaico_game_assets
+             mosaico_game_audio
              mosaico_game_2d esp_driver_jpeg mosaico_raylib_fast
              mosaico_raylib_port raylib)
 
@@ -13,12 +14,18 @@ set(volume_atlases
     sunrise_cliff_front sunrise_cliff_side sunrise_cliff_rear
     aurora_ice_front aurora_ice_side aurora_ice_rear
     ocean_reef_left_front ocean_reef_left_side ocean_reef_left_rear
-    ocean_reef_right_front ocean_reef_right_side ocean_reef_right_rear)
+    ocean_reef_right_front ocean_reef_right_side ocean_reef_right_rear
+    rainforest_falls)
+set(scene_sounds
+    aurora_wind_ice ocean_ambience sunrise_wind rainforest_ambience)
 file(GLOB asset_inputs CONFIGURE_DEPENDS "${asset_source}/*.json" "${asset_source}/*.png"
-     "${asset_source}/*.jpg")
+     "${asset_source}/*.jpg" "${asset_source}/*.wav")
 set(asset_outputs)
 foreach(name IN LISTS volume_atlases)
     list(APPEND asset_outputs "${asset_output}/${name}.atlas")
+endforeach()
+foreach(name IN LISTS scene_sounds)
+    list(APPEND asset_outputs "${asset_output}/${name}.sound")
 endforeach()
 add_custom_command(
     OUTPUT ${asset_outputs}
@@ -31,6 +38,10 @@ add_dependencies(${COMPONENT_LIB} living_worlds_assets)
 foreach(name IN LISTS volume_atlases)
     target_add_binary_data(${COMPONENT_LIB} "${asset_output}/${name}.atlas" BINARY
         RENAME_TO ${name}_atlas DEPENDS living_worlds_assets)
+endforeach()
+foreach(name IN LISTS scene_sounds)
+    target_add_binary_data(${COMPONENT_LIB} "${asset_output}/${name}.sound" BINARY
+        RENAME_TO ${name}_sound DEPENDS living_worlds_assets)
 endforeach()
 foreach(name aurora ocean sunrise rainforest)
     target_add_binary_data(${COMPONENT_LIB} "${asset_source}/${name}.jpg" BINARY

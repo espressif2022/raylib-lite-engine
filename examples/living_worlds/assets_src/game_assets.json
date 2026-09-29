@@ -81,6 +81,17 @@
       "config": "rainforest.json",
       "source": "rainforest.jpg",
       "output": "rainforest.atlas"
+    },
+    {
+      "config": "rainforest_falls.json",
+      "source": "rainforest_falls.png",
+      "output": "rainforest_falls.atlas"
     }
+  ],
+  "sounds": [
+    {"source": "aurora_wind_ice.wav", "output": "aurora_wind_ice.sound"},
+    {"source": "ocean_ambience.wav", "output": "ocean_ambience.sound"},
+    {"source": "sunrise_wind.wav", "output": "sunrise_wind.sound"},
+    {"source": "rainforest_ambience.wav", "output": "rainforest_ambience.sound"}
   ]
 }

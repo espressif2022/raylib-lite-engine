@@ -1,0 +1,11 @@
+{
+  "image": "rainforest_falls.png",
+  "columns": 2,
+  "rows": 1,
+  "output_cell": 64,
+  "alpha_mode": "smooth",
+  "frames": [
+    {"name": "rainforest_falls_body", "pivot_x": 0, "pivot_y": 0},
+    {"name": "rainforest_falls_foam", "pivot_x": 0, "pivot_y": 0}
+  ]
+}

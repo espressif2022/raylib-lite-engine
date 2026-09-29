@@ -10,12 +10,20 @@
 #include "mosaico_board_platform.h"
 #include "mosaico_game_2d.h"
 #include "mosaico_game_assets.h"
+#include "mosaico_game_audio.h"
 #include "raylib_lite_game_app.h"
 #include "raylib_lite_native_hooks.h"
 #include "living_worlds_view.h"
 #include "living_worlds_world.h"
 
 static const char *TAG = "living_worlds";
+enum { SCENE_AUDIO_COUNT = LIVING_SCENE_RAINFOREST + 1 };
+static const char *const SCENE_AUDIO_PATHS[SCENE_AUDIO_COUNT] = {
+    [LIVING_SCENE_AURORA] = "aurora_wind_ice.sound",
+    [LIVING_SCENE_OCEAN] = "ocean_ambience.sound",
+    [LIVING_SCENE_SUNRISE] = "sunrise_wind.sound",
+    [LIVING_SCENE_RAINFOREST] = "rainforest_ambience.sound",
+};
 
 #define ATLAS_SYMBOLS(name) \
     extern const uint8_t _binary_##name##_atlas_start[]; \
@@ -32,6 +40,14 @@ ATLAS_SYMBOLS(ocean_reef_left_rear);
 ATLAS_SYMBOLS(ocean_reef_right_front);
 ATLAS_SYMBOLS(ocean_reef_right_side);
 ATLAS_SYMBOLS(ocean_reef_right_rear);
+ATLAS_SYMBOLS(rainforest_falls);
+#define SOUND_SYMBOLS(name) \
+    extern const uint8_t _binary_##name##_sound_start[]; \
+    extern const uint8_t _binary_##name##_sound_end[]
+SOUND_SYMBOLS(aurora_wind_ice);
+SOUND_SYMBOLS(ocean_ambience);
+SOUND_SYMBOLS(sunrise_wind);
+SOUND_SYMBOLS(rainforest_ambience);
 extern const uint8_t _binary_ocean_jpg_start[], _binary_ocean_jpg_end[];
 extern const uint8_t _binary_aurora_jpg_start[], _binary_aurora_jpg_end[];
 extern const uint8_t _binary_sunrise_jpg_start[], _binary_sunrise_jpg_end[];
@@ -44,10 +60,13 @@ typedef struct {
     jpeg_decoder_handle_t jpeg;
     void *background_pixels;
     uint8_t loaded_volumes;
+    Music scene_audio[SCENE_AUDIO_COUNT];
+    uint8_t playing_scene;
+    bool audio_load_attempted;
     bool paused;
 } living_worlds_native_t;
 
-static esp_err_t register_atlas(const char *name, const uint8_t *start,
+static esp_err_t register_asset(const char *name, const uint8_t *start,
                                 const uint8_t *end)
 {
     return mosaico_game_asset_register_memory(name, start,
@@ -58,7 +77,7 @@ static esp_err_t register_assets(void)
 {
 #define REGISTER(name, symbol) \
     do { \
-        esp_err_t err = register_atlas(name, _binary_##symbol##_atlas_start, \
+        esp_err_t err = register_asset(name, _binary_##symbol##_atlas_start, \
                                        _binary_##symbol##_atlas_end); \
         if (err != ESP_OK) return err; \
     } while (0)
@@ -74,7 +93,19 @@ static esp_err_t register_assets(void)
     REGISTER("ocean_reef_right_front.atlas", ocean_reef_right_front);
     REGISTER("ocean_reef_right_side.atlas", ocean_reef_right_side);
     REGISTER("ocean_reef_right_rear.atlas", ocean_reef_right_rear);
+    REGISTER("rainforest_falls.atlas", rainforest_falls);
 #undef REGISTER
+#define REGISTER_SOUND(name) \
+    do { \
+        esp_err_t err = register_asset(#name ".sound", \
+            _binary_##name##_sound_start, _binary_##name##_sound_end); \
+        if (err != ESP_OK) return err; \
+    } while (0)
+    REGISTER_SOUND(aurora_wind_ice);
+    REGISTER_SOUND(ocean_ambience);
+    REGISTER_SOUND(sunrise_wind);
+    REGISTER_SOUND(rainforest_ambience);
+#undef REGISTER_SOUND
     return ESP_OK;
 }
 
@@ -204,6 +235,7 @@ static void unload_volumes(living_worlds_atlases_t *atlases)
     unload_atlas(&atlases->ocean_right_front);
     unload_atlas(&atlases->ocean_right_side);
     unload_atlas(&atlases->ocean_right_rear);
+    unload_atlas(&atlases->rainforest_falls);
 }
 
 static bool atlas_ready(MosaicoAtlas atlas)
@@ -244,6 +276,9 @@ static esp_err_t load_volumes(living_worlds_native_t *state, uint8_t scene)
             !atlas_ready(state->atlases.ocean_right_front) ||
             !atlas_ready(state->atlases.ocean_right_side) ||
             !atlas_ready(state->atlases.ocean_right_rear)) err = ESP_ERR_NOT_FOUND;
+    } else if (scene == LIVING_SCENE_RAINFOREST) {
+        state->atlases.rainforest_falls = LoadMosaicoAtlas("rainforest_falls.atlas");
+        if (!atlas_ready(state->atlases.rainforest_falls)) err = ESP_ERR_NOT_FOUND;
     }
     if (err != ESP_OK) {
         unload_volumes(&state->atlases);
@@ -251,6 +286,19 @@ static esp_err_t load_volumes(living_worlds_native_t *state, uint8_t scene)
     }
     state->loaded_volumes = scene;
     return ESP_OK;
+}
+
+static void play_scene_audio(living_worlds_native_t *state, uint8_t scene)
+{
+    if (state->playing_scene == scene) return;
+    if (state->playing_scene < SCENE_AUDIO_COUNT)
+        MosaicoAudioStopMusic(state->scene_audio[state->playing_scene]);
+    state->playing_scene = UINT8_MAX;
+    if (scene >= SCENE_AUDIO_COUNT || !state->scene_audio[scene].frameCount)
+        return;
+    MosaicoAudioSetMusicVolume(state->scene_audio[scene], 0.65f);
+    MosaicoAudioPlayMusic(state->scene_audio[scene]);
+    state->playing_scene = scene;
 }
 
 static raylib_lite_result_t app_start(void *user)
@@ -270,6 +318,7 @@ static raylib_lite_result_t app_start(void *user)
     if (err != ESP_OK) goto fail;
     err = load_volumes(state, state->world.scene);
     if (err != ESP_OK) goto fail;
+    MosaicoAudioInit();
     return RAYLIB_LITE_OK;
 
 fail:
@@ -302,7 +351,9 @@ static void app_event(void *user, const raylib_lite_input_event_t *event)
         state->world.scene = previous;
         (void)load_background(state, previous);
         (void)load_volumes(state, previous);
+        return;
     }
+    play_scene_audio(state, state->world.scene);
 }
 
 static bool app_idle(void *user)
@@ -314,6 +365,17 @@ static void app_update(void *user)
 {
     living_worlds_native_t *state = user;
     if (!state->paused) living_world_update(&state->world);
+    if (!state->audio_load_attempted && MosaicoAudioReady()) {
+        state->audio_load_attempted = true;
+        for (unsigned i = 0; i < SCENE_AUDIO_COUNT; ++i) {
+            state->scene_audio[i] = MosaicoAudioLoadMusic(SCENE_AUDIO_PATHS[i]);
+            if (!state->scene_audio[i].frameCount)
+                ESP_LOGW(TAG, "failed to load %s", SCENE_AUDIO_PATHS[i]);
+        }
+        play_scene_audio(state, state->world.scene);
+    }
+    if (state->playing_scene < SCENE_AUDIO_COUNT)
+        MosaicoAudioUpdateMusic(state->scene_audio[state->playing_scene]);
 }
 
 static void app_render(void *user)
@@ -350,6 +412,14 @@ static void app_stats(void *user)
 static void app_stop(void *user)
 {
     living_worlds_native_t *state = user;
+    play_scene_audio(state, UINT8_MAX);
+    for (unsigned i = 0; i < SCENE_AUDIO_COUNT; ++i) {
+        if (state->scene_audio[i].frameCount) {
+            MosaicoAudioUnloadMusic(state->scene_audio[i]);
+            state->scene_audio[i] = (Music){0};
+        }
+    }
+    MosaicoAudioClose();
     unload_volumes(&state->atlases);
     if (state->atlases.aurora.texture.id)
         Mosaico2DUnloadTexture(state->atlases.aurora.texture);
@@ -370,7 +440,10 @@ esp_err_t living_worlds_native_run(mosaico_board_platform_t *board)
         mosaico_board_platform_services(board);
     if (!services) return ESP_ERR_INVALID_STATE;
 
-    living_worlds_native_t state = {.board = board, .loaded_volumes = UINT8_MAX};
+    living_worlds_native_t state = {
+        .board = board, .loaded_volumes = UINT8_MAX,
+        .playing_scene = UINT8_MAX,
+    };
     const raylib_lite_game_app_t app = {
         .tag = "living_worlds",
         .window_title = "Living Worlds",

@@ -515,27 +515,37 @@ static rainforest_flow_point_t rainforest_flow_sample_ribbon(
     };
 }
 
+static float rainforest_hash01(uint32_t value)
+{
+    value^=value>>16;value*=0x7feb352dU;value^=value>>15;
+    value*=0x846ca68bU;value^=value>>16;
+    return (float)(value&0xffffU)*(1.0f/65536.0f);
+}
+
+static float rainforest_fract(float value)
+{
+    return value-floorf(value);
+}
+
+/* Destination stays on the traced ribbon. The photo is sampled a little
+   upstream of it, and that offset grows every tick, so the photographed water
+   itself travels downstream. The bank and both ends keep offset zero, which
+   pins rocks and plants to the panorama. */
 static mosaico_textured_vertex_t rainforest_flow_vertex(
     const living_world_t *world,MosaicoAtlas rainforest,
     const rainforest_flow_slice_t *slices,int count,float progress,float lane,
-    float phase,float inset,float speed_scale)
+    float inset,float drift,float wobble)
 {
     float actual_lane=inset+lane*(1.0f-inset*2.0f);
     rainforest_flow_point_t destination=rainforest_flow_sample_ribbon(
         slices,count,progress,actual_lane);
-    /* Two forward-travelling waves deform the photographed water itself.
-       Their unequal wavelength and velocity prevent a synchronized push/pull.
-       Fade deformation at the traced bank so rocks and plants stay locked. */
-    float bank=4.0f*fminf(lane,1.0f-lane);
-    float end=5.0f*fminf(progress,1.0f-progress);
+    float bank=3.0f*fminf(lane,1.0f-lane);
+    float end=4.0f*fminf(progress,1.0f-progress);
     float envelope=fminf(1.0f,fminf(bank,end));
-    float time=(float)world->tick*speed_scale;
-    float flow=progress+phase;
-    float longitudinal=(sinf(flow*31.0f-time*.105f)*.0080f+
-                        sinf(flow*53.0f-time*.071f)*.0035f)*envelope;
-    float lateral=(sinf(flow*39.0f-time*.083f+lane*5.0f)*.0070f)*envelope;
+    float time=(float)world->tick;
+    float lateral=sinf(progress*27.0f-time*.091f+lane*4.0f)*wobble*envelope;
     rainforest_flow_point_t source=rainforest_flow_sample_ribbon(slices,count,
-        fminf(.9999f,fmaxf(0.0f,progress+longitudinal)),
+        fminf(.9999f,fmaxf(0.0f,progress-drift*envelope)),
         fminf(.9999f,fmaxf(0.0f,actual_lane+lateral)));
     Vector2 p=rainforest_flow_project(world,rainforest,
         (Vector2){destination.longitude,destination.source_v});
@@ -547,36 +557,208 @@ static mosaico_textured_vertex_t rainforest_flow_vertex(
     };
 }
 
+typedef struct {
+    float phase;    /* desynchronizes ribbons */
+    float inset;    /* lane margin kept on the photographed bank */
+    float rate;     /* sawtooth cycles per tick */
+    float reach;    /* upstream sampling distance, in ribbon progress */
+    float wobble;   /* cross-stream sampling sway */
+    float crest;    /* 0 = calm pool, 1 = rapids */
+} rainforest_flow_style_t;
+
+/* Falling water comes from its own tile, not the photo: the photographed
+   falls are only 6-15 texels wide and scrolling them jumps whole texels.
+   The tile repeats every RF_FALLS_PERIOD rows starting at RF_FALLS_TOP (the
+   packer keeps a transparent border around each cell). V scrolls without
+   ever resetting; out-of-range UVs are mirror-folded rather than repeated,
+   so every quad is cut where it crosses a tile seam. */
+#define RF_FALLS_TOP 2.0f
+#define RF_FALLS_PERIOD 60.0f
+
+typedef struct {
+    float u0;       /* first texel column of the frame */
+    float span;     /* tile rows over the whole ribbon */
+    float speed;    /* tile rows per tick */
+    float offset;   /* desynchronizes layers */
+} rainforest_falls_layer_t;
+
+static mosaico_textured_vertex_t rainforest_falls_vertex(
+    const living_world_t *world,MosaicoAtlas rainforest,
+    const rainforest_flow_slice_t *slices,int count,float progress,float lane,
+    float u0,float v)
+{
+    rainforest_flow_point_t point=rainforest_flow_sample_ribbon(
+        slices,count,progress,lane);
+    Vector2 p=rainforest_flow_project(world,rainforest,
+        (Vector2){point.longitude,point.source_v});
+    return (mosaico_textured_vertex_t){
+        p.x,p.y,u0+lane*RF_FALLS_PERIOD,RF_FALLS_TOP+v,0.f
+    };
+}
+
+static void draw_rainforest_falls_layer(const living_world_t *world,
+                                        MosaicoAtlas rainforest,
+                                        MosaicoAtlas falls,
+                                        const rainforest_flow_slice_t *slices,
+                                        int count,
+                                        const rainforest_falls_layer_t *layer)
+{
+    int along=effect_count(world,6,9,12);
+    int across=effect_count(world,2,3,4);
+    float scroll=(float)world->tick*layer->speed-layer->offset;
+    for(int iy=0;iy<along;++iy){
+        float p0=(float)iy/(float)along;
+        float p1=(float)(iy+1)/(float)along;
+        float v0=p0*layer->span-scroll;
+        float v1=p1*layer->span-scroll;
+        float tile=floorf(v0/RF_FALLS_PERIOD);
+        float base=tile*RF_FALLS_PERIOD;
+        float seam=base+RF_FALLS_PERIOD;
+        float cut=v1>seam?p0+(p1-p0)*(seam-v0)/(v1-v0):p1;
+        for(int ix=0;ix<across;++ix){
+            float l0=(float)ix/(float)across;
+            float l1=(float)(ix+1)/(float)across;
+            mosaico_textured_vertex_t a=rainforest_falls_vertex(world,rainforest,
+                slices,count,p0,l0,layer->u0,v0-base);
+            mosaico_textured_vertex_t b=rainforest_falls_vertex(world,rainforest,
+                slices,count,p0,l1,layer->u0,v0-base);
+            if((!rainforest_on_screen((Vector2){a.x,a.y})&&
+                !rainforest_on_screen((Vector2){b.x,b.y}))||
+               fabsf(b.x-a.x)>120.0f)continue;
+            mosaico_textured_vertex_t c=rainforest_falls_vertex(world,rainforest,
+                slices,count,cut,l0,layer->u0,
+                cut<p1?RF_FALLS_PERIOD:v1-base);
+            mosaico_textured_vertex_t d=rainforest_falls_vertex(world,rainforest,
+                slices,count,cut,l1,layer->u0,
+                cut<p1?RF_FALLS_PERIOD:v1-base);
+            Mosaico2DDrawTexturedQuad(falls.texture,a,b,c,d,256U);
+            if(cut<p1){
+                mosaico_textured_vertex_t e=rainforest_falls_vertex(world,rainforest,
+                    slices,count,cut,l0,layer->u0,0.0f);
+                mosaico_textured_vertex_t f=rainforest_falls_vertex(world,rainforest,
+                    slices,count,cut,l1,layer->u0,0.0f);
+                mosaico_textured_vertex_t g=rainforest_falls_vertex(world,rainforest,
+                    slices,count,p1,l0,layer->u0,v1-seam);
+                mosaico_textured_vertex_t h=rainforest_falls_vertex(world,rainforest,
+                    slices,count,p1,l1,layer->u0,v1-seam);
+                Mosaico2DDrawTexturedQuad(falls.texture,e,f,g,h,256U);
+            }
+        }
+    }
+}
+
+static void draw_rainforest_falls(const living_world_t *world,
+                                  MosaicoAtlas rainforest,MosaicoAtlas falls)
+{
+    if(!falls.texture.id||falls.texture.height<=0)return;
+    /* Wider than the photographed sheet; the tile's alpha fades out over
+       the spray on either side instead of ending at a hard edge. */
+    static const rainforest_flow_slice_t sheet[]={
+        {{267.0f,.318f},{269.9f,.318f}},
+        {{266.5f,.358f},{270.7f,.358f}},
+        {{265.8f,.400f},{271.5f,.400f}},
+        {{265.1f,.436f},{272.2f,.436f}},
+        {{265.3f,.466f},{272.0f,.466f}}
+    };
+    static const rainforest_falls_layer_t body={2.0f,84.0f,1.7f,0.0f};
+    static const rainforest_falls_layer_t foam={66.0f,110.0f,2.9f,23.0f};
+    int count=(int)(sizeof(sheet)/sizeof(sheet[0]));
+    draw_rainforest_falls_layer(world,rainforest,falls,sheet,count,&body);
+    draw_rainforest_falls_layer(world,rainforest,falls,sheet,count,&foam);
+}
+
+/* Each quad runs its own staggered sawtooth. A shared phase would make the
+   whole stream snap back at once; scattered short resets read as wavelets. */
 static void draw_rainforest_flow_mesh(const living_world_t *world,
                                       MosaicoAtlas rainforest,
                                       const rainforest_flow_slice_t *slices,
-                                      int count,float phase,float inset,
-                                      float speed_scale)
+                                      int count,const rainforest_flow_style_t *style)
 {
     int along=(count-1)*effect_count(world,3,4,5);
     int across=effect_count(world,2,3,4);
+    float time=(float)world->tick;
     for(int iy=0;iy<along;++iy){
         float p0=(float)iy/(float)along;
         float p1=(float)(iy+1)/(float)along;
         for(int ix=0;ix<across;++ix){
             float l0=(float)ix/(float)across;
             float l1=(float)(ix+1)/(float)across;
-            mosaico_textured_vertex_t a=rainforest_flow_vertex(
-                world,rainforest,slices,count,p0,l0,phase,inset,speed_scale);
-            mosaico_textured_vertex_t b=rainforest_flow_vertex(
-                world,rainforest,slices,count,p0,l1,phase,inset,speed_scale);
-            mosaico_textured_vertex_t c=rainforest_flow_vertex(
-                world,rainforest,slices,count,p1,l0,phase,inset,speed_scale);
-            mosaico_textured_vertex_t d=rainforest_flow_vertex(
-                world,rainforest,slices,count,p1,l1,phase,inset,speed_scale);
+            float seed=rainforest_hash01((uint32_t)(iy*131+ix*977)+
+                                         (uint32_t)(style->phase*4096.0f));
+            float cycle=rainforest_fract(time*style->rate+seed);
+            float drift=cycle*style->reach;
+            mosaico_textured_vertex_t a=rainforest_flow_vertex(world,rainforest,
+                slices,count,p0,l0,style->inset,drift,style->wobble);
+            mosaico_textured_vertex_t b=rainforest_flow_vertex(world,rainforest,
+                slices,count,p0,l1,style->inset,drift,style->wobble);
+            mosaico_textured_vertex_t c=rainforest_flow_vertex(world,rainforest,
+                slices,count,p1,l0,style->inset,drift,style->wobble);
+            mosaico_textured_vertex_t d=rainforest_flow_vertex(world,rainforest,
+                slices,count,p1,l1,style->inset,drift,style->wobble);
             float min_x=fminf(fminf(a.x,b.x),fminf(c.x,d.x));
             float max_x=fmaxf(fmaxf(a.x,b.x),fmaxf(c.x,d.x));
             float min_y=fminf(fminf(a.y,b.y),fminf(c.y,d.y));
             float max_y=fmaxf(fmaxf(a.y,b.y),fmaxf(c.y,d.y));
             if(max_x<0.0f||min_x>=480.0f||max_y<0.0f||min_y>=420.0f||
                max_x-min_x>120.0f)continue;
-            Mosaico2DDrawTexturedQuad(rainforest.texture,a,b,c,d,256U);
+            /* Travelling troughs darken a little; crests keep full photo
+               brightness so the shaded path runs on a minority of quads. */
+            float wave=sinf((p0+style->phase)*23.0f-time*style->rate*6.2831853f*1.7f);
+            unsigned light=wave<-.35f?(unsigned)(256.0f-26.0f*style->crest-10.0f):256U;
+            Mosaico2DDrawTexturedQuad(rainforest.texture,a,b,c,d,light);
         }
+    }
+}
+
+/* Short bright sparkles riding the current. Colour is taken from the lit
+   water in the photo so they sit in it instead of on top of it. */
+static void draw_rainforest_glints(const living_world_t *world,
+                                   MosaicoAtlas rainforest,
+                                   const rainforest_flow_slice_t *slices,int count,
+                                   const rainforest_flow_style_t *style,int glints,
+                                   float length,unsigned char peak)
+{
+    float time=(float)world->tick;
+    for(int i=0;i<glints;++i){
+        float seed=rainforest_hash01((uint32_t)i*2654435761U+
+                                     (uint32_t)(style->phase*8192.0f));
+        float lane=.18f+.64f*rainforest_hash01((uint32_t)i*40503U+7U);
+        float speed=style->rate*style->reach*(.75f+.5f*seed);
+        float progress=rainforest_fract(seed+time*speed);
+        float life=sinf(progress*3.14159265f);
+        float twinkle=.55f+.45f*sinf(time*.37f+seed*40.0f);
+        unsigned char alpha=(unsigned char)((float)peak*life*twinkle);
+        if(alpha<24)continue;
+        float actual_lane=style->inset+lane*(1.0f-style->inset*2.0f);
+        rainforest_flow_point_t head=rainforest_flow_sample_ribbon(
+            slices,count,progress,actual_lane);
+        rainforest_flow_point_t tail=rainforest_flow_sample_ribbon(
+            slices,count,fmaxf(0.0f,progress-length),actual_lane);
+        Vector2 h=rainforest_flow_project(world,rainforest,
+            (Vector2){head.longitude,head.source_v});
+        Vector2 t=rainforest_flow_project(world,rainforest,
+            (Vector2){tail.longitude,tail.source_v});
+        if(!rainforest_on_screen(h)||fabsf(h.x-t.x)>60.0f)continue;
+        DrawLine((int)t.x,(int)t.y,(int)h.x,(int)h.y,(Color){238,246,242,alpha});
+    }
+}
+
+/* Mist rolling off the plunge pool. */
+static void draw_rainforest_falls_mist(const living_world_t *world,
+                                       MosaicoAtlas rainforest)
+{
+    Vector2 base=rainforest_flow_project(world,rainforest,(Vector2){268.6f,.462f});
+    if(!rainforest_on_screen(base))return;
+    float time=(float)world->tick;
+    int puffs=effect_count(world,3,5,7);
+    for(int i=0;i<puffs;++i){
+        float cycle=rainforest_fract(time*.012f+(float)i/(float)puffs);
+        float x=base.x+sinf((float)i*2.4f+time*.02f)*6.0f+(cycle-.5f)*10.0f;
+        float y=base.y-cycle*16.0f;
+        float radius=3.0f+cycle*9.0f;
+        unsigned char alpha=(unsigned char)(70.0f*(1.0f-cycle));
+        if(alpha<10)continue;
+        DrawCircle((int)x,(int)y,radius,(Color){226,236,232,alpha});
     }
 }
 
@@ -611,25 +793,26 @@ static void draw_rainforest_texture_flow(const living_world_t *world,
         {{4.0f,.750f},{4.0f,.820f}},
         {{8.0f,.755f},{8.0f,.790f}}
     };
-    static const rainforest_flow_slice_t waterfall[]={
-        {{264.0f,.308f},{270.0f,.308f}},
-        {{265.0f,.356f},{272.0f,.356f}},
-        {{266.0f,.407f},{274.0f,.407f}},
-        {{267.0f,.458f},{276.0f,.458f}},
-        {{268.0f,.500f},{277.0f,.500f}}
-    };
-    draw_rainforest_flow_mesh(world,rainforest,pool,
-        (int)(sizeof(pool)/sizeof(pool[0])),0.0f,.28f,1.30f);
-    draw_rainforest_flow_mesh(world,rainforest,left_stream,
-        (int)(sizeof(left_stream)/sizeof(left_stream[0])),1.3f,.16f,1.45f);
-    draw_rainforest_flow_mesh(world,rainforest,right_stream,
-        (int)(sizeof(right_stream)/sizeof(right_stream[0])),2.0f,.16f,1.45f);
-    draw_rainforest_flow_mesh(world,rainforest,lower_stream_a,
-        (int)(sizeof(lower_stream_a)/sizeof(lower_stream_a[0])),3.0f,.08f,1.20f);
-    draw_rainforest_flow_mesh(world,rainforest,lower_stream_b,
-        (int)(sizeof(lower_stream_b)/sizeof(lower_stream_b[0])),4.0f,.08f,1.20f);
-    draw_rainforest_flow_mesh(world,rainforest,waterfall,
-        (int)(sizeof(waterfall)/sizeof(waterfall[0])),5.2f,.08f,3.20f);
+    static const rainforest_flow_style_t pool_style={0.0f,.20f,.010f,.05f,.010f,.3f};
+    static const rainforest_flow_style_t stream_style={1.3f,.12f,.030f,.16f,.020f,1.0f};
+    static const rainforest_flow_style_t stream_b_style={2.0f,.12f,.034f,.16f,.020f,1.0f};
+    static const rainforest_flow_style_t lower_style={3.0f,.08f,.026f,.14f,.016f,.8f};
+    static const rainforest_flow_style_t lower_b_style={4.0f,.08f,.026f,.14f,.016f,.8f};
+#define RF_COUNT(slices) ((int)(sizeof(slices)/sizeof((slices)[0])))
+    draw_rainforest_flow_mesh(world,rainforest,pool,RF_COUNT(pool),&pool_style);
+    draw_rainforest_flow_mesh(world,rainforest,left_stream,RF_COUNT(left_stream),&stream_style);
+    draw_rainforest_flow_mesh(world,rainforest,right_stream,RF_COUNT(right_stream),&stream_b_style);
+    draw_rainforest_flow_mesh(world,rainforest,lower_stream_a,RF_COUNT(lower_stream_a),&lower_style);
+    draw_rainforest_flow_mesh(world,rainforest,lower_stream_b,RF_COUNT(lower_stream_b),&lower_b_style);
+
+    int glints=effect_count(world,3,6,9);
+    draw_rainforest_glints(world,rainforest,pool,RF_COUNT(pool),&pool_style,glints,.03f,120);
+    draw_rainforest_glints(world,rainforest,left_stream,RF_COUNT(left_stream),&stream_style,glints,.07f,190);
+    draw_rainforest_glints(world,rainforest,right_stream,RF_COUNT(right_stream),&stream_b_style,glints,.07f,190);
+    draw_rainforest_glints(world,rainforest,lower_stream_a,RF_COUNT(lower_stream_a),&lower_style,glints,.08f,170);
+    draw_rainforest_glints(world,rainforest,lower_stream_b,RF_COUNT(lower_stream_b),&lower_b_style,glints/2+1,.08f,170);
+#undef RF_COUNT
+    draw_rainforest_falls_mist(world,rainforest);
 }
 
 /* One entry, then ripples. A polyline across the still pool reads as a worm. */
@@ -669,14 +852,15 @@ static void draw_rainforest_entry(const living_world_t *world,
 }
 
 static void draw_rainforest_water(const living_world_t *world,
-                                  MosaicoAtlas rainforest)
+                                  MosaicoAtlas rainforest,MosaicoAtlas falls)
 {
     if(!rainforest.texture.id||rainforest.texture.height<=0)return;
+    draw_rainforest_falls(world,rainforest,falls);
     draw_rainforest_texture_flow(world,rainforest);
     static const rainforest_flow_point_t entries[]={
         {174.0f,.676f},
         {322.2f,.703f},
-        {265.5f,.456f}
+        {268.6f,.460f}
     };
     static const float scales[]={1.0f,.82f,.40f};
     static const unsigned offsets[]={0U,19U,31U};
@@ -774,9 +958,9 @@ static void draw_rainforest_rain(const living_world_t *world,
 }
 
 static void draw_rainforest_fx(const living_world_t *world,
-                               MosaicoAtlas rainforest)
+                               MosaicoAtlas rainforest,MosaicoAtlas falls)
 {
-    draw_rainforest_water(world,rainforest);
+    draw_rainforest_water(world,rainforest,falls);
     /* Morpho butterflies stay sparse and move in world longitude. */
     static const float base_lon[]={42.0f,167.0f,284.0f};
     static const float base_y[]={176.0f,292.0f,116.0f};
@@ -1059,7 +1243,7 @@ void living_worlds_view_render(const living_world_t *world,
         draw_sunrise_fx(world);
     }else if(world->scene==LIVING_SCENE_RAINFOREST){
         draw_panorama(world,atlases->rainforest);
-        draw_rainforest_fx(world,atlases->rainforest);
+        draw_rainforest_fx(world,atlases->rainforest,atlases->rainforest_falls);
     }else{
         living_ocean_draw(&world->ocean,world->yaw,world->pitch,world->effects_level,
             atlases->ocean,atlases->ocean_left_front,atlases->ocean_left_side,

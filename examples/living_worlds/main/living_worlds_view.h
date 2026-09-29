@@ -4,7 +4,7 @@
 #include "living_worlds_world.h"
 
 typedef struct {
-    MosaicoAtlas aurora,sunrise,ocean,rainforest;
+    MosaicoAtlas aurora,sunrise,ocean,rainforest,rainforest_falls;
     MosaicoAtlas sunrise_cliff_front,sunrise_cliff_side,sunrise_cliff_rear;
     MosaicoAtlas aurora_ice_front,aurora_ice_side,aurora_ice_rear;
     MosaicoAtlas ocean_left_front,ocean_left_side,ocean_left_rear;
