@@ -9,7 +9,7 @@ static const char s_maps[LAST_ZONE_LAYOUTS][LAST_ZONE_HEIGHT][LAST_ZONE_WIDTH + 
     "111111111111111111111111",
     "100000010000000000000001",
     "100000020000000000000001",
-    "100000020000000000000001",
+    "100006020000000000000001",
     "100000010000100000000001",
     "100030010000100000000001",
     "100000010000100000000001",
@@ -168,7 +168,10 @@ static bool line_clear(const last_zone_game_t *game,float x0,float y0,float x1,f
     if(distance<.01f)return true;
     int steps=(int)(distance/.14f);
     for(int i=1;i<steps;++i)
-        if(last_zone_blocks(game,(int)(x0+dx*(float)i/steps),(int)(y0+dy*(float)i/steps)))
+        if(last_zone_cell(game,(int)(x0+dx*(float)i/steps),
+                          (int)(y0+dy*(float)i/steps))!=6&&
+           last_zone_blocks(game,(int)(x0+dx*(float)i/steps),
+                            (int)(y0+dy*(float)i/steps)))
             return false;
     return true;
 }
@@ -320,6 +323,11 @@ bool last_zone_blocks(const last_zone_game_t *game,int x,int y)
     if(cell==0||cell==5)return false;
     if(cell==4)return !game||!game->door_open[y][x];
     return true;
+}
+
+float last_zone_cover_height(const last_zone_game_t *game,int x,int y)
+{
+    return last_zone_cell(game,x,y)==6?LAST_ZONE_COVER_HEIGHT:0.0f;
 }
 
 bool last_zone_door_ahead(const last_zone_game_t *game)
