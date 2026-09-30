@@ -1252,44 +1252,64 @@ static bool nearby(const sl_game_t *g,int x,int z,float radius)
     return dx*dx+dz*dz<radius*radius;
 }
 
+static unsigned interaction_target(const sl_game_t *g)
+{
+    if(g->journal||g->briefing||g->escaped||g->failed||g->paused||g->action)return 0;
+    if(nearby(g,7,1,1.1f)&&!g->fuse&&!g->power)return 1;
+    if(nearby(g,12,4,1.55f))return g->power?8:2;
+    if(nearby(g,8,6,1.1f)&&!g->pumping)return 3;
+    if(nearby(g,4,4,1.55f)&&!g->chart)return 7;
+    if(nearby(g,2,8,1.55f)&&!g->west)return 4;
+    if(nearby(g,14,8,1.55f)&&!g->east)return 5;
+    if(nearby(g,5,11,1.1f)&&!(g->logs&1))return 9;
+    if(nearby(g,11,11,1.1f)&&!(g->logs&2))return 10;
+    if(nearby(g,11,11,1.1f)&&!g->salvaged)return 13;
+    if(has_tool(g,SL_WRENCH)&&nearby(g,6,8,1.1f)&&!g->hatch_w&&!g->west)return 11;
+    if(has_tool(g,SL_WRENCH)&&nearby(g,10,8,1.1f)&&!g->hatch_e&&!g->east)return 12;
+    if(g->mission==SL_RECOVERY&&nearby(g,8,14,1.55f)&&!g->record)return 6;
+    return 0;
+}
+static unsigned interaction_block(const sl_game_t *g,unsigned action)
+{
+    if(!action)return 0;
+    if(action==2&&!g->fuse)return 9;
+    if(action==3&&!g->power&&!g->battery_charge)return 10;
+    if(action==6&&(!g->west||!g->east||g->water>.02f))return 4;
+    if(action==13&&g->lure_charge)return 21;
+    sl_vec3_t center=work_center(action);float heading=work_heading(action),stand=work_distance(action);
+    float dx=center.x-sinf(heading)*stand-g->x,dz=center.z-cosf(heading)*stand-g->z;
+    if(dx*dx+dz*dz>.65f*.65f)return 15;
+    for(int sample=1;sample<=5;++sample)
+        if(!movement_ok(g,g->x+dx*sample/5,g->z+dz*sample/5))return 15;
+    return 0;
+}
+static const char *interaction_prompt(const sl_game_t *g,unsigned action,unsigned blocked)
+{
+    static const char *const prompts[]={NULL,"F  PICK UP SPARE FUSE","F  INSTALL FUSE",
+        "F  PULL PUMP STARTER","F  OPEN WEST VALVE","F  OPEN EAST VALVE","F  TAKE THE RECORDER",
+        "F  READ SERVICE CHART","F  ENABLE BACKUP RELAY","F  READ WEST SERVICE LOG",
+        "F  READ EAST SERVICE LOG","F  WRENCH: OPEN WEST HATCH","F  WRENCH: OPEN EAST HATCH","F  SALVAGE SPARE DECOY"};
+    if(blocked==15)return "STEP CLOSER TO THE DEVICE";
+    if(blocked==9)return "FUSE MISSING - CHECK ENTRY BENCH";
+    if(blocked==10)return "PUMP NEEDS POWER OR A BATTERY";
+    if(blocked==21)return "SPARE DECOY - YOUR POUCH IS FULL";
+    if(blocked==4)return g->water>.02f?"DRAIN THE CENTRAL WELL":"TWO VALVES REQUIRED";
+    if(action==8&&g->relay)return "F  DISCONNECT BACKUP RELAY";
+    if(action==3&&!g->power)return "F  USE BATTERY TO START PUMP";
+    return prompts[action];
+}
 static void interact(sl_game_t *g)
 {
     if(g->journal||g->briefing||g->escaped||g->failed||g->paused||g->action)return;
-    uint8_t action=0;
-    if(nearby(g,7,1,1.1f)&&!g->fuse&&!g->power){action=1;}
-    else if(nearby(g,12,4,1.55f)){
-        if(!g->power&&!g->fuse){g->signal=9;g->signal_until=g->tick+100;cue(g,SL_CLICK);return;}
-        action=g->power?8:2;
-    }else if(nearby(g,8,6,1.1f)&&!g->pumping){
-        if(!g->power&&!g->battery_charge){g->signal=10;g->signal_until=g->tick+100;return;}
-        action=3;
-    }else if(nearby(g,4,4,1.55f)&&!g->chart){action=7;}
-    else if(nearby(g,2,8,1.55f)&&!g->west){action=4;}
-    else if(nearby(g,14,8,1.55f)&&!g->east){action=5;}
-    else if(nearby(g,5,11,1.1f)&&!(g->logs&1)){action=9;}
-    else if(nearby(g,11,11,1.1f)&&!(g->logs&2)){action=10;}
-    else if(nearby(g,11,11,1.1f)&&!g->salvaged){
-        if(g->lure_charge){g->signal=21;g->signal_until=g->tick+120;return;}
-        action=13;
-    }
-    else if(has_tool(g,SL_WRENCH)&&nearby(g,6,8,1.1f)&&!g->hatch_w&&!g->west){action=11;}
-    else if(has_tool(g,SL_WRENCH)&&nearby(g,10,8,1.1f)&&!g->hatch_e&&!g->east){action=12;}
-    else if(g->mission==SL_RECOVERY&&nearby(g,8,14,1.55f)&&!g->record){
-        if(!g->west||!g->east||g->water>.02f){
-            g->signal=4;g->signal_until=g->tick+100;return;
-        }
-        action=6;
+    unsigned action=interaction_target(g),blocked=interaction_block(g,action);
+    if(blocked){
+        g->signal=blocked;g->signal_until=g->tick+(blocked==21?120:blocked==15?90:100);
+        if(blocked==9)cue(g,SL_CLICK);
+        return;
     }
     if(action){
-        sl_vec3_t center=work_center(action);float heading=work_heading(action);
-        float stand=work_distance(action);
-        float dx=center.x-sinf(heading)*stand-g->x,dz=center.z-cosf(heading)*stand-g->z;
-        bool safe=dx*dx+dz*dz<=.65f*.65f;
-        for(int sample=1;sample<=5&&safe;++sample)
-            safe=movement_ok(g,g->x+dx*sample/5,g->z+dz*sample/5);
-        if(!safe){g->signal=15;g->signal_until=g->tick+90;return;}
         g->action=action;g->action_ticks=36;
-        g->action_yaw=heading;
+        g->action_yaw=work_heading(action);
         return;
     }
     int x=tile_at(g->x),z=tile_at(g->z);
@@ -1515,24 +1535,21 @@ static void draw_hud(const sl_game_t *g)
                      messages[g->signal],82,366,12,mint);
         }
     }
-    const char *prompt=NULL;
-    if(nearby(g,6,10,2.4f)||low_passage(g->x,g->z))
+    unsigned focus=interaction_target(g),blocked=interaction_block(g,focus);
+    const char *prompt=interaction_prompt(g,focus,blocked);
+    if(!prompt&&(nearby(g,6,10,2.4f)||low_passage(g->x,g->z)))
         prompt=g->water>.02f?"SUBMERGED DUCT - START THE PUMP":"HOLD SHIFT / SNEAK: ENTER LOW DUCT";
-    if(nearby(g,7,1,1.1f)&&!g->fuse&&!g->power)prompt="F  PICK UP SPARE FUSE";
-    else if(nearby(g,8,6,1.1f)&&!g->pumping)prompt=g->power?"F  PULL PUMP STARTER":g->battery_charge?"F  USE BATTERY TO START PUMP":"PUMP NEEDS POWER";
-    else if(nearby(g,4,4,1.55f)&&!g->chart)prompt="F  READ SERVICE CHART";
-    else if(nearby(g,12,4,1.55f))prompt=g->power?"F  TOGGLE EMERGENCY RELAY":
-                                   g->fuse?"F  INSTALL FUSE":"FUSE MISSING";
-    else if(nearby(g,2,8,1.55f)&&!g->west)prompt="F  OPEN WEST VALVE";
-    else if(nearby(g,14,8,1.55f)&&!g->east)prompt="F  OPEN EAST VALVE";
-    else if(nearby(g,8,14,1.55f)&&!g->record)prompt=g->water>.02f?
-        "DRAIN THE CENTRAL WELL":g->west&&g->east?"F  TAKE THE RECORDER":"TWO VALVES REQUIRED";
-    if(nearby(g,5,11,1.1f)&&!(g->logs&1))prompt="F  READ WEST SERVICE LOG";
-    if(nearby(g,11,11,1.1f)&&!(g->logs&2))prompt="F  READ EAST SERVICE LOG";
-    if(nearby(g,11,11,1.1f)&&(g->logs&2)&&!g->salvaged)
-        prompt=g->lure_charge?"SPARE DECOY - YOUR POUCH IS FULL":"F  SALVAGE SPARE DECOY";
-    if(has_tool(g,SL_WRENCH)&&((nearby(g,6,8,1.1f)&&!g->hatch_w&&!g->west)||
-       (nearby(g,10,8,1.1f)&&!g->hatch_e&&!g->east)))prompt="F  WRENCH: OPEN MAINTENANCE HATCH";
+    if(focus&&!blocked){
+        sl_view_t target=to_view(work_center(focus));
+        if(target.z>.15f){
+            Vector2 point=project(target);
+            if(point.x>12&&point.x<468&&point.y>68&&point.y<388){
+                int x=(int)point.x,y=(int)point.y;
+                DrawRectangle(x-8,y-8,5,2,mint);DrawRectangle(x-8,y-8,2,5,mint);
+                DrawRectangle(x+3,y+6,5,2,mint);DrawRectangle(x+6,y+3,2,5,mint);
+            }
+        }
+    }
     if(g->action){
         static const char *const verbs[]={"","PICK UP FUSE","INSTALL FUSE","PULL STARTER",
             "TURN WEST VALVE","TURN EAST VALVE","TAKE RECORDER","READ CHART","SET RELAY",
@@ -1550,7 +1567,7 @@ static void draw_hud(const sl_game_t *g)
     DrawText(g->passage_used?"DUCT FOUND":"RECORD",210,458,11,g->passage_used||g->record?mint:amber);
     DrawText("MARKS",338,458,11,pale);
     DrawText(TextFormat("%d/5",g->mark_count),405,458,11,mint);
-    if(!g->record&&g->mark_count<5)DrawText("F: MARK",386,439,9,(Color){145,171,164,255});
+    if(!focus&&!g->action&&g->mark_count<5&&!g->marks[tile_at(g->z)][tile_at(g->x)])DrawText("F: MARK",386,439,9,(Color){145,171,164,255});
     if(g->pumping&&g->water>.02f){
         DrawRectangle(18,85,8,82,(Color){19,39,42,255});
         DrawRectangle(18,85+(int)((1-g->water)*82),8,(int)(g->water*82),mint);
@@ -1903,10 +1920,11 @@ static uint32_t state_hash(const void *value)
 static int state_json(const void *value,char *out,size_t cap)
 {
     const sl_game_t *g=&((const sl_module_t*)value)->game;
+    unsigned focus=interaction_target(g);
     return snprintf(out,cap,
         "{\"phase\":\"%s\",\"x\":%.2f,\"z\":%.2f,\"cell_x\":%d,\"cell_z\":%d,"
         "\"camera_distance\":%.2f,\"camera_yaw\":%.2f,\"facing\":%.2f,"
-        "\"fuse\":%s,\"power\":%s,\"pumping\":%s,\"water\":%.3f,\"action\":%u,"
+        "\"fuse\":%s,\"power\":%s,\"pumping\":%s,\"water\":%.3f,\"action\":%u,\"focus\":%u,\"focus_block\":%u,"
         "\"sneaking\":%s,\"seen\":%s,\"alert\":%.3f,\"drone_x\":%.2f,"
         "\"drone_z\":%.2f,\"patrol_mode\":%u,\"scanning\":%s,\"turn_ticks\":%u,"
         "\"sfx\":\"%s\",\"sfx_seq\":%lu,\"checkpoint\":%s,"
@@ -1922,7 +1940,7 @@ static int state_json(const void *value,char *out,size_t cap)
         sqrtf((g->cam_x-g->x)*(g->cam_x-g->x)+(g->cam_z-g->z)*(g->cam_z-g->z)),
         g->yaw,g->facing,
         g->fuse?"true":"false",g->power?"true":"false",g->pumping?"true":"false",
-        g->water,(unsigned)g->action,
+        g->water,(unsigned)g->action,focus,interaction_block(g,focus),
         g->sneaking?"true":"false",g->seen?"true":"false",g->alert,g->drone_x,
         g->drone_z,site_config(g)->patrol_mode,g->drone_scan?"true":"false",patrol_turn_ticks(g),
         !g->paused&&g->tick<=g->sfx_until?s_cues[g->cue]:"",(unsigned long)g->sfx_seq,

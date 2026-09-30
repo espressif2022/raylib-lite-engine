@@ -169,11 +169,14 @@ assert.equal(plays,2);
                 result = run_scenario(route, CHECKPOINTS[route]["end"])
                 self.assertFalse(result["power"] or result["pumping"])
                 self.assertEqual(result["water"], 1)
+                self.assertEqual(result["focus"], 2 if route == "missing-fuse.json" else 3)
+                self.assertEqual(result["focus_block"], 9 if route == "missing-fuse.json" else 10)
 
     def test_pickup_commits_after_animation(self) -> None:
         result = run_scenario("power-slice.json", CHECKPOINTS["power-slice.json"]["fuse"] - 20)
         self.assertFalse(result["fuse"])
         self.assertEqual(result["action"], 1)
+        self.assertEqual(result["focus"], 0)
 
     def test_power_and_drain_sequence(self) -> None:
         route = "power-slice.json"

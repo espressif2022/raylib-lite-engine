@@ -14,6 +14,7 @@ def main():
     checkpoints = json.loads((PROJECT / "scenarios/checkpoints.json").read_text())
     summaries = {}
     for name, shots in [("submerged-duct.json", {"mouth": "duct-flooded"}),
+                        ("missing-fuse.json", {"end": "device-blocked"}),
                         ("service-duct.json", {"mouth": "duct-exposed", "inside": "duct-crouch",
                                                "log": "duct-log", "end": "duct-complete"}),
                         ("patrol-loop.json", {"end": "patrol-loop"}),

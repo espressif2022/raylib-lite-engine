@@ -81,6 +81,11 @@ $('mute').onclick=()=>{unlock();muted=!muted;stopAudio();$('mute').textContent='
 $('shot').onclick=()=>{if(!blobURL)return;const link=document.createElement('a');link.href=blobURL;link.download='below-the-tide.png';link.click()};
 function objective(m){
   if(m.journal)return '现场笔记已打开，世界暂停。A 查看线索，D 查看地图，J 返回。已探索路线会保留到本次仿真结束。';
+  if(m.focus){
+    const blocked={4:m.water>.02?'记录仪仍被水淹着：先启动泵并等待排水。':'记录仪有压力锁：先打开两侧分流阀。',9:'配电柜缺少保险件：回入口工作台拿取。',10:'水泵没有电：先恢复供电，或携带电池直接启动。',15:'已经找到设备，再靠近操作面一点；不要隔着家具操作。',21:'工具袋里已有诱饵，用掉后才能拿这份备用补给。'};
+    const actions=['','拿取保险件','安装保险件','启动水泵','打开西侧分流阀','打开东侧分流阀','拿取记录仪','阅读检修图',m.relay?'断开备用继电器':'启用备用继电器','阅读西侧日志','阅读东侧日志','用扳手打开西侧检修门','用扳手打开东侧检修门','拿取备用诱饵'];
+    return blocked[m.focus_block]||`按 F ${actions[m.focus]}。浅绿色角标标出操作位置。`;
+  }
   if(m.phase==='playing'&&m.cell_x===11&&m.cell_z===11&&(m.logs&2)&&!m.salvaged)
     return m.lure?'这里有一个备用诱饵，你的工具袋目前已满。用掉手中的诱饵后可回来取。':'日志提到柜内的备用诱饵。靠近按 F 拿取，无需出发时携带该工具。';
   if(m.phase==='playing'&&m.cell_x===6&&m.cell_z>=10&&m.cell_z<=11)

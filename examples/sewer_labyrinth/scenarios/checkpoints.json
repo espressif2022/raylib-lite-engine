@@ -98,5 +98,11 @@
     "draining": 754,
     "drained": 874,
     "end": 1394
+  },
+  "battery-wrench-return.json": {
+    "battery_pump": 205,
+    "wrench_hatch": 545,
+    "west": 704,
+    "end": 1091
   }
 }

@@ -320,6 +320,38 @@ static void check_field_map(void)
     e.pressed=false;input(&s,&e);e.y=422;e.pressed=true;input(&s,&e);
     assert(!s.game.journal);
 }
+static void check_interaction_feedback(void)
+{
+    for(unsigned action=1;action<=13;++action){
+        sl_game_t g;reset_game(&g);
+        g.kit=0;g.water=0;
+        if(action==2)g.fuse=true;
+        if(action==3||action==8)g.power=true;
+        if(action==6)g.west=g.east=true;
+        if(action==13)g.logs=2;
+        sl_vec3_t c=work_center(action);float yaw=work_heading(action);
+        g.x=c.x-sinf(yaw)*work_distance(action);g.z=c.z-cosf(yaw)*work_distance(action);
+        assert(interaction_target(&g)==action);
+        assert(!interaction_block(&g,action));
+        assert(strncmp(interaction_prompt(&g,action,0),"F  ",3)==0);
+        interact(&g);assert(g.action==action&&g.action_ticks==36&&!g.mark_count);
+        assert(!interaction_target(&g));
+    }
+    sl_game_t g;reset_game(&g);g.x=16.5f;g.z=2.65f;
+    assert(interaction_target(&g)==1&&interaction_block(&g,1)==15);
+    assert(strstr(interaction_prompt(&g,1,15),"CLOSER"));
+    interact(&g);assert(g.signal==15&&!g.action&&!g.mark_count);
+    reset_game(&g);g.x=tile_center(12);g.z=tile_center(4);
+    assert(interaction_block(&g,interaction_target(&g))==9);
+    interact(&g);assert(g.signal==9&&!g.action&&!g.mark_count);
+    reset_game(&g);g.x=tile_center(8);g.z=tile_center(14);
+    assert(interaction_target(&g)==6&&interaction_block(&g,6)==4);
+    for(unsigned m=SL_DRAINAGE;m<SL_MISSIONS;++m){g.mission=m;assert(!interaction_target(&g));}
+    reset_game(&g);g.x=tile_center(11);g.z=tile_center(11);g.logs=2;g.lure_charge=true;
+    assert(interaction_target(&g)==13&&interaction_block(&g,13)==21);
+    interact(&g);assert(g.signal==21&&!g.action&&!g.mark_count);
+    g.journal=true;assert(!interaction_target(&g));
+}
 int main(void)
 {
     check_motion();check_scene_budget();
@@ -382,6 +414,7 @@ int main(void)
     check_patrol_variants();
     check_expedition_records();
     check_field_map();
+    check_interaction_feedback();
     puts("sewer model and audio lifecycle: ok");
     return 0;
 }

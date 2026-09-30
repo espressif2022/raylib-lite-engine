@@ -6,9 +6,11 @@ ROOT = Path(__file__).resolve().parent
 
 
 class Route:
-    def __init__(self, mission=0, site=0):
+    def __init__(self, mission=0, site=0, kit=0):
         self.events = []
         self.frame = 0
+        for _ in range(kit):
+            self.key(9, 1)
         for _ in range(site):
             self.key(2, 1)
         for _ in range(mission):
@@ -196,4 +198,18 @@ if __name__ == "__main__":
         if site == 2:
             watch.frame += 180
         checkpoints[name] = watch.save(name)
+    battery = Route(mission=1, site=4, kit=2)
+    battery.go(8, 6)
+    battery.use("battery_pump")
+    battery.frame += 180
+    battery.go(6, 6)
+    battery.go(6, 8)
+    battery.use("wrench_hatch")
+    battery.go(2, 8)
+    battery.use("west")
+    battery.go(6, 8)
+    battery.go(6, 6)
+    battery.go(8, 6)
+    battery.go(8, 1)
+    checkpoints["battery-wrench-return.json"] = battery.save("battery-wrench-return.json")
     (ROOT / "checkpoints.json").write_text(json.dumps(checkpoints, indent=2) + "\n")
