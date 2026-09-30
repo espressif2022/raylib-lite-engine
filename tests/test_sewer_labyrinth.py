@@ -32,6 +32,18 @@ def run_scenario(name: str, frames: int) -> dict:
 
 
 class SewerLabyrinthTests(unittest.TestCase):
+    def test_facility_changes_patrol_lane_and_scanning(self) -> None:
+        loop = run_scenario("patrol-loop.json", CHECKPOINTS["patrol-loop.json"]["end"])
+        self.assertEqual(loop["patrol_mode"], 1)
+        self.assertLess(loop["drone_z"], 31.9)
+        self.assertEqual(loop["phase"], "playing")
+        scan = run_scenario("patrol-scan.json", CHECKPOINTS["patrol-scan.json"]["end"])
+        self.assertEqual(scan["patrol_mode"], 2)
+        self.assertTrue(scan["scanning"])
+        self.assertEqual(scan["phase"], "playing")
+        self.assertGreater(scan["turn_ticks"], 0)
+        self.assertLess(scan["turn_ticks"], 90)
+
     def test_replays_have_independent_generated_assets(self) -> None:
         with ThreadPoolExecutor(max_workers=2) as workers:
             futures = [workers.submit(run_scenario, "mark-start.json", 4) for _ in range(2)]

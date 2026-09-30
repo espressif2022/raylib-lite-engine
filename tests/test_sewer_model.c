@@ -211,6 +211,41 @@ static void check_notebook_and_salvage(void)
     tap.pressed=false;input(&s,&tap);tap.pressed=true;input(&s,&tap);assert(!s.game.journal);
     puts("notebook: pause, retained knowledge, one-shot salvage and touch/key edges ok");
 }
+static void check_patrol_variants(void)
+{
+    for(unsigned site=0;site<SL_SITES;++site){
+        sl_game_t g;reset_dispatch(&g,0,site,1,false);g.water=0;g.west=g.east=true;
+        float start_x=0,start_z=0,previous_x=0,previous_z=0;
+        unsigned scanned=0;
+        for(int t=0;t<=720;++t){
+            g.drone_tick=t%720;patrol_pose(&g);
+            assert(movement_ok(&g,g.drone_x,g.drone_z));
+            assert(patrol_turn_ticks(&g)>0&&patrol_turn_ticks(&g)<=360);
+            if(t==0){start_x=g.drone_x;start_z=g.drone_z;}
+            else{
+                float dx=g.drone_x-previous_x,dz=g.drone_z-previous_z;
+                assert(dx*dx+dz*dz<.06f*.06f); /* no jumps at corners or wrap */
+            }
+            previous_x=g.drone_x;previous_z=g.drone_z;
+            if(t<720&&g.drone_scan)++scanned;
+        }
+        assert(fabsf(start_x-g.drone_x)<.001f&&fabsf(start_z-g.drone_z)<.001f);
+        assert(scanned==(site_config(&g)->patrol_mode==2?180u:0u));
+        g.power=true;g.drone_tick=310;patrol_pose(&g);
+        g.x=tile_center(8);g.z=tile_center(12);use_lure(&g);
+        float x=g.drone_x,z=g.drone_z;unsigned tick=g.drone_tick;
+        for(int i=0;i<120;++i)update_drone(&g);
+        assert(g.drone_x==x&&g.drone_z==z&&g.drone_tick==tick);
+        update_drone(&g);assert(g.drone_tick==(tick+1)%720);
+        /* Both deep recesses remain places to wait, even on the inner circuit. */
+        for(int side=0;side<2;++side){
+            g.x=tile_center(side?11:5);g.z=tile_center(11);g.sneaking=true;g.alert=0;g.failed=false;
+            for(int i=0;i<720;++i)update_drone(&g);
+            assert(!g.failed);
+        }
+    }
+    puts("patrol variants: full circuits, bounds, continuity, scan holds, lure and cover ok");
+}
 int main(void)
 {
     check_motion();check_scene_budget();
@@ -270,6 +305,7 @@ int main(void)
     check_dispatches();
     check_service_duct();
     check_notebook_and_salvage();
+    check_patrol_variants();
     puts("sewer model and audio lifecycle: ok");
     return 0;
 }

@@ -15,7 +15,9 @@ def main():
     summaries = {}
     for name, shots in [("submerged-duct.json", {"mouth": "duct-flooded"}),
                         ("service-duct.json", {"mouth": "duct-exposed", "inside": "duct-crouch",
-                                               "log": "duct-log", "end": "duct-complete"})]:
+                                               "log": "duct-log", "end": "duct-complete"}),
+                        ("patrol-loop.json", {"end": "patrol-loop"}),
+                        ("patrol-scan.json", {"end": "patrol-scan"})]:
         events = json.loads((PROJECT / "scenarios" / name).read_text())["events"]
         by_frame = {}
         for event in events:

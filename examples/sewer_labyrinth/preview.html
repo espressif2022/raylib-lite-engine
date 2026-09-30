@@ -116,7 +116,8 @@ async function tick(){
     const missions=['回收记录仪','排水抢修','调查检修日志'];
     const kits=['扳手＋绝缘工具','扳手＋诱饵','扳手＋电池','绝缘工具＋诱饵','绝缘工具＋电池','诱饵＋电池'];
     const sites=['标准巡检','西环关闭／西侧漏电','东环关闭／东侧漏电','西侧漏电','西环关闭／东侧漏电','东环关闭／西侧漏电'];
-    $('dispatchInfo').textContent=`${missions[meta.mission]} · ${kits[meta.kit]} · ${sites[meta.site]} · 目标${meta.target_side?'东':'西'}侧 ｜ 本任务完成 ${meta.completed} 次 · 最快 ${meta.best_ticks?Math.round(meta.best_ticks/30)+'秒':'—'} · 徽章：${meta.badges&2?'无警觉 ':''}${meta.badges&4?'额外日志':''}`;
+    const patrols=['南廊往返','内环巡检','停驻扫描'];
+    $('dispatchInfo').textContent=`${missions[meta.mission]} · ${kits[meta.kit]} · ${sites[meta.site]} · ${patrols[meta.patrol_mode]} · 目标${meta.target_side?'东':'西'}侧 ｜ 本任务完成 ${meta.completed} 次 · 最快 ${meta.best_ticks?Math.round(meta.best_ticks/30)+'秒':'—'} · 徽章：${meta.badges&2?'无警觉 ':''}${meta.badges&4?'额外日志':''}`;
     $('metrics').textContent=`Host 光栅：${meta.host_render_ms.toFixed(2)} ms（不是设备 FPS）\n几何面：${meta.faces} / 丢弃：${meta.faces_dropped}\n警戒：${Math.round(meta.alert*100)}% · 慢走：${meta.sneaking?'是':'否'}\n检查点：${meta.checkpoint?'已保存':'未到达'}`;
   }catch(error){$('error').textContent='连接暂时中断，将自动重试。'+error.message}finally{busy=false}
 }

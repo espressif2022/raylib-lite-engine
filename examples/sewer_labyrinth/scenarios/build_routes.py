@@ -6,9 +6,11 @@ ROOT = Path(__file__).resolve().parent
 
 
 class Route:
-    def __init__(self, mission=0):
+    def __init__(self, mission=0, site=0):
         self.events = []
         self.frame = 0
+        for _ in range(site):
+            self.key(2, 1)
         for _ in range(mission):
             self.key(1, 1)
         self.key(6, 1)
@@ -49,8 +51,8 @@ class Route:
         return {**self.checkpoints, "end": self.frame + 2}
 
 
-def power_route(relay=False, mission=0):
-    route = Route(mission)
+def power_route(relay=False, mission=0, site=0):
+    route = Route(mission, site)
     route.go(7, 1)
     route.use("fuse")
     route.go(8, 1)
@@ -184,4 +186,14 @@ if __name__ == "__main__":
     salvage.key(3, 1)
     salvage.use("empty_cabinet")
     checkpoints["salvage-route.json"] = salvage.save("salvage-route.json")
+    for site, name in [(1, "patrol-loop.json"), (2, "patrol-scan.json")]:
+        watch = power_route(site=site)
+        watch.go(10, 6)
+        watch.go(10, 10)
+        watch.go(8, 10)
+        watch.sneak(True)
+        watch.go(8, 12)
+        if site == 2:
+            watch.frame += 180
+        checkpoints[name] = watch.save(name)
     (ROOT / "checkpoints.json").write_text(json.dumps(checkpoints, indent=2) + "\n")

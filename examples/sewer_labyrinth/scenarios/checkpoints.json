@@ -82,5 +82,21 @@
     "salvage": 1586,
     "empty_cabinet": 1629,
     "end": 1631
+  },
+  "patrol-loop.json": {
+    "fuse": 75,
+    "power": 354,
+    "pump": 692,
+    "draining": 752,
+    "drained": 872,
+    "end": 1212
+  },
+  "patrol-scan.json": {
+    "fuse": 77,
+    "power": 356,
+    "pump": 694,
+    "draining": 754,
+    "drained": 874,
+    "end": 1394
   }
 }

@@ -64,7 +64,8 @@ typedef struct {
     float water,action_yaw;
     uint8_t action;
     uint16_t action_ticks;
-    float drone_x,drone_yaw,alert;
+    float drone_x,drone_z,drone_yaw,alert;
+    bool drone_scan;
     uint32_t sfx_seq,sfx_until,next_step;
     uint16_t drone_tick;
     uint8_t cue;
@@ -231,22 +232,49 @@ static bool drone_sight(float x0,float z0,float x1,float z1)
     return true;
 }
 
+/* Authored 24-second circuits share a clock, but occupy different lanes.
+ * Sampling is O(1), so variants need neither an AI search nor a path buffer. */
+static void patrol_pose(sl_game_t *g)
+{
+    unsigned t=g->drone_tick%720,mode=site_config(g)->patrol_mode;
+    g->drone_z=tile_center(14);g->drone_scan=false;
+    if(mode==1){
+        if(t<300){g->drone_x=tile_center(6)+4*SL_TILE*t/300;g->drone_z=tile_center(13);g->drone_yaw=SL_PI*.5f;}
+        else if(t<360){g->drone_x=tile_center(10);g->drone_z=tile_center(13)+SL_TILE*(t-300)/60;g->drone_yaw=0;}
+        else if(t<660){g->drone_x=tile_center(10)-4*SL_TILE*(t-360)/300;g->drone_yaw=-SL_PI*.5f;}
+        else{g->drone_x=tile_center(6);g->drone_z=tile_center(14)-SL_TILE*(t-660)/60;g->drone_yaw=SL_PI;}
+    }else if(mode==2){
+        if(t<270){g->drone_x=tile_center(6)+4*SL_TILE*t/270;g->drone_yaw=SL_PI*.5f;}
+        else if(t<360){g->drone_x=tile_center(10);g->drone_yaw=SL_PI*.5f+smooth(270,360,t)*SL_PI;g->drone_scan=true;}
+        else if(t<630){g->drone_x=tile_center(10)-4*SL_TILE*(t-360)/270;g->drone_yaw=-SL_PI*.5f;}
+        else{g->drone_x=tile_center(6);g->drone_yaw=-SL_PI*.5f-smooth(630,720,t)*SL_PI;g->drone_scan=true;}
+    }else{
+        float leg=t<360?t:720-t;
+        g->drone_x=tile_center(4)+leg*(8*SL_TILE/360.0f);
+        g->drone_yaw=t<360?SL_PI*.5f:-SL_PI*.5f;
+    }
+}
+static unsigned patrol_turn_ticks(const sl_game_t *g)
+{
+    unsigned t=g->drone_tick%720,mode=site_config(g)->patrol_mode;
+    if(mode==1)return (t<300?300:t<360?360:t<660?660:720)-t;
+    if(mode==2)return (t<270?270:t<360?360:t<630?630:720)-t;
+    return 360-t%360;
+}
 static void update_drone(sl_game_t *g)
 {
     g->seen=false;
     if(!g->power&&!g->pumping)return;
     if(g->lure_ticks){
         --g->lure_ticks;g->alert=clampf(g->alert-.012f,0,1);
-        g->drone_yaw=atan2f(g->lure_x-g->drone_x,g->lure_z-tile_center(14));return;
+        g->drone_yaw=atan2f(g->lure_x-g->drone_x,g->lure_z-g->drone_z);return;
     }
     /* A fixed patrol, one visibility ray, no per-frame path search. */
     g->drone_tick=(g->drone_tick+1)%720;
-    float leg=g->drone_tick<360?g->drone_tick:720-g->drone_tick;
-    g->drone_x=tile_center(4)+leg*(8*SL_TILE/360.0f);
-    g->drone_yaw=g->drone_tick<360?SL_PI*.5f:-SL_PI*.5f;
-    float dx=g->x-g->drone_x,dz=g->z-tile_center(14),distance=dx*dx+dz*dz;
+    patrol_pose(g);
+    float dx=g->x-g->drone_x,dz=g->z-g->drone_z,distance=dx*dx+dz*dz;
     float dot=dx*sinf(g->drone_yaw)+dz*cosf(g->drone_yaw);
-    bool clear=distance<49.0f&&drone_sight(g->drone_x,tile_center(14),g->x,g->z);
+    bool clear=distance<49.0f&&drone_sight(g->drone_x,g->drone_z,g->x,g->z);
     g->seen=clear&&((dot>0&&dot*dot>distance*.50f)||
                     (!g->sneaking&&distance<2.25f));
     float before=g->alert;
@@ -322,7 +350,7 @@ static void reset_game(sl_game_t *g)
 {
     memset(g,0,sizeof(*g));
     g->water=1.0f;
-    g->drone_x=tile_center(4);g->drone_yaw=SL_PI*.5f;
+    patrol_pose(g);
     g->x=tile_center(8);g->z=tile_center(1);g->pitch=-.18f;
     g->facing=0.0f;place_camera(g);
     g->visited[1][8]=1;
@@ -333,8 +361,7 @@ static void reset_dispatch(sl_game_t *g,unsigned mission,uint32_t dispatch,unsig
     g->site=dispatch%SL_SITES;g->kit=kit%6;g->briefing=briefing;
     g->battery_charge=has_tool(g,SL_BATTERY);g->lure_charge=has_tool(g,SL_DECOY);
     g->drone_tick=site_config(g)->patrol_offset;
-    float leg=g->drone_tick<360?g->drone_tick:720-g->drone_tick;
-    g->drone_x=tile_center(4)+leg*(8*SL_TILE/360.0f);
+    patrol_pose(g);
 }
 
 static sl_view_t to_view(sl_vec3_t p)
@@ -599,11 +626,12 @@ static void add_character(const sl_game_t *g)
 
 static void add_drone(const sl_game_t *g)
 {
-    if(fabsf(g->z-tile_center(14))>11||(!g->power&&!g->pumping))return;
+    if(fabsf(g->z-g->drone_z)>11||(!g->power&&!g->pumping))return;
     s_material=0;
-    sl_xf_t root=xf_mul(xf_trans(g->drone_x,0,tile_center(14)),xf_roty(g->drone_yaw));
+    sl_xf_t root=xf_mul(xf_trans(g->drone_x,0,g->drone_z),xf_roty(g->drone_yaw));
     Color steel={77,110,108,255},yellow={189,145,55,255};
-    Color lamp=g->seen?(Color){248,72,48,255}:(Color){240,193,79,255};
+    Color lamp=g->lure_ticks?(Color){98,206,228,255}:g->seen?(Color){248,72,48,255}:
+        g->drone_scan?(Color){239,139,64,255}:(Color){240,193,79,255};
     add_beveled(root,.58f,.44f,.30f,.84f,.66f,.30f,steel);
     add_xf_box(xf_mul(root,xf_trans(0,.66f,.08f)),.36f,.22f,.34f,0,yellow);
     add_xf_box(xf_mul(root,xf_trans(0,.67f,.26f)),.24f,.09f,.035f,0,lamp);
@@ -970,6 +998,21 @@ static void add_scene(const sl_game_t *g)
         }
     }
     int px=tile_at(g->x),pz=tile_at(g->z);
+    if(pz>=9){
+        unsigned mode=site_config(g)->patrol_mode;
+        float x0=tile_center(mode?6:4),x1=tile_center(mode?10:12),south=tile_center(14);
+        Color track={77,128,128,255};
+        add_floor(x0,south-.04f,x1,south+.04f,.009f,track);
+        if(mode==1){
+            float north=tile_center(13);
+            add_floor(x0,north-.04f,x1,north+.04f,.009f,track);
+            add_floor(x0-.04f,north,x0+.04f,south,.009f,track);
+            add_floor(x1-.04f,north,x1+.04f,south,.009f,track);
+        }else if(mode==2){
+            add_floor(x0-.35f,south-.35f,x0+.35f,south+.35f,.01f,(Color){117,102,66,255});
+            add_floor(x1-.35f,south-.35f,x1+.35f,south+.35f,.01f,(Color){117,102,66,255});
+        }
+    }
     Color floor={75,79,73,255},ceiling={31,48,49,255};
     for(int z=0;z<15;++z)for(int x=1;x<16;++x){
         if(abs(x-px)>5||abs(z-pz)>5||
@@ -1306,8 +1349,11 @@ static void draw_map(const sl_game_t *g)
             (Color){104,137,139,255});
     }
     DrawRectangle(393+(cx-1)*4,83+(cz-1)*4,4,4,(Color){242,239,210,255});
-    if((g->power||g->pumping)&&g->z>tile_center(11))
-        DrawRectangle(393+(tile_at(g->drone_x)-1)*4,83+13*4,3,3,(Color){237,93,68,255});
+    if((g->power||g->pumping)&&g->z>tile_center(11)){
+        int dx=393+(int)((g->drone_x/SL_TILE-1)*4),dz=83+(int)((g->drone_z/SL_TILE-1)*4);
+        DrawRectangle(dx-1,dz-1,3,3,(Color){237,93,68,255});
+        DrawRectangle(dx+(int)(sinf(g->drone_yaw)*4),dz+(int)(cosf(g->drone_yaw)*4),2,2,(Color){247,199,114,255});
+    }
 }
 
 static void draw_hud(const sl_game_t *g)
@@ -1336,9 +1382,12 @@ static void draw_hud(const sl_game_t *g)
     if(g->camera_distance<1.15f&&!g->briefing)DrawText("CLOSE VIEW",20,76,10,(Color){154,184,177,255});
     if((g->power||g->pumping)&&g->z>tile_center(11)){
         DrawRectangle(18,176,190,36,(Color){8,24,28,230});
-        DrawText(g->seen?"SEEN - BREAK LINE OF SIGHT":"PATROL - SHIFT TO SNEAK",25,182,10,g->seen?alarm:amber);
+        DrawText(g->lure_ticks?"DISTRACTED - MOVE NOW":g->seen?"SEEN - BREAK LINE OF SIGHT":
+                 g->drone_scan?"SCANNING - WAIT IN COVER":"PATROL - SHIFT TO SNEAK",25,182,10,g->seen?alarm:amber);
         DrawRectangle(25,199,176,4,(Color){47,66,63,255});
         DrawRectangle(25,199,(int)(176*g->alert),4,alarm);
+        if(g->knowledge&4)DrawText(TextFormat("%s / %us",s_patrol_names[site_config(g)->patrol_mode],
+            (patrol_turn_ticks(g)+29)/30),25,218,10,mint);
     }
     DrawRectangle(12,402,54,30,(Color){8,24,28,220});
     DrawText(g->sneaking?"SNEAK":"WALK",18,413,10,g->sneaking?mint:pale);
@@ -1427,13 +1476,14 @@ static void draw_hud(const sl_game_t *g)
         DrawText("W / S : FACILITY (TAP ROW)",50,269,12,amber);
         DrawText(site_config(g)->name,50,291,13,pale);
         DrawText(site_config(g)->target_side?"TARGET: EAST":"TARGET: WEST",50,316,12,mint);
+        DrawText(s_patrol_names[site_config(g)->patrol_mode],50,334,11,amber);
         DrawText("F / TAP HERE : DEPART",83,358,19,mint);
     }
     if(g->journal){
         static const char *const titles[]={"WEST SERVICE CHART","WEST LOG: FLUSH BYPASS","EAST LOG: CRAWLER SERVICE","FIELD SKETCH: LOW DUCT","SWITCH ROOM: BACKUP RELAY"};
         static const char *const lines[]={"Valves drain outer loops. Check shutter notices.",
             "After pumping, follow yellow marks. Keep low.",
-            "Watch the tracks. A spare decoy is in this locker.",
+            "Track timing unlocked. Spare decoy in the locker.",
             "Both mouths stay open when the flush gate shuts.",
             "Grid power and relay hold the center gate open."};
         DrawRectangle(24,73,432,354,(Color){14,33,36,252});
@@ -1686,6 +1736,7 @@ static int state_json(const void *value,char *out,size_t cap)
         "\"camera_distance\":%.2f,\"camera_yaw\":%.2f,\"facing\":%.2f,"
         "\"fuse\":%s,\"power\":%s,\"pumping\":%s,\"water\":%.3f,\"action\":%u,"
         "\"sneaking\":%s,\"seen\":%s,\"alert\":%.3f,\"drone_x\":%.2f,"
+        "\"drone_z\":%.2f,\"patrol_mode\":%u,\"scanning\":%s,\"turn_ticks\":%u,"
         "\"sfx\":\"%s\",\"sfx_seq\":%lu,\"checkpoint\":%s,"
         "\"west\":%s,\"east\":%s,\"chart\":%s,\"relay\":%s,"
         "\"center_open\":%s,\"record\":%s,\"marks\":%u,"
@@ -1700,6 +1751,7 @@ static int state_json(const void *value,char *out,size_t cap)
         g->fuse?"true":"false",g->power?"true":"false",g->pumping?"true":"false",
         g->water,(unsigned)g->action,
         g->sneaking?"true":"false",g->seen?"true":"false",g->alert,g->drone_x,
+        g->drone_z,site_config(g)->patrol_mode,g->drone_scan?"true":"false",patrol_turn_ticks(g),
         !g->paused&&g->tick<=g->sfx_until?s_cues[g->cue]:"",(unsigned long)g->sfx_seq,
         ((const sl_module_t*)value)->has_checkpoint?"true":"false",
         g->west?"true":"false",g->east?"true":"false",
