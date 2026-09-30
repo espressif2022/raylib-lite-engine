@@ -15,9 +15,9 @@ from run_game import GenericHostRuntime, prepare_project_assets  # noqa: E402
 
 def look(runtime, direction):
     start, end = (460, 264) if direction < 0 else (264, 460)
-    runtime.pointer(99, start, 235, True)
-    runtime.pointer(99, end, 235, True)
-    runtime.pointer(99, end, 235, False)
+    runtime.pointer(99, start, 275, True)
+    runtime.pointer(99, end, 275, True)
+    runtime.pointer(99, end, 275, False)
 
 
 def main():

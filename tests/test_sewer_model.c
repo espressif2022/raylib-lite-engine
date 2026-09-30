@@ -64,22 +64,23 @@ static void check_motion(void)
 
 static void check_scene_budget(void)
 {
-    static const int positions[][2]={{8,1},{7,1},{8,6},{8,9},{2,8},{14,8},{8,13},{5,11},{11,11},{4,3},{12,3},{6,10},{6,11}};
-    unsigned max_faces=0;
+    unsigned max_faces=0,views=0;
     for(unsigned site=0;site<SL_SITES;++site)
-    for(unsigned spot=0;spot<sizeof(positions)/sizeof(positions[0]);++spot)
+    for(int state=0;state<2;++state)for(int z=1;z<15;++z)for(int x=1;x<16;++x)
         for(int angle=0;angle<8;++angle)for(int tilt=0;tilt<3;++tilt){
-            sl_game_t g;reset_dispatch(&g,0,site,0,false);g.power=g.pumping=g.west=g.east=true;g.water=0;
-            g.x=tile_center(positions[spot][0]);g.z=tile_center(positions[spot][1]);
+            sl_game_t g;reset_dispatch(&g,0,site,0,false);g.power=g.pumping=g.west=g.east=state;g.water=state?0:1;
+            g.x=tile_center(x);g.z=tile_center(z);
             if(low_passage(g.x,g.z)){g.sneaking=true;g.crouch=1;}
+            if(!movement_ok(&g,g.x,g.z))continue;
             g.yaw=angle*SL_PI*.25f;g.pitch=-.35f+tilt*.35f;place_camera(&g);
             s_cam_x=g.cam_x;s_cam_y=g.cam_y;s_cam_z=g.cam_z;
             s_sy=sinf(g.yaw);s_cy=cosf(g.yaw);s_sp=sinf(g.pitch);s_cp=cosf(g.pitch);
             add_scene(&g);add_character(&g);add_drone(&g);
-            assert(!s_faces_dropped);
+            if(s_faces_dropped)fprintf(stderr,"scene overflow: site=%u state=%d cell=%d,%d angle=%d tilt=%d\n",site,state,x,z,angle,tilt);
+            assert(!s_faces_dropped);++views;
             if((unsigned)s_face_count>max_faces)max_faces=s_face_count;
         }
-    printf("scene budget: %u max faces across 1872 views\n",max_faces);
+    printf("scene budget: %u max faces across %u views\n",max_faces,views);
 }
 
 /* Fine navigation lattice tests actual actor clearance, including furniture,

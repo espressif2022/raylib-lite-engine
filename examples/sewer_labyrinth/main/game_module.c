@@ -603,11 +603,17 @@ static void add_character(const sl_game_t *g)
     add_beveled(head,.30f,.22f,.12f,.30f,.22f,.27f,hood);
     add_xf_box(xf_mul(head,xf_trans(0,.205f,.04f)),.32f,.035f,.33f,0,hood);
     add_xf_box(xf_mul(head,xf_trans(0,.13f,.123f)),.18f,.06f,.025f,0,(Color){27,43,48,255});
+    add_xf_box(xf_mul(head,xf_trans(0,.205f,-.135f)),.24f,.035f,.018f,0,stripe);
+    add_xf_box(xf_mul(torso,xf_trans(0,.445f,0)),.25f,.06f,.26f,0,pack);
     for(int side=0;side<2;++side){
         add_beveled(xf_mul(root,bone_frame(pose.shoulder[side],pose.elbow[side])),
                     .12f,.17f,.28f,.13f,.16f,-.14f,coat);
         add_beveled(xf_mul(root,bone_frame(pose.elbow[side],pose.hand[side])),
                     .10f,.12f,.28f,.10f,.12f,-.14f,coat);
+        add_xf_box(xf_mul(root,bone_frame(pose.elbow[side],pose.hand[side])),
+                    .123f,.045f,.123f,-.10f,stripe);
+        add_xf_box(xf_mul(torso,xf_trans(side?.115f:-.115f,.26f,.142f)),
+                    .045f,.29f,.022f,0,pack);
         sl_vec3_t hand=pose.hand[side],ankle=pose.ankle[side],knee=pose.knee[side];
         add_xf_box(xf_mul(root,xf_trans(hand.x,hand.y,hand.z)),.11f,.10f,.12f,0,boot);
         add_xf_box(xf_mul(root,bone_frame(pose.hip[side],pose.knee[side])),.14f,.36f,.15f,-.18f,trouser);
@@ -894,6 +900,20 @@ static bool flooded_branch(const sl_game_t *g,int x,int z)
            (x==14&&z>=9&&z<=13&&!g->east);
 }
 
+/* Flush wall details use one inward-facing quad, with the same winding as
+ * the room lintels. Keep them off the wall plane to avoid painter ties. */
+static void add_wall_panel(int side,float x0,float z0,float x1,float z1,
+                           float lo,float hi,float inset,float offset,Color color)
+{
+    if(side==0)add_face((sl_vec3_t){x0+offset,lo,z0+inset},(sl_vec3_t){x0+offset,lo,z1-inset},
+        (sl_vec3_t){x0+offset,hi,z1-inset},(sl_vec3_t){x0+offset,hi,z0+inset},color);
+    if(side==1)add_face((sl_vec3_t){x1-offset,lo,z1-inset},(sl_vec3_t){x1-offset,lo,z0+inset},
+        (sl_vec3_t){x1-offset,hi,z0+inset},(sl_vec3_t){x1-offset,hi,z1-inset},color);
+    if(side==2)add_face((sl_vec3_t){x1-inset,lo,z0+offset},(sl_vec3_t){x0+inset,lo,z0+offset},
+        (sl_vec3_t){x0+inset,hi,z0+offset},(sl_vec3_t){x1-inset,hi,z0+offset},color);
+    if(side==3)add_face((sl_vec3_t){x0+inset,lo,z1-offset},(sl_vec3_t){x1-inset,lo,z1-offset},
+        (sl_vec3_t){x1-inset,hi,z1-offset},(sl_vec3_t){x0+inset,hi,z1-offset},color);
+}
 static void add_wall_edge(const sl_game_t *g,int x,int z,int side,
                           float x0,float z0,float x1,float z1)
 {
@@ -938,14 +958,32 @@ static void add_wall_edge(const sl_game_t *g,int x,int z,int side,
     float height=cell_at(x,z)=='u'?1.45f:room_height(x,z);
     bool hall=height>4;
     bool service=cell_at(x,z)=='u'||((x==5||x==11)&&z>=11&&z<=12);
-    uint8_t mat=hall||service?0:c=='#'?(x<7?SL_MAT_BRICK:SL_MAT_CONCRETE):SL_MAT_WARNING;
-    Color tint=c=='#'?(Color){88,91,84,255}:(Color){115,91,53,255};
+    uint8_t mat=hall||service||c=='#'?0:SL_MAT_WARNING;
+    Color tint=c=='#'?(x<7?(Color){115,111,91,255}:x>10?(Color){91,117,116,255}:
+                      (Color){100,112,106,255}):(Color){115,91,53,255};
     if(hall)tint=(Color){103,119,113,255};
     else if(service)tint=(Color){78,105,102,255};
-    if(side==0)add_material_box(x0-.12f,z0,x0,z1,0,height,tint,mat);
-    if(side==1)add_material_box(x1,z0,x1+.12f,z1,0,height,tint,mat);
-    if(side==2)add_material_box(x0,z0-.12f,x1,z0,0,height,tint,mat);
-    if(side==3)add_material_box(x0,z1,x1,z1+.12f,0,height,tint,mat);
+    if(c=='#'){
+        /* Solid map walls have no exposed back or top. Two strips retain the
+         * existing depth-sort granularity without submitting hidden faces. */
+        for(int part=0;part<2;++part){
+            float a=part*.5f,b=a+.5f;
+            add_wall_panel(side,side<2?x0:x0+(x1-x0)*a,side<2?z0+(z1-z0)*a:z0,
+                side<2?x1:x0+(x1-x0)*b,side<2?z0+(z1-z0)*b:z1,
+                0,height,0,0,color_scale(tint,side<2?153:204));
+        }
+    }else{
+        if(side==0)add_material_box(x0-.12f,z0,x0,z1,0,height,tint,mat);
+        if(side==1)add_material_box(x1,z0,x1+.12f,z1,0,height,tint,mat);
+        if(side==2)add_material_box(x0,z0-.12f,x1,z0,0,height,tint,mat);
+        if(side==3)add_material_box(x0,z1,x1,z1+.12f,0,height,tint,mat);
+    }
+    if(c=='#'&&!hall&&!service){
+        Color dado=x<7?(Color){74,79,66,255}:(Color){46,77,79,255};
+        Color stripe=x<7?(Color){177,143,77,255}:(Color){91,162,157,255};
+        add_wall_panel(side,x0,z0,x1,z1,.06f,1.06f,.04f,.008f,dado);
+        add_wall_panel(side,x0,z0,x1,z1,1.10f,1.15f,.04f,.008f,stripe);
+    }
     if((side==0||side==1)&&c=='#'){
         float wx=side==0?x0+.025f:x1-.025f;
         Color pipe=x<7?(Color){146,100,63,255}:(Color){79,133,134,255};
@@ -1007,6 +1045,22 @@ static void add_scene(const sl_game_t *g)
     }
     int px=tile_at(g->x),pz=tile_at(g->z);
     if(pz>=9){
+        /* South-bay marker is a large painted landmark, readable from both
+         * log alcoves without a new texture or a screen-space label. */
+        add_face((sl_vec3_t){17.70f,1.62f,32.96f},(sl_vec3_t){19.70f,1.62f,32.96f},
+                 (sl_vec3_t){19.70f,2.64f,32.96f},(sl_vec3_t){17.70f,2.64f,32.96f},(Color){36,65,69,255});
+        static const float bars[7][4]={{0,.74f,.42f,.80f},{0,.40f,.06f,.74f},
+            {.36f,.40f,.42f,.74f},{0,.37f,.42f,.43f},{0,.05f,.06f,.40f},
+            {.36f,.05f,.42f,.40f},{0,0,.42f,.06f}};
+        for(int digit=0;digit<2;++digit)for(int bar=0;bar<7;++bar){
+            unsigned mask=digit?0x6d:0x77;
+            if(!(mask&(1u<<bar)))continue;
+            float x=18.12f+digit*.70f,y=1.73f;
+            add_face((sl_vec3_t){x+bars[bar][0],y+bars[bar][1],32.94f},
+                     (sl_vec3_t){x+bars[bar][2],y+bars[bar][1],32.94f},
+                     (sl_vec3_t){x+bars[bar][2],y+bars[bar][3],32.94f},
+                     (sl_vec3_t){x+bars[bar][0],y+bars[bar][3],32.94f},(Color){220,197,128,255});
+        }
         unsigned mode=site_config(g)->patrol_mode;
         float x0=tile_center(mode?6:4),x1=tile_center(mode?10:12),south=tile_center(14);
         Color track={77,128,128,255};
@@ -1028,12 +1082,17 @@ static void add_scene(const sl_game_t *g)
         float x0=x*SL_TILE,x1=x0+SL_TILE,z0=z*SL_TILE,z1=z0+SL_TILE;
         sl_view_t tile_view=to_view((sl_vec3_t){(x0+x1)*.5f,1.5f,(z0+z1)*.5f});
         if(tile_view.z< -2.7f||fabsf(tile_view.x)>fmaxf(tile_view.z,0)*.85f+3.5f)continue;
-        s_material=(x<7||z<5)?SL_MAT_BRICK:SL_MAT_GRATE;
+        s_material=0;
         bool entry=z==1&&x>=7&&x<=9;
         bool hall=room_height(x,z)>4,duct=cell_at(x,z)=='u';
         bool service=(x==5||x==11)&&z>=11&&z<=12;
         if(entry||hall||duct||service)s_material=0;
         add_walk_floor(x0,z0,x1,z1,entry?(Color){94,91,75,255}:hall?(Color){79,97,94,255}:floor,0);
+        if(!entry&&!hall&&!duct&&!service){
+            Color joint={44,60,57,255};
+            add_floor(x0,z0,x1,z0+.024f,.006f,joint);
+            add_floor(x0,z0,x0+.024f,z1,.006f,joint);
+        }
         s_material=0;
         if(x==site_config(g)->fault_x&&z==3&&g->power){
             add_box(tile_center(x)-.8f,tile_center(z)-.8f,tile_center(x)+.8f,
