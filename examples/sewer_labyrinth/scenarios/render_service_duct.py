@@ -43,6 +43,9 @@ def main():
                             runtime.action(4, True)
                             runtime.action(4, False)
                             (PROJECT / "docs/field-notes.png").write_bytes(runtime.frame())
+                            runtime.action(1, True)
+                            runtime.action(1, False)
+                            (PROJECT / "docs/field-map.png").write_bytes(runtime.frame())
                             runtime.action(4, True)
                             runtime.action(4, False)
                         summaries[captures[frame + 1]] = {key: state[key] for key in

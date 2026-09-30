@@ -77,6 +77,7 @@ typedef struct {
     float lure_x,lure_z;
     bool passage_used;
     bool journal,salvaged;
+    uint8_t journal_page;
     uint8_t knowledge;
     uint8_t completed_sites[SL_MISSIONS],personal_badges,run_badges;
     uint16_t selected_wins;
@@ -97,6 +98,7 @@ typedef struct {
     uint8_t completed_sites[SL_MISSIONS];
     sl_run_record_t records[SL_MISSIONS][SL_SITES][6];
     uint8_t learned;
+    uint32_t surveyed[SL_MAP];
 #if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     Sound sounds[SL_CUES];
 #endif
@@ -1337,6 +1339,47 @@ static void draw_atmosphere(const sl_game_t *g)
     }
 }
 
+static bool map_known(const sl_game_t *g,int x,int z)
+{
+    char c=cell_at(x,z);
+    if(c=='#'||c=='c')return false;
+    return abs(x-tile_at(g->x))+abs(z-tile_at(g->z))<=2||g->visited[z][x]||g->marks[z][x]||
+        (g->chart&&(c=='W'||c=='E'||(z==11&&(x==5||x==11))))||
+        (c=='W'&&g->west)||(c=='E'&&g->east)||(c=='R'&&g->record);
+}
+static void draw_field_map(const sl_game_t *g)
+{
+    const int ox=104,oy=116,cell=16;
+    Color pale={226,224,194,255},green={76,130,114,255},blue={50,109,141,255},amber={222,164,72,255};
+    DrawRectangle(ox,oy,SL_MAP*cell,SL_MAP*cell,(Color){8,22,27,255});
+    for(int z=0;z<SL_MAP;++z)for(int x=0;x<SL_MAP;++x){
+        if(!map_known(g,x,z))continue;
+        char c=cell_at(x,z);int sx=ox+x*cell,sy=oy+z*cell;
+        bool flood=flooded_branch(g,x,z)||((c=='u'||c=='b')&&g->water>.02f);
+        Color color=flood?blue:!walkable(g,x,z)?amber:c=='H'?(Color){33,58,60,255}:green;
+        DrawRectangle(sx+1,sy+1,cell-2,cell-2,color);
+        if(g->marks[z][x])DrawRectangle(sx+5,sy+5,6,6,(Color){113,244,177,255});
+        const char *label=c=='S'?"S":c=='W'?"W":c=='E'?"E":c=='R'?"R":c=='H'?"P":c=='u'?"v":
+            z==11&&(x==5||x==11)?"L":NULL;
+        if(g->power&&x==site_config(g)->fault_x&&z==3)label="!";
+        if(label)DrawText(label,sx+5,sy+4,9,pale);
+    }
+    for(int side=0;side<2;++side)if(map_known(g,side?9:7,8)){
+        float sx=side?20.20f:15.92f;
+        DrawRectangle(ox+(int)(sx*cell/SL_TILE),oy+(int)(15.72f*cell/SL_TILE),9,40,blue);
+    }
+    float px=ox+g->x*cell/SL_TILE,pz=oy+g->z*cell/SL_TILE;
+    float dx=sinf(g->yaw),dz=cosf(g->yaw);
+    DrawTriangle((Vector2){px+dx*7,pz+dz*7},(Vector2){px-dx*4+dz*4,pz-dz*4-dx*4},
+                 (Vector2){px-dx*4-dz*4,pz-dz*4+dx*4},pale);
+    if((g->knowledge&4)&&(g->power||g->pumping)&&map_known(g,tile_at(g->drone_x),tile_at(g->drone_z))){
+        int x=ox+(int)(g->drone_x*cell/SL_TILE),z=oy+(int)(g->drone_z*cell/SL_TILE);
+        DrawRectangle(x-3,z-3,6,6,(Color){238,98,75,255});
+        DrawRectangle(x+(int)(sinf(g->drone_yaw)*6),z+(int)(cosf(g->drone_yaw)*6),2,2,amber);
+    }
+    DrawText("S EXIT   P PUMP   L LOG   v LOW DUCT",44,389,10,pale);
+    DrawText("BLUE: WATER   AMBER: SEALED   ! LIVE FLOOR",44,402,10,amber);
+}
 static void draw_map(const sl_game_t *g)
 {
     int cx=tile_at(g->x),cz=tile_at(g->z);
@@ -1345,10 +1388,7 @@ static void draw_map(const sl_game_t *g)
         char c=cell_at(x,z);
         if(c=='#')continue;
         int sx=393+(x-1)*4,sy=83+(z-1)*4;
-        bool known=abs(x-cx)+abs(z-cz)<=2||g->visited[z][x]||g->marks[z][x]||
-                   (g->chart&&(c=='W'||c=='E'||(z==11&&(x==5||x==11))))||
-                   (c=='W'&&g->west)||(c=='E'&&g->east)||(c=='R'&&g->record);
-        if(known)DrawRectangle(sx,sy,3,3,
+        if(map_known(g,x,z))DrawRectangle(sx,sy,3,3,
             g->marks[z][x]?(Color){96,231,174,255}:
             z==11&&(x==5||x==11)?(Color){100,185,232,255}:
             c=='W'||c=='E'||c=='R'?(Color){225,172,73,255}:
@@ -1512,15 +1552,19 @@ static void draw_hud(const sl_game_t *g)
             "Track timing unlocked. Spare decoy in the locker.",
             "Both mouths stay open when the flush gate shuts.",
             "Grid power and relay hold the center gate open."};
-        DrawRectangle(24,73,432,354,(Color){14,33,36,252});
-        DrawText("FIELD NOTES",45,89,22,amber);
-        for(int note=0;note<5;++note){
+        DrawRectangle(24,73,432,365,(Color){14,33,36,252});
+        DrawText(g->journal_page?"FIELD MAP":"FIELD NOTES",45,89,22,amber);
+        DrawRectangle(283,85,67,23,g->journal_page?(Color){29,57,60,255}:(Color){52,95,80,255});
+        DrawRectangle(357,85,67,23,g->journal_page?(Color){52,95,80,255}:(Color){29,57,60,255});
+        DrawText("A NOTES",289,93,10,pale);DrawText("D MAP",369,93,10,pale);
+        if(g->journal_page)draw_field_map(g);
+        else for(int note=0;note<5;++note){
             int y=128+note*53;bool known=(g->knowledge&(1u<<note))!=0;
             DrawRectangle(43,y-5,392,1,(Color){57,82,77,255});
             DrawText(known?titles[note]:"UNDISCOVERED NOTE",45,y,12,known?mint:pale);
             DrawText(known?lines[note]:"Explore service rooms and inspect equipment.",45,y+20,10,pale);
         }
-        DrawText("J / TAP TO CLOSE - WORLD PAUSED",51,407,12,amber);
+        DrawText("J / TAP TO CLOSE - WORLD PAUSED",51,422,12,amber);
     }
 }
 
@@ -1566,6 +1610,20 @@ static void clear_input(sl_module_t *s)
     s->game.sneaking=false;
 }
 
+static void restore_survey(sl_module_t *s)
+{
+    for(int z=0;z<SL_MAP;++z)for(int x=0;x<SL_MAP;++x)
+        if(s->surveyed[z]&(1u<<x))s->game.visited[z][x]=1;
+}
+static void survey_local(sl_module_t *s)
+{
+    int px=(int)(s->game.x/SL_TILE),pz=(int)(s->game.z/SL_TILE);
+    for(int z=pz-2;z<=pz+2;++z)for(int x=px-2;x<=px+2;++x){
+        char c=cell_at(x,z);
+        if(c=='#'||c=='c'||abs(x-px)+abs(z-pz)>2)continue;
+        s->surveyed[z]|=1u<<x;s->game.visited[z][x]=1;
+    }
+}
 static void retry_checkpoint(sl_module_t *s)
 {
     stop_audio(s);
@@ -1575,6 +1633,7 @@ static void retry_checkpoint(sl_module_t *s)
     if(s->has_checkpoint)s->game=s->checkpoint;
     else reset_dispatch(&s->game,s->game.mission,s->game.dispatch,s->game.kit,false);
     s->game.detected|=detected;
+    restore_survey(s);
     s->game.sfx_seq=sequence;cue(&s->game,SL_CLICK);
     clear_input(s);
     s->fire=held;s->sneak_id=track;
@@ -1591,7 +1650,7 @@ static int initialize(void *value
 #elif defined(MOSAICO_GAME_NATIVE)
     (void)asset_root;
 #endif
-    sl_module_t *s=value;reset_dispatch(&s->game,0,0,0,true);
+    sl_module_t *s=value;reset_dispatch(&s->game,0,0,0,true);restore_survey(s);
     s->materials=LoadMosaicoWallAtlas("materials.wall");
     if(!s->materials.descriptor)return -1;
     clear_input(s);
@@ -1634,7 +1693,7 @@ static void dispatch_choice(sl_module_t *s,int code)
     else if(code==5)dispatch=(dispatch+SL_SITES-1)%SL_SITES;
     else if(code==6){g->briefing=false;s->run_ticks=0;clear_input(s);s->fire=true;return;}
     else return;
-    reset_dispatch(g,mission,dispatch,kit,true);
+    reset_dispatch(g,mission,dispatch,kit,true);restore_survey(s);
 }
 static void use_lure(sl_game_t *g)
 {
@@ -1654,6 +1713,7 @@ static void input(void *value,const mosaico_host_input_v1_t *e)
     if(e->type==MOSAICO_HOST_INPUT_CONTROL){
         if(e->code==MOSAICO_HOST_CONTROL_RESET){
             stop_audio(s);reset_dispatch(&s->game,s->game.mission,s->game.dispatch,s->game.kit,true);clear_input(s);
+            restore_survey(s);
             s->run_ticks=0;
             s->has_checkpoint=false;s->consumed_sfx=0;
         }
@@ -1667,7 +1727,10 @@ static void input(void *value,const mosaico_host_input_v1_t *e)
             if(e->pressed)s->menu_down|=16;else s->menu_down&=~16;
             return;
         }
-        if(s->game.journal)return;
+        if(s->game.journal){
+            if(e->pressed&&(e->code==0||e->code==1))s->game.journal_page=(uint8_t)e->code;
+            return;
+        }
         if(s->game.briefing){
             if(e->code>=0&&e->code<16){
                 uint16_t bit=(uint16_t)(1u<<e->code);
@@ -1691,7 +1754,10 @@ static void input(void *value,const mosaico_host_input_v1_t *e)
         }else if(e->track_id==s->sneak_id){
             /* A held finger toggles once, even if input is resent. */
         }else if(s->game.journal||(!s->game.briefing&&e->x>=382&&e->y>=211&&e->y<=239)){
-            toggle_journal(s);s->sneak_id=e->track_id;
+            if(s->game.journal&&e->x>=283&&e->x<=424&&e->y>=85&&e->y<=108)
+                s->game.journal_page=e->x>=354;
+            else toggle_journal(s);
+            s->sneak_id=e->track_id;
         }else if(s->game.briefing){
             if(e->x>=28&&e->x<=452&&e->y>=145&&e->y<=395)
                 dispatch_choice(s,e->y<205?1:e->y<263?9:e->y<340?2:6);
@@ -1732,6 +1798,7 @@ static void update(void *value)
             stop_audio(s);reset_dispatch(&s->game,(s->game.mission+1)%SL_MISSIONS,
                                         s->game.dispatch+(s->game.mission+1==SL_MISSIONS),s->game.kit,true);
             s->has_checkpoint=false;s->run_ticks=0;clear_input(s);
+            restore_survey(s);
             s->fire=held;s->sneak_id=track;if(held)s->menu_down|=1u<<6;
         }else if(s->game.failed&&!s->game.paused)retry_checkpoint(s);
         else interact(&s->game);
@@ -1741,6 +1808,7 @@ static void update(void *value)
     if(!s->game.briefing&&!s->game.journal&&!s->game.paused&&!s->game.escaped&&!s->game.failed&&s->run_ticks<UINT32_MAX)
         ++s->run_ticks;
     update_game(&s->game);
+    if(!s->game.briefing&&!s->game.journal&&!s->game.paused)survey_local(s);
     s->game.elapsed=s->run_ticks;
     s->learned|=(s->game.chart?1:0)|((s->game.logs&3)<<1)|
                 (s->game.passage_used?8:0)|(s->game.relay?16:0);
@@ -1787,7 +1855,7 @@ static int state_json(const void *value,char *out,size_t cap)
         "\"center_open\":%s,\"record\":%s,\"marks\":%u,"
         "\"mission\":%u,\"site\":%u,\"kit\":%u,\"target_side\":%u,\"logs\":%u,"
         "\"duct_open\":%s,\"duct_used\":%s,\"crouch\":%.2f,"
-        "\"journal\":%s,\"knowledge\":%u,\"salvaged\":%s,"
+        "\"journal\":%s,\"journal_page\":%u,\"knowledge\":%u,\"salvaged\":%s,"
         "\"battery\":%s,\"lure\":%s,\"ready\":%s,\"completed\":%lu,\"best_ticks\":%lu,\"badges\":%u,"
         "\"elapsed\":%lu,\"run_wins\":%u,\"run_badges\":%u,\"new_best\":%s,\"outing_mask\":%u,"
         "\"faces\":%d,\"faces_dropped\":%d,\"state_hash\":\"%08lx\"}",
@@ -1806,7 +1874,7 @@ static int state_json(const void *value,char *out,size_t cap)
         g->record?"true":"false",(unsigned)g->mark_count,
         g->mission,g->site,g->kit,site_config(g)->target_side,g->logs,
         g->water<=.02f?"true":"false",g->passage_used?"true":"false",g->crouch,
-        g->journal?"true":"false",g->knowledge,g->salvaged?"true":"false",
+        g->journal?"true":"false",g->journal_page,g->knowledge,g->salvaged?"true":"false",
         g->battery_charge?"true":"false",g->lure_charge?"true":"false",mission_ready(g)?"true":"false",
         (unsigned long)((const sl_module_t*)value)->completed[g->mission],
         (unsigned long)g->best_ticks,g->personal_badges,

@@ -291,6 +291,34 @@ static void check_expedition_records(void)
     fire.pressed=false;input(&clock,&fire);fire.pressed=true;input(&clock,&fire);assert(!clock.game.briefing);
     puts("expedition records: all 18 outings, per-kit bests, retries and pause timing ok");
 }
+static void check_field_map(void)
+{
+    sl_module_t s={0};reset_game(&s.game);clear_input(&s);
+    assert(map_known(&s.game,8,1)&&!map_known(&s.game,8,14));
+    assert(!map_known(&s.game,8,0)&&!map_known(&s.game,-1,1));
+    s.game.chart=true;
+    assert(map_known(&s.game,2,8)&&map_known(&s.game,11,11));
+    assert(!map_known(&s.game,10,13));
+    s.game.x=tile_center(6);s.game.z=tile_center(10);update(&s);
+    assert(s.surveyed[10]&(1u<<6));
+    mosaico_host_input_v1_t e={.type=MOSAICO_HOST_INPUT_CONTROL,.code=MOSAICO_HOST_CONTROL_RESET};
+    input(&s,&e);update(&s);
+    assert(s.game.briefing&&map_known(&s.game,6,10)&&!map_known(&s.game,10,13));
+    s.game.briefing=false;s.has_checkpoint=true;s.checkpoint=s.game;
+    s.game.x=tile_center(11);s.game.z=tile_center(11);survey_local(&s);
+    retry_checkpoint(&s);assert(map_known(&s.game,11,11));
+    e=(mosaico_host_input_v1_t){.type=MOSAICO_HOST_INPUT_ACTION,.code=4,.pressed=true};
+    input(&s,&e);e.pressed=false;input(&s,&e);assert(s.game.journal);
+    uint32_t tick=s.game.tick,elapsed=s.run_ticks;
+    e.code=1;e.pressed=true;input(&s,&e);input(&s,&e);update(&s);
+    assert(s.game.journal_page==1&&s.game.tick==tick&&s.run_ticks==elapsed&&!s.right);
+    e=(mosaico_host_input_v1_t){.type=MOSAICO_HOST_INPUT_POINTER,.track_id=91,.pressed=true,.x=310,.y=96};
+    input(&s,&e);input(&s,&e);assert(s.game.journal&&s.game.journal_page==0);
+    e.pressed=false;input(&s,&e);e.x=390;e.pressed=true;
+    input(&s,&e);assert(s.game.journal&&s.game.journal_page==1);
+    e.pressed=false;input(&s,&e);e.y=422;e.pressed=true;input(&s,&e);
+    assert(!s.game.journal);
+}
 int main(void)
 {
     check_motion();check_scene_budget();
@@ -352,6 +380,7 @@ int main(void)
     check_notebook_and_salvage();
     check_patrol_variants();
     check_expedition_records();
+    check_field_map();
     puts("sewer model and audio lifecycle: ok");
     return 0;
 }
