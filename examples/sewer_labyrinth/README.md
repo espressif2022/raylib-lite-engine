@@ -50,13 +50,14 @@ python3 examples/sewer_labyrinth/scenarios/render_motion.py
 ```
 
 The model test checks limb lengths, planted-foot height, handle contact,
-furniture clearance, and 1,872 combinations of facility, room, camera heading, and pitch.
+furniture clearance, and 28,656 combinations of facility, traversable cell, gate state,
+camera heading, and pitch.
 These geometry checks do not establish device FPS.
 
 ## Pump Hall 02 / 退水后的检修近路
 
 中央泵房使用 4.6 米高的机械大厅、赭黄色吊梁、双色设备分区、02 号墙面标识和桥面标线。
-泵房及检修凹室以大面积素色墙面和地面控制纹理噪点，保留外围通道的旧砖材质。
+泵房及检修凹室以大面积素色墙面和地面控制纹理噪点，外围通道用墙裙与分区色带区分方向。
 这些细节由现有几何绘制接口生成，不增加纹理包或实时光照通道。
 
 排水会同时降低西南检修口内的水位并抬升格栅。沿西侧黄色标线走到低洞口，
@@ -232,6 +233,24 @@ the center shortcut shortens the physical return path, not the full replay time.
 三种路径都在固定的 720 tick 周期内直接求位置，不使用导航搜索，不增加机器人数量。
 模型测试检查六种设施整个周期的碰撞连通性、连续位移、停驻时间、诱饵恢复及凹室避让。
 设备帧率仍需上板测量。
+
+## 维修间与可开启的返程回路
+
+从中央泵房东北角可进入新增维修间。房内有壁挂工作台、拆下的备用电机、工具架和机械安全闩。
+靠近北墙的横杆按 F，角色会双手下拉，动作完成后打开通往东侧配电间的通道；
+无需供电，不消耗工具。门只能从维修间内开启，开启后可双向通过，也不会在取记录仪报警时关闭。
+可利用它回配电间启用备用继电器，然后直接回到泵房，减少反复绕行北侧通道。
+地图用 G 标识门，未开启时为琥珀色；工作台同时阻挡角色和镜头，通行区保持畅通。
+
+![Workshop release](docs/workshop-release.gif)
+
+`scenarios/workshop-loop.json` 是完整的排水抢修回放：进入维修间开门，穿过配电间，
+启用继电器，再次穿回泵房，开西阀后经新通道撤离。回放检查开启前状态、北侧出口及最终撤离。
+在停用交互仿真或隔离的项目副本中，可用以下命令重新生成实际 Host 截图与动作预览：
+
+```sh
+python3 examples/sewer_labyrinth/scenarios/render_workshop.py
+```
 
 ## 一致的设备交互提示
 

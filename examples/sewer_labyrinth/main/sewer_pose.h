@@ -83,6 +83,10 @@ static sl_pose_t character_pose(const sl_game_t *g)
         sl_vec3_t target=resting;
         if(g->action){
             sl_vec3_t contact=center;
+            if(g->action==14){
+                contact.y-=.18f*smooth(.30f,.72f,t);
+                contact.z+=.04f*smooth(.30f,.72f,t);
+            }
             if(g->action==4||g->action==5){
                 float angle=(smooth(.25f,.48f,t)*(1-smooth(.48f,.56f,t))+
                              smooth(.56f,.78f,t))*.35f*SL_PI;

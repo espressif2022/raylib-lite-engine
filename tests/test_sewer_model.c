@@ -69,6 +69,7 @@ static void check_scene_budget(void)
     for(int state=0;state<2;++state)for(int z=1;z<15;++z)for(int x=1;x<16;++x)
         for(int angle=0;angle<8;++angle)for(int tilt=0;tilt<3;++tilt){
             sl_game_t g;reset_dispatch(&g,0,site,0,false);g.power=g.pumping=g.west=g.east=state;g.water=state?0:1;
+            g.workshop_open=state;
             g.x=tile_center(x);g.z=tile_center(z);
             if(low_passage(g.x,g.z)){g.sneaking=true;g.crouch=1;}
             if(!movement_ok(&g,g.x,g.z))continue;
@@ -322,7 +323,7 @@ static void check_field_map(void)
 }
 static void check_interaction_feedback(void)
 {
-    for(unsigned action=1;action<=13;++action){
+    for(unsigned action=1;action<=14;++action){
         sl_game_t g;reset_game(&g);
         g.kit=0;g.water=0;
         if(action==2)g.fuse=true;
@@ -351,6 +352,38 @@ static void check_interaction_feedback(void)
     assert(interaction_target(&g)==13&&interaction_block(&g,13)==21);
     interact(&g);assert(g.signal==21&&!g.action&&!g.mark_count);
     g.journal=true;assert(!interaction_target(&g));
+}
+static void check_workshop(void)
+{
+    sl_game_t g;reset_game(&g);
+    assert(!walkable(&g,11,5));
+    g.x=tile_center(11);g.z=10.70f;
+    assert(!interaction_target(&g));
+    assert(!movement_ok(&g,g.x,11.1f));
+    g.x=tile_center(12);g.z=tile_center(6);
+    assert(movement_ok(&g,g.x,g.z));
+    assert(!movement_ok(&g,28.2f,14.4f)&&!camera_point_ok(&g,28.2f,14.4f));
+    assert(interaction_target(&g)==14);
+    interact(&g);assert(g.action==14&&!g.workshop_open);
+    for(int tick=9;tick<=26;++tick){
+        sl_game_t pose_game=g;pose_game.action_ticks=36-tick;pose_game.facing=SL_PI;
+        pose_game.x=27.5f;pose_game.z=13.26f+work_distance(14);
+        sl_pose_t pose=character_pose(&pose_game);
+        float pull=smooth(.30f,.72f,action_progress(&pose_game));
+        for(int side=0;side<2;++side){
+            sl_vec3_t hand=xf_point(pose.root,pose.hand[side].x,pose.hand[side].y,pose.hand[side].z);
+            sl_vec3_t target={27.5f+(side?-.11f:.11f),1.34f-.18f*pull,13.26f+.04f*pull};
+            assert(distance(hand,target)<.035f);
+        }
+    }
+    for(int i=0;i<35;++i)update_game(&g);
+    assert(!g.workshop_open);update_game(&g);assert(g.workshop_open);
+    assert(walkable(&g,11,5)&&!walkable(&g,11,8));
+    for(int step=0;step<=88;++step)
+        assert(movement_ok(&g,tile_center(11),tile_center(4)+step*.05f));
+    g.x=tile_center(11);g.z=tile_center(5);update_game(&g);assert(g.workshop_used);
+    g.record=true;g.water=0;assert(walkable(&g,11,5)&&!walkable(&g,8,11));
+    puts("workshop: inner release, hand contact, clear return lane and alarm persistence ok");
 }
 int main(void)
 {
@@ -415,6 +448,7 @@ int main(void)
     check_expedition_records();
     check_field_map();
     check_interaction_feedback();
+    check_workshop();
     puts("sewer model and audio lifecycle: ok");
     return 0;
 }

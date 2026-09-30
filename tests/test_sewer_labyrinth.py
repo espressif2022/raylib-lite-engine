@@ -32,6 +32,19 @@ def run_scenario(name: str, frames: int) -> dict:
 
 
 class SewerLabyrinthTests(unittest.TestCase):
+    def test_workshop_release_opens_a_two_way_return_loop(self) -> None:
+        route = "workshop-loop.json"
+        before = run_scenario(route, CHECKPOINTS[route]["bench"])
+        self.assertFalse(before["workshop_open"])
+        self.assertEqual(before["focus"], 14)
+        self.assertEqual(before["focus_block"], 0)
+        north = run_scenario(route, CHECKPOINTS[route]["north"])
+        self.assertTrue(north["workshop_open"] and north["workshop_used"])
+        self.assertEqual((north["cell_x"], north["cell_z"]), (11, 4))
+        end = run_scenario(route, CHECKPOINTS[route]["end"])
+        self.assertEqual(end["phase"], "won")
+        self.assertTrue(end["workshop_used"] and end["relay"] and end["west"])
+
     def test_facility_changes_patrol_lane_and_scanning(self) -> None:
         loop = run_scenario("patrol-loop.json", CHECKPOINTS["patrol-loop.json"]["end"])
         self.assertEqual(loop["patrol_mode"], 1)

@@ -104,5 +104,20 @@
     "wrench_hatch": 545,
     "west": 704,
     "end": 1091
+  },
+  "workshop-loop.json": {
+    "fuse": 75,
+    "power": 354,
+    "pump": 692,
+    "draining": 752,
+    "drained": 872,
+    "bench": 991,
+    "latch": 1032,
+    "north": 1122,
+    "relay": 1193,
+    "return": 1283,
+    "hatch": 1532,
+    "west": 1691,
+    "end": 2258
   }
 }

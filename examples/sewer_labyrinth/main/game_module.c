@@ -77,6 +77,7 @@ typedef struct {
     float lure_x,lure_z;
     bool passage_used;
     bool journal,salvaged;
+    bool workshop_open,workshop_used;
     uint8_t journal_page;
     uint8_t knowledge;
     uint8_t completed_sites[SL_MISSIONS],personal_badges,run_badges;
@@ -118,9 +119,9 @@ static const char *const s_map[SL_MAP]={
     "##.............##",
     "##....##.##....##",
     "##....##.##....##",
-    "##.#####.#####.##",
-    "##.###.....###.##",
-    "##.###.....###.##",
+    "##.#####.##s##.##",
+    "##.###.......#.##",
+    "##.###......##.##",
     "##W..w..H..e..E##",
     "##.###.....###.##",
     "##.###.....###.##",
@@ -165,6 +166,7 @@ static sl_vec3_t work_center(unsigned action)
     case 9:return (sl_vec3_t){12.10f,1.35f,24.33f};
     case 10:return (sl_vec3_t){25.30f,1.35f,24.33f};
     case 13:return (sl_vec3_t){25.30f,.87f,24.38f};
+    case 14:return (sl_vec3_t){27.50f,1.34f,13.26f};
     case 11:return (sl_vec3_t){13.21f,1.14f,18.70f};
     case 12:return (sl_vec3_t){24.19f,1.14f,18.70f};
     default:return (sl_vec3_t){9.90f,1.40f,10.72f};
@@ -172,7 +174,7 @@ static sl_vec3_t work_center(unsigned action)
 }
 static float work_heading(unsigned action)
 {return action==4||action==11?-SL_PI*.5f:action==5||action==12?SL_PI*.5f:
-        action==9||action==10||action==13?SL_PI:0;}
+        action==9||action==10||action==13||action==14?SL_PI:0;}
 static float work_distance(unsigned action)
 {return action==1?.60f:action==3||action==6?.54f:action==4||action==5?.49f:.47f;}
 static float wrap_angle(float v)
@@ -299,6 +301,7 @@ static bool walkable(const sl_game_t *g,int x,int z)
     if(c=='e')return g->east||g->hatch_e;
     if(c=='b')return g->water<=.02f&&(!g->record||g->relay);
     if(c=='u')return g->water<=.02f;
+    if(c=='s')return g->workshop_open;
     if(z>=10&&z<=12&&((x==2&&site_config(g)->closed_side==1)||
                       (x==14&&site_config(g)->closed_side==2)))return false;
     if(x==2&&z>=9&&z<=13&&!g->west)return false;
@@ -312,6 +315,7 @@ static bool clearance_ok(const sl_game_t *g,float x,float z,bool camera)
     if(!camera&&!has_tool(g,SL_INSULATOR)&&electric_floor(g,x,z))return false;
     if(z>23.92f&&z<24.40f&&((x>13.12f&&x<13.59f)||(x>15.03f&&x<15.50f)))return false;
     if(x>24.88f&&x<25.72f&&z>24.20f&&z<24.70f)return false;
+    if(x>27.95f&&x<28.62f&&z>13.65f&&z<15.32f)return false;
     /* Recessed sumps and fixed equipment have the same clearance for actor
      * and camera. The center bridge remains available on either side. */
     if(z>15.65f&&z<21.35f&&((x>15.7f&&x<17.4f)||(x>20.0f&&x<21.7f)))return false;
@@ -1012,6 +1016,45 @@ static void add_console(int x,int z,Color lamp)
     }
 }
 
+static void add_workshop(const sl_game_t *g)
+{
+    if(fabsf(g->x-26.4f)>10||fabsf(g->z-14.3f)>10)return;
+    Color steel={50,79,81,255},ochre={180,138,64,255},paper={206,200,161,255};
+    /* A wall-hung bench, spare motor and rack leave a clear central lane. */
+    add_box(28.08f,13.84f,28.48f,15.13f,.83f,.92f,ochre);
+    add_box(28.12f,13.91f,28.40f,14.03f,0,.83f,steel);
+    add_box(28.12f,14.92f,28.40f,15.04f,0,.83f,steel);
+    add_beveled(xf_trans(28.27f,1.10f,14.56f),.32f,.26f,.36f,.44f,.38f,0,(Color){91,121,113,255});
+    add_box(28.02f,14.48f,28.12f,14.64f,1.05f,1.16f,paper);
+    add_floor(28.12f,13.94f,28.40f,14.25f,.925f,paper);
+    add_box(28.45f,13.85f,28.56f,15.15f,1.65f,1.74f,steel);
+    for(int tool=0;tool<3;++tool)
+        add_box(28.43f,14.00f+tool*.38f,28.47f,14.08f+tool*.38f,1.24f,1.58f,ochre);
+    add_box(24.35f,15.60f,24.44f,17.20f,1.95f,2.05f,(Color){84,145,141,255});
+    add_box(25.00f,14.00f,27.50f,14.18f,2.85f,2.95f,(Color){222,209,156,255});
+    add_floor(24.80f,13.50f,24.87f,15.00f,.013f,ochre);
+    add_floor(25.73f,13.50f,25.80f,15.00f,.013f,ochre);
+    /* Mechanical latch slides with both hands. No power or consumable needed. */
+    float pull=g->workshop_open?1:g->action==14?smooth(.30f,.72f,action_progress(g)):0;
+    add_box(27.09f,13.21f,27.91f,13.24f,1.01f,1.63f,steel);
+    add_box(27.15f,13.23f,27.20f,13.32f,1.05f,1.53f,ochre);
+    add_box(27.80f,13.23f,27.85f,13.32f,1.05f,1.53f,ochre);
+    add_box(27.28f,13.24f+.04f*pull,27.72f,13.28f+.04f*pull,
+            1.31f-.18f*pull,1.37f-.18f*pull,paper);
+    add_box(27.36f,13.25f,27.64f,13.28f,1.49f,1.56f,
+            g->workshop_open?(Color){103,211,162,255}:(Color){213,115,68,255});
+    /* Both mouths retain a raised shutter and a broad frame after release. */
+    for(int end=0;end<2;++end){
+        float z=end?13.15f:11.02f;
+        add_box(24.21f,z,24.30f,z+.06f,0,3.02f,ochre);
+        add_box(26.30f,z,26.39f,z+.06f,0,3.02f,ochre);
+        add_box(24.30f,z,26.30f,z+.06f,2.56f,3.02f,steel);
+    }
+    if(!g->workshop_open){
+        for(int rib=0;rib<4;++rib)
+            add_box(24.32f,13.19f,26.28f,13.215f,.30f+rib*.45f,.34f+rib*.45f,steel);
+    }
+}
 static void add_scene(const sl_game_t *g)
 {
     s_face_count=0;s_faces_dropped=0;s_material=0;
@@ -1044,6 +1087,7 @@ static void add_scene(const sl_game_t *g)
         }
     }
     int px=tile_at(g->x),pz=tile_at(g->z);
+    add_workshop(g);
     if(pz>=9){
         /* South-bay marker is a large painted landmark, readable from both
          * log alcoves without a new texture or a screen-space label. */
@@ -1264,6 +1308,7 @@ static unsigned interaction_target(const sl_game_t *g)
     if(nearby(g,5,11,1.1f)&&!(g->logs&1))return 9;
     if(nearby(g,11,11,1.1f)&&!(g->logs&2))return 10;
     if(nearby(g,11,11,1.1f)&&!g->salvaged)return 13;
+    if(nearby(g,12,6,1.1f)&&!g->workshop_open)return 14;
     if(has_tool(g,SL_WRENCH)&&nearby(g,6,8,1.1f)&&!g->hatch_w&&!g->west)return 11;
     if(has_tool(g,SL_WRENCH)&&nearby(g,10,8,1.1f)&&!g->hatch_e&&!g->east)return 12;
     if(g->mission==SL_RECOVERY&&nearby(g,8,14,1.55f)&&!g->record)return 6;
@@ -1288,7 +1333,8 @@ static const char *interaction_prompt(const sl_game_t *g,unsigned action,unsigne
     static const char *const prompts[]={NULL,"F  PICK UP SPARE FUSE","F  INSTALL FUSE",
         "F  PULL PUMP STARTER","F  OPEN WEST VALVE","F  OPEN EAST VALVE","F  TAKE THE RECORDER",
         "F  READ SERVICE CHART","F  ENABLE BACKUP RELAY","F  READ WEST SERVICE LOG",
-        "F  READ EAST SERVICE LOG","F  WRENCH: OPEN WEST HATCH","F  WRENCH: OPEN EAST HATCH","F  SALVAGE SPARE DECOY"};
+        "F  READ EAST SERVICE LOG","F  WRENCH: OPEN WEST HATCH","F  WRENCH: OPEN EAST HATCH","F  SALVAGE SPARE DECOY",
+        "F  RELEASE WORKSHOP SAFETY LATCH"};
     if(blocked==15)return "STEP CLOSER TO THE DEVICE";
     if(blocked==9)return "FUSE MISSING - CHECK ENTRY BENCH";
     if(blocked==10)return "PUMP NEEDS POWER OR A BATTERY";
@@ -1338,6 +1384,7 @@ static void finish_action(sl_game_t *g)
     case 11:g->hatch_w=true;g->signal=17;break;
     case 12:g->hatch_e=true;g->signal=17;break;
     case 13:g->salvaged=true;g->lure_charge=true;g->signal=22;break;
+    case 14:g->workshop_open=true;g->signal=23;break;
     default:break;
     }
     g->signal_until=g->tick+105;g->action=0;
@@ -1395,6 +1442,7 @@ static void update_game(sl_game_t *g)
     place_camera(g);
     int x=tile_at(g->x),z=tile_at(g->z);
     if(x>=0&&x<SL_MAP&&z>=0&&z<SL_MAP)g->visited[z][x]=1;
+    if(cell_at(x,z)=='s'&&g->workshop_open)g->workshop_used=true;
     if(mission_ready(g)&&nearby(g,8,1,1.2f)){g->escaped=true;cue(g,SL_WIN);}
     ++g->tick;
 }
@@ -1438,7 +1486,7 @@ static void draw_field_map(const sl_game_t *g)
         Color color=flood?blue:!walkable(g,x,z)?amber:c=='H'?(Color){33,58,60,255}:green;
         DrawRectangle(sx+1,sy+1,cell-2,cell-2,color);
         if(g->marks[z][x])DrawRectangle(sx+5,sy+5,6,6,(Color){113,244,177,255});
-        const char *label=c=='S'?"S":c=='W'?"W":c=='E'?"E":c=='R'?"R":c=='H'?"P":c=='u'?"v":
+        const char *label=c=='S'?"S":c=='W'?"W":c=='E'?"E":c=='R'?"R":c=='H'?"P":c=='u'?"v":c=='s'?"G":
             z==11&&(x==5||x==11)?"L":NULL;
         if(g->power&&x==site_config(g)->fault_x&&z==3)label="!";
         if(label)DrawText(label,sx+5,sy+4,9,pale);
@@ -1456,7 +1504,7 @@ static void draw_field_map(const sl_game_t *g)
         DrawRectangle(x-3,z-3,6,6,(Color){238,98,75,255});
         DrawRectangle(x+(int)(sinf(g->drone_yaw)*6),z+(int)(cosf(g->drone_yaw)*6),2,2,amber);
     }
-    DrawText("S EXIT   P PUMP   L LOG   v LOW DUCT",44,389,10,pale);
+    DrawText("S EXIT  P PUMP  L LOG  v DUCT  G GATE",44,389,10,pale);
     DrawText("BLUE: WATER   AMBER: SEALED   ! LIVE FLOOR",44,402,10,amber);
 }
 static void draw_map(const sl_game_t *g)
@@ -1527,8 +1575,8 @@ static void draw_hud(const sl_game_t *g)
             "BACKUP RELAY DISCONNECTED", "STEP CLOSER TO THE DEVICE",
             "SERVICE LOG COLLECTED", "MAINTENANCE HATCH OPEN", "DECOY ACTIVE - MOVE NOW",
             "WEST LOG: FLUSH BYPASS / J NOTES", "EAST LOG: SPARE DECOY / J NOTES",
-            "POUCH FULL - USE YOUR DECOY FIRST", "SPARE DECOY SALVAGED"};
-        if(g->signal>0&&g->signal<23){
+            "POUCH FULL - USE YOUR DECOY FIRST", "SPARE DECOY SALVAGED", "WORKSHOP LINK TO SWITCH ROOM OPEN"};
+        if(g->signal>0&&g->signal<24){
             DrawRectangle(70,357,340,29,(Color){8,24,28,226});
             DrawRectangle(70,357,3,29,mint);
             DrawText(g->signal==3&&g->relay?"RECORDER SECURED - RELAY HOLDS":
@@ -1539,6 +1587,8 @@ static void draw_hud(const sl_game_t *g)
     const char *prompt=interaction_prompt(g,focus,blocked);
     if(!prompt&&(nearby(g,6,10,2.4f)||low_passage(g->x,g->z)))
         prompt=g->water>.02f?"SUBMERGED DUCT - START THE PUMP":"HOLD SHIFT / SNEAK: ENTER LOW DUCT";
+    if(!prompt&&!g->workshop_open&&nearby(g,11,4,1.6f)&&g->z>10.05f)
+        prompt="SAFETY LATCH IS INSIDE THE WORKSHOP";
     if(focus&&!blocked){
         sl_view_t target=to_view(work_center(focus));
         if(target.z>.15f){
@@ -1553,7 +1603,7 @@ static void draw_hud(const sl_game_t *g)
     if(g->action){
         static const char *const verbs[]={"","PICK UP FUSE","INSTALL FUSE","PULL STARTER",
             "TURN WEST VALVE","TURN EAST VALVE","TAKE RECORDER","READ CHART","SET RELAY",
-            "READ WEST LOG","READ EAST LOG","UNLOCK WEST HATCH","UNLOCK EAST HATCH","SALVAGE DECOY"};
+            "READ WEST LOG","READ EAST LOG","UNLOCK WEST HATCH","UNLOCK EAST HATCH","SALVAGE DECOY","RELEASE SAFETY LATCH"};
         DrawRectangle(126,397,228,29,(Color){8,24,28,230});
         DrawText(verbs[g->action],144,405,11,pale);
         DrawRectangle(126,426,(int)(228*(36-g->action_ticks)/36),3,amber);
@@ -1931,7 +1981,7 @@ static int state_json(const void *value,char *out,size_t cap)
         "\"west\":%s,\"east\":%s,\"chart\":%s,\"relay\":%s,"
         "\"center_open\":%s,\"record\":%s,\"marks\":%u,"
         "\"mission\":%u,\"site\":%u,\"kit\":%u,\"target_side\":%u,\"logs\":%u,"
-        "\"duct_open\":%s,\"duct_used\":%s,\"crouch\":%.2f,"
+        "\"duct_open\":%s,\"duct_used\":%s,\"crouch\":%.2f,\"workshop_open\":%s,\"workshop_used\":%s,"
         "\"journal\":%s,\"journal_page\":%u,\"knowledge\":%u,\"salvaged\":%s,"
         "\"battery\":%s,\"lure\":%s,\"ready\":%s,\"completed\":%lu,\"best_ticks\":%lu,\"badges\":%u,"
         "\"elapsed\":%lu,\"run_wins\":%u,\"run_badges\":%u,\"new_best\":%s,\"outing_mask\":%u,"
@@ -1951,6 +2001,7 @@ static int state_json(const void *value,char *out,size_t cap)
         g->record?"true":"false",(unsigned)g->mark_count,
         g->mission,g->site,g->kit,site_config(g)->target_side,g->logs,
         g->water<=.02f?"true":"false",g->passage_used?"true":"false",g->crouch,
+        g->workshop_open?"true":"false",g->workshop_used?"true":"false",
         g->journal?"true":"false",g->journal_page,g->knowledge,g->salvaged?"true":"false",
         g->battery_charge?"true":"false",g->lure_charge?"true":"false",mission_ready(g)?"true":"false",
         (unsigned long)((const sl_module_t*)value)->completed[g->mission],
