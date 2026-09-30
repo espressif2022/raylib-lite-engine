@@ -395,8 +395,11 @@ static Vector2 rainforest_flow_project(const living_world_t *world,
     while(longitude<0.0f)longitude+=360.0f;
     while(longitude>=360.0f)longitude-=360.0f;
     float delta=longitude-world->yaw;
-    while(delta<0.0f)delta+=360.0f;
-    while(delta>=360.0f)delta-=360.0f;
+    /* Keep points just left of the viewport at a small negative X. Mapping
+       them to almost 360 degrees makes a seam-crossing waterfall quad span
+       the whole screen. */
+    while(delta<-180.0f)delta+=360.0f;
+    while(delta>=180.0f)delta-=360.0f;
     return (Vector2){delta*(480.0f/VIEW_FOV_DEG),v*480.0f};
 }
 
@@ -596,6 +599,20 @@ static mosaico_textured_vertex_t rainforest_falls_vertex(
     };
 }
 
+static int rainforest_falls_quad_visible(mosaico_textured_vertex_t a,
+                                        mosaico_textured_vertex_t b,
+                                        mosaico_textured_vertex_t c,
+                                        mosaico_textured_vertex_t d)
+{
+    float min_x=fminf(fminf(a.x,b.x),fminf(c.x,d.x));
+    float max_x=fmaxf(fmaxf(a.x,b.x),fmaxf(c.x,d.x));
+    float min_y=fminf(fminf(a.y,b.y),fminf(c.y,d.y));
+    float max_y=fmaxf(fmaxf(a.y,b.y),fmaxf(c.y,d.y));
+    return isfinite(min_x)&&isfinite(max_x)&&isfinite(min_y)&&isfinite(max_y)&&
+        max_x>=0.0f&&min_x<480.0f&&max_y>=0.0f&&min_y<420.0f&&
+        max_x-min_x<=120.0f;
+}
+
 static void draw_rainforest_falls_layer(const living_world_t *world,
                                         MosaicoAtlas rainforest,
                                         MosaicoAtlas falls,
@@ -622,16 +639,14 @@ static void draw_rainforest_falls_layer(const living_world_t *world,
                 slices,count,p0,l0,layer->u0,v0-base);
             mosaico_textured_vertex_t b=rainforest_falls_vertex(world,rainforest,
                 slices,count,p0,l1,layer->u0,v0-base);
-            if((!rainforest_on_screen((Vector2){a.x,a.y})&&
-                !rainforest_on_screen((Vector2){b.x,b.y}))||
-               fabsf(b.x-a.x)>120.0f)continue;
             mosaico_textured_vertex_t c=rainforest_falls_vertex(world,rainforest,
                 slices,count,cut,l0,layer->u0,
                 cut<p1?RF_FALLS_PERIOD:v1-base);
             mosaico_textured_vertex_t d=rainforest_falls_vertex(world,rainforest,
                 slices,count,cut,l1,layer->u0,
                 cut<p1?RF_FALLS_PERIOD:v1-base);
-            Mosaico2DDrawTexturedQuad(falls.texture,a,b,c,d,256U);
+            if(rainforest_falls_quad_visible(a,b,c,d))
+                Mosaico2DDrawTexturedQuad(falls.texture,a,b,c,d,256U);
             if(cut<p1){
                 mosaico_textured_vertex_t e=rainforest_falls_vertex(world,rainforest,
                     slices,count,cut,l0,layer->u0,0.0f);
@@ -641,7 +656,8 @@ static void draw_rainforest_falls_layer(const living_world_t *world,
                     slices,count,p1,l0,layer->u0,v1-seam);
                 mosaico_textured_vertex_t h=rainforest_falls_vertex(world,rainforest,
                     slices,count,p1,l1,layer->u0,v1-seam);
-                Mosaico2DDrawTexturedQuad(falls.texture,e,f,g,h,256U);
+                if(rainforest_falls_quad_visible(e,f,g,h))
+                    Mosaico2DDrawTexturedQuad(falls.texture,e,f,g,h,256U);
             }
         }
     }
@@ -1184,30 +1200,10 @@ static void draw_scene_button(int x,const char *label,bool selected)
     DrawText(label,x+8,435,10,text);
 }
 
-static int measured_fps(void)
-{
-    static int64_t started_us;
-    static int frames;
-    static int fps;
-    int64_t now=(int64_t)raylib_lite_time_us();
-    if(!started_us)started_us=now;
-    ++frames;
-    int64_t elapsed=now-started_us;
-    if(elapsed>=1000000){
-        /* 32-bit divide: the ELF libc allowlist has no __divdi3. */
-        uint32_t us=elapsed>100000000LL?100000000u:(uint32_t)elapsed;
-        uint32_t n=frames>4000?4000u:(uint32_t)frames;
-        fps=(int)((n*1000000u)/us);
-        started_us=now;
-        frames=0;
-    }
-    return fps;
-}
-
 static void draw_overlay(const living_world_t *world)
 {
     DrawRectangle(16,16,448,39,(Color){0,22,36,145});
-    DrawText(TextFormat("FPS: %d",measured_fps()),29,26,16,(Color){218,250,242,255});
+    DrawText("LIVING WORLDS",29,27,14,(Color){218,250,242,255});
     const char *fx=world->effects_level==0?"FX CALM":
                    (world->effects_level==2?"FX VIVID":"FX LIVING");
     DrawText(fx,260,31,8,(Color){156,220,211,230});
@@ -1223,8 +1219,6 @@ void living_worlds_view_render(const living_world_t *world,
 {
     if(!world||!atlases)return;
     BeginDrawing();
-    /* Diagnostic clear: rule out stale pixels in a reused frame buffer. */
-    ClearBackground(BLACK);
     if(world->scene==LIVING_SCENE_AURORA){
         living_aurora_draw(&world->aurora,world->yaw,world->pitch,world->effects_level,
             atlases->aurora,atlases->aurora_ice_front,atlases->aurora_ice_side,

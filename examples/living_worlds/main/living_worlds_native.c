@@ -3,7 +3,6 @@
 #include <string.h>
 #include <stdbool.h>
 #include "living_worlds_native.h"
-#include "living_worlds_ocean_draw.h"
 
 #include "driver/jpeg_decode.h"
 #include "esp_log.h"
@@ -300,32 +299,6 @@ static void app_render(void *user)
     living_worlds_session_render(&((living_worlds_native_t *)user)->session);
 }
 
-static void app_stats(void *user)
-{
-    living_worlds_native_t *state = user;
-    ESP_LOGI(TAG, "scene=%u yaw=%.1f pitch=%.1f hash=%08lx",
-             state->session.world.scene, state->session.world.yaw,
-             state->session.world.pitch,
-             (unsigned long)living_world_hash(&state->session.world));
-#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
-    if (state->session.world.scene == LIVING_SCENE_OCEAN) {
-        mosaico_game_2d_raster_stats_t raster;
-        mosaico_game_2d_get_raster_stats(&raster);
-        living_ocean_draw_profile_t ocean = living_ocean_draw_profile();
-        ESP_LOGI(TAG,
-                 "ocean_profile cover=%luus water=%luus reefs=%luus actors=%luus "
-                 "water_setup=%luus water_emit=%luus reefs_emit=%luus jelly=%luus "
-                 "tri_setup=%luus tri_raster=%luus",
-                 (unsigned long)raster.sky_us, (unsigned long)raster.floor_us,
-                 (unsigned long)raster.wall_us, (unsigned long)raster.enemy_us,
-                 (unsigned long)raster.hud_us, (unsigned long)ocean.water_emit_us,
-                 (unsigned long)ocean.reefs_emit_us, (unsigned long)ocean.jelly_us,
-                 (unsigned long)raster.triangle_setup_us,
-                 (unsigned long)raster.triangle_raster_us);
-    }
-#endif
-}
-
 static void app_stop(void *user)
 {
     living_worlds_native_t *state = user;
@@ -350,7 +323,8 @@ esp_err_t living_worlds_native_run(mosaico_board_platform_t *board)
         .window_title = "Living Worlds",
         .logic_hz = 30,
         .target_fps = 30,
-        .stats_interval = 300,
+        /* Keep the shared timing logger dormant in release builds. */
+        .stats_interval = UINT32_MAX,
         .platform = *services,
         .input = mosaico_board_platform_input(board),
         .user = &state,
@@ -360,7 +334,7 @@ esp_err_t living_worlds_native_run(mosaico_board_platform_t *board)
         .idle = app_idle,
         .on_update = app_update,
         .on_render = app_render,
-        .on_stats = app_stats,
+        .on_stats = NULL,
         .on_stop = app_stop,
     };
     switch (raylib_lite_game_app_run(&app)) {
