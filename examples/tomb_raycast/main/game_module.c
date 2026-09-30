@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>
-#include "raylib_lite_clock.h"
 #if defined(MOSAICO_GAME_ELF)
 #include "mosaico_game_module.h"
 #include "mosaico_runtime_v1.h"
@@ -33,11 +32,6 @@ typedef struct {
     bool paused, left, right, forward, backward, jump, strafe_left, strafe_right;
     int32_t joystick_track, look_track, jump_track, look_x, look_y, stick_x, stick_y;
     float move_forward, move_strafe;
-#if defined(MOSAICO_GAME_ELF)
-    int64_t fps_started_us;
-    uint32_t fps_frames;
-    float display_fps;
-#endif
 } tomb_module_t;
 
 #define JOYSTICK_RADIUS 53
@@ -89,11 +83,6 @@ static int initialize(void *value
 #if !defined(MOSAICO_GAME_NATIVE)
     InitWindow(480,480,"Tomb Raycast");
     SetTargetFPS(30);
-#endif
-#if defined(MOSAICO_GAME_ELF)
-    state->fps_started_us=raylib_lite_time_us();
-    state->fps_frames=0;
-    state->display_fps=0.0f;
 #endif
     return 0;
 }
@@ -198,14 +187,8 @@ static int render(void *value)
 {
     tomb_module_t *state=value;
 #if defined(MOSAICO_GAME_ELF)
-    ++state->fps_frames;
-    int64_t now_us=raylib_lite_time_us();
-    if(now_us-state->fps_started_us>=1000000){
-        state->display_fps=(float)state->fps_frames;
-        state->fps_started_us=now_us;
-        state->fps_frames=0;
-    }
-    float display_fps=state->display_fps;
+    mosaico_runtime_performance_stats_v1_t stats={0};
+    float display_fps=MosaicoPerformanceGetStats(&stats)?stats.display_fps:0.0f;
 #else
     float display_fps=(float)GetFPS();
 #if defined(MOSAICO_GAME_NATIVE)

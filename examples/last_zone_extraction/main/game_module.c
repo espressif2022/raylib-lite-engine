@@ -33,9 +33,6 @@ typedef struct {
     uint8_t warmup_frames;
     bool deploy_ready;
     bool block_until_up;
-    uint64_t last_frame_us;
-    float display_fps;
-    float render_ms;
 #if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
     last_zone_feedback_t feedback;
 #endif
@@ -142,11 +139,6 @@ static int initialize(void *value
     state->warmup_frames = 2;
     state->deploy_ready = false;
     state->block_until_up = false;
-#if defined(MOSAICO_GAME_ELF)
-    state->last_frame_us = 0;
-    state->display_fps = 0.0f;
-    state->render_ms = 0.0f;
-#endif
 #else
     const char *layout = getenv("LAST_ZONE_SIM_LAYOUT");
     if (layout) {
@@ -349,20 +341,22 @@ static int render(void *value)
 {
     last_zone_module_t *state = value;
     uint64_t now = raylib_lite_time_us();
+    float logic_fps = state->game.perf_logic_fps;
+    float display_fps = state->game.perf_display_fps;
 #if defined(MOSAICO_GAME_ELF)
-    if (state->last_frame_us) {
-        uint32_t dt = (uint32_t)(now - state->last_frame_us);
-        if (dt > 0 && dt < 1000000u)
-            state->display_fps = 1000000.0f / (float)dt;
+    mosaico_runtime_performance_stats_v1_t stats = {0};
+    if (MosaicoPerformanceGetStats(&stats)) {
+        logic_fps = stats.logic_fps;
+        display_fps = stats.display_fps;
+    } else {
+        logic_fps = display_fps = 0.0f;
     }
-    state->last_frame_us = now;
-    last_zone_set_performance(&state->game, 30.0f, state->display_fps, state->render_ms);
 #else
 #if defined(MOSAICO_GAME_NATIVE)
     mosaico_game_stats_t stats = {0};
     MosaicoGameGetStats(&stats);
-    last_zone_set_performance(&state->game, stats.logic_fps, stats.display_fps,
-                              state->game.perf_render_ms);
+    logic_fps = stats.logic_fps;
+    display_fps = stats.display_fps;
 #else
     uint64_t now_us = now;
     if (!state->fps_window_us) state->fps_window_us = now_us;
@@ -371,22 +365,19 @@ static int render(void *value)
     if (window_us >= 1000000ULL) {
         float fps = (float)state->fps_window_frames * 1000000.0f /
                     (float)window_us;
-        last_zone_set_performance(&state->game, fps, fps,
-                                  state->game.perf_render_ms);
+        logic_fps = display_fps = fps;
         state->fps_window_us = now_us;
         state->fps_window_frames = 0;
     }
 #endif
 #endif
+    last_zone_set_performance(&state->game, logic_fps, display_fps,
+                              state->game.perf_render_ms);
     last_zone_view_render(&state->game, state->enemies, state->weapon,
                           state->environment, state->floor, state->walls,
                           state->controls, state->props);
     uint32_t elapsed_us = (uint32_t)(raylib_lite_time_us() - now);
-#if defined(MOSAICO_GAME_ELF)
-    state->render_ms = (float)elapsed_us / 1000.0f;
-#else
     state->game.perf_render_ms = (float)elapsed_us / 1000.0f;
-#endif
     return 0;
 }
 
