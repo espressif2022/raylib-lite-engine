@@ -1,5 +1,6 @@
 idf_component_register(
-    SRCS "main.c" "living_worlds_native.c" "living_worlds_world.c"
+    SRCS "main.c" "living_worlds_native.c" "living_worlds_scene_audio.c"
+         "living_worlds_world.c"
          "living_worlds_aurora.c" "living_worlds_ocean.c"
          "living_worlds_volume.c" "living_worlds_view.c"
     INCLUDE_DIRS "."

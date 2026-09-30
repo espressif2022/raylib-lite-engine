@@ -10,20 +10,13 @@
 #include "mosaico_board_platform.h"
 #include "mosaico_game_2d.h"
 #include "mosaico_game_assets.h"
-#include "mosaico_game_audio.h"
 #include "raylib_lite_game_app.h"
 #include "raylib_lite_native_hooks.h"
+#include "living_worlds_scene_audio.h"
 #include "living_worlds_view.h"
 #include "living_worlds_world.h"
 
 static const char *TAG = "living_worlds";
-enum { SCENE_AUDIO_COUNT = LIVING_SCENE_RAINFOREST + 1 };
-static const char *const SCENE_AUDIO_PATHS[SCENE_AUDIO_COUNT] = {
-    [LIVING_SCENE_AURORA] = "aurora_wind_ice.sound",
-    [LIVING_SCENE_OCEAN] = "ocean_ambience.sound",
-    [LIVING_SCENE_SUNRISE] = "sunrise_wind.sound",
-    [LIVING_SCENE_RAINFOREST] = "rainforest_ambience.sound",
-};
 
 #define ATLAS_SYMBOLS(name) \
     extern const uint8_t _binary_##name##_atlas_start[]; \
@@ -60,9 +53,7 @@ typedef struct {
     jpeg_decoder_handle_t jpeg;
     void *background_pixels;
     uint8_t loaded_volumes;
-    Music scene_audio[SCENE_AUDIO_COUNT];
-    uint8_t playing_scene;
-    bool audio_load_attempted;
+    living_worlds_scene_audio_t audio;
     bool paused;
 } living_worlds_native_t;
 
@@ -288,19 +279,6 @@ static esp_err_t load_volumes(living_worlds_native_t *state, uint8_t scene)
     return ESP_OK;
 }
 
-static void play_scene_audio(living_worlds_native_t *state, uint8_t scene)
-{
-    if (state->playing_scene == scene) return;
-    if (state->playing_scene < SCENE_AUDIO_COUNT)
-        MosaicoAudioStopMusic(state->scene_audio[state->playing_scene]);
-    state->playing_scene = UINT8_MAX;
-    if (scene >= SCENE_AUDIO_COUNT || !state->scene_audio[scene].frameCount)
-        return;
-    MosaicoAudioSetMusicVolume(state->scene_audio[scene], 0.65f);
-    MosaicoAudioPlayMusic(state->scene_audio[scene]);
-    state->playing_scene = scene;
-}
-
 static raylib_lite_result_t app_start(void *user)
 {
     living_worlds_native_t *state = user;
@@ -318,7 +296,7 @@ static raylib_lite_result_t app_start(void *user)
     if (err != ESP_OK) goto fail;
     err = load_volumes(state, state->world.scene);
     if (err != ESP_OK) goto fail;
-    MosaicoAudioInit();
+    living_worlds_scene_audio_init(&state->audio);
     return RAYLIB_LITE_OK;
 
 fail:
@@ -353,7 +331,7 @@ static void app_event(void *user, const raylib_lite_input_event_t *event)
         (void)load_volumes(state, previous);
         return;
     }
-    play_scene_audio(state, state->world.scene);
+    living_worlds_scene_audio_select(&state->audio, state->world.scene);
 }
 
 static bool app_idle(void *user)
@@ -365,17 +343,12 @@ static void app_update(void *user)
 {
     living_worlds_native_t *state = user;
     if (!state->paused) living_world_update(&state->world);
-    if (!state->audio_load_attempted && MosaicoAudioReady()) {
-        state->audio_load_attempted = true;
+    if (living_worlds_scene_audio_update(&state->audio, state->world.scene)) {
         for (unsigned i = 0; i < SCENE_AUDIO_COUNT; ++i) {
-            state->scene_audio[i] = MosaicoAudioLoadMusic(SCENE_AUDIO_PATHS[i]);
-            if (!state->scene_audio[i].frameCount)
+            if (!state->audio.tracks[i].frameCount)
                 ESP_LOGW(TAG, "failed to load %s", SCENE_AUDIO_PATHS[i]);
         }
-        play_scene_audio(state, state->world.scene);
     }
-    if (state->playing_scene < SCENE_AUDIO_COUNT)
-        MosaicoAudioUpdateMusic(state->scene_audio[state->playing_scene]);
 }
 
 static void app_render(void *user)
@@ -412,14 +385,7 @@ static void app_stats(void *user)
 static void app_stop(void *user)
 {
     living_worlds_native_t *state = user;
-    play_scene_audio(state, UINT8_MAX);
-    for (unsigned i = 0; i < SCENE_AUDIO_COUNT; ++i) {
-        if (state->scene_audio[i].frameCount) {
-            MosaicoAudioUnloadMusic(state->scene_audio[i]);
-            state->scene_audio[i] = (Music){0};
-        }
-    }
-    MosaicoAudioClose();
+    living_worlds_scene_audio_close(&state->audio);
     unload_volumes(&state->atlases);
     if (state->atlases.aurora.texture.id)
         Mosaico2DUnloadTexture(state->atlases.aurora.texture);
@@ -442,7 +408,7 @@ esp_err_t living_worlds_native_run(mosaico_board_platform_t *board)
 
     living_worlds_native_t state = {
         .board = board, .loaded_volumes = UINT8_MAX,
-        .playing_scene = UINT8_MAX,
+        .audio.playing_scene = UINT8_MAX,
     };
     const raylib_lite_game_app_t app = {
         .tag = "living_worlds",

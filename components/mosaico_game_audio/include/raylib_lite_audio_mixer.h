@@ -95,6 +95,9 @@ raylib_lite_result_t raylib_lite_audio_mixer_play_music(
 void raylib_lite_audio_mixer_stop_music(raylib_lite_audio_mixer_t *mixer);
 void raylib_lite_audio_mixer_set_music_volume(
     raylib_lite_audio_mixer_t *mixer, float volume);
+/* Scales the mixed output. 1 leaves games' own volumes unchanged. */
+void raylib_lite_audio_mixer_set_master_volume(
+    raylib_lite_audio_mixer_t *mixer, float volume);
 
 /* Synchronously produces 24 kHz, mono, native-endian signed S16 PCM. */
 raylib_lite_result_t raylib_lite_audio_mixer_mix(

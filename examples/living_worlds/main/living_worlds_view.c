@@ -1223,8 +1223,8 @@ void living_worlds_view_render(const living_world_t *world,
 {
     if(!world||!atlases)return;
     BeginDrawing();
-    /* All scene backgrounds cover the canvas for their supported camera
-     * ranges, so a full PSRAM clear would only add 230,400 writes. */
+    /* Diagnostic clear: rule out stale pixels in a reused frame buffer. */
+    ClearBackground(BLACK);
     if(world->scene==LIVING_SCENE_AURORA){
         living_aurora_draw(&world->aurora,world->yaw,world->pitch,world->effects_level,
             atlases->aurora,atlases->aurora_ice_front,atlases->aurora_ice_side,

@@ -16,6 +16,9 @@
 
 #define STRIP_FRAME_TOKEN 1U
 #define FRAME_COUNT 3U
+#ifndef MOSAICO_STRIP_FORCE_CPU_COPY
+#define MOSAICO_STRIP_FORCE_CPU_COPY 0
+#endif
 
 typedef enum {
     FRAME_FREE,
@@ -148,6 +151,9 @@ raylib_lite_result_t mosaico_strip_present_open(
     ESP_LOGI("strip_present", "producer core=%d priority=%u",
              xPortGetCoreID(), (unsigned)uxTaskPriorityGet(NULL));
 
+#if MOSAICO_STRIP_FORCE_CPU_COPY
+    ESP_LOGW("strip_present", "diagnostic CPU-only strip copy enabled");
+#else
     const async_color_convert_config_t copy_config = {
         .backlog = 1, .dma_burst_size = 16,
     };
@@ -158,6 +164,7 @@ raylib_lite_result_t mosaico_strip_present_open(
     else
         ESP_LOGW("strip_present", "DMA2D unavailable (%s); CPU fallback",
                  esp_err_to_name(dma_err));
+#endif
 #endif
     video->width = width;
     video->height = height;

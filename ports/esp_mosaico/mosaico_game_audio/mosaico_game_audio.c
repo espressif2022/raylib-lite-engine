@@ -12,6 +12,7 @@
 
 static raylib_lite_audio_mixer_t *s_mixer;
 static platform_esp_audio_service_t *s_service;
+static float s_master_volume = 1.0f;
 
 #define AUDIO_STOP_TIMEOUT_MS 100U
 
@@ -114,7 +115,9 @@ void MosaicoAudioInit(void)
         s_mixer = NULL;
         (void)platform_esp_audio_service_destroy(s_service, 0);
         s_service = NULL;
+        return;
     }
+    raylib_lite_audio_mixer_set_master_volume(s_mixer, s_master_volume);
 }
 
 void MosaicoAudioClose(void)
@@ -241,6 +244,14 @@ void MosaicoAudioSetMusicVolume(Music music, float volume)
 {
     (void)music;
     raylib_lite_audio_mixer_set_music_volume(s_mixer, volume);
+}
+
+void MosaicoAudioSetMasterVolume(float volume)
+{
+    if (volume < 0.0f) volume = 0.0f;
+    if (volume > 1.0f) volume = 1.0f;
+    s_master_volume = volume;
+    if (s_mixer) raylib_lite_audio_mixer_set_master_volume(s_mixer, volume);
 }
 
 void MosaicoAudioGetStats(mosaico_audio_stats_t *stats)

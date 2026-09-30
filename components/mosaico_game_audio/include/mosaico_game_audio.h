@@ -29,6 +29,8 @@ void MosaicoAudioPlayMusic(Music music);
 void MosaicoAudioUpdateMusic(Music music);
 void MosaicoAudioStopMusic(Music music);
 void MosaicoAudioSetMusicVolume(Music music,float volume);
+/* Device master gain, 0..1. Kept across InitAudioDevice. */
+void MosaicoAudioSetMasterVolume(float volume);
 void MosaicoAudioGetStats(mosaico_audio_stats_t *stats);
 #ifdef __cplusplus
 }

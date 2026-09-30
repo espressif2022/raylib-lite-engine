@@ -27,6 +27,7 @@ struct raylib_lite_audio_mixer {
     mixer_voice_t *voices;
     mixer_voice_t music;
     float music_volume;
+    float master_volume;
     uint32_t serial;
     raylib_lite_audio_mixer_stats_t stats;
 };
@@ -107,6 +108,7 @@ raylib_lite_result_t raylib_lite_audio_mixer_create(
     }
     mixer->config = *config;
     mixer->music_volume = 0.28f;
+    mixer->master_volume = 1.0f;
     for (uint16_t i = 0; i < config->max_clips; ++i) {
         mixer->clips[i].generation = 1U;
     }
@@ -311,6 +313,15 @@ void raylib_lite_audio_mixer_set_music_volume(
     mixer_unlock(mixer);
 }
 
+void raylib_lite_audio_mixer_set_master_volume(
+    raylib_lite_audio_mixer_t *mixer, float volume)
+{
+    if (!mixer) return;
+    mixer_lock(mixer);
+    mixer->master_volume = clamp_volume(volume);
+    mixer_unlock(mixer);
+}
+
 raylib_lite_result_t raylib_lite_audio_mixer_mix(
     raylib_lite_audio_mixer_t *mixer, int16_t *out_frames,
     size_t frame_count)
@@ -346,6 +357,10 @@ raylib_lite_result_t raylib_lite_audio_mixer_mix(
                 }
             }
             mixed += (int64_t)(sample * mixer->music_volume);
+        }
+        if (mixer->master_volume < 1.0f) {
+            int master = (int)(mixer->master_volume * 256.0f + 0.5f);
+            mixed = mixed * master / 256;
         }
         if (mixed > 32767) mixed = 32767;
         if (mixed < -32768) mixed = -32768;
