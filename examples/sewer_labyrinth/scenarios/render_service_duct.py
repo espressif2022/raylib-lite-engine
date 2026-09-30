@@ -26,6 +26,8 @@ def main():
         with tempfile.TemporaryDirectory() as directory:
             runtime = GenericHostRuntime(PROJECT, Path(directory))
             try:
+                if name == "submerged-duct.json":
+                    (PROJECT / "docs/dispatch.png").write_bytes(runtime.frame())
                 for frame in range(checkpoints[name]["end"]):
                     for event in by_frame.get(frame, []):
                         runtime.action(event["code"], event["pressed"])
@@ -47,6 +49,11 @@ def main():
                             ("phase", "cell_x", "cell_z", "logs", "duct_open", "duct_used", "faces")}
                 if name == "service-duct.json" and runtime.metadata()["phase"] != "won":
                     raise RuntimeError("Survey route did not complete: " + str(runtime.metadata()))
+                if name == "service-duct.json":
+                    runtime.action(6, True)
+                    runtime.action(6, False)
+                    runtime.api.mosaico_host_game_update_v1(runtime.context)
+                    (PROJECT / "docs/outing-board.png").write_bytes(runtime.frame())
             finally:
                 runtime.close()
     print(json.dumps(summaries, indent=2))

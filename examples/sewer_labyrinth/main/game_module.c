@@ -78,9 +78,14 @@ typedef struct {
     bool passage_used;
     bool journal,salvaged;
     uint8_t knowledge;
+    uint8_t completed_sites[SL_MISSIONS],personal_badges,run_badges;
+    uint16_t selected_wins;
+    uint32_t elapsed,best_ticks;
+    bool new_best;
 } sl_game_t;
 enum { SL_SILENT,SL_STEP,SL_CLICK,SL_POWER,SL_PUMP,SL_ALERT,SL_FAIL,SL_WIN,SL_CUES };
 static const char *const s_cues[SL_CUES]={"","step","click","power","pump","alert","fail","win"};
+typedef struct {uint32_t best_ticks;uint16_t wins;uint8_t badges;} sl_run_record_t;
 typedef struct {
     sl_game_t game;
     sl_game_t checkpoint;
@@ -88,8 +93,9 @@ typedef struct {
     bool left,right,forward,back,strafe_left,strafe_right,fire,fire_edge,sneak,touch_sneak,has_checkpoint;
     uint32_t consumed_sfx;
     uint16_t menu_down;
-    uint32_t completed[SL_MISSIONS],best_ticks[SL_MISSIONS];
-    uint8_t badges[SL_MISSIONS];
+    uint32_t completed[SL_MISSIONS],run_ticks;
+    uint8_t completed_sites[SL_MISSIONS];
+    sl_run_record_t records[SL_MISSIONS][SL_SITES][6];
     uint8_t learned;
 #if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     Sound sounds[SL_CUES];
@@ -1452,11 +1458,15 @@ static void draw_hud(const sl_game_t *g)
         DrawText(TextFormat("%d%%",(int)(g->water*100)),34,90,12,mint);
     }
     if(g->escaped){
-        DrawRectangle(64,174,352,128,(Color){8,25,28,242});
+        DrawRectangle(64,174,352,160,(Color){8,25,28,242});
         DrawRectangle(64,174,352,3,mint);
-        DrawText("BACK ABOVE GROUND",94,207,23,mint);
-        DrawText(TextFormat("%lus / BONUS LOGS %u",(unsigned long)(g->tick/30),bonus_logs(g)),100,243,14,pale);
-        DrawText("F: NEXT DISPATCH",107,276,15,pale);
+        DrawText("BACK ABOVE GROUND",94,195,22,mint);
+        DrawText(TextFormat("%lus / BONUS LOGS %u",(unsigned long)(g->elapsed/30),bonus_logs(g)),100,230,14,pale);
+        DrawText(g->new_best?"PERSONAL BEST - THIS MISSION / SITE / KIT":"DISPATCH COMPLETE",82,254,10,amber);
+        DrawText(g->run_badges&2?"UNDETECTED": "CLEARED",95,274,11,mint);
+        if(g->run_badges&4)DrawText("EXTRA LOG",223,274,11,mint);
+        if(g->run_badges&8)DrawText("DUCT",334,274,11,mint);
+        DrawText("F: NEXT DISPATCH",107,307,15,pale);
     }
     if(g->failed){
         DrawRectangle(50,224,380,104,(Color){8,25,28,248});
@@ -1478,6 +1488,22 @@ static void draw_hud(const sl_game_t *g)
         DrawText(site_config(g)->target_side?"TARGET: EAST":"TARGET: WEST",50,316,12,mint);
         DrawText(s_patrol_names[site_config(g)->patrol_mode],50,334,11,amber);
         DrawText("F / TAP HERE : DEPART",83,358,19,mint);
+        DrawRectangle(28,403,424,70,(Color){8,24,28,250});
+        unsigned clears=0;
+        static const char *const labels[]={"REC","DRAIN","LOG"};
+        for(int row=0;row<SL_MISSIONS;++row){
+            DrawText(labels[row],200,412+row*19,10,pale);
+            for(unsigned site=0;site<SL_SITES;++site){
+                bool done=(g->completed_sites[row]&(1u<<site))!=0;
+                if(done)++clears;
+                if(row==g->mission&&site==g->site)DrawRectangle(249+site*29,408+row*19,24,17,amber);
+                DrawRectangle(250+site*29,409+row*19,22,15,done?(Color){45,113,90,255}:(Color){33,56,59,255});
+                DrawText(TextFormat("%u",site+1),257+site*29,412+row*19,9,done?mint:pale);
+            }
+        }
+        DrawText("OUTINGS",43,411,12,amber);
+        DrawText(TextFormat("%u / 18",clears),43,430,19,mint);
+        DrawText(g->best_ticks?TextFormat("KIT BEST %lus",(unsigned long)(g->best_ticks/30)):"UNTRIED KIT",43,455,10,pale);
     }
     if(g->journal){
         static const char *const titles[]={"WEST SERVICE CHART","WEST LOG: FLUSH BYPASS","EAST LOG: CRAWLER SERVICE","FIELD SKETCH: LOW DUCT","SWITCH ROOM: BACKUP RELAY"};
@@ -1543,6 +1569,7 @@ static void clear_input(sl_module_t *s)
 static void retry_checkpoint(sl_module_t *s)
 {
     stop_audio(s);
+    bool held=s->fire;int track=s->sneak_id>=0?s->sneak_id:s->look_id;
     uint32_t sequence=s->game.sfx_seq;
     bool detected=s->game.detected||s->game.failed;
     if(s->has_checkpoint)s->game=s->checkpoint;
@@ -1550,6 +1577,7 @@ static void retry_checkpoint(sl_module_t *s)
     s->game.detected|=detected;
     s->game.sfx_seq=sequence;cue(&s->game,SL_CLICK);
     clear_input(s);
+    s->fire=held;s->sneak_id=track;
 }
 
 static int initialize(void *value
@@ -1604,7 +1632,7 @@ static void dispatch_choice(sl_module_t *s,int code)
     else if(code==9)kit=(kit+1)%6;
     else if(code==2)dispatch=(dispatch+1)%SL_SITES;
     else if(code==5)dispatch=(dispatch+SL_SITES-1)%SL_SITES;
-    else if(code==6){g->briefing=false;clear_input(s);s->fire=true;return;}
+    else if(code==6){g->briefing=false;s->run_ticks=0;clear_input(s);s->fire=true;return;}
     else return;
     reset_dispatch(g,mission,dispatch,kit,true);
 }
@@ -1626,6 +1654,7 @@ static void input(void *value,const mosaico_host_input_v1_t *e)
     if(e->type==MOSAICO_HOST_INPUT_CONTROL){
         if(e->code==MOSAICO_HOST_CONTROL_RESET){
             stop_audio(s);reset_dispatch(&s->game,s->game.mission,s->game.dispatch,s->game.kit,true);clear_input(s);
+            s->run_ticks=0;
             s->has_checkpoint=false;s->consumed_sfx=0;
         }
         else if(e->code==MOSAICO_HOST_CONTROL_PAUSE){s->game.paused=true;stop_audio(s);clear_input(s);}
@@ -1664,8 +1693,11 @@ static void input(void *value,const mosaico_host_input_v1_t *e)
         }else if(s->game.journal||(!s->game.briefing&&e->x>=382&&e->y>=211&&e->y<=239)){
             toggle_journal(s);s->sneak_id=e->track_id;
         }else if(s->game.briefing){
-            dispatch_choice(s,e->y<205?1:e->y<263?9:e->y<340?2:6);
+            if(e->x>=28&&e->x<=452&&e->y>=145&&e->y<=395)
+                dispatch_choice(s,e->y<205?1:e->y<263?9:e->y<340?2:6);
             s->sneak_id=e->track_id;
+        }else if((s->game.escaped||s->game.failed)&&e->x>=50&&e->x<=430&&e->y>=224&&e->y<=334){
+            s->fire_edge=true;s->sneak_id=e->track_id;
         }else if(e->x>=382&&e->y>=166&&e->y<=196){
             s->sneak_id=e->track_id;use_lure(&s->game);
         }else if(e->track_id==s->pointer_id){
@@ -1696,23 +1728,36 @@ static void update(void *value)
     s->game.sneaking=s->sneak||s->touch_sneak;
     if(s->fire_edge){
         if(s->game.escaped&&!s->game.paused){
+            bool held=s->fire;int track=s->sneak_id>=0?s->sneak_id:s->look_id;
             stop_audio(s);reset_dispatch(&s->game,(s->game.mission+1)%SL_MISSIONS,
-                                        s->game.dispatch+1,s->game.kit,true);
-            s->has_checkpoint=false;clear_input(s);
+                                        s->game.dispatch+(s->game.mission+1==SL_MISSIONS),s->game.kit,true);
+            s->has_checkpoint=false;s->run_ticks=0;clear_input(s);
+            s->fire=held;s->sneak_id=track;if(held)s->menu_down|=1u<<6;
         }else if(s->game.failed&&!s->game.paused)retry_checkpoint(s);
         else interact(&s->game);
         s->fire_edge=false;
     }
     bool won=s->game.escaped;
+    if(!s->game.briefing&&!s->game.journal&&!s->game.paused&&!s->game.escaped&&!s->game.failed&&s->run_ticks<UINT32_MAX)
+        ++s->run_ticks;
     update_game(&s->game);
+    s->game.elapsed=s->run_ticks;
     s->learned|=(s->game.chart?1:0)|((s->game.logs&3)<<1)|
                 (s->game.passage_used?8:0)|(s->game.relay?16:0);
     s->game.knowledge=s->learned;
     if(!won&&s->game.escaped){
         unsigned m=s->game.mission;++s->completed[m];
-        if(!s->best_ticks[m]||s->game.tick<s->best_ticks[m])s->best_ticks[m]=s->game.tick;
-        s->badges[m]|=1|(!s->game.detected?2:0)|(bonus_logs(&s->game)>0?4:0);
+        sl_run_record_t *record=&s->records[m][s->game.site][s->game.kit];
+        if(record->wins<UINT16_MAX)++record->wins;
+        s->game.new_best=!record->best_ticks||s->run_ticks<record->best_ticks;
+        if(s->game.new_best)record->best_ticks=s->run_ticks;
+        s->game.run_badges=1|(!s->game.detected?2:0)|(bonus_logs(&s->game)>0?4:0)|(s->game.passage_used?8:0);
+        record->badges|=s->game.run_badges;
+        s->completed_sites[m]|=1u<<s->game.site;
     }
+    const sl_run_record_t *record=&s->records[s->game.mission][s->game.site][s->game.kit];
+    s->game.best_ticks=record->best_ticks;s->game.selected_wins=record->wins;s->game.personal_badges=record->badges;
+    memcpy(s->game.completed_sites,s->completed_sites,sizeof(s->completed_sites));
     if(s->game.pumping&&!s->has_checkpoint){s->checkpoint=s->game;s->has_checkpoint=true;}
     consume_audio(s);
 }
@@ -1744,6 +1789,7 @@ static int state_json(const void *value,char *out,size_t cap)
         "\"duct_open\":%s,\"duct_used\":%s,\"crouch\":%.2f,"
         "\"journal\":%s,\"knowledge\":%u,\"salvaged\":%s,"
         "\"battery\":%s,\"lure\":%s,\"ready\":%s,\"completed\":%lu,\"best_ticks\":%lu,\"badges\":%u,"
+        "\"elapsed\":%lu,\"run_wins\":%u,\"run_badges\":%u,\"new_best\":%s,\"outing_mask\":%u,"
         "\"faces\":%d,\"faces_dropped\":%d,\"state_hash\":\"%08lx\"}",
         g->briefing?"briefing":g->escaped?"won":g->failed?"lost":"playing",g->x,g->z,tile_at(g->x),tile_at(g->z),
         sqrtf((g->cam_x-g->x)*(g->cam_x-g->x)+(g->cam_z-g->z)*(g->cam_z-g->z)),
@@ -1763,8 +1809,9 @@ static int state_json(const void *value,char *out,size_t cap)
         g->journal?"true":"false",g->knowledge,g->salvaged?"true":"false",
         g->battery_charge?"true":"false",g->lure_charge?"true":"false",mission_ready(g)?"true":"false",
         (unsigned long)((const sl_module_t*)value)->completed[g->mission],
-        (unsigned long)((const sl_module_t*)value)->best_ticks[g->mission],
-        ((const sl_module_t*)value)->badges[g->mission],
+        (unsigned long)g->best_ticks,g->personal_badges,
+        (unsigned long)g->elapsed,g->selected_wins,g->run_badges,g->new_best?"true":"false",
+        (unsigned)(g->completed_sites[0]|(g->completed_sites[1]<<6)|(g->completed_sites[2]<<12)),
         s_face_count,s_faces_dropped,(unsigned long)state_hash(value));
 }
 #endif

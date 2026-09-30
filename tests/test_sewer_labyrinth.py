@@ -76,6 +76,10 @@ class SewerLabyrinthTests(unittest.TestCase):
         self.assertTrue(end["logs"] & 1)
         self.assertFalse(end["west"] or end["east"] or end["record"])
         self.assertEqual(end["completed"], 1)
+        self.assertEqual(end["run_wins"], 1)
+        self.assertEqual(end["outing_mask"], 1 << 12)
+        self.assertEqual(end["best_ticks"], end["elapsed"])
+        self.assertTrue(end["new_best"])
 
     def test_submerged_duct_blocks_even_when_crouching(self) -> None:
         route = "submerged-duct.json"
@@ -125,6 +129,7 @@ assert.equal(plays,2);
         self.assertTrue(retry["power"] and retry["pumping"])
         self.assertFalse(retry["record"] or retry["west"] or retry["east"])
         self.assertEqual((retry["cell_x"], retry["cell_z"]), (8, 6))
+        self.assertGreater(retry["elapsed"], caught["elapsed"])
 
     def test_generated_audio_matches_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

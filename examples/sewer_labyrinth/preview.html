@@ -12,6 +12,7 @@ button:hover,button:focus-visible{border-color:#edbd64}#screen{display:block;wid
 <main><header><h1>潮线以下</h1><p>选择出勤目标和两件工具，探索泵站，完成工作后从北侧竖井撤离。</p></header>
 <div class="tools" id="dispatch"><button id="mission">更换任务</button><button id="kit">更换工具组合</button><button id="site">更换设施配置</button><button id="depart">出发</button></div>
 <p id="dispatchInfo"></p>
+<div id="outings" aria-label="本次会话出勤进度"></div>
 <p>新区域：02 号泵房。启动排水后，沿西侧黄色地面标线寻找退水露出的检修口；按住 Shift，或开启触屏 SNEAK，蹲身穿过。它通向日志凹室，也能绕过报警后的中央闸门。</p>
 <div class="tools"><button id="lure">投放诱饵（Space）</button><button id="journal">巡检笔记（J）</button></div>
 <section id="notebook" hidden style="white-space:pre-line;padding:14px;background:#1a3032;border-left:3px solid #e7bb69"></section>
@@ -81,7 +82,7 @@ function objective(m){
   if(m.phase==='playing'&&m.cell_x===6&&m.cell_z>=10&&m.cell_z<=11)
     return m.duct_open?'黄色标线通往低矮检修口。按住 Shift / 开启 SNEAK，穿过后向西寻找日志；洞内松键仍会保持蹲姿。':'前方检修口被水淹没。先启动中央泵，观察水位下降后露出的入口。';
   if(m.phase==='briefing')return '任务板：A/D 选任务，Q/E 选两件工具，W/S 换设施配置，F 出发。也可点击上方按钮。';
-  if(m.phase==='won')return '出勤完成！按 F 进入下一次任务板。本次会话保留完成次数、最快时间与探索徽章。';
+  if(m.phase==='won')return `出勤完成，用时 ${Math.floor(m.elapsed/30)} 秒。${m.new_best?'这是相同任务、设施、工具组合的新纪录！':''}按 F 接下一项出勤。`;
   if(m.ready)return '目标已完成，返回北侧入口竖井撤离；可继续寻找额外日志。';
   if(m.mission===2&&m.phase!=='lost')return !m.chart?'调查任务：先阅读西侧检修图，再前往深处寻找日志。':`调查任务：前往南侧${m.target_side?'东':'西'}凹室，按 F 读取日志。`;
   if(m.mission===1&&m.pumping&&m.water<=.02&&m.phase!=='lost')return `抢修任务：打开${m.target_side?'东':'西'}分流阀后返回入口。`;
@@ -117,7 +118,9 @@ async function tick(){
     const kits=['扳手＋绝缘工具','扳手＋诱饵','扳手＋电池','绝缘工具＋诱饵','绝缘工具＋电池','诱饵＋电池'];
     const sites=['标准巡检','西环关闭／西侧漏电','东环关闭／东侧漏电','西侧漏电','西环关闭／东侧漏电','东环关闭／西侧漏电'];
     const patrols=['南廊往返','内环巡检','停驻扫描'];
-    $('dispatchInfo').textContent=`${missions[meta.mission]} · ${kits[meta.kit]} · ${sites[meta.site]} · ${patrols[meta.patrol_mode]} · 目标${meta.target_side?'东':'西'}侧 ｜ 本任务完成 ${meta.completed} 次 · 最快 ${meta.best_ticks?Math.round(meta.best_ticks/30)+'秒':'—'} · 徽章：${meta.badges&2?'无警觉 ':''}${meta.badges&4?'额外日志':''}`;
+    $('dispatchInfo').textContent=`${missions[meta.mission]} · ${kits[meta.kit]} · ${sites[meta.site]} · ${patrols[meta.patrol_mode]} · 目标${meta.target_side?'东':'西'}侧 ｜ 当前组合完成 ${meta.run_wins} 次 · 最快 ${meta.best_ticks?Math.floor(meta.best_ticks/30)+'秒':'—'} · 徽章：${meta.badges&2?'无警觉 ':''}${meta.badges&4?'额外日志 ':''}${meta.badges&8?'检修近路':''}`;
+    const progress=missions.map((name,row)=>name+'：'+sites.map((_,site)=>(meta.outing_mask&(1<<(row*6+site)))?'●':'○').join(' '));
+    $('outings').textContent='出勤册 · 每行对应设施 1—6 · '+progress.join(' ｜ ');
     $('metrics').textContent=`Host 光栅：${meta.host_render_ms.toFixed(2)} ms（不是设备 FPS）\n几何面：${meta.faces} / 丢弃：${meta.faces_dropped}\n警戒：${Math.round(meta.alert*100)}% · 慢走：${meta.sneaking?'是':'否'}\n检查点：${meta.checkpoint?'已保存':'未到达'}`;
   }catch(error){$('error').textContent='连接暂时中断，将自动重试。'+error.message}finally{busy=false}
 }

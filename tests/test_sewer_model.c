@@ -148,9 +148,9 @@ static void check_dispatches(void)
     e.code=6;input(&s,&e);assert(!s.game.briefing);
     s.game.pumping=true;s.game.water=0;s.game.west=true;update(&s);
     assert(s.game.escaped&&s.completed[1]==1);update(&s);assert(s.completed[1]==1);
-    s.fire_edge=true;update(&s);assert(s.game.briefing&&s.game.mission==2&&s.game.site==1);
+    s.fire_edge=true;update(&s);assert(s.game.briefing&&s.game.mission==2&&s.game.site==0);
     s.game.briefing=false;s.game.failed=true;s.fire_edge=true;update(&s);
-    assert(s.game.mission==2&&s.game.site==1&&!s.game.failed&&s.game.detected);
+    assert(s.game.mission==2&&s.game.site==0&&!s.game.failed&&s.game.detected);
     puts("108 mission/site/kit routes, tool effects and dispatch lifecycle: ok");
 }
 static void check_service_duct(void)
@@ -246,6 +246,51 @@ static void check_patrol_variants(void)
     }
     puts("patrol variants: full circuits, bounds, continuity, scan holds, lure and cover ok");
 }
+static void check_expedition_records(void)
+{
+    sl_module_t s={0};reset_dispatch(&s.game,0,0,0,false);clear_input(&s);
+    for(unsigned round=0;round<18;++round){
+        unsigned mission=round%3,site=round/3;
+        assert(s.game.mission==mission&&s.game.site==site);
+        s.game.record=s.game.chart=s.game.west=s.game.east=s.game.pumping=true;
+        s.game.logs=3;s.game.water=0;s.run_ticks=60+round;
+        update(&s);assert(s.game.escaped&&s.game.new_best);
+        assert(s.records[mission][site][0].wins==1);
+        assert(s.records[mission][site][0].best_ticks==61+round);
+        assert(s.game.best_ticks==61+round);
+        update(&s);assert(s.records[mission][site][0].wins==1);
+        s.fire_edge=true;update(&s);assert(s.game.briefing&&s.run_ticks==0);
+        dispatch_choice(&s,6);
+    }
+    assert(s.game.mission==0&&s.game.site==0);
+    for(int m=0;m<3;++m)assert(s.completed_sites[m]==63);
+    reset_dispatch(&s.game,0,0,1,false);s.game.record=true;s.run_ticks=40;update(&s);
+    assert(s.records[0][0][1].best_ticks==41&&s.records[0][0][0].best_ticks==61);
+    assert(s.game.best_ticks==41&&s.game.selected_wins==1);
+    sl_module_t clock={0};reset_dispatch(&clock.game,0,0,0,false);clear_input(&clock);
+    for(int i=0;i<10;++i)update(&clock);
+    assert(clock.game.elapsed==10);
+    clock.game.paused=true;update(&clock);assert(clock.run_ticks==10);
+    clock.game.paused=false;clock.game.journal=true;update(&clock);assert(clock.run_ticks==10);
+    clock.game.journal=false;clock.checkpoint=clock.game;clock.has_checkpoint=true;
+    clock.run_ticks=123;clock.game.failed=true;clock.fire_edge=true;update(&clock);
+    assert(clock.game.elapsed==124&&clock.game.tick==11);
+    clock.game.record=true;update(&clock);assert(clock.game.best_ticks==125);
+    mosaico_host_input_v1_t reset={.type=MOSAICO_HOST_INPUT_CONTROL,.code=MOSAICO_HOST_CONTROL_RESET};
+    input(&clock,&reset);update(&clock);assert(clock.run_ticks==0&&clock.game.best_ticks==125);
+    mosaico_host_input_v1_t touch={.type=MOSAICO_HOST_INPUT_POINTER,.track_id=5,.pressed=true,.x=300,.y=430};
+    input(&clock,&touch);assert(clock.game.briefing); /* Progress board is not a departure button. */
+    touch.pressed=false;input(&clock,&touch);
+    clock.game.briefing=false;clock.game.escaped=true;
+    touch.y=310;touch.pressed=true;input(&clock,&touch);update(&clock);
+    unsigned site=clock.game.site;input(&clock,&touch);assert(clock.game.briefing&&clock.game.site==site);
+    touch.pressed=false;input(&clock,&touch);
+    clock.game.briefing=false;clock.game.escaped=true;
+    mosaico_host_input_v1_t fire={.type=MOSAICO_HOST_INPUT_ACTION,.code=6,.pressed=true};
+    input(&clock,&fire);update(&clock);input(&clock,&fire);assert(clock.game.briefing);
+    fire.pressed=false;input(&clock,&fire);fire.pressed=true;input(&clock,&fire);assert(!clock.game.briefing);
+    puts("expedition records: all 18 outings, per-kit bests, retries and pause timing ok");
+}
 int main(void)
 {
     check_motion();check_scene_budget();
@@ -306,6 +351,7 @@ int main(void)
     check_service_duct();
     check_notebook_and_salvage();
     check_patrol_variants();
+    check_expedition_records();
     puts("sewer model and audio lifecycle: ok");
     return 0;
 }
