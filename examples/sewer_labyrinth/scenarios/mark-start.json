@@ -1,0 +1,28 @@
+{
+  "events": [
+    {
+      "frame": 0,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 1,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "frame": 2,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 3,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    }
+  ]
+}

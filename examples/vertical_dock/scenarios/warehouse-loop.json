@@ -1,0 +1,14 @@
+{"events":[
+  {"frame":0,"type":"action","code":2,"pressed":true},
+  {"frame":134,"type":"action","code":2,"pressed":false},
+  {"frame":135,"type":"action","code":8,"pressed":true},
+  {"frame":268,"type":"action","code":8,"pressed":false},
+  {"frame":269,"type":"action","code":2,"pressed":true},
+  {"frame":338,"type":"action","code":2,"pressed":false},
+  {"frame":339,"type":"action","code":8,"pressed":true},
+  {"frame":369,"type":"action","code":8,"pressed":false},
+  {"frame":370,"type":"action","code":6,"pressed":true},
+  {"frame":371,"type":"action","code":6,"pressed":false},
+  {"frame":372,"type":"action","code":9,"pressed":true},
+  {"frame":433,"type":"action","code":9,"pressed":false}
+]}

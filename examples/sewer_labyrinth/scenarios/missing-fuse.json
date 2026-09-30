@@ -1,0 +1,64 @@
+{
+  "events": [
+    {
+      "frame": 0,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 1,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "frame": 2,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "frame": 31,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "frame": 32,
+      "type": "action",
+      "code": 9,
+      "pressed": true
+    },
+    {
+      "frame": 149,
+      "type": "action",
+      "code": 9,
+      "pressed": false
+    },
+    {
+      "frame": 150,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "frame": 209,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "frame": 210,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 211,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    }
+  ]
+}

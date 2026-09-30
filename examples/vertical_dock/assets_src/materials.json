@@ -1,0 +1,14 @@
+{
+  "image": "materials.png",
+  "columns": 2,
+  "rows": 2,
+  "output_columns": 2,
+  "output_cell": 256,
+  "layout": "row-major",
+  "frames": [
+    {"name": "dock_concrete"},
+    {"name": "dock_steel"},
+    {"name": "dock_wood"},
+    {"name": "dock_hazard"}
+  ]
+}

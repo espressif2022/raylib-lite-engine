@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>潮线以下 · 泵站探索</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101b20;color:#dce6df;font:14px/1.6 system-ui,sans-serif}
+main{max-width:760px;margin:24px auto;padding:20px}h1{font-size:23px;margin:0}header p{color:#a5b9b5;margin:4px 0 16px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}button{color:#e1e7d6;background:#253739;border:1px solid #50625d;border-radius:6px;padding:7px 13px;cursor:pointer}
+button:hover,button:focus-visible{border-color:#edbd64}#screen{display:block;width:min(100%,600px);height:auto;aspect-ratio:1;image-rendering:pixelated;touch-action:none;background:#081113;border-radius:8px}
+.play{display:grid;justify-items:center}.readout{width:100%;max-width:600px;padding:12px 0;color:#e7bb69}#hint{color:#a5b9b5}details{border-top:1px solid #33463f;padding-top:10px;margin-top:12px;color:#96aba3}#metrics{font:12px/1.7 monospace;white-space:pre-wrap}kbd{color:#f1d7a2}#error{color:#f69a7c}
+</style>
+<main><header><h1>潮线以下</h1><p>选择出勤目标和两件工具，探索泵站，完成工作后从北侧竖井撤离。</p></header>
+<div class="tools" id="dispatch"><button id="mission">更换任务</button><button id="kit">更换工具组合</button><button id="site">更换设施配置</button><button id="depart">出发</button></div>
+<p id="dispatchInfo"></p>
+<p>新区域：02 号泵房。启动排水后，沿西侧黄色地面标线寻找退水露出的检修口；按住 Shift，或开启触屏 SNEAK，蹲身穿过。它通向日志凹室，也能绕过报警后的中央闸门。</p>
+<div class="tools"><button id="lure">投放诱饵（Space）</button></div>
+<details><summary>工具与路线</summary>扳手：从中央泵井两侧打开检修近道。绝缘工具：通过配电后的蓝色漏电地面；未携带时请绕行。诱饵：在南侧巡逻区使用一次，争取 4 秒通行时间。电池：直接启动中央泵一次；备用继电器仍需配电。深处两侧凹室有检修日志，可作为额外探索目标。记录仪报警后中央闸门会关闭，请留意设施配置中封闭的外环。</details>
+<div class="tools"><button id="pause">暂停</button><button id="step">单步</button><button id="reset">重新开始</button><button id="mute">音效：开</button><button id="shot">截图</button></div>
+<section class="play"><img id="screen" tabindex="0" draggable="false" alt="泵站探索实时游戏画面"><div class="readout" id="objective">正在连接仿真…</div></section>
+<div id="hint"><kbd>W/S</kbd> 前后 · <kbd>A/D</kbd> 转向 · <kbd>Q/E</kbd> 横移 · <kbd>F</kbd> 操作 / 失败重试 · 按住 <kbd>Shift</kbd> 慢走<br>触屏：左侧拖动移动，右侧拖动观察；右下角操作，左下角 WALK / SNEAK 切换慢走。</div>
+<p id="error" role="status"></p><details><summary>运行信息</summary><div id="metrics"></div></details></main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id), screen=$('screen'), held=new Set(), pointers=new Map();
+const cues=new Set(['step','click','power','pump','alert','fail','win']), sounds=new Map();
+let paused=false,muted=false,unlocked=false,lastCue=-1,busy=false,blobURL='',requestChain=Promise.resolve();
+function stopAudio(){for(const audio of sounds.values()){audio.pause();audio.currentTime=0}}
+function unlock(){unlocked=true}
+function sound(meta){
+  if(meta.simulation.paused){stopAudio();lastCue=meta.sfx_seq;return}
+  if(meta.sfx_seq===lastCue)return;
+  lastCue=meta.sfx_seq;
+  if(muted||!unlocked||!cues.has(meta.sfx))return;
+  let audio=sounds.get(meta.sfx);
+  if(!audio){audio=new Audio('/sfx/'+meta.sfx+'.wav');sounds.set(meta.sfx,audio)}
+  if(meta.sfx==='fail'||meta.sfx==='win')stopAudio();
+  audio.currentTime=0;audio.volume=meta.sfx==='step'?.25:.55;audio.play().catch(()=>{});
+}
+function post(path,value){
+  requestChain=requestChain.catch(()=>{}).then(async()=>{
+    const result=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});
+    if(!result.ok)throw Error('输入请求失败：'+result.status);
+  });
+  requestChain.catch(error=>{$('error').textContent=error.message});
+}
+function sendInput(){post('/api/v1/input',{
+  left:held.has('a')||held.has('arrowleft'),right:held.has('d')||held.has('arrowright'),
+  jump:held.has('w')||held.has('arrowup'),back:held.has('s')||held.has('arrowdown'),
+  fire:held.has('f')||held.has('control'),sprint:held.has('shift'),
+  strafe_left:held.has('q'),strafe_right:held.has('e'),
+  pointers:[...pointers].map(([track,p])=>({track,...p,pressed:true}))})}
+function release(){held.clear();pointers.clear();sendInput()}
+function pulse(code){unlock();release();post('/api/v1/input',{actions:[{code,pressed:true},{code,pressed:false}]})}
+$('mission').onclick=()=>pulse(1);$('kit').onclick=()=>pulse(9);$('site').onclick=()=>pulse(2);$('depart').onclick=()=>pulse(6);$('lure').onclick=()=>pulse(3);
+function control(command){unlock();stopAudio();if(command==='reset')lastCue=-1;release();post('/api/v1/control',{command})}
+for(const type of ['keydown','keyup'])addEventListener(type,event=>{
+  const key=event.key.toLowerCase();
+  if(key===' '){event.preventDefault();if(type==='keydown'&&!event.repeat)pulse(3);return}
+  if(!['w','a','s','d','q','e','f','control','shift','arrowup','arrowdown','arrowleft','arrowright','p'].includes(key))return;
+  event.preventDefault();unlock();
+  if(key==='p'){if(type==='keydown'&&!event.repeat)control(paused?'resume':'pause');return}
+  if(type==='keydown'){if(held.has(key))return;held.add(key)}else held.delete(key);
+  sendInput();
+});
+function point(event){const r=screen.getBoundingClientRect();return {x:(event.clientX-r.left)*480/r.width,y:(event.clientY-r.top)*480/r.height}}
+screen.onpointerdown=event=>{event.preventDefault();unlock();screen.focus();screen.setPointerCapture(event.pointerId);pointers.set(event.pointerId,point(event));sendInput()};
+screen.onpointermove=event=>{if(pointers.has(event.pointerId)){pointers.set(event.pointerId,point(event));sendInput()}};
+screen.onpointerup=screen.onpointercancel=event=>{pointers.delete(event.pointerId);sendInput()};
+addEventListener('blur',()=>{stopAudio();release()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)control('pause')});
+$('pause').onclick=()=>control(paused?'resume':'pause');$('step').onclick=()=>control('step');$('reset').onclick=()=>control('reset');
+$('mute').onclick=()=>{unlock();muted=!muted;stopAudio();$('mute').textContent='音效：'+(muted?'关':'开')};
+$('shot').onclick=()=>{if(!blobURL)return;const link=document.createElement('a');link.href=blobURL;link.download='below-the-tide.png';link.click()};
+function objective(m){
+  if(m.phase==='playing'&&m.cell_x===6&&m.cell_z>=10&&m.cell_z<=11)
+    return m.duct_open?'黄色标线通往低矮检修口。按住 Shift / 开启 SNEAK，穿过后向西寻找日志；洞内松键仍会保持蹲姿。':'前方检修口被水淹没。先启动中央泵，观察水位下降后露出的入口。';
+  if(m.phase==='briefing')return '任务板：A/D 选任务，Q/E 选两件工具，W/S 换设施配置，F 出发。也可点击上方按钮。';
+  if(m.phase==='won')return '出勤完成！按 F 进入下一次任务板。本次会话保留完成次数、最快时间与探索徽章。';
+  if(m.ready)return '目标已完成，返回北侧入口竖井撤离；可继续寻找额外日志。';
+  if(m.mission===2&&m.phase!=='lost')return !m.chart?'调查任务：先阅读西侧检修图，再前往深处寻找日志。':`调查任务：前往南侧${m.target_side?'东':'西'}凹室，按 F 读取日志。`;
+  if(m.mission===1&&m.pumping&&m.water<=.02&&m.phase!=='lost')return `抢修任务：打开${m.target_side?'东':'西'}分流阀后返回入口。`;
+  if(!m.power&&!m.pumping&&m.battery&&m.phase!=='lost')return '可直接去中央泵使用便携电池；也可先拿保险件恢复常规供电。';
+  if(m.phase==='lost')return m.checkpoint?'被巡检机器人截住了。按 F 从泵站检查点重试；先绕开视线，再靠近记录仪。':'被巡检机器人截住了。按 F 从入口重试；先完成泵站任务以保存检查点。';
+  if(m.phase==='won')return '已取回记录仪并撤离。可以重新开始，尝试另一条返程路线。';
+  if(!m.power&&!m.pumping)return m.fuse?'带着保险件前往东侧配电间，靠近配电柜按 F。':'在入口左侧工作台拿保险件：靠近后按 F。';
+  if(!m.pumping)return '前往中央泵井，靠近黄色启动杆按 F。配电柜还能开启备用继电器。';
+  if(m.water>.02)return '水位正在下降。泵站检查点已保存。';
+  if(m.record)return m.relay?'记录仪已取回。中央通路仍然开放，返回北侧竖井。':'记录仪已取回，中央闸门关闭。沿东西外环返回北侧竖井。';
+  if(!m.west||!m.east)return '分别打开东西分流阀门，再前往南侧记录仪室。';
+  return '注意巡检机器人的朝向。按住 Shift 慢走，利用侧面凹室躲避，再按 F 取记录仪。';
+}
+async function tick(){
+  if(busy)return;busy=true;
+  try{
+    const response=await fetch('/api/v1/frame');if(!response.ok)throw Error('仿真连接失败');
+    const meta=JSON.parse(response.headers.get('X-Mosaico-State'));const blob=await response.blob();
+    const previous=blobURL;blobURL=URL.createObjectURL(blob);screen.src=blobURL;if(previous)URL.revokeObjectURL(previous);
+    paused=meta.simulation.paused;$('pause').textContent=paused?'继续':'暂停';
+    sound(meta);$('objective').textContent=objective(meta);$('error').textContent=meta.reload_error||'';
+    $('dispatch').hidden=meta.phase!=='briefing';$('lure').disabled=!meta.lure||meta.phase!=='playing';
+    const missions=['回收记录仪','排水抢修','调查检修日志'];
+    const kits=['扳手＋绝缘工具','扳手＋诱饵','扳手＋电池','绝缘工具＋诱饵','绝缘工具＋电池','诱饵＋电池'];
+    const sites=['标准巡检','西环关闭／西侧漏电','东环关闭／东侧漏电','西侧漏电','西环关闭／东侧漏电','东环关闭／西侧漏电'];
+    $('dispatchInfo').textContent=`${missions[meta.mission]} · ${kits[meta.kit]} · ${sites[meta.site]} · 目标${meta.target_side?'东':'西'}侧 ｜ 本任务完成 ${meta.completed} 次 · 最快 ${meta.best_ticks?Math.round(meta.best_ticks/30)+'秒':'—'} · 徽章：${meta.badges&2?'无警觉 ':''}${meta.badges&4?'额外日志':''}`;
+    $('metrics').textContent=`Host 光栅：${meta.host_render_ms.toFixed(2)} ms（不是设备 FPS）\n几何面：${meta.faces} / 丢弃：${meta.faces_dropped}\n警戒：${Math.round(meta.alert*100)}% · 慢走：${meta.sneaking?'是':'否'}\n检查点：${meta.checkpoint?'已保存':'未到达'}`;
+  }catch(error){$('error').textContent='连接暂时中断，将自动重试。'+error.message}finally{busy=false}
+}
+setInterval(tick,50);tick();
+</script></html>

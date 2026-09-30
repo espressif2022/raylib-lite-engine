@@ -1,0 +1,8 @@
+{
+  "title": "Night Shift: Dock 17",
+  "sdk_version": "0.1.0",
+  "sources": ["main/game_module.c"],
+  "include_dirs": ["main"],
+  "icon": "../docs/maintenance-room.png",
+  "asset_sources": "assets_src"
+}

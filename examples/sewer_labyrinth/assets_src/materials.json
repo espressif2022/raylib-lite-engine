@@ -1,0 +1,14 @@
+{
+  "image": "materials.png",
+  "columns": 2,
+  "rows": 2,
+  "output_columns": 2,
+  "output_cell": 256,
+  "layout": "row-major",
+  "frames": [
+    {"name": "sewer_brick"},
+    {"name": "wet_concrete"},
+    {"name": "drain_grate"},
+    {"name": "warning_steel"}
+  ]
+}

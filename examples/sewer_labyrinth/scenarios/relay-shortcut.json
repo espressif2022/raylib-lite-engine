@@ -1,0 +1,364 @@
+{
+  "events": [
+    {
+      "frame": 0,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 1,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "frame": 2,
+      "type": "action",
+      "code": 8,
+      "pressed": true
+    },
+    {
+      "frame": 31,
+      "type": "action",
+      "code": 8,
+      "pressed": false
+    },
+    {
+      "frame": 32,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 33,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "frame": 73,
+      "type": "action",
+      "code": 9,
+      "pressed": true
+    },
+    {
+      "frame": 102,
+      "type": "action",
+      "code": 9,
+      "pressed": false
+    },
+    {
+      "frame": 103,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "frame": 132,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "frame": 133,
+      "type": "action",
+      "code": 9,
+      "pressed": true
+    },
+    {
+      "frame": 250,
+      "type": "action",
+      "code": 9,
+      "pressed": false
+    },
+    {
+      "frame": 251,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "frame": 310,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "frame": 311,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 312,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "frame": 352,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 353,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "frame": 393,
+      "type": "action",
+      "code": 5,
+      "pressed": true
+    },
+    {
+      "frame": 452,
+      "type": "action",
+      "code": 5,
+      "pressed": false
+    },
+    {
+      "frame": 453,
+      "type": "action",
+      "code": 8,
+      "pressed": true
+    },
+    {
+      "frame": 570,
+      "type": "action",
+      "code": 8,
+      "pressed": false
+    },
+    {
+      "frame": 571,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "frame": 689,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "frame": 690,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 691,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "frame": 911,
+      "type": "action",
+      "code": 5,
+      "pressed": true
+    },
+    {
+      "frame": 1029,
+      "type": "action",
+      "code": 5,
+      "pressed": false
+    },
+    {
+      "frame": 1030,
+      "type": "action",
+      "code": 8,
+      "pressed": true
+    },
+    {
+      "frame": 1206,
+      "type": "action",
+      "code": 8,
+      "pressed": false
+    },
+    {
+      "frame": 1207,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "frame": 1383,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "frame": 1384,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 1385,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "frame": 1425,
+      "type": "action",
+      "code": 5,
+      "pressed": true
+    },
+    {
+      "frame": 1601,
+      "type": "action",
+      "code": 5,
+      "pressed": false
+    },
+    {
+      "frame": 1602,
+      "type": "action",
+      "code": 9,
+      "pressed": true
+    },
+    {
+      "frame": 1954,
+      "type": "action",
+      "code": 9,
+      "pressed": false
+    },
+    {
+      "frame": 1955,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "frame": 2131,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "frame": 2132,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 2133,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "frame": 2173,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "frame": 2349,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "frame": 2530,
+      "type": "action",
+      "code": 7,
+      "pressed": true
+    },
+    {
+      "frame": 2531,
+      "type": "action",
+      "code": 8,
+      "pressed": true
+    },
+    {
+      "frame": 2824,
+      "type": "action",
+      "code": 8,
+      "pressed": false
+    },
+    {
+      "frame": 2825,
+      "type": "action",
+      "code": 7,
+      "pressed": false
+    },
+    {
+      "frame": 2826,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 2827,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "frame": 2867,
+      "type": "action",
+      "code": 5,
+      "pressed": true
+    },
+    {
+      "frame": 2984,
+      "type": "action",
+      "code": 5,
+      "pressed": false
+    },
+    {
+      "frame": 2985,
+      "type": "action",
+      "code": 9,
+      "pressed": true
+    },
+    {
+      "frame": 3043,
+      "type": "action",
+      "code": 9,
+      "pressed": false
+    },
+    {
+      "frame": 3044,
+      "type": "action",
+      "code": 5,
+      "pressed": true
+    },
+    {
+      "frame": 3161,
+      "type": "action",
+      "code": 5,
+      "pressed": false
+    },
+    {
+      "frame": 3162,
+      "type": "action",
+      "code": 8,
+      "pressed": true
+    },
+    {
+      "frame": 3220,
+      "type": "action",
+      "code": 8,
+      "pressed": false
+    },
+    {
+      "frame": 3221,
+      "type": "action",
+      "code": 5,
+      "pressed": true
+    },
+    {
+      "frame": 3368,
+      "type": "action",
+      "code": 5,
+      "pressed": false
+    }
+  ]
+}

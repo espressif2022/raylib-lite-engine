@@ -1,0 +1,70 @@
+{
+  "events": [
+    {
+      "frame": 0,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "frame": 1,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "frame": 2,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "frame": 149,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "frame": 150,
+      "type": "action",
+      "code": 8,
+      "pressed": true
+    },
+    {
+      "frame": 209,
+      "type": "action",
+      "code": 8,
+      "pressed": false
+    },
+    {
+      "frame": 210,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "frame": 327,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "frame": 328,
+      "type": "action",
+      "code": 7,
+      "pressed": true
+    },
+    {
+      "frame": 329,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "frame": 378,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    }
+  ]
+}

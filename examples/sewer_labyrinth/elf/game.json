@@ -1,0 +1,8 @@
+{
+  "title": "Below the Tide",
+  "sdk_version": "0.1.0",
+  "sources": ["main/game_module.c"],
+  "include_dirs": ["main"],
+  "icon": "../docs/entrance.png",
+  "asset_sources": "assets_src"
+}

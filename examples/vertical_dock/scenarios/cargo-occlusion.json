@@ -1,0 +1,8 @@
+{"events":[
+  {"frame":0,"type":"action","code":2,"pressed":true},
+  {"frame":151,"type":"action","code":2,"pressed":false},
+  {"frame":152,"type":"action","code":8,"pressed":true},
+  {"frame":158,"type":"action","code":8,"pressed":false},
+  {"frame":159,"type":"action","code":1,"pressed":true},
+  {"frame":199,"type":"action","code":1,"pressed":false}
+]}

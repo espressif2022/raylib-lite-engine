@@ -1,0 +1,246 @@
+// SPDX-License-Identifier: Apache-2.0
+/* Exercise real game logic and feedback lifecycle without rendering a frame. */
+#include <assert.h>
+#include "../examples/sewer_labyrinth/main/game_module.c"
+
+static unsigned plays,stops,unloads,closes;
+void InitAudioDevice(void){}
+bool IsAudioDeviceReady(void){return true;}
+Sound LoadSound(const char *path){(void)path;return (Sound){1};}
+void SetSoundVolume(Sound sound,float volume){(void)sound;(void)volume;}
+void PlaySound(Sound sound){assert(sound.frameCount);++plays;}
+void StopSound(Sound sound){assert(sound.frameCount);++stops;}
+void UnloadSound(Sound sound){assert(sound.frameCount);++unloads;}
+void CloseAudioDevice(void){++closes;}
+void UnloadMosaicoWallAtlas(MosaicoWallAtlas atlas){(void)atlas;}
+
+static float distance(sl_vec3_t a,sl_vec3_t b)
+{sl_vec3_t d=vsub(a,b);return sqrtf(vdot(d,d));}
+
+static void check_motion(void)
+{
+    sl_game_t g;reset_game(&g);
+    for(int crouch=0;crouch<2;++crouch)for(int frame=0;frame<120;++frame){
+        g.walk_weight=1;g.walk_phase=frame*2*SL_PI/120;g.crouch=crouch;g.tick=frame;
+        sl_pose_t pose=character_pose(&g);
+        for(int side=0;side<2;++side){
+            assert(fabsf(distance(pose.hip[side],pose.knee[side])-.36f)<.0001f);
+            assert(fabsf(distance(pose.knee[side],pose.ankle[side])-.36f)<.0001f);
+            assert(fabsf(distance(pose.shoulder[side],pose.elbow[side])-.28f)<.0001f);
+            assert(fabsf(distance(pose.elbow[side],pose.hand[side])-.28f)<.0001f);
+            assert(pose.ankle[side].y>=.084f);
+            float phase=fmodf(g.walk_phase/(2*SL_PI)+2+side*.5f,1);
+            if(phase<.60f)assert(fabsf(pose.ankle[side].y-.085f)<.003f);
+        }
+    }
+    for(int action=3;action<=5;++action)for(int tick=9;tick<=26;++tick){
+        reset_game(&g);g.action=action;g.action_ticks=36-tick;
+        g.facing=work_heading(action);
+        sl_vec3_t center=work_center(action);
+        g.x=center.x-sinf(g.facing)*.60f;g.z=center.z-cosf(g.facing)*.60f;
+        sl_pose_t pose=character_pose(&g);
+        for(int side=0;side<2;++side){
+            sl_vec3_t hand=xf_point(pose.root,pose.hand[side].x,pose.hand[side].y,pose.hand[side].z);
+            if(action==3){
+                sl_vec3_t handle={center.x+(side?.105f:-.105f),
+                    1.04f+.35f*cosf(starter_angle(&g)),15.12f+.35f*sinf(starter_angle(&g))};
+                assert(distance(hand,handle)<.035f);
+            }else{
+                if(fabsf(hand.x-center.x)>=.035f)
+                    fprintf(stderr,"contact: action=%d tick=%d side=%d hand=(%.3f,%.3f,%.3f) center=(%.3f,%.3f,%.3f)\n",
+                            action,tick,side,hand.x,hand.y,hand.z,center.x,center.y,center.z);
+                assert(fabsf(hand.x-center.x)<.035f);
+                float y=hand.y-center.y,z=hand.z-center.z;
+                assert(fabsf(sqrtf(y*y+z*z)-.18f)<.035f);
+            }
+        }
+    }
+    reset_game(&g);g.x=16.5f;g.z=2.65f;interact(&g);
+    assert(!g.action&&g.signal==15); /* Do not reach across the room. */
+    g.z=3.3f;interact(&g);assert(g.action==1);
+    assert(!movement_ok(&g,16.8f,4.0f));
+    assert(!camera_point_ok(&g,18.7f,15.2f));
+}
+
+static void check_scene_budget(void)
+{
+    static const int positions[][2]={{8,1},{7,1},{8,6},{8,9},{2,8},{14,8},{8,13},{5,11},{11,11},{4,3},{12,3},{6,10},{6,11}};
+    unsigned max_faces=0;
+    for(unsigned site=0;site<SL_SITES;++site)
+    for(unsigned spot=0;spot<sizeof(positions)/sizeof(positions[0]);++spot)
+        for(int angle=0;angle<8;++angle)for(int tilt=0;tilt<3;++tilt){
+            sl_game_t g;reset_dispatch(&g,0,site,0,false);g.power=g.pumping=g.west=g.east=true;g.water=0;
+            g.x=tile_center(positions[spot][0]);g.z=tile_center(positions[spot][1]);
+            if(low_passage(g.x,g.z)){g.sneaking=true;g.crouch=1;}
+            g.yaw=angle*SL_PI*.25f;g.pitch=-.35f+tilt*.35f;place_camera(&g);
+            s_cam_x=g.cam_x;s_cam_y=g.cam_y;s_cam_z=g.cam_z;
+            s_sy=sinf(g.yaw);s_cy=cosf(g.yaw);s_sp=sinf(g.pitch);s_cp=cosf(g.pitch);
+            add_scene(&g);add_character(&g);add_drone(&g);
+            assert(!s_faces_dropped);
+            if((unsigned)s_face_count>max_faces)max_faces=s_face_count;
+        }
+    printf("scene budget: %u max faces across 1872 views\n",max_faces);
+}
+
+/* Fine navigation lattice tests actual actor clearance, including furniture,
+ * live floor and shutters. No drone is advanced during this geometric proof. */
+static unsigned char reachable[170*170];
+static void flood_routes(const sl_game_t *g,int x,int z)
+{
+    static int queue[170*170];int head=0,tail=0;
+    memset(reachable,0,sizeof(reachable));
+    int start=(z*10+5)*170+x*10+5;queue[tail++]=start;reachable[start]=1;
+    while(head<tail){
+        int p=queue[head++],px=p%170,pz=p/170;
+        const int dx[]={-1,1,0,0},dz[]={0,0,-1,1};
+        for(int d=0;d<4;++d){
+            int nx=px+dx[d],nz=pz+dz[d],q=nz*170+nx;
+            if(nx<1||nx>=169||nz<1||nz>=169||reachable[q])continue;
+            if(movement_ok(g,nx*.22f,nz*.22f)&&
+               movement_ok(g,(px+nx)*.11f,(pz+nz)*.11f)){
+                reachable[q]=1;queue[tail++]=q;
+            }
+        }
+    }
+}
+static bool reached(int x,int z){return reachable[(z*10+5)*170+x*10+5]!=0;}
+static void check_dispatches(void)
+{
+    sl_game_t g;
+    for(unsigned m=0;m<SL_MISSIONS;++m)for(unsigned site=0;site<SL_SITES;++site)
+    for(unsigned kit=0;kit<6;++kit){
+        reset_dispatch(&g,m,site,kit,false);
+        flood_routes(&g,8,1);assert(reached(7,1)&&reached(12,4)&&reached(4,4));
+        g.action=1;finish_action(&g);g.action=2;finish_action(&g);
+        flood_routes(&g,12,4);assert(reached(8,6)&&reached(2,8)&&reached(14,8));
+        g.action=3;finish_action(&g);g.water=0;
+        g.action=4;finish_action(&g);g.action=5;finish_action(&g);
+        flood_routes(&g,8,6);assert(reached(8,14)&&reached(5,11)&&reached(11,11));
+        g.action=7;finish_action(&g);g.action=9;finish_action(&g);g.action=10;finish_action(&g);
+        if(m==SL_RECOVERY){g.action=6;finish_action(&g);}
+        assert(mission_ready(&g));
+        flood_routes(&g,8,14);assert(reached(8,1));
+    }
+    reset_dispatch(&g,SL_DRAINAGE,1,2,false);
+    g.x=tile_center(8);g.z=tile_center(6);interact(&g);assert(g.action==3);
+    finish_action(&g);assert(g.pumping&&!g.power&&!g.battery_charge);
+    reset_dispatch(&g,SL_RECOVERY,0,0,false);
+    g.x=tile_center(6);g.z=tile_center(8);interact(&g);assert(g.action==11);
+    finish_action(&g);assert(walkable(&g,5,8)&&!walkable(&g,2,10)&&!g.west);
+    reset_dispatch(&g,SL_SURVEY,0,0,false);g.water=0;g.pumping=true;
+    for(int i=0;i<2;++i){
+        g.x=tile_center(i?11:5);g.z=tile_center(11);interact(&g);
+        assert(g.action==9+i);finish_action(&g);
+    }
+    assert(g.logs==3&&!mission_ready(&g));g.chart=true;assert(mission_ready(&g));
+    reset_dispatch(&g,SL_RECOVERY,1,1,false);g.power=true;
+    assert(!movement_ok(&g,tile_center(4),tile_center(3)));
+    g.kit=0;assert(movement_ok(&g,tile_center(4),tile_center(3)));
+    reset_dispatch(&g,SL_RECOVERY,0,1,false);g.pumping=true;g.z=tile_center(12);
+    use_lure(&g);assert(g.lure_ticks==120&&!g.lure_charge);
+    g.paused=true;update_game(&g);assert(g.lure_ticks==120);
+    g.paused=false;float x=g.drone_x;
+    for(int i=0;i<120;++i)update_game(&g);
+    assert(!g.lure_ticks&&g.drone_x==x);use_lure(&g);assert(!g.lure_ticks);
+    sl_module_t s={0};reset_dispatch(&s.game,0,0,0,true);clear_input(&s);
+    mosaico_host_input_v1_t e={.type=MOSAICO_HOST_INPUT_ACTION,.code=1,.pressed=true};
+    input(&s,&e);input(&s,&e);assert(s.game.mission==1);
+    e.code=6;input(&s,&e);assert(!s.game.briefing);
+    s.game.pumping=true;s.game.water=0;s.game.west=true;update(&s);
+    assert(s.game.escaped&&s.completed[1]==1);update(&s);assert(s.completed[1]==1);
+    s.fire_edge=true;update(&s);assert(s.game.briefing&&s.game.mission==2&&s.game.site==1);
+    s.game.briefing=false;s.game.failed=true;s.fire_edge=true;update(&s);
+    assert(s.game.mission==2&&s.game.site==1&&!s.game.failed&&s.game.detected);
+    puts("108 mission/site/kit routes, tool effects and dispatch lifecycle: ok");
+}
+static void check_service_duct(void)
+{
+    sl_game_t g;reset_game(&g);
+    g.x=tile_center(6);g.z=tile_center(10);g.sneaking=true;g.crouch=1;
+    assert(!movement_ok(&g,tile_center(6),tile_center(11)));
+    g.water=0;g.sneaking=false;
+    assert(!movement_ok(&g,tile_center(6),tile_center(11)));
+    g.sneaking=true;g.crouch=0;
+    assert(!movement_ok(&g,tile_center(6),tile_center(11)));
+    g.crouch=1;assert(movement_ok(&g,tile_center(6),tile_center(11)));
+    g.z=tile_center(11);g.sneaking=false;update_game(&g);
+    assert(g.sneaking&&g.crouch==1&&g.passage_used);
+    for(int angle=0;angle<8;++angle)for(int phase=0;phase<12;++phase){
+        g.facing=angle*SL_PI*.25f;g.yaw=g.facing;g.walk_phase=phase*SL_PI/6;g.walk_weight=1;
+        sl_pose_t p=character_pose(&g);
+        sl_vec3_t helmet=xf_point(p.head,0,.33f,0);
+        assert(helmet.y<1.40f);
+        place_camera(&g);assert(g.camera_distance<=1.65f&&g.cam_y<1.40f);
+        for(int side=0;side<2;++side){
+            assert(fabsf(distance(p.shoulder[side],p.elbow[side])-.28f)<.0001f);
+            assert(fabsf(distance(p.elbow[side],p.hand[side])-.28f)<.0001f);
+        }
+    }
+    g.record=true;assert(!walkable(&g,8,11)&&walkable(&g,6,11));
+    flood_routes(&g,5,11);assert(reached(6,10)&&reached(8,1));
+    g.z=tile_center(10);g.sneaking=false;g.move=0;
+    for(int frame=0;frame<30;++frame)update_game(&g);
+    assert(g.crouch<.01f);
+    puts("service duct: flood gate, crouch clearance, helmet, camera and alarm return ok");
+}
+int main(void)
+{
+    check_motion();check_scene_budget();
+    sl_game_t normal,quiet;
+    reset_game(&normal);
+    assert(normal.camera_distance>2.3f);
+    assert(!movement_ok(&normal,tile_center(8),tile_center(0)));
+    assert(drone_sight(tile_center(4),tile_center(14),tile_center(7),tile_center(14)));
+    assert(!drone_sight(tile_center(4),tile_center(14),tile_center(4),tile_center(12)));
+    normal.power=true;normal.x=tile_center(7);normal.z=tile_center(14);
+    quiet=normal;quiet.sneaking=true;
+    for(int i=0;i<30;++i){update_game(&normal);update_game(&quiet);}
+    assert(normal.seen&&quiet.seen);
+    assert(quiet.alert>0&&quiet.alert<normal.alert);
+    float alert=quiet.alert;
+    quiet.x=tile_center(2);quiet.z=tile_center(12);
+    update_game(&quiet);
+    assert(!quiet.seen&&quiet.alert<alert);
+    sl_game_t cover;reset_game(&cover);cover.power=true;
+    cover.x=tile_center(5);cover.z=tile_center(11);
+    for(int i=0;i<720;++i){update_game(&cover);assert(!cover.seen&&!cover.failed);}
+    normal.paused=true;uint16_t patrol=normal.drone_tick;
+    update_game(&normal);assert(normal.drone_tick==patrol);
+    normal.paused=false;
+    for(int i=0;i<100&&!normal.failed;++i)update_game(&normal);
+    assert(normal.failed);
+    uint32_t sequence=normal.sfx_seq;
+    update_game(&normal);assert(normal.sfx_seq==sequence);
+
+    sl_module_t state={0};reset_game(&state.game);clear_input(&state);
+    for(int i=1;i<SL_CUES;++i)state.sounds[i].frameCount=1;
+    cue(&state.game,SL_CLICK);consume_audio(&state);consume_audio(&state);
+    assert(plays==1);
+    cue(&state.game,SL_CLICK);consume_audio(&state);assert(plays==2);
+    cue(&state.game,SL_STEP);consume_audio(&state);assert(plays==2);
+    state.game.power=true;state.game.x=tile_center(8);state.game.z=tile_center(6);
+    state.game.action=3;state.game.action_ticks=1;
+    update(&state);assert(state.has_checkpoint&&state.game.pumping);
+    state.game.failed=true;state.game.record=true;state.forward=true;
+    state.game.x=tile_center(7);state.game.z=tile_center(14);
+    sequence=state.game.sfx_seq;
+    state.fire_edge=true;update(&state);
+    assert(!state.game.failed&&!state.game.record&&state.game.pumping);
+    assert(nearby(&state.game,8,6,.1f)&&!state.forward);
+    assert(state.game.sfx_seq>sequence);
+    mosaico_host_input_v1_t touch={.type=MOSAICO_HOST_INPUT_POINTER,.track_id=42,.pressed=true,.x=35,.y=415};
+    input(&state,&touch);input(&state,&touch);assert(state.touch_sneak);
+    touch.pressed=false;input(&state,&touch);touch.pressed=true;
+    input(&state,&touch);assert(!state.touch_sneak);
+    mosaico_host_input_v1_t pause={.type=MOSAICO_HOST_INPUT_CONTROL,.code=MOSAICO_HOST_CONTROL_PAUSE};
+    unsigned old_plays=plays;input(&state,&pause);update(&state);assert(plays==old_plays);
+    assert(stops>=SL_CUES-1);
+    pause.code=MOSAICO_HOST_CONTROL_RESET;input(&state,&pause);
+    assert(!state.has_checkpoint&&!state.game.power&&!state.game.paused);
+    assert(state.pointer_id==-1&&state.sneak_id==-1);
+    shutdown(&state);assert(unloads==SL_CUES-1&&closes==1);
+    check_dispatches();
+    check_service_duct();
+    puts("sewer model and audio lifecycle: ok");
+    return 0;
+}

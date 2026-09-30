@@ -1,0 +1,5 @@
+{
+  "schema": "mosaico-game-sim/v1",
+  "sources": ["main/game_module.c"],
+  "preview": "preview.html"
+}

@@ -1,0 +1,75 @@
+{
+  "power-slice.json": {
+    "fuse": 73,
+    "power": 352,
+    "pump": 690,
+    "draining": 750,
+    "drained": 870,
+    "end": 872
+  },
+  "full-route.json": {
+    "fuse": 73,
+    "power": 352,
+    "pump": 690,
+    "draining": 750,
+    "drained": 870,
+    "west": 1384,
+    "east": 2132,
+    "record": 2527,
+    "end": 3266
+  },
+  "relay-shortcut.json": {
+    "fuse": 73,
+    "power": 352,
+    "relay": 393,
+    "pump": 731,
+    "draining": 791,
+    "drained": 911,
+    "west": 1425,
+    "east": 2173,
+    "record": 2867,
+    "end": 3371
+  },
+  "chart-route.json": {
+    "chart": 251,
+    "end": 253
+  },
+  "missing-fuse.json": {
+    "attempt": 251,
+    "end": 253
+  },
+  "unpowered-pump.json": {
+    "attempt": 191,
+    "end": 193
+  },
+  "patrol-retry.json": {
+    "fuse": 73,
+    "power": 352,
+    "pump": 690,
+    "draining": 750,
+    "drained": 870,
+    "west": 1384,
+    "east": 2132,
+    "record": 2527,
+    "watch": 2586,
+    "caught": 3486,
+    "retry": 3527,
+    "end": 3529
+  },
+  "service-duct.json": {
+    "fuse": 77,
+    "power": 356,
+    "pump": 694,
+    "draining": 754,
+    "drained": 874,
+    "chart": 1212,
+    "mouth": 1687,
+    "inside": 1738,
+    "log": 1841,
+    "end": 2282
+  },
+  "submerged-duct.json": {
+    "mouth": 328,
+    "end": 381
+  }
+}

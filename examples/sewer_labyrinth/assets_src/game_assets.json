@@ -1,0 +1,8 @@
+{
+  "schema": "mosaico-game-assets/v1",
+  "limit_bytes": 2097152,
+  "sounds": [{"source": "*.wav"}],
+  "wall_atlases": [
+    {"config": "materials.json", "source": "materials.png", "output": "materials.wall"}
+  ]
+}
