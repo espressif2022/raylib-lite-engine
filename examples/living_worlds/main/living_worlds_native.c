@@ -12,9 +12,7 @@
 #include "mosaico_game_assets.h"
 #include "raylib_lite_game_app.h"
 #include "raylib_lite_native_hooks.h"
-#include "living_worlds_scene_audio.h"
-#include "living_worlds_view.h"
-#include "living_worlds_world.h"
+#include "living_worlds_session.h"
 
 static const char *TAG = "living_worlds";
 
@@ -48,13 +46,10 @@ extern const uint8_t _binary_rainforest_jpg_start[], _binary_rainforest_jpg_end[
 
 typedef struct {
     mosaico_board_platform_t *board;
-    living_world_t world;
-    living_worlds_atlases_t atlases;
+    living_worlds_session_t session;
     jpeg_decoder_handle_t jpeg;
     void *background_pixels;
-    uint8_t loaded_volumes;
-    living_worlds_scene_audio_t audio;
-    bool paused;
+    esp_err_t asset_error;
 } living_worlds_native_t;
 
 static esp_err_t register_asset(const char *name, const uint8_t *start,
@@ -158,7 +153,9 @@ static void clear_background_aliases(living_worlds_atlases_t *atlases)
     atlases->rainforest = (MosaicoAtlas){0};
 }
 
-static esp_err_t load_background(living_worlds_native_t *state, uint8_t scene)
+static esp_err_t load_background(living_worlds_native_t *state,
+                                 living_worlds_atlases_t *atlases,
+                                 uint8_t scene)
 {
     const char *name;
     const uint8_t *start;
@@ -193,97 +190,46 @@ static esp_err_t load_background(living_worlds_native_t *state, uint8_t scene)
                                       &next, &next_pixels);
     if (err != ESP_OK) return err;
 
-    if (state->atlases.aurora.texture.id)
-        Mosaico2DUnloadTexture(state->atlases.aurora.texture);
+    if (atlases->aurora.texture.id)
+        Mosaico2DUnloadTexture(atlases->aurora.texture);
     free(state->background_pixels);
-    clear_background_aliases(&state->atlases);
+    clear_background_aliases(atlases);
     state->background_pixels = next_pixels;
-    state->atlases.aurora = state->atlases.ocean =
-        state->atlases.sunrise = state->atlases.rainforest = next;
+    atlases->aurora = atlases->ocean =
+        atlases->sunrise = atlases->rainforest = next;
     if (scene == LIVING_SCENE_OCEAN)
         (void)Mosaico2DCacheTextureLight(next.texture, 232);
     return ESP_OK;
 }
 
-static void unload_atlas(MosaicoAtlas *atlas)
+static int session_load_background(void *context,
+                                   living_worlds_atlases_t *atlases,
+                                   uint8_t scene)
 {
-    if (!atlas || !atlas->texture.id) return;
-    UnloadMosaicoAtlas(*atlas);
-    *atlas = (MosaicoAtlas){0};
+    living_worlds_native_t *state = context;
+    state->asset_error = load_background(state, atlases, scene);
+    return state->asset_error == ESP_OK ? 0 : -1;
 }
 
-static void unload_volumes(living_worlds_atlases_t *atlases)
+static void session_release_background(void *context,
+                                       living_worlds_atlases_t *atlases)
 {
-    unload_atlas(&atlases->sunrise_cliff_front);
-    unload_atlas(&atlases->sunrise_cliff_side);
-    unload_atlas(&atlases->sunrise_cliff_rear);
-    unload_atlas(&atlases->aurora_ice_front);
-    unload_atlas(&atlases->aurora_ice_side);
-    unload_atlas(&atlases->aurora_ice_rear);
-    unload_atlas(&atlases->ocean_left_front);
-    unload_atlas(&atlases->ocean_left_side);
-    unload_atlas(&atlases->ocean_left_rear);
-    unload_atlas(&atlases->ocean_right_front);
-    unload_atlas(&atlases->ocean_right_side);
-    unload_atlas(&atlases->ocean_right_rear);
-    unload_atlas(&atlases->rainforest_falls);
+    living_worlds_native_t *state = context;
+    if (atlases->aurora.texture.id)
+        Mosaico2DUnloadTexture(atlases->aurora.texture);
+    free(state->background_pixels);
+    state->background_pixels = NULL;
+    clear_background_aliases(atlases);
 }
 
-static bool atlas_ready(MosaicoAtlas atlas)
-{
-    return atlas.texture.id != 0;
-}
-
-static esp_err_t load_volumes(living_worlds_native_t *state, uint8_t scene)
-{
-    if (state->loaded_volumes == scene) return ESP_OK;
-    unload_volumes(&state->atlases);
-    state->loaded_volumes = UINT8_MAX;
-    esp_err_t err = ESP_OK;
-    if (scene == LIVING_SCENE_AURORA) {
-        state->atlases.aurora_ice_front = LoadMosaicoAtlas("aurora_ice_front.atlas");
-        state->atlases.aurora_ice_side = LoadMosaicoAtlas("aurora_ice_side.atlas");
-        state->atlases.aurora_ice_rear = LoadMosaicoAtlas("aurora_ice_rear.atlas");
-        if (!atlas_ready(state->atlases.aurora_ice_front) ||
-            !atlas_ready(state->atlases.aurora_ice_side) ||
-            !atlas_ready(state->atlases.aurora_ice_rear)) err = ESP_ERR_NOT_FOUND;
-    } else if (scene == LIVING_SCENE_SUNRISE) {
-        state->atlases.sunrise_cliff_front = LoadMosaicoAtlas("sunrise_cliff_front.atlas");
-        state->atlases.sunrise_cliff_side = LoadMosaicoAtlas("sunrise_cliff_side.atlas");
-        state->atlases.sunrise_cliff_rear = LoadMosaicoAtlas("sunrise_cliff_rear.atlas");
-        if (!atlas_ready(state->atlases.sunrise_cliff_front) ||
-            !atlas_ready(state->atlases.sunrise_cliff_side) ||
-            !atlas_ready(state->atlases.sunrise_cliff_rear)) err = ESP_ERR_NOT_FOUND;
-    } else if (scene == LIVING_SCENE_OCEAN) {
-        state->atlases.ocean_left_front = LoadMosaicoAtlas("ocean_reef_left_front.atlas");
-        state->atlases.ocean_left_side = LoadMosaicoAtlas("ocean_reef_left_side.atlas");
-        state->atlases.ocean_left_rear = LoadMosaicoAtlas("ocean_reef_left_rear.atlas");
-        state->atlases.ocean_right_front = LoadMosaicoAtlas("ocean_reef_right_front.atlas");
-        state->atlases.ocean_right_side = LoadMosaicoAtlas("ocean_reef_right_side.atlas");
-        state->atlases.ocean_right_rear = LoadMosaicoAtlas("ocean_reef_right_rear.atlas");
-        if (!atlas_ready(state->atlases.ocean_left_front) ||
-            !atlas_ready(state->atlases.ocean_left_side) ||
-            !atlas_ready(state->atlases.ocean_left_rear) ||
-            !atlas_ready(state->atlases.ocean_right_front) ||
-            !atlas_ready(state->atlases.ocean_right_side) ||
-            !atlas_ready(state->atlases.ocean_right_rear)) err = ESP_ERR_NOT_FOUND;
-    } else if (scene == LIVING_SCENE_RAINFOREST) {
-        state->atlases.rainforest_falls = LoadMosaicoAtlas("rainforest_falls.atlas");
-        if (!atlas_ready(state->atlases.rainforest_falls)) err = ESP_ERR_NOT_FOUND;
-    }
-    if (err != ESP_OK) {
-        unload_volumes(&state->atlases);
-        return err;
-    }
-    state->loaded_volumes = scene;
-    return ESP_OK;
-}
+static const living_worlds_session_assets_t s_session_assets = {
+    .load_background = session_load_background,
+    .release_background = session_release_background,
+};
 
 static raylib_lite_result_t app_start(void *user)
 {
     living_worlds_native_t *state = user;
-    living_world_reset(&state->world);
-    state->loaded_volumes = UINT8_MAX;
     esp_err_t err = register_assets();
     if (err != ESP_OK) goto fail;
     const jpeg_decode_engine_cfg_t jpeg_config = {
@@ -292,15 +238,20 @@ static raylib_lite_result_t app_start(void *user)
     };
     err = jpeg_new_decoder_engine(&jpeg_config, &state->jpeg);
     if (err != ESP_OK) goto fail;
-    err = load_background(state, state->world.scene);
-    if (err != ESP_OK) goto fail;
-    err = load_volumes(state, state->world.scene);
-    if (err != ESP_OK) goto fail;
-    living_worlds_scene_audio_init(&state->audio);
+    if (living_worlds_session_start(&state->session, &s_session_assets, state)) {
+        err = state->asset_error == ESP_OK ? ESP_ERR_NOT_FOUND : state->asset_error;
+        goto fail;
+    }
     return RAYLIB_LITE_OK;
 
 fail:
     ESP_LOGE(TAG, "startup failed: %s", esp_err_to_name(err));
+    living_worlds_session_close(&state->session);
+    if (state->jpeg) {
+        jpeg_del_decoder_engine(state->jpeg);
+        state->jpeg = NULL;
+    }
+    mosaico_game_assets_unmount();
     return err == ESP_ERR_NO_MEM ? RAYLIB_LITE_NO_MEMORY
                                  : RAYLIB_LITE_PLATFORM_ERROR;
 }
@@ -318,34 +269,27 @@ static raylib_lite_result_t app_first_present(void *user)
 static void app_event(void *user, const raylib_lite_input_event_t *event)
 {
     living_worlds_native_t *state = user;
-    if (!event || (event->type != RAYLIB_LITE_INPUT_POINTER &&
-                   event->type != RAYLIB_LITE_INPUT_TOUCH)) return;
-    uint8_t previous = state->world.scene;
-    living_world_pointer(&state->world, (float)event->x, (float)event->y,
-                         event->pressed);
-    if (state->world.scene == previous) return;
-    if (load_background(state, state->world.scene) != ESP_OK ||
-        load_volumes(state, state->world.scene) != ESP_OK) {
-        state->world.scene = previous;
-        (void)load_background(state, previous);
-        (void)load_volumes(state, previous);
-        return;
-    }
-    living_worlds_scene_audio_select(&state->audio, state->world.scene);
+    if (!event) return;
+    if (event->type == RAYLIB_LITE_INPUT_POINTER ||
+        event->type == RAYLIB_LITE_INPUT_TOUCH)
+        living_worlds_session_pointer(&state->session, (float)event->x,
+                                      (float)event->y, event->pressed);
+    else if (event->type == RAYLIB_LITE_INPUT_BUTTON)
+        living_worlds_session_action(&state->session, event->value,
+                                     event->pressed);
 }
 
 static bool app_idle(void *user)
 {
-    return ((living_worlds_native_t *)user)->paused;
+    return ((living_worlds_native_t *)user)->session.paused;
 }
 
 static void app_update(void *user)
 {
     living_worlds_native_t *state = user;
-    if (!state->paused) living_world_update(&state->world);
-    if (living_worlds_scene_audio_update(&state->audio, state->world.scene)) {
+    if (living_worlds_session_update(&state->session)) {
         for (unsigned i = 0; i < SCENE_AUDIO_COUNT; ++i) {
-            if (!state->audio.tracks[i].frameCount)
+            if (!state->session.audio.tracks[i].frameCount)
                 ESP_LOGW(TAG, "failed to load %s", SCENE_AUDIO_PATHS[i]);
         }
     }
@@ -353,18 +297,18 @@ static void app_update(void *user)
 
 static void app_render(void *user)
 {
-    living_worlds_native_t *state = user;
-    living_worlds_view_render(&state->world, &state->atlases);
+    living_worlds_session_render(&((living_worlds_native_t *)user)->session);
 }
 
 static void app_stats(void *user)
 {
     living_worlds_native_t *state = user;
     ESP_LOGI(TAG, "scene=%u yaw=%.1f pitch=%.1f hash=%08lx",
-             state->world.scene, state->world.yaw, state->world.pitch,
-             (unsigned long)living_world_hash(&state->world));
+             state->session.world.scene, state->session.world.yaw,
+             state->session.world.pitch,
+             (unsigned long)living_world_hash(&state->session.world));
 #if CONFIG_MOSAICO_GAME_RASTER_PROFILE
-    if (state->world.scene == LIVING_SCENE_OCEAN) {
+    if (state->session.world.scene == LIVING_SCENE_OCEAN) {
         mosaico_game_2d_raster_stats_t raster;
         mosaico_game_2d_get_raster_stats(&raster);
         living_ocean_draw_profile_t ocean = living_ocean_draw_profile();
@@ -385,13 +329,7 @@ static void app_stats(void *user)
 static void app_stop(void *user)
 {
     living_worlds_native_t *state = user;
-    living_worlds_scene_audio_close(&state->audio);
-    unload_volumes(&state->atlases);
-    if (state->atlases.aurora.texture.id)
-        Mosaico2DUnloadTexture(state->atlases.aurora.texture);
-    free(state->background_pixels);
-    state->background_pixels = NULL;
-    clear_background_aliases(&state->atlases);
+    living_worlds_session_close(&state->session);
     if (state->jpeg) {
         jpeg_del_decoder_engine(state->jpeg);
         state->jpeg = NULL;
@@ -406,10 +344,7 @@ esp_err_t living_worlds_native_run(mosaico_board_platform_t *board)
         mosaico_board_platform_services(board);
     if (!services) return ESP_ERR_INVALID_STATE;
 
-    living_worlds_native_t state = {
-        .board = board, .loaded_volumes = UINT8_MAX,
-        .audio.playing_scene = UINT8_MAX,
-    };
+    living_worlds_native_t state = {.board = board};
     const raylib_lite_game_app_t app = {
         .tag = "living_worlds",
         .window_title = "Living Worlds",

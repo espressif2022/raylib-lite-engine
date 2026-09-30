@@ -1,5 +1,6 @@
 idf_component_register(
-    SRCS "main.c" "living_worlds_native.c" "living_worlds_scene_audio.c"
+    SRCS "main.c" "living_worlds_native.c" "living_worlds_session.c"
+         "living_worlds_scene_audio.c"
          "living_worlds_world.c"
          "living_worlds_aurora.c" "living_worlds_ocean.c"
          "living_worlds_volume.c" "living_worlds_view.c"
@@ -8,6 +9,8 @@ idf_component_register(
              mosaico_game_audio
              mosaico_game_2d esp_driver_jpeg mosaico_raylib_fast
              mosaico_raylib_port raylib)
+
+target_compile_definitions(${COMPONENT_LIB} PRIVATE MOSAICO_GAME_NATIVE=1)
 
 set(asset_source "${CMAKE_CURRENT_LIST_DIR}/../assets_src")
 set(asset_output "${CMAKE_CURRENT_BINARY_DIR}/living_worlds_assets")
