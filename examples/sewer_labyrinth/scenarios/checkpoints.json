@@ -71,5 +71,16 @@
   "submerged-duct.json": {
     "mouth": 328,
     "end": 381
+  },
+  "salvage-route.json": {
+    "fuse": 73,
+    "power": 352,
+    "pump": 690,
+    "draining": 750,
+    "drained": 870,
+    "east_log": 1545,
+    "salvage": 1586,
+    "empty_cabinet": 1629,
+    "end": 1631
   }
 }

@@ -75,6 +75,8 @@ typedef struct {
     uint16_t lure_ticks;
     float lure_x,lure_z;
     bool passage_used;
+    bool journal,salvaged;
+    uint8_t knowledge;
 } sl_game_t;
 enum { SL_SILENT,SL_STEP,SL_CLICK,SL_POWER,SL_PUMP,SL_ALERT,SL_FAIL,SL_WIN,SL_CUES };
 static const char *const s_cues[SL_CUES]={"","step","click","power","pump","alert","fail","win"};
@@ -87,6 +89,7 @@ typedef struct {
     uint16_t menu_down;
     uint32_t completed[SL_MISSIONS],best_ticks[SL_MISSIONS];
     uint8_t badges[SL_MISSIONS];
+    uint8_t learned;
 #if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     Sound sounds[SL_CUES];
 #endif
@@ -152,6 +155,7 @@ static sl_vec3_t work_center(unsigned action)
     case 6:return (sl_vec3_t){18.70f,.82f,32.56f};
     case 9:return (sl_vec3_t){12.10f,1.35f,24.33f};
     case 10:return (sl_vec3_t){25.30f,1.35f,24.33f};
+    case 13:return (sl_vec3_t){25.30f,.87f,24.38f};
     case 11:return (sl_vec3_t){13.21f,1.14f,18.70f};
     case 12:return (sl_vec3_t){24.19f,1.14f,18.70f};
     default:return (sl_vec3_t){9.90f,1.40f,10.72f};
@@ -159,7 +163,7 @@ static sl_vec3_t work_center(unsigned action)
 }
 static float work_heading(unsigned action)
 {return action==4||action==11?-SL_PI*.5f:action==5||action==12?SL_PI*.5f:
-        action==9||action==10?SL_PI:0;}
+        action==9||action==10||action==13?SL_PI:0;}
 static float work_distance(unsigned action)
 {return action==1?.60f:action==3||action==6?.54f:action==4||action==5?.49f:.47f;}
 static float wrap_angle(float v)
@@ -271,6 +275,7 @@ static bool clearance_ok(const sl_game_t *g,float x,float z,bool camera)
        !low_passage(g->x,g->z))return false;
     if(!camera&&!has_tool(g,SL_INSULATOR)&&electric_floor(g,x,z))return false;
     if(z>23.92f&&z<24.40f&&((x>13.12f&&x<13.59f)||(x>15.03f&&x<15.50f)))return false;
+    if(x>24.88f&&x<25.72f&&z>24.20f&&z<24.70f)return false;
     /* Recessed sumps and fixed equipment have the same clearance for actor
      * and camera. The center bridge remains available on either side. */
     if(z>15.65f&&z<21.35f&&((x>15.7f&&x<17.4f)||(x>20.0f&&x<21.7f)))return false;
@@ -576,7 +581,7 @@ static void add_character(const sl_game_t *g)
                     .17f,.16f,.12f,.28f,.22f,0,boot);
         add_xf_box(xf_mul(root,xf_trans(knee.x,knee.y,knee.z+.083f)),.12f,.13f,.035f,0,pack);
     }
-    if((g->action==1||g->action==6)&&action_progress(g)>.52f){
+    if((g->action==1||g->action==6||g->action==13)&&action_progress(g)>.52f){
         sl_vec3_t hand=pose.hand[1];
         add_xf_box(xf_mul(root,xf_trans(hand.x,hand.y+.055f,hand.z)),
                    .10f,.06f,.16f,0,stripe);
@@ -942,6 +947,16 @@ static void add_scene(const sl_game_t *g)
             add_box(p.x-.23f,p.z-.04f,p.x+.23f,p.z+.04f,1.0f,1.6f,(Color){43,66,64,255});
             add_box(p.x-.17f,p.z+.045f,p.x+.17f,p.z+.055f,1.15f,1.50f,
                     g->logs&(1<<i)?(Color){73,172,121,255}:(Color){222,185,102,255});
+            for(int line=0;line<3;++line)
+                add_box(p.x-.12f,p.z+.058f,p.x+.09f-line*.025f,p.z+.06f,
+                        1.23f+line*.075f,1.24f+line*.075f,(Color){51,76,71,255});
+            if(i==1){
+                add_box(p.x-.23f,p.z-.08f,p.x+.23f,p.z+.19f,.52f,.82f,(Color){100,116,92,255});
+                add_box(p.x-.19f,p.z-.04f,p.x+.19f,p.z+.15f,.82f,.83f,(Color){22,43,43,255});
+                add_xf_box(xf_mul(xf_trans(p.x,.83f,p.z-.07f),xf_rotx(g->salvaged?-.95f:0)),
+                           .46f,.035f,.28f,.02f,(Color){175,139,71,255});
+                if(!g->salvaged)add_box(p.x-.08f,p.z+.09f,p.x+.08f,p.z+.16f,.85f,.93f,(Color){110,210,176,255});
+            }
         }
     }
     if(g->lure_ticks)add_box(g->lure_x-.10f,g->lure_z-.10f,g->lure_x+.10f,
@@ -1129,7 +1144,7 @@ static bool nearby(const sl_game_t *g,int x,int z,float radius)
 
 static void interact(sl_game_t *g)
 {
-    if(g->briefing||g->escaped||g->failed||g->paused||g->action)return;
+    if(g->journal||g->briefing||g->escaped||g->failed||g->paused||g->action)return;
     uint8_t action=0;
     if(nearby(g,7,1,1.1f)&&!g->fuse&&!g->power){action=1;}
     else if(nearby(g,12,4,1.55f)){
@@ -1143,6 +1158,10 @@ static void interact(sl_game_t *g)
     else if(nearby(g,14,8,1.55f)&&!g->east){action=5;}
     else if(nearby(g,5,11,1.1f)&&!(g->logs&1)){action=9;}
     else if(nearby(g,11,11,1.1f)&&!(g->logs&2)){action=10;}
+    else if(nearby(g,11,11,1.1f)&&!g->salvaged){
+        if(g->lure_charge){g->signal=21;g->signal_until=g->tick+120;return;}
+        action=13;
+    }
     else if(has_tool(g,SL_WRENCH)&&nearby(g,6,8,1.1f)&&!g->hatch_w&&!g->west){action=11;}
     else if(has_tool(g,SL_WRENCH)&&nearby(g,10,8,1.1f)&&!g->hatch_e&&!g->east){action=12;}
     else if(g->mission==SL_RECOVERY&&nearby(g,8,14,1.55f)&&!g->record){
@@ -1184,10 +1203,11 @@ static void finish_action(sl_game_t *g)
     case 6:g->record=true;g->signal=3;break;
     case 7:g->chart=true;g->signal=6;break;
     case 8:g->relay=!g->relay;g->signal=g->relay?7:14;break;
-    case 9:g->logs|=1;g->signal=16;break;
-    case 10:g->logs|=2;g->signal=16;break;
+    case 9:g->logs|=1;g->signal=19;break;
+    case 10:g->logs|=2;g->signal=20;break;
     case 11:g->hatch_w=true;g->signal=17;break;
     case 12:g->hatch_e=true;g->signal=17;break;
+    case 13:g->salvaged=true;g->lure_charge=true;g->signal=22;break;
     default:break;
     }
     g->signal_until=g->tick+105;g->action=0;
@@ -1195,7 +1215,7 @@ static void finish_action(sl_game_t *g)
 
 static void update_game(sl_game_t *g)
 {
-    if(g->briefing||g->paused||g->escaped||g->failed)return;
+    if(g->journal||g->briefing||g->paused||g->escaped||g->failed)return;
     if(low_passage(g->x,g->z)){
         g->sneaking=true;g->crouch=1;
         if(cell_at(tile_at(g->x),tile_at(g->z))=='u'&&g->water<=.02f)g->passage_used=true;
@@ -1331,8 +1351,10 @@ static void draw_hud(const sl_game_t *g)
             "PUMP HAS NO POWER", "POWER RESTORED - START CENTRAL PUMP",
             "PUMP RUNNING - DRAINING", "WATER LOW - WEST SERVICE DUCT EXPOSED",
             "BACKUP RELAY DISCONNECTED", "STEP CLOSER TO THE DEVICE",
-            "SERVICE LOG COLLECTED", "MAINTENANCE HATCH OPEN", "DECOY ACTIVE - MOVE NOW"};
-        if(g->signal>0&&g->signal<19){
+            "SERVICE LOG COLLECTED", "MAINTENANCE HATCH OPEN", "DECOY ACTIVE - MOVE NOW",
+            "WEST LOG: FLUSH BYPASS / J NOTES", "EAST LOG: SPARE DECOY / J NOTES",
+            "POUCH FULL - USE YOUR DECOY FIRST", "SPARE DECOY SALVAGED"};
+        if(g->signal>0&&g->signal<23){
             DrawRectangle(70,357,340,29,(Color){8,24,28,226});
             DrawRectangle(70,357,3,29,mint);
             DrawText(g->signal==3&&g->relay?"RECORDER SECURED - RELAY HOLDS":
@@ -1353,12 +1375,14 @@ static void draw_hud(const sl_game_t *g)
         "DRAIN THE CENTRAL WELL":g->west&&g->east?"F  TAKE THE RECORDER":"TWO VALVES REQUIRED";
     if(nearby(g,5,11,1.1f)&&!(g->logs&1))prompt="F  READ WEST SERVICE LOG";
     if(nearby(g,11,11,1.1f)&&!(g->logs&2))prompt="F  READ EAST SERVICE LOG";
+    if(nearby(g,11,11,1.1f)&&(g->logs&2)&&!g->salvaged)
+        prompt=g->lure_charge?"SPARE DECOY - YOUR POUCH IS FULL":"F  SALVAGE SPARE DECOY";
     if(has_tool(g,SL_WRENCH)&&((nearby(g,6,8,1.1f)&&!g->hatch_w&&!g->west)||
        (nearby(g,10,8,1.1f)&&!g->hatch_e&&!g->east)))prompt="F  WRENCH: OPEN MAINTENANCE HATCH";
     if(g->action){
         static const char *const verbs[]={"","PICK UP FUSE","INSTALL FUSE","PULL STARTER",
             "TURN WEST VALVE","TURN EAST VALVE","TAKE RECORDER","READ CHART","SET RELAY",
-            "READ WEST LOG","READ EAST LOG","UNLOCK WEST HATCH","UNLOCK EAST HATCH"};
+            "READ WEST LOG","READ EAST LOG","UNLOCK WEST HATCH","UNLOCK EAST HATCH","SALVAGE DECOY"};
         DrawRectangle(126,397,228,29,(Color){8,24,28,230});
         DrawText(verbs[g->action],144,405,11,pale);
         DrawRectangle(126,426,(int)(228*(36-g->action_ticks)/36),3,amber);
@@ -1392,6 +1416,7 @@ static void draw_hud(const sl_game_t *g)
                              "F / TAP RIGHT TO RESTART",70,288,13,pale);
     }
     if(g->lure_charge){DrawRectangle(382,166,90,30,(Color){8,24,28,235});DrawText("SPACE: LURE",388,177,10,mint);}
+    if(!g->briefing){DrawRectangle(382,211,90,28,(Color){8,24,28,235});DrawText("J: NOTES",393,221,11,amber);}
     if(g->briefing){
         DrawRectangle(28,90,424,305,(Color){8,24,28,250});
         DrawText("DISPATCH BOARD",50,108,24,mint);
@@ -1403,6 +1428,23 @@ static void draw_hud(const sl_game_t *g)
         DrawText(site_config(g)->name,50,291,13,pale);
         DrawText(site_config(g)->target_side?"TARGET: EAST":"TARGET: WEST",50,316,12,mint);
         DrawText("F / TAP HERE : DEPART",83,358,19,mint);
+    }
+    if(g->journal){
+        static const char *const titles[]={"WEST SERVICE CHART","WEST LOG: FLUSH BYPASS","EAST LOG: CRAWLER SERVICE","FIELD SKETCH: LOW DUCT","SWITCH ROOM: BACKUP RELAY"};
+        static const char *const lines[]={"Valves drain outer loops. Check shutter notices.",
+            "After pumping, follow yellow marks. Keep low.",
+            "Watch the tracks. A spare decoy is in this locker.",
+            "Both mouths stay open when the flush gate shuts.",
+            "Grid power and relay hold the center gate open."};
+        DrawRectangle(24,73,432,354,(Color){14,33,36,252});
+        DrawText("FIELD NOTES",45,89,22,amber);
+        for(int note=0;note<5;++note){
+            int y=128+note*53;bool known=(g->knowledge&(1u<<note))!=0;
+            DrawRectangle(43,y-5,392,1,(Color){57,82,77,255});
+            DrawText(known?titles[note]:"UNDISCOVERED NOTE",45,y,12,known?mint:pale);
+            DrawText(known?lines[note]:"Explore service rooms and inspect equipment.",45,y+20,10,pale);
+        }
+        DrawText("J / TAP TO CLOSE - WORLD PAUSED",51,407,12,amber);
     }
 }
 
@@ -1518,10 +1560,15 @@ static void dispatch_choice(sl_module_t *s,int code)
 }
 static void use_lure(sl_game_t *g)
 {
-    if(g->briefing||g->paused||g->failed||g->escaped||g->action||!g->lure_charge||
+    if(g->journal||g->briefing||g->paused||g->failed||g->escaped||g->action||!g->lure_charge||
        (!g->power&&!g->pumping)||fabsf(g->z-tile_center(14))>10)return;
     g->lure_charge=false;g->lure_ticks=120;g->lure_x=g->x;g->lure_z=g->z;
     g->signal=18;g->signal_until=g->tick+90;cue(g,SL_CLICK);
+}
+static void toggle_journal(sl_module_t *s)
+{
+    if(s->game.briefing||s->game.paused||s->game.failed||s->game.escaped||s->game.action)return;
+    stop_audio(s);s->game.journal=!s->game.journal;clear_input(s);
 }
 static void input(void *value,const mosaico_host_input_v1_t *e)
 {
@@ -1536,6 +1583,12 @@ static void input(void *value,const mosaico_host_input_v1_t *e)
         return;
     }
     if(e->type==MOSAICO_HOST_INPUT_ACTION){
+        if(e->code==4){
+            if(e->pressed&&!(s->menu_down&16))toggle_journal(s);
+            if(e->pressed)s->menu_down|=16;else s->menu_down&=~16;
+            return;
+        }
+        if(s->game.journal)return;
         if(s->game.briefing){
             if(e->code>=0&&e->code<16){
                 uint16_t bit=(uint16_t)(1u<<e->code);
@@ -1558,6 +1611,8 @@ static void input(void *value,const mosaico_host_input_v1_t *e)
             if(e->track_id==s->sneak_id)s->sneak_id=-1;
         }else if(e->track_id==s->sneak_id){
             /* A held finger toggles once, even if input is resent. */
+        }else if(s->game.journal||(!s->game.briefing&&e->x>=382&&e->y>=211&&e->y<=239)){
+            toggle_journal(s);s->sneak_id=e->track_id;
         }else if(s->game.briefing){
             dispatch_choice(s,e->y<205?1:e->y<263?9:e->y<340?2:6);
             s->sneak_id=e->track_id;
@@ -1600,6 +1655,9 @@ static void update(void *value)
     }
     bool won=s->game.escaped;
     update_game(&s->game);
+    s->learned|=(s->game.chart?1:0)|((s->game.logs&3)<<1)|
+                (s->game.passage_used?8:0)|(s->game.relay?16:0);
+    s->game.knowledge=s->learned;
     if(!won&&s->game.escaped){
         unsigned m=s->game.mission;++s->completed[m];
         if(!s->best_ticks[m]||s->game.tick<s->best_ticks[m])s->best_ticks[m]=s->game.tick;
@@ -1633,6 +1691,7 @@ static int state_json(const void *value,char *out,size_t cap)
         "\"center_open\":%s,\"record\":%s,\"marks\":%u,"
         "\"mission\":%u,\"site\":%u,\"kit\":%u,\"target_side\":%u,\"logs\":%u,"
         "\"duct_open\":%s,\"duct_used\":%s,\"crouch\":%.2f,"
+        "\"journal\":%s,\"knowledge\":%u,\"salvaged\":%s,"
         "\"battery\":%s,\"lure\":%s,\"ready\":%s,\"completed\":%lu,\"best_ticks\":%lu,\"badges\":%u,"
         "\"faces\":%d,\"faces_dropped\":%d,\"state_hash\":\"%08lx\"}",
         g->briefing?"briefing":g->escaped?"won":g->failed?"lost":"playing",g->x,g->z,tile_at(g->x),tile_at(g->z),
@@ -1649,6 +1708,7 @@ static int state_json(const void *value,char *out,size_t cap)
         g->record?"true":"false",(unsigned)g->mark_count,
         g->mission,g->site,g->kit,site_config(g)->target_side,g->logs,
         g->water<=.02f?"true":"false",g->passage_used?"true":"false",g->crouch,
+        g->journal?"true":"false",g->knowledge,g->salvaged?"true":"false",
         g->battery_charge?"true":"false",g->lure_charge?"true":"false",mission_ready(g)?"true":"false",
         (unsigned long)((const sl_module_t*)value)->completed[g->mission],
         (unsigned long)((const sl_module_t*)value)->best_ticks[g->mission],

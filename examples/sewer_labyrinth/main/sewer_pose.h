@@ -55,7 +55,7 @@ static sl_pose_t character_pose(const sl_game_t *g)
     float body_lean=.10f*weight+.15f*crouch,twist=sinf(phase)*.045f*weight;
     bool duct=low_passage(g->x,g->z);
     if(duct)body_lean+=.12f*crouch;
-    if(g->action==1||g->action==6)body_lean+=.38f*work*(1-smooth(.5f,.85f,t));
+    if(g->action==1||g->action==6||g->action==13)body_lean+=.38f*work*(1-smooth(.5f,.85f,t));
     else if(g->action==3)body_lean+=work*(.16f-.36f*smooth(.3f,.72f,t));
     else if(g->action==4||g->action==5){body_lean+=.12f*work;twist+=sinf(wheel_angle(g,g->action))*.08f*work;}
     else body_lean+=.08f*work;
@@ -95,14 +95,14 @@ static sl_pose_t character_pose(const sl_game_t *g)
                 contact.x+=sign*.105f;
                 contact.y=1.04f+.35f*cosf(starter_angle(g));
                 contact.z=15.12f+.35f*sinf(starter_angle(g));
-            }else if(g->action!=1&&g->action!=6){
+            }else if(g->action!=1&&g->action!=6&&g->action!=13){
                 contact.x+=cosf(heading)*sign*.11f;
                 contact.z-=sinf(heading)*sign*.11f;
             }
             target=actor_local(p.root,contact);
-            if((g->action==1||g->action==6)&&side==1)
+            if((g->action==1||g->action==6||g->action==13)&&side==1)
                 target=vlerp(target,(sl_vec3_t){.22f,.84f,.14f},smooth(.52f,.85f,t));
-            if((g->action==1||g->action==6)&&side==0)
+            if((g->action==1||g->action==6||g->action==13)&&side==0)
                 target=(sl_vec3_t){-.20f,.80f,.13f};
             target=vlerp(resting,target,work);
         }

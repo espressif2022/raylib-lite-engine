@@ -35,6 +35,12 @@ def main():
                         if state["faces_dropped"]:
                             raise RuntimeError("Geometry buffer overflow")
                         (PROJECT / "docs" / (captures[frame + 1] + ".png")).write_bytes(image)
+                        if captures[frame + 1] == "duct-log":
+                            runtime.action(4, True)
+                            runtime.action(4, False)
+                            (PROJECT / "docs/field-notes.png").write_bytes(runtime.frame())
+                            runtime.action(4, True)
+                            runtime.action(4, False)
                         summaries[captures[frame + 1]] = {key: state[key] for key in
                             ("phase", "cell_x", "cell_z", "logs", "duct_open", "duct_used", "faces")}
                 if name == "service-duct.json" and runtime.metadata()["phase"] != "won":

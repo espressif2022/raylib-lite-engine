@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import re
 import shutil
@@ -17,14 +18,39 @@ CHECKPOINTS = json.loads((PROJECT / "scenarios/checkpoints.json").read_text())
 
 
 def run_scenario(name: str, frames: int) -> dict:
-    command = [sys.executable, str(CLI), "sim", str(PROJECT), "--headless",
-               "--frames", str(frames), "--scenario",
-               str(PROJECT / "scenarios" / name), "--json"]
-    output = subprocess.check_output(command, cwd=ENGINE, text=True)
-    return json.loads(output)["result"]
+    # Asset preparation replaces generated files. Keep each replay independent
+    # of an interactive simulator or another checkout-wide test invocation.
+    with tempfile.TemporaryDirectory(prefix="sewer-replay-") as directory:
+        isolated = Path(directory) / "sewer_labyrinth"
+        shutil.copytree(PROJECT, isolated, ignore=shutil.ignore_patterns(
+            "assets", "docs", "build", "managed_components", "__pycache__"))
+        command = [sys.executable, str(CLI), "sim", str(isolated), "--headless",
+                   "--frames", str(frames), "--scenario",
+                   str(isolated / "scenarios" / name), "--json"]
+        output = subprocess.check_output(command, cwd=ENGINE, text=True)
+        return json.loads(output)["result"]
 
 
 class SewerLabyrinthTests(unittest.TestCase):
+    def test_replays_have_independent_generated_assets(self) -> None:
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            futures = [workers.submit(run_scenario, "mark-start.json", 4) for _ in range(2)]
+            states = [future.result() for future in futures]
+        self.assertTrue(all(state["marks"] == 1 for state in states))
+        self.assertEqual(states[0]["state_hash"], states[1]["state_hash"])
+
+    def test_salvage_gives_one_usable_decoy(self) -> None:
+        route = "salvage-route.json"
+        collected = run_scenario(route, CHECKPOINTS[route]["salvage"])
+        self.assertTrue(collected["salvaged"] and collected["lure"])
+        self.assertEqual(collected["logs"], 2)
+        self.assertTrue(collected["knowledge"] & 4)
+        end = run_scenario(route, CHECKPOINTS[route]["end"])
+        self.assertTrue(end["salvaged"])
+        self.assertFalse(end["lure"])
+        self.assertEqual(end["phase"], "playing")
+        self.assertEqual(end["faces_dropped"], 0)
+
     def test_exposed_duct_completes_survey_and_return(self) -> None:
         route = "service-duct.json"
         inside = run_scenario(route, CHECKPOINTS[route]["inside"])
@@ -90,10 +116,13 @@ assert.equal(plays,2);
 
     def test_generated_audio_matches_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            destination = Path(directory)
-            subprocess.run([sys.executable, str(PROJECT / "assets_src/generate_audio.py")], check=True)
+            destination = Path(directory) / "generated"
+            source = Path(directory) / "assets_src"
+            shutil.copytree(PROJECT / "assets_src", source)
+            subprocess.run([sys.executable, str(source / "generate_audio.py")], check=True)
+            subprocess.run([sys.executable, str(source / "prepare_materials.py")], check=True)
             subprocess.run([sys.executable, str(ENGINE / "tools/pack_game_assets.py"),
-                            "--source", str(PROJECT / "assets_src"), "--output", str(destination)],
+                            "--source", str(source), "--output", str(destination)],
                            check=True, capture_output=True)
             report = json.loads((destination / "assets-report.json").read_text())
             sounds = {"step", "click", "power", "pump", "alert", "fail", "win"}

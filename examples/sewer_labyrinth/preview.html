@@ -13,7 +13,8 @@ button:hover,button:focus-visible{border-color:#edbd64}#screen{display:block;wid
 <div class="tools" id="dispatch"><button id="mission">更换任务</button><button id="kit">更换工具组合</button><button id="site">更换设施配置</button><button id="depart">出发</button></div>
 <p id="dispatchInfo"></p>
 <p>新区域：02 号泵房。启动排水后，沿西侧黄色地面标线寻找退水露出的检修口；按住 Shift，或开启触屏 SNEAK，蹲身穿过。它通向日志凹室，也能绕过报警后的中央闸门。</p>
-<div class="tools"><button id="lure">投放诱饵（Space）</button></div>
+<div class="tools"><button id="lure">投放诱饵（Space）</button><button id="journal">巡检笔记（J）</button></div>
+<section id="notebook" hidden style="white-space:pre-line;padding:14px;background:#1a3032;border-left:3px solid #e7bb69"></section>
 <details><summary>工具与路线</summary>扳手：从中央泵井两侧打开检修近道。绝缘工具：通过配电后的蓝色漏电地面；未携带时请绕行。诱饵：在南侧巡逻区使用一次，争取 4 秒通行时间。电池：直接启动中央泵一次；备用继电器仍需配电。深处两侧凹室有检修日志，可作为额外探索目标。记录仪报警后中央闸门会关闭，请留意设施配置中封闭的外环。</details>
 <div class="tools"><button id="pause">暂停</button><button id="step">单步</button><button id="reset">重新开始</button><button id="mute">音效：开</button><button id="shot">截图</button></div>
 <section class="play"><img id="screen" tabindex="0" draggable="false" alt="泵站探索实时游戏画面"><div class="readout" id="objective">正在连接仿真…</div></section>
@@ -27,7 +28,7 @@ let paused=false,muted=false,unlocked=false,lastCue=-1,busy=false,blobURL='',req
 function stopAudio(){for(const audio of sounds.values()){audio.pause();audio.currentTime=0}}
 function unlock(){unlocked=true}
 function sound(meta){
-  if(meta.simulation.paused){stopAudio();lastCue=meta.sfx_seq;return}
+  if(meta.simulation.paused||meta.journal){stopAudio();lastCue=meta.sfx_seq;return}
   if(meta.sfx_seq===lastCue)return;
   lastCue=meta.sfx_seq;
   if(muted||!unlocked||!cues.has(meta.sfx))return;
@@ -52,9 +53,11 @@ function sendInput(){post('/api/v1/input',{
 function release(){held.clear();pointers.clear();sendInput()}
 function pulse(code){unlock();release();post('/api/v1/input',{actions:[{code,pressed:true},{code,pressed:false}]})}
 $('mission').onclick=()=>pulse(1);$('kit').onclick=()=>pulse(9);$('site').onclick=()=>pulse(2);$('depart').onclick=()=>pulse(6);$('lure').onclick=()=>pulse(3);
+$('journal').onclick=()=>pulse(4);
 function control(command){unlock();stopAudio();if(command==='reset')lastCue=-1;release();post('/api/v1/control',{command})}
 for(const type of ['keydown','keyup'])addEventListener(type,event=>{
   const key=event.key.toLowerCase();
+  if(key==='j'){event.preventDefault();if(type==='keydown'&&!event.repeat)pulse(4);return}
   if(key===' '){event.preventDefault();if(type==='keydown'&&!event.repeat)pulse(3);return}
   if(!['w','a','s','d','q','e','f','control','shift','arrowup','arrowdown','arrowleft','arrowright','p'].includes(key))return;
   event.preventDefault();unlock();
@@ -72,6 +75,9 @@ $('pause').onclick=()=>control(paused?'resume':'pause');$('step').onclick=()=>co
 $('mute').onclick=()=>{unlock();muted=!muted;stopAudio();$('mute').textContent='音效：'+(muted?'关':'开')};
 $('shot').onclick=()=>{if(!blobURL)return;const link=document.createElement('a');link.href=blobURL;link.download='below-the-tide.png';link.click()};
 function objective(m){
+  if(m.journal)return '巡检笔记已打开，世界暂停。按 J 返回；已学到的线索会保留到本次仿真结束。';
+  if(m.phase==='playing'&&m.cell_x===11&&m.cell_z===11&&(m.logs&2)&&!m.salvaged)
+    return m.lure?'这里有一个备用诱饵，你的工具袋目前已满。用掉手中的诱饵后可回来取。':'日志提到柜内的备用诱饵。靠近按 F 拿取，无需出发时携带该工具。';
   if(m.phase==='playing'&&m.cell_x===6&&m.cell_z>=10&&m.cell_z<=11)
     return m.duct_open?'黄色标线通往低矮检修口。按住 Shift / 开启 SNEAK，穿过后向西寻找日志；洞内松键仍会保持蹲姿。':'前方检修口被水淹没。先启动中央泵，观察水位下降后露出的入口。';
   if(m.phase==='briefing')return '任务板：A/D 选任务，Q/E 选两件工具，W/S 换设施配置，F 出发。也可点击上方按钮。';
@@ -98,6 +104,15 @@ async function tick(){
     paused=meta.simulation.paused;$('pause').textContent=paused?'继续':'暂停';
     sound(meta);$('objective').textContent=objective(meta);$('error').textContent=meta.reload_error||'';
     $('dispatch').hidden=meta.phase!=='briefing';$('lure').disabled=!meta.lure||meta.phase!=='playing';
+    $('journal').disabled=meta.phase!=='playing'||meta.action!==0;
+    $('notebook').hidden=!meta.journal;
+    const notes=[
+      '检修图：阀门分别排空东西外环；出发前留意哪一侧闸门关闭。',
+      '西侧日志：退水后沿黄色标线寻找低矮检修口。这条近路在冲洗报警后仍可通行。',
+      '东侧日志：观察机器人的行进方向，等它经过再穿越。旁边工具柜中存有一个备用诱饵。',
+      '现场速写：低洞两端连通泵房与西侧凹室，蹲身通过后可绕过中央闸门。',
+      '备用供电：恢复电网后开启配电柜继电器，可在取记录仪后保持中央闸门开放。'];
+    $('notebook').textContent='巡检笔记 · 本次会话保留\n\n'+notes.map((note,i)=>(meta.knowledge&(1<<i))?note:'未发现：继续检查维修间与设备。').join('\n\n');
     const missions=['回收记录仪','排水抢修','调查检修日志'];
     const kits=['扳手＋绝缘工具','扳手＋诱饵','扳手＋电池','绝缘工具＋诱饵','绝缘工具＋电池','诱饵＋电池'];
     const sites=['标准巡检','西环关闭／西侧漏电','东环关闭／东侧漏电','西侧漏电','西环关闭／东侧漏电','东环关闭／西侧漏电'];

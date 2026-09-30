@@ -183,6 +183,34 @@ static void check_service_duct(void)
     assert(g.crouch<.01f);
     puts("service duct: flood gate, crouch clearance, helmet, camera and alarm return ok");
 }
+static void check_notebook_and_salvage(void)
+{
+    sl_module_t s={0};reset_dispatch(&s.game,0,0,0,false);clear_input(&s);
+    s.game.chart=true;s.game.logs=2;s.game.pumping=true;s.game.relay=true;update(&s);
+    assert(s.learned==(1|4|16)&&s.game.knowledge==s.learned);
+    mosaico_host_input_v1_t key={.type=MOSAICO_HOST_INPUT_ACTION,.code=4,.pressed=true};
+    input(&s,&key);input(&s,&key);assert(s.game.journal);
+    uint32_t tick=s.game.tick;float water=s.game.water,drone=s.game.drone_x;
+    s.game.lure_charge=true;use_lure(&s.game);assert(s.game.lure_charge);
+    for(int i=0;i<20;++i)update(&s);
+    assert(s.game.tick==tick&&s.game.water==water&&s.game.drone_x==drone);
+    key.pressed=false;input(&s,&key);key.pressed=true;input(&s,&key);assert(!s.game.journal);
+    s.game.x=tile_center(11);s.game.z=tile_center(11);s.game.lure_charge=false;
+    interact(&s.game);assert(s.game.action==13&&!s.game.salvaged&&!s.game.lure_charge);
+    s.game.action_ticks=1;update(&s);assert(s.game.salvaged&&s.game.lure_charge);
+    use_lure(&s.game);assert(!s.game.lure_charge);
+    interact(&s.game);assert(s.game.action!=13); /* The cabinet cannot generate infinite charges. */
+    reset_dispatch(&s.game,0,0,1,false);s.game.logs=2;
+    s.game.x=tile_center(11);s.game.z=tile_center(11);interact(&s.game);
+    assert(!s.game.action&&!s.game.salvaged&&s.game.signal==21);
+    mosaico_host_input_v1_t reset={.type=MOSAICO_HOST_INPUT_CONTROL,.code=MOSAICO_HOST_CONTROL_RESET};
+    input(&s,&reset);update(&s);assert(s.game.knowledge==(1|4|16)&&!s.game.salvaged);
+    s.game.briefing=false;
+    mosaico_host_input_v1_t tap={.type=MOSAICO_HOST_INPUT_POINTER,.track_id=9,.x=400,.y=220,.pressed=true};
+    input(&s,&tap);input(&s,&tap);assert(s.game.journal);
+    tap.pressed=false;input(&s,&tap);tap.pressed=true;input(&s,&tap);assert(!s.game.journal);
+    puts("notebook: pause, retained knowledge, one-shot salvage and touch/key edges ok");
+}
 int main(void)
 {
     check_motion();check_scene_budget();
@@ -241,6 +269,7 @@ int main(void)
     shutdown(&state);assert(unloads==SL_CUES-1&&closes==1);
     check_dispatches();
     check_service_duct();
+    check_notebook_and_salvage();
     puts("sewer model and audio lifecycle: ok");
     return 0;
 }
