@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <string.h>
 #ifndef LIVING_WORLDS_SCENE_SIM_ONLY
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "raylib_lite_clock.h"
 #include "ocean_depth.h"
 #include "ocean_left_volume.h"

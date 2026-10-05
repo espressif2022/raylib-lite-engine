@@ -195,6 +195,7 @@ class GenericHostRuntime:
                     ENGINE_ROOT / "components/mosaico_game_assets/include",
                     ENGINE_ROOT / "components/mosaico_game_2d/include",
                     ENGINE_ROOT / "components/mosaico_raylib_fast/include",
+                    ENGINE_ROOT / "compat/raylib/include",
                     ENGINE_ROOT / "components/mosaico_game_fx/include",
                     ENGINE_ROOT / "components/mosaico_game_tilemap/include",
                     project / "main", project / "assets/generated",

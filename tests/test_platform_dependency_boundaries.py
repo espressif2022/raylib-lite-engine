@@ -245,6 +245,29 @@ int main(void) {{ return M2D_WALL_MODE; }}
                             "-x", "c", "-c", "-o", output, "-"],
                            input=source, text=True, check=True)
 
+    def test_raylib_name_compatibility_is_explicit(self) -> None:
+        fast = (ENGINE / "components/mosaico_raylib_fast/include/mosaico_raylib_fast.h").read_text()
+        compat = (ENGINE / "compat/raylib/include/raylib_lite_raylib.h").read_text()
+        for macro in ("InitWindow", "BeginDrawing", "DrawRectangle",
+                      "DrawTexture", "DrawText"):
+            self.assertNotIn(f"#define {macro} ", fast)
+            self.assertIn(f"#define {macro} MosaicoFast", compat)
+
+        for root in (ENGINE / "examples").glob("*/main"):
+            if root.parent.name == "render_benchmark":
+                continue
+            for path in root.iterdir():
+                if path.suffix not in {".c", ".h"}:
+                    continue
+                source = path.read_text(encoding="utf-8")
+                with self.subTest(path=path.relative_to(ENGINE)):
+                    self.assertNotIn('#include "mosaico_raylib_fast.h"', source)
+
+        for relative in ("components/mosaico_game_app/mosaico_game_app.c",
+                         "components/mosaico_game_ui/mosaico_game_ui.c"):
+            source = (ENGINE / relative).read_text(encoding="utf-8")
+            self.assertNotIn('#include "raylib_lite_raylib.h"', source)
+
     def test_s31_rgb565_acceleration_is_arch_scoped(self) -> None:
         renderer = ENGINE / "components/mosaico_game_2d"
         cmake = (renderer / "CMakeLists.txt").read_text(encoding="utf-8")

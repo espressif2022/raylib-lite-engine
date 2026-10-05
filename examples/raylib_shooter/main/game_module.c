@@ -12,7 +12,7 @@
 #endif
 #endif
 #include "mosaico_game_2d.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "shooter_game.h"
 #include "shooter_view.h"
 

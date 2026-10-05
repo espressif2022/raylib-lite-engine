@@ -8,7 +8,7 @@
 #else
 #include "mosaico_game_module.h"
 #endif
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "mosaico_rgb565.h"
 #include "pet.h"
 #include "pet_draw.h"

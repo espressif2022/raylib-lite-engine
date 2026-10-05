@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "raylib_lite_clock.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "sunrise_depth.h"
 #include "sunrise_volume.h"
 #include "living_worlds_aurora_draw.h"

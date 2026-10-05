@@ -4,7 +4,7 @@
 #include <math.h>
 
 #include "assets_ids.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 
 #define RALLY_W 480
 #define RALLY_H 480

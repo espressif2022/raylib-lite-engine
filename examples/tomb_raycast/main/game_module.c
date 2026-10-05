@@ -11,7 +11,7 @@
 #include "host_asset_runtime.h"
 #endif
 #endif
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #if defined(MOSAICO_GAME_NATIVE)
 #include "native_feedback.h"
 #include "raylib_lite_runtime_stats.h"

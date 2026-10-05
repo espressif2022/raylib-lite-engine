@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "tomb_view.h"
 #include "assets_ids.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "raylib_lite_clock.h"
 #include <math.h>
 #include <stdio.h>

@@ -9,7 +9,7 @@
 #include "host_asset_runtime.h"
 #endif
 #endif
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "platform_game.h"
 #include "sky_hop_view.h"
 

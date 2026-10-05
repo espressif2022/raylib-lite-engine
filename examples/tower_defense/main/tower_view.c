@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include "assets_ids.h"
 #include "mosaico_game_assets.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 
 static const Color C_BG = {5, 10, 20, 255};
 static const Color C_GRASS = {12, 30, 35, 255};

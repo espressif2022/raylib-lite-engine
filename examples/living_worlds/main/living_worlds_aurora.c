@@ -6,7 +6,7 @@
 #ifndef LIVING_WORLDS_SCENE_SIM_ONLY
 #include "aurora_depth.h"
 #include "aurora_ice_volume.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "living_worlds_aurora_draw.h"
 #include "living_worlds_volume.h"
 #endif

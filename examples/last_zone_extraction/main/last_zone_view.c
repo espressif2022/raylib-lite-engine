@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "assets_ids.h"
 #include "raylib_lite_clock.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "mosaico_rgb565.h"
 
 #define LAST_ZONE_COLUMNS 120

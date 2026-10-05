@@ -2,7 +2,7 @@
 #include "living_worlds_volume.h"
 #include <math.h>
 #include <string.h>
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 
 #define LIVING_FOCAL (480.0f*1.055f)
 #define LIVING_VERTEX_CAP 400

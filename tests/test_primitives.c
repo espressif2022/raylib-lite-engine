@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "raylib_lite_host_video.h"
 
 #define W 480

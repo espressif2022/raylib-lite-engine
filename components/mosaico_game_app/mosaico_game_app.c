@@ -59,7 +59,7 @@ static void poll_input(void *context)
 static bool should_close(void *context)
 {
     app_runtime_t *runtime = context;
-    return runtime->terminal_result != RAYLIB_LITE_OK || WindowShouldClose();
+    return runtime->terminal_result != RAYLIB_LITE_OK || MosaicoFastWindowShouldClose();
 }
 
 static bool idle(void *context)
@@ -115,7 +115,7 @@ static void render(void *context)
 static uint32_t render_fps(void *context)
 {
     app_runtime_t *runtime = context;
-    int fps = GetFPS();
+    int fps = MosaicoFastGetFPS();
     return fps > 0 ? (uint32_t)fps : runtime->app->target_fps;
 }
 
@@ -141,9 +141,9 @@ raylib_lite_result_t raylib_lite_game_app_run(
         result = RAYLIB_LITE_INVALID_STATE;
         goto shutdown_port;
     }
-    InitWindow((int)width, (int)height,
+    MosaicoFastInitWindow((int)width, (int)height,
                app->window_title ? app->window_title : "Raylib Lite");
-    SetTargetFPS((int)app->target_fps);
+    MosaicoFastSetTargetFPS((int)app->target_fps);
     if (app->on_start) {
         /* Once entered, on_start owns a matching on_stop even when startup
          * reports failure after partially acquiring application resources. */
@@ -186,7 +186,7 @@ raylib_lite_result_t raylib_lite_game_app_run(
 
 shutdown_port:
     if (started && app->on_stop) app->on_stop(app->user);
-    CloseWindow();
+    MosaicoFastCloseWindow();
     mosaico_raylib_port_deinit();
     return result;
 }

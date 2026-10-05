@@ -11,7 +11,7 @@
 #include <string.h>
 
 #include "mosaico_game_module.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #if !defined(MOSAICO_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif

@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "mosaico_game_module.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #if defined(MOSAICO_GAME_ELF)
 #include "mosaico_runtime_v1.h"
 #endif

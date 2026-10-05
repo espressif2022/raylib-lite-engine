@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <stddef.h>
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "shooter_view.h"
 #include "assets_ids.h"
 

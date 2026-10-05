@@ -2,7 +2,7 @@
 #include "sky_hop_view.h"
 
 #include "assets_ids.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 
 static void centered(const char *text, int y, int size, Color color)
 {

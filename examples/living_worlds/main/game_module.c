@@ -7,7 +7,7 @@
 #include "host_asset_runtime.h"
 #endif
 #include "mosaico_game_module.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "living_worlds_session.h"
 
 typedef living_worlds_session_t module_state_t;

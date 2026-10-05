@@ -13,7 +13,7 @@
 #if !defined(MOSAICO_GAME_NATIVE) && !defined(MOSAICO_GAME_ELF)
 #include "host_asset_runtime.h"
 #endif
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "last_zone_game.h"
 #include "last_zone_view.h"
 #if defined(MOSAICO_GAME_NATIVE)

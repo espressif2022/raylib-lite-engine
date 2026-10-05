@@ -10,7 +10,7 @@
 #endif
 #include "cat_draw.h"
 #include "cat_rig.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "mosaico_rgb565.h"
 #include "vg_raster.h"
 

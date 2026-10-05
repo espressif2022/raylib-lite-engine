@@ -25,7 +25,8 @@ class PrimitiveTests(unittest.TestCase):
             for path in ["host/include", "host", "components/mosaico_game_assets/include",
                          "components/mosaico_raylib_port/include",
                          "components/raylib_lite_platform/include",
-                         "components/mosaico_game_2d/include", "components/mosaico_raylib_fast/include"]:
+                         "components/mosaico_game_2d/include", "components/mosaico_raylib_fast/include",
+                         "compat/raylib/include"]:
                 command += ["-I", str(ROOT / path)]
             subprocess.run(command + ["-lm", "-o", executable], check=True)
             subprocess.run([executable], check=True)
