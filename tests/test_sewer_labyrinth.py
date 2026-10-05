@@ -167,10 +167,10 @@ assert.equal(plays,2);
             command = ["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
                        "-DMOSAICO_GAME_NATIVE=1", "-ffunction-sections", "-fdata-sections"]
             for include in ["tests/fakes/sewer_audio", "host/include", "host",
-                            "components/mosaico_game_2d/include",
-                            "components/mosaico_game_assets/include",
-                            "components/raylib_lite_platform/include",
-                            "components/mosaico_raylib_fast/include",
+                            "include/raylib_lite",
+                            "include/raylib_lite",
+                            "include/raylib_lite",
+                            "include/raylib_lite",
                             "compat/raylib/include"]:
                 command += ["-I", str(ENGINE / include)]
             linker_gc = "-Wl,-dead_strip" if sys.platform == "darwin" else "-Wl,--gc-sections"

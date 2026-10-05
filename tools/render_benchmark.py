@@ -197,9 +197,9 @@ def main():
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     # Archive inputs before compilation and reject concurrent source changes.
     files=set(EXAMPLE.rglob('*'))
-    files.update((ROOT/'components/mosaico_game_2d').rglob('*'))
-    files.update((ROOT/'components/mosaico_game_assets/include').glob('*.h'))
-    files.update((ROOT/'components/raylib_lite_platform/include').glob('*.h'))
+    files.update((ROOT/'src/renderer').rglob('*'))
+    files.update((ROOT/'include/raylib_lite').glob('*.h'))
+    files.update((ROOT/'include/raylib_lite').glob('*.h'))
     files.add(ROOT/'host/include/raylib.h');files.add(Path(__file__).resolve());files.add(ROOT/'tools/wall_benchmark.py')
     files={x for x in files if x.is_file() and x.suffix in ('.c','.h','.S','.cmake','.txt','.json','.py') and not any(part.startswith('build') or part in ('managed_components','.git','__pycache__') for part in x.relative_to(ROOT).parts)}
     manifest={str(f.relative_to(ROOT)):sha(f) for f in sorted(files)}

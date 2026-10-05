@@ -17,10 +17,10 @@ class GameAssetsTests(unittest.TestCase):
                 "game_assets.exe" if os.name == "nt" else "game_assets")
             subprocess.run([
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
-                f"-I{ENGINE / 'components/mosaico_game_assets/include'}",
-                f"-I{ENGINE / 'components/mosaico_game_assets'}",
+                f"-I{ENGINE / 'include/raylib_lite'}",
+                f"-I{ENGINE / 'src/assets'}",
                 str(ENGINE / "tests/test_game_assets.c"),
-                str(ENGINE / "components/mosaico_game_assets/mosaico_game_assets.c"),
+                str(ENGINE / "src/assets/mosaico_game_assets.c"),
                 "-o", str(executable),
             ], check=True)
             result = subprocess.run([str(executable)], check=True,

@@ -21,10 +21,10 @@ class RunnerTests(unittest.TestCase):
             command += shlex.split(os.environ.get("CFLAGS", ""))
             command += [
                 str(ROOT / "tests/test_runner.c"),
-                str(ROOT / "components/raylib_lite_runner/raylib_lite_runner.c"),
-                str(ROOT / "components/raylib_lite_runner/raylib_lite_input_queue.c"),
-                "-I", str(ROOT / "components/raylib_lite_runner/include"),
-                "-I", str(ROOT / "components/raylib_lite_platform/include"),
+                str(ROOT / "src/runner/raylib_lite_runner.c"),
+                str(ROOT / "src/runner/raylib_lite_input_queue.c"),
+                "-I", str(ROOT / "include/raylib_lite"),
+                "-I", str(ROOT / "include/raylib_lite"),
                 "-pthread", "-o", str(executable),
             ]
             subprocess.run(command, check=True)

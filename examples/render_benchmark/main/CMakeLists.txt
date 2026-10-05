@@ -3,7 +3,7 @@ idf_component_register(SRCS ${BENCH_SOURCES} INCLUDE_DIRS ${BENCH_INCLUDES}
     REQUIRES esp_timer esp_hw_support esp_system esp_psram esp_app_format heap freertos nvs_flash)
 target_compile_definitions(${COMPONENT_LIB} PRIVATE ${BENCH_DEFINITIONS})
 target_compile_options(${COMPONENT_LIB} PRIVATE -O3 -funroll-loops
-    "$<$<COMPILE_LANGUAGE:C>:-include${ENGINE_ROOT}/components/mosaico_game_2d/raster_esp_config.h>")
+    "$<$<COMPILE_LANGUAGE:C>:-include${ENGINE_ROOT}/src/renderer/raster_esp_config.h>")
 
 if(RENDER_BENCH_DISPLAY)
     # BSP is explicitly included in top-level COMPONENTS for early dependency

@@ -17,9 +17,9 @@ class GameSaveTests(unittest.TestCase):
                 "game_save.exe" if os.name == "nt" else "game_save")
             subprocess.run([
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
-                f"-I{ENGINE / 'components/mosaico_game_save/include'}",
+                f"-I{ENGINE / 'include/raylib_lite'}",
                 str(ENGINE / "tests/test_game_save.c"),
-                str(ENGINE / "components/mosaico_game_save/mosaico_game_save.c"),
+                str(ENGINE / "src/save/mosaico_game_save.c"),
                 "-o", str(executable),
             ], check=True)
             result = subprocess.run([str(executable)], check=True,

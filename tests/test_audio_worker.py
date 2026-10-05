@@ -21,7 +21,7 @@ class AudioWorkerTests(unittest.TestCase):
             subprocess.run([
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
                 f"-I{platform}",
-                f"-I{ENGINE / 'components/raylib_lite_platform/include'}",
+                f"-I{ENGINE / 'include/raylib_lite'}",
                 str(ENGINE / "tests/test_audio_worker.c"),
                 str(platform / "platform_audio_write_all.c"),
                 "-o", str(executable),

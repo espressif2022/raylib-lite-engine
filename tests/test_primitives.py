@@ -14,19 +14,19 @@ class PrimitiveTests(unittest.TestCase):
     def test_reference_pixels(self):
         with tempfile.TemporaryDirectory() as directory:
             executable = str(Path(directory) / "primitives")
-            source = os.environ.get("FAST_TEST_SOURCE", str(ROOT / "components/mosaico_raylib_fast/mosaico_raylib_fast.c"))
+            source = os.environ.get("FAST_TEST_SOURCE", str(ROOT / "src/renderer/mosaico_raylib_fast.c"))
             command = [os.environ.get("CC", "cc"), "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"]
             command += shlex.split(os.environ.get("CFLAGS", ""))
             command += [str(ROOT / path) for path in ["tests/test_primitives.c", "host/host_video_backend.c",
-                        "components/mosaico_raylib_port/mosaico_raylib_port.c",
-                        "host/host_asset_runtime.c", "components/mosaico_game_2d/mosaico_game_2d.c",
-                        "components/mosaico_game_2d/mosaico_game_2d_raylib.c",
-                        "components/mosaico_game_2d/mosaico_rgb565.c"]]
+                        "src/runtime/mosaico_raylib_port.c",
+                        "host/host_asset_runtime.c", "src/renderer/mosaico_game_2d.c",
+                        "src/renderer/mosaico_game_2d_raylib.c",
+                        "src/renderer/mosaico_rgb565.c"]]
             command += [source]
-            for path in ["host/include", "host", "components/mosaico_game_assets/include",
-                         "components/mosaico_raylib_port/include",
-                         "components/raylib_lite_platform/include",
-                         "components/mosaico_game_2d/include", "components/mosaico_raylib_fast/include",
+            for path in ["host/include", "host", "include/raylib_lite",
+                         "include/raylib_lite",
+                         "include/raylib_lite",
+                         "include/raylib_lite", "include/raylib_lite",
                          "compat/raylib/include"]:
                 command += ["-I", str(ROOT / path)]
             subprocess.run(command + ["-lm", "-o", executable], check=True)

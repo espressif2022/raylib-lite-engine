@@ -10,5 +10,5 @@ add_mosaico_game(sewer_labyrinth SOURCE_ROOT "${SEWER_SOURCE_ROOT}"
     ASSET_ROOT "${SEWER_SOURCE_ROOT}")
 target_include_directories(sewer_labyrinth_module PRIVATE
     "${SEWER_SOURCE_ROOT}/main"
-    "${RAYLIB_LITE_ENGINE_ROOT}/components/mosaico_game_2d/include")
+    "${RAYLIB_LITE_ENGINE_ROOT}/include/raylib_lite")
 target_compile_definitions(sewer_labyrinth_module PRIVATE ESP_PLATFORM)

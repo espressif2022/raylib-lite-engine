@@ -19,16 +19,16 @@ class AudioFacadeTests(unittest.TestCase):
             subprocess.run([
                 cc, "-std=c11", "-Wall", "-Wextra", "-Werror",
                 f"-I{FAKES / 'audio'}",
-                f"-I{ENGINE / 'components/mosaico_game_audio/include'}",
+                f"-I{ENGINE / 'include/raylib_lite'}",
                 f"-I{audio}",
-                f"-I{ENGINE / 'components/mosaico_game_assets/include'}",
+                f"-I{ENGINE / 'include/raylib_lite'}",
                 f"-I{PORT}",
-                f"-I{ENGINE / 'components/raylib_lite_platform/include'}",
+                f"-I{ENGINE / 'include/raylib_lite'}",
                 f"-I{ENGINE / 'host/include'}",
                 str(ENGINE / "tests/test_audio_facade.c"),
                 str(audio / "mosaico_game_audio.c"),
-                str(ENGINE / "components/mosaico_game_audio/raylib_lite_audio_decode.c"),
-                str(ENGINE / "components/mosaico_game_audio/raylib_lite_audio_mixer.c"),
+                str(ENGINE / "src/audio/raylib_lite_audio_decode.c"),
+                str(ENGINE / "src/audio/raylib_lite_audio_mixer.c"),
                 "-o", str(exe),
             ], check=True)
             result = subprocess.run([str(exe)], check=True, text=True, capture_output=True)

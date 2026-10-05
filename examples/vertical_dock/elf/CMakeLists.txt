@@ -10,5 +10,5 @@ add_mosaico_game(vertical_dock SOURCE_ROOT "${VERTICAL_DOCK_SOURCE_ROOT}"
     ASSET_ROOT "${VERTICAL_DOCK_SOURCE_ROOT}")
 target_include_directories(vertical_dock_module PRIVATE
     "${VERTICAL_DOCK_SOURCE_ROOT}/main"
-    "${RAYLIB_LITE_ENGINE_ROOT}/components/mosaico_game_2d/include")
+    "${RAYLIB_LITE_ENGINE_ROOT}/include/raylib_lite")
 target_compile_definitions(vertical_dock_module PRIVATE ESP_PLATFORM)

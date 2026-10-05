@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 get_filename_component(ENGINE_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 # Reconfigure the embedded workload identity when a developer edits a case.
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    "${ENGINE_ROOT}/components/mosaico_game_2d/mosaico_wall_bench.c"
+    "${ENGINE_ROOT}/src/renderer/mosaico_wall_bench.c"
     "${CMAKE_CURRENT_LIST_DIR}/main/core_bench.c"
     "${CMAKE_CURRENT_LIST_DIR}/main/render_preview.c")
 option(RENDER_BENCH_HOST "Build standalone host benchmark" OFF)

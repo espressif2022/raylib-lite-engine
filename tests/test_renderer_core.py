@@ -17,13 +17,13 @@ class RendererCoreTests(unittest.TestCase):
                 "renderer_core.exe" if os.name == "nt" else "renderer_core")
             command = [
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
-                f"-I{ROOT / 'components/mosaico_game_2d/include'}",
-                f"-I{ROOT / 'components/mosaico_game_2d'}",
-                f"-I{ROOT / 'components/mosaico_game_assets/include'}",
-                f"-I{ROOT / 'components/raylib_lite_platform/include'}",
+                f"-I{ROOT / 'include/raylib_lite'}",
+                f"-I{ROOT / 'src/renderer'}",
+                f"-I{ROOT / 'include/raylib_lite'}",
+                f"-I{ROOT / 'include/raylib_lite'}",
                 str(ROOT / "tests/test_renderer_core.c"),
-                str(ROOT / "components/mosaico_game_2d/mosaico_game_2d.c"),
-                str(ROOT / "components/mosaico_game_2d/mosaico_rgb565.c"),
+                str(ROOT / "src/renderer/mosaico_game_2d.c"),
+                str(ROOT / "src/renderer/mosaico_rgb565.c"),
                 "-lm", "-o", str(executable),
             ]
             subprocess.run(command, check=True)

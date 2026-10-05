@@ -6,26 +6,18 @@ import unittest
 
 
 ENGINE = Path(__file__).resolve().parents[1]
-CORE_COMPONENTS = (
-    "raylib_lite_platform",
-    "raylib_lite_runner",
-    "mosaico_game_app",
-    "mosaico_raylib_port",
-    "mosaico_raylib_fast",
-    "mosaico_game_audio",
-    "mosaico_game_input",
-)
+ENGINE_SOURCE_ROOTS = ("src", "include/raylib_lite", "compat/raylib")
 ESP_IMPLEMENTATIONS = {
-    "mosaico_game/mosaico_game.c",
-    "mosaico_game_assets/mosaico_game_assets_mmap.c",
-    "mosaico_game_debug/mosaico_game_debug.c",
-    "mosaico_game_save/mosaico_game_save_nvs.c",
-    "mosaico_game_2d/mosaico_game_2d_esp.c",
-    "mosaico_game_2d/mosaico_raster_bench.c",
-    "mosaico_game_2d/mosaico_wall_bench.c",
-    "mosaico_game_2d/raster_log.c",
-    "mosaico_game_2d/raster_esp_config.h",
-    "raylib_lite_platform/clock_esp.c",
+    "src/runtime/mosaico_game.c",
+    "src/idf/mosaico_game_assets_mmap.c",
+    "src/runtime/mosaico_game_debug.c",
+    "src/idf/mosaico_game_save_nvs.c",
+    "src/renderer/mosaico_game_2d_esp.c",
+    "src/renderer/mosaico_raster_bench.c",
+    "src/renderer/mosaico_wall_bench.c",
+    "src/renderer/raster_log.c",
+    "src/renderer/raster_esp_config.h",
+    "src/idf/clock_esp.c",
 }
 ESP_BENCHMARK_SOURCES = {
     "benchmark_main.c", "core_bench.c", "render_preview.c",
@@ -35,13 +27,12 @@ ESP_BENCHMARK_SOURCES = {
 
 class PlatformDependencyBoundaryTests(unittest.TestCase):
     def test_runtime_frame_backpressure_is_not_terminal(self):
-        source = (ENGINE / "components/mosaico_game_app/mosaico_game_app.c").read_text()
+        source = (ENGINE / "src/runtime/mosaico_game_app.c").read_text()
         for legacy in ("MosaicoGameInit", "MosaicoGameShutdown",
                        "MosaicoGamePollDeviceEvent", "MosaicoGamePostDeviceEvent"):
             self.assertNotIn(legacy, source)
 
-        source = (ENGINE / "components" / "mosaico_game_app" /
-                  "mosaico_game_app.c").read_text()
+        source = (ENGINE / "src/runtime/mosaico_game_app.c").read_text()
         fatal = source[source.index("static bool frame_result_is_fatal"):
                        source.index("static void poll_input")]
         for transient in ("RAYLIB_LITE_NOT_READY", "RAYLIB_LITE_BUSY",
@@ -51,7 +42,7 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
         self.assertIn("if (frame_result_is_fatal(frame_result))", source)
 
     def test_portable_app_stops_after_failed_start(self) -> None:
-        source = (ENGINE / "components/mosaico_game_app/mosaico_game_app.c").read_text(
+        source = (ENGINE / "src/runtime/mosaico_game_app.c").read_text(
             encoding="utf-8")
         entered = source.index("started = true;", source.index("if (app->on_start)"))
         called = source.index("result = app->on_start", entered)
@@ -61,12 +52,10 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
         self.assertIn("if (started && app->on_stop)", source)
 
     def test_core_does_not_depend_on_legacy_mosaico_launcher(self) -> None:
-        for component in CORE_COMPONENTS:
-            root = ENGINE / "components" / component
+        for root_name in ENGINE_SOURCE_ROOTS:
+            root = ENGINE / root_name
             for path in root.rglob("*"):
-                if not path.is_file():
-                    continue
-                if path.suffix not in {".c", ".h", ".txt"} and path.name != "CMakeLists.txt":
+                if not path.is_file() or path.suffix not in {".c", ".h", ".S"}:
                     continue
                 text = path.read_text(encoding="utf-8")
                 with self.subTest(path=path.relative_to(ENGINE)):
@@ -79,43 +68,35 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
             "ports/esp_mosaico",
             "MOSAICO_BSP_ROOT",
         )
-        for path in (ENGINE / "components").rglob("*"):
-            if not path.is_file():
-                continue
-            if path.suffix not in {".c", ".h", ".S", ".txt", ".cmake"} and path.name not in {
-                    "CMakeLists.txt", "Kconfig"}:
-                continue
-            text = path.read_text(encoding="utf-8")
-            with self.subTest(path=path.relative_to(ENGINE)):
-                for token in forbidden:
-                    self.assertNotIn(token, text)
+        roots = [ENGINE / name for name in ENGINE_SOURCE_ROOTS]
+        roots.extend((ENGINE / "CMakeLists.txt", ENGINE / "Kconfig"))
+        for root in roots:
+            paths = [root] if root.is_file() else root.rglob("*")
+            for path in paths:
+                if not path.is_file():
+                    continue
+                if path.suffix not in {".c", ".h", ".S", ".txt", ".cmake"} and path.name not in {"CMakeLists.txt", "Kconfig"}:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                with self.subTest(path=path.relative_to(ENGINE)):
+                    for token in forbidden:
+                        self.assertNotIn(token, text)
 
     def test_mosaico_launcher_has_been_removed(self) -> None:
         self.assertFalse((ENGINE / "components/platform_mosaico_launcher").exists())
         self.assertFalse((ENGINE / "cmake/mosaico_game_example.cmake").exists())
 
-    def test_esp_implementations_are_scoped_to_their_components(self) -> None:
-        self.assertFalse((ENGINE / "components/platform_esp_audio").exists())
+    def test_esp_implementations_are_scoped_to_explicit_backends(self) -> None:
         self.assertTrue((ENGINE / "cmake/raylib_lite_esp.cmake").is_file())
         forbidden_include = re.compile(
             r'#\s*include\s*[<"](?:esp_|freertos/|nvs|bsp/|driver/|sdkconfig)')
-        for path in (ENGINE / "components").rglob("*"):
-            if not path.is_file():
+        for path in (ENGINE / "src").rglob("*"):
+            if not path.is_file() or path.suffix not in {".c", ".h"}:
                 continue
-            relative = path.relative_to(ENGINE / "components").as_posix()
+            relative = path.relative_to(ENGINE).as_posix()
             if relative in ESP_IMPLEMENTATIONS:
                 continue
             with self.subTest(path=path.relative_to(ENGINE)):
-                if path.name == "CMakeLists.txt":
-                    cmake = path.read_text()
-                    if relative == "raylib_lite_engine/CMakeLists.txt":
-                        self.assertIn('include("${CMAKE_CURRENT_LIST_DIR}/../../CMakeLists.txt")', cmake)
-                    else:
-                        self.assertIn("idf_component_register", cmake)
-                if path.suffix not in {".c", ".h"}:
-                    continue
-                if path.name == "raylib_lite_compat.h":
-                    continue  # Frozen ABI typedefs; no platform services.
                 source = path.read_text(encoding="utf-8")
                 self.assertIsNone(forbidden_include.search(source))
                 for token in ("heap_caps_", "esp_timer_", "bsp_",
@@ -125,7 +106,7 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
     def test_engine_has_no_fixed_board_resolution_or_task_stack_policy(self) -> None:
         forbidden = ("MOSAICO_GAME_WIDTH", "MOSAICO_GAME_HEIGHT",
                      "game_task_stack")
-        for root_name in ("components",):
+        for root_name in ("src", "include/raylib_lite"):
             for path in (ENGINE / root_name).rglob("*"):
                 if not path.is_file() or path.suffix not in {".c", ".h"}:
                     continue
@@ -135,12 +116,11 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                         self.assertNotIn(token, source)
 
     def test_legacy_input_producer_is_not_built(self) -> None:
-        component = ENGINE / "components/mosaico_game_input"
-        cmake = (component / "CMakeLists.txt").read_text(encoding="utf-8")
+        cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
         self.assertNotIn("mosaico_game_input.c", cmake)
-        self.assertFalse((component / "mosaico_game_input.c").exists())
-        self.assertFalse((component / "include/mosaico_game_input.h").exists())
-        action = (component / "include/mosaico_game_action.h").read_text(
+        self.assertFalse((ENGINE / "src/input/mosaico_game_input.c").exists())
+        self.assertFalse((ENGINE / "include/raylib_lite/mosaico_game_input.h").exists())
+        action = (ENGINE / "include/raylib_lite/mosaico_game_action.h").read_text(
             encoding="utf-8")
         self.assertIn('#include "raylib_lite_input.h"', action)
         self.assertNotIn('#include "mosaico_game.h"', action)
@@ -157,6 +137,12 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                          (ENGINE / "idf_component.yml").read_text())
         self.assertEqual((shim / "Kconfig").read_text(),
                          (ENGINE / "Kconfig").read_text())
+
+        component_dirs = {
+            path.name for path in (ENGINE / "components").iterdir()
+            if path.is_dir()
+        }
+        self.assertEqual(component_dirs, {"raylib_lite_engine"})
 
         helper = (ENGINE / "cmake/raylib_lite_esp.cmake").read_text(
             encoding="utf-8")
@@ -186,14 +172,14 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
         forbidden = ("MosaicoGameInit", "MosaicoGameShutdown",
                      "MosaicoGamePollDeviceEvent", "MosaicoGamePostDeviceEvent",
                      "MosaicoGameGetStats", "MosaicoGameRecord")
-        for root_name in ("components", "examples"):
+        for root_name in ("src", "examples"):
             for path in (ENGINE / root_name).rglob("*"):
                 if not path.is_file() or path.suffix not in {".c", ".h"}:
                     continue
                 if "managed_components" in path.parts or any(
                         part.startswith("build") for part in path.parts):
                     continue
-                if "components/mosaico_game/" in path.as_posix():
+                if path == ENGINE / "src/runtime/mosaico_game.c":
                     continue
                 source = path.read_text(encoding="utf-8")
                 with self.subTest(path=path.relative_to(ENGINE)):
@@ -201,27 +187,26 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                         self.assertNotIn(token, source)
 
     def test_save_core_uses_storage_contract_not_nvs(self) -> None:
-        core = (ENGINE / "components/mosaico_game_save/mosaico_game_save.c").read_text(
+        core = (ENGINE / "src/save/mosaico_game_save.c").read_text(
             encoding="utf-8")
-        header = (ENGINE / "components/mosaico_game_save/include/mosaico_game_save.h").read_text(
+        header = (ENGINE / "include/raylib_lite/mosaico_game_save.h").read_text(
             encoding="utf-8")
         self.assertNotIn('#include "nvs.h"', core)
         for symbol in ("nvs_open", "nvs_get_blob", "nvs_set_blob", "nvs_commit"):
             self.assertNotIn(symbol, core)
         self.assertIn("mosaico_save_storage_t", header)
-        self.assertIn("mosaico_game_save_nvs.c",
-                      (ENGINE / "components/mosaico_game_save/CMakeLists.txt").read_text())
-        save_cmake = (ENGINE / "components/mosaico_game_save/CMakeLists.txt").read_text()
-        self.assertIn("PRIV_REQUIRES nvs_flash", save_cmake)
-        self.assertNotIn("\n    REQUIRES nvs_flash", save_cmake)
+        root_cmake = (ENGINE / "CMakeLists.txt").read_text()
+        self.assertIn("src/idf/mosaico_game_save_nvs.c", root_cmake)
+        self.assertIn("PRIV_REQUIRES esp_timer esp_system heap freertos esp_mmap_assets",
+                      root_cmake)
+        self.assertIn("nvs_flash log", root_cmake)
 
     def test_asset_core_uses_backing_contract_not_mmap_implementation(self) -> None:
-        root = ENGINE / "components/mosaico_game_assets"
-        core = (root / "mosaico_game_assets.c").read_text(encoding="utf-8")
-        header = (root / "include/mosaico_game_assets.h").read_text(encoding="utf-8")
-        backend = (root / "mosaico_game_assets_mmap.c").read_text(encoding="utf-8")
-        cmake = (root / "CMakeLists.txt").read_text(encoding="utf-8")
-        manifest = (root / "idf_component.yml").read_text(encoding="utf-8")
+        core = (ENGINE / "src/assets/mosaico_game_assets.c").read_text(encoding="utf-8")
+        header = (ENGINE / "include/raylib_lite/mosaico_game_assets.h").read_text(encoding="utf-8")
+        backend = (ENGINE / "src/idf/mosaico_game_assets_mmap.c").read_text(encoding="utf-8")
+        cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
+        manifest = (ENGINE / "idf_component.yml").read_text(encoding="utf-8")
 
         for token in ("esp_mmap_assets.h", "mmap_assets_new",
                       "mmap_assets_get_mem", "mmap_assets_get_name"):
@@ -230,7 +215,9 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
         self.assertIn("mosaico_game_assets_mount_backing", header)
         self.assertIn("mosaico_game_asset_stream_open", header)
         self.assertIn('#include "esp_mmap_assets.h"', backend)
-        self.assertIn("PRIV_REQUIRES esp_mmap_assets", cmake)
+        private_requires = re.search(r"PRIV_REQUIRES\s+([^)]*)", cmake, re.S)
+        self.assertIsNotNone(private_requires)
+        self.assertIn("esp_mmap_assets", private_requires.group(1).split())
         self.assertIn("espressif/esp_mmap_assets", manifest)
 
         for game_manifest in (ENGINE / "examples").glob("*/main/idf_component.yml"):
@@ -238,7 +225,7 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                 self.assertNotIn("esp_mmap_assets", game_manifest.read_text())
 
     def test_error_compatibility_header_compiles_without_sdk(self) -> None:
-        header = ENGINE / "components/raylib_lite_platform/include/raylib_lite_compat.h"
+        header = ENGINE / "include/raylib_lite/raylib_lite_compat.h"
         source = f'''#include "{header}"
 _Static_assert(sizeof(esp_err_t) == sizeof(int), "legacy ABI");
 _Static_assert(ESP_OK == 0 && ESP_ERR_INVALID_ARG == 0x102, "error ABI");
@@ -252,7 +239,7 @@ int main(void) {{ return ESP_OK; }}
                            text=True, check=True)
 
     def test_wall_config_header_compiles_with_strict_c11(self) -> None:
-        header = ENGINE / "components/mosaico_game_2d/include/mosaico_wall_config.h"
+        header = ENGINE / "include/raylib_lite/mosaico_wall_config.h"
         source = f'''#include "{header}"
 int main(void) {{ return M2D_WALL_MODE; }}
 '''
@@ -263,7 +250,7 @@ int main(void) {{ return M2D_WALL_MODE; }}
                            input=source, text=True, check=True)
 
     def test_raylib_name_compatibility_is_explicit(self) -> None:
-        fast = (ENGINE / "components/mosaico_raylib_fast/include/mosaico_raylib_fast.h").read_text()
+        fast = (ENGINE / "include/raylib_lite/mosaico_raylib_fast.h").read_text()
         compat = (ENGINE / "compat/raylib/include/raylib_lite_raylib.h").read_text()
         for macro in ("InitWindow", "BeginDrawing", "DrawRectangle",
                       "DrawTexture", "DrawText"):
@@ -280,18 +267,18 @@ int main(void) {{ return M2D_WALL_MODE; }}
                 with self.subTest(path=path.relative_to(ENGINE)):
                     self.assertNotIn('#include "mosaico_raylib_fast.h"', source)
 
-        for relative in ("components/mosaico_game_app/mosaico_game_app.c",
-                         "components/mosaico_game_ui/mosaico_game_ui.c"):
+        for relative in ("src/runtime/mosaico_game_app.c",
+                         "src/ui/mosaico_game_ui.c"):
             source = (ENGINE / relative).read_text(encoding="utf-8")
             self.assertNotIn('#include "raylib_lite_raylib.h"', source)
 
     def test_renderer_core_is_raylib_type_neutral(self) -> None:
-        renderer = ENGINE / "components/mosaico_game_2d"
+        renderer = ENGINE / "src/renderer"
         core = (renderer / "mosaico_game_2d.c").read_text(encoding="utf-8")
-        neutral = (renderer / "include/mosaico_renderer.h").read_text(encoding="utf-8")
-        legacy = (renderer / "include/mosaico_game_2d.h").read_text(encoding="utf-8")
+        neutral = (ENGINE / "include/raylib_lite/mosaico_renderer.h").read_text(encoding="utf-8")
+        legacy = (ENGINE / "include/raylib_lite/mosaico_game_2d.h").read_text(encoding="utf-8")
         adapter = (renderer / "mosaico_game_2d_raylib.c").read_text(encoding="utf-8")
-        cmake = (renderer / "CMakeLists.txt").read_text(encoding="utf-8")
+        cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
 
         for source in (core, neutral):
             for token in ("raylib.h", "Texture2D", "Rectangle", "Vector2",
@@ -302,9 +289,8 @@ int main(void) {{ return M2D_WALL_MODE; }}
         self.assertIn("Texture2D", legacy)
         self.assertIn("to_renderer_texture", adapter)
         self.assertIn("mosaico_game_2d_raylib.c", cmake)
-        self.assertIn("REQUIRES mosaico_game_assets raylib raylib_lite_platform",
-                      cmake)
-        legacy_header = (renderer / "include/mosaico_game_2d.h").read_text(
+        self.assertIn("REQUIRES raylib", cmake)
+        legacy_header = (ENGINE / "include/raylib_lite/mosaico_game_2d.h").read_text(
             encoding="utf-8")
         for hot in ("Mosaico2DDrawTexturePro", "Mosaico2DDrawTexturedTriangle",
                     "Mosaico2DDrawTexturedQuad", "Mosaico2DDrawColumn",
@@ -314,13 +300,13 @@ int main(void) {{ return M2D_WALL_MODE; }}
             self.assertNotIn(f"void {hot}(", adapter)
 
     def test_s31_rgb565_acceleration_is_arch_scoped(self) -> None:
-        renderer = ENGINE / "components/mosaico_game_2d"
-        cmake = (renderer / "CMakeLists.txt").read_text(encoding="utf-8")
-        arch = renderer / "arch/esp32s31/mosaico_rgb565_pie.S"
+        renderer = ENGINE / "src/renderer"
+        cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
+        arch = ENGINE / "src/arch/esp32s31/mosaico_rgb565_pie.S"
         self.assertTrue(arch.is_file())
         self.assertFalse((renderer / "mosaico_rgb565_pie.S").exists())
-        self.assertIn('"mosaico_rgb565.c"', cmake)
-        self.assertIn('"arch/esp32s31/mosaico_rgb565_pie.S"', cmake)
+        self.assertIn('src/renderer/mosaico_rgb565.c', cmake)
+        self.assertIn('src/arch/esp32s31/mosaico_rgb565_pie.S', cmake)
         self.assertIn('IDF_TARGET STREQUAL "esp32s31"', cmake)
 
     def test_product_app_integrations_are_external(self) -> None:
@@ -400,10 +386,12 @@ int main(void) {{ return M2D_WALL_MODE; }}
                 self.assertIsNone(forbidden.search(path.read_text()))
 
     def test_audio_core_is_engine_owned_and_games_do_not_get_api_from_board(self) -> None:
-        audio = ENGINE / "components/mosaico_game_audio"
-        cmake = (audio / "CMakeLists.txt").read_text()
-        self.assertIn("raylib_lite_audio_decode.c", cmake)
-        self.assertIn("raylib_lite_audio_mixer.c", cmake)
+        audio = ENGINE / "src/audio"
+        cmake = (ENGINE / "CMakeLists.txt").read_text()
+        self.assertTrue((audio / "raylib_lite_audio_decode.c").is_file())
+        self.assertTrue((audio / "raylib_lite_audio_mixer.c").is_file())
+        self.assertIn("src/audio/raylib_lite_audio_decode.c", cmake)
+        self.assertIn("src/audio/raylib_lite_audio_mixer.c", cmake)
 
         board_cmake = (ENGINE / "examples/boards/esp-mosaico/CMakeLists.txt").read_text()
         self.assertIn("raylib_lite_engine", board_cmake)

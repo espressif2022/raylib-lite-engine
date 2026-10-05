@@ -18,8 +18,8 @@ class Rgb565Tests(unittest.TestCase):
             command += shlex.split(os.environ.get("CFLAGS", ""))
             command += [
                 str(ROOT / "tests/test_rgb565.c"),
-                str(ROOT / "components/mosaico_game_2d/mosaico_rgb565.c"),
-                "-I", str(ROOT / "components/mosaico_game_2d/include"),
+                str(ROOT / "src/renderer/mosaico_rgb565.c"),
+                "-I", str(ROOT / "include/raylib_lite"),
                 "-o", executable,
             ]
             subprocess.run(command, check=True)

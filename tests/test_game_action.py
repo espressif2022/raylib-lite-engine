@@ -17,11 +17,11 @@ class GameActionTests(unittest.TestCase):
                 "game_action.exe" if os.name == "nt" else "game_action")
             subprocess.run([
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
-                f"-I{ENGINE / 'components/mosaico_game_input/include'}",
-                f"-I{ENGINE / 'components/raylib_lite_runner/include'}",
-                f"-I{ENGINE / 'components/raylib_lite_platform/include'}",
+                f"-I{ENGINE / 'include/raylib_lite'}",
+                f"-I{ENGINE / 'include/raylib_lite'}",
+                f"-I{ENGINE / 'include/raylib_lite'}",
                 str(ENGINE / "tests/test_game_action.c"),
-                str(ENGINE / "components/mosaico_game_input/mosaico_game_action.c"),
+                str(ENGINE / "src/input/mosaico_game_action.c"),
                 "-o", str(executable),
             ], check=True)
             result = subprocess.run([str(executable)], check=True,

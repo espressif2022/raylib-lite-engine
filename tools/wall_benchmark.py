@@ -147,12 +147,12 @@ def main():
         parser.error('C compiler not found')
     previous = json.loads(args.baseline.read_text()) if args.baseline else None
     out = args.output.resolve(); out.mkdir(parents=True, exist_ok=False)
-    sources = [ROOT/'components/mosaico_game_2d'/name for name in
+    sources = [ROOT/'src/renderer'/name for name in
                ('mosaico_wall_bench.c', 'mosaico_game_2d.c', 'mosaico_game_2d_raylib.c', 'mosaico_rgb565.c')]
     sources += [ROOT/'host/host_asset_runtime.c']
     flags = ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-DWALL_BENCH_HOST=1']
-    for folder in ('host/include', 'host', 'components/mosaico_game_assets/include',
-                   'components/mosaico_game_2d/include'):
+    for folder in ('host/include', 'host', 'include/raylib_lite',
+                   'include/raylib_lite'):
         flags += ['-I', str(ROOT/folder)]
     environment = {'platform': platform.platform(), 'machine': platform.machine(),
                    'compiler': subprocess.check_output([compiler, '--version'], text=True),
@@ -180,7 +180,7 @@ def main():
               'protocol': {'rounds': args.rounds, 'warmup_replays': 2, 'frames': 8,
                            'samples_per_round': 7, 'replays_per_sample': 4,
                            'clock': 'monotonic', 'timing': 'microseconds/draw; batched, no clear/oracle/display'},
-              'workload_sha256': manifest['components/mosaico_game_2d/mosaico_wall_bench.c'],
+              'workload_sha256': manifest['src/renderer/mosaico_wall_bench.c'],
               'git_head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'source_manifest_sha256': digest(json.dumps(manifest, sort_keys=True).encode()),
               'device_score': None, 'full_game_acceptance': 'pending', 'binaries': {}, 'commands': []}

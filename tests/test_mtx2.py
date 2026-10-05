@@ -111,10 +111,10 @@ class Mtx2Tests(unittest.TestCase):
             command += shlex.split(os.environ.get("CFLAGS", ""))
             command += [
                 str(ROOT / "tests/test_mtx2.c"),
-                str(ROOT / "components/mosaico_game_2d/mosaico_mtx2.c"),
-                str(ROOT / "components/mosaico_game_2d/mosaico_rgb565.c"),
+                str(ROOT / "src/renderer/mosaico_mtx2.c"),
+                str(ROOT / "src/renderer/mosaico_rgb565.c"),
             ]
-            command += ["-I", str(ROOT / "components/mosaico_game_2d/include")]
+            command += ["-I", str(ROOT / "include/raylib_lite")]
             command += ["-lm", "-o", str(binary)]
             subprocess.run(command, check=True)
             subprocess.run([str(binary), str(temp), str(BLOCK_W)], check=True)

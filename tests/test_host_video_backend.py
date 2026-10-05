@@ -20,10 +20,10 @@ class HostVideoBackendTests(unittest.TestCase):
             command += [
                 str(ROOT / "tests/test_host_video_backend.c"),
                 str(ROOT / "host/host_video_backend.c"),
-                str(ROOT / "components/mosaico_raylib_port/mosaico_raylib_port.c"),
+                str(ROOT / "src/runtime/mosaico_raylib_port.c"),
                 "-I", str(ROOT / "host/include"),
-                "-I", str(ROOT / "components/mosaico_raylib_port/include"),
-                "-I", str(ROOT / "components/raylib_lite_platform/include"),
+                "-I", str(ROOT / "include/raylib_lite"),
+                "-I", str(ROOT / "include/raylib_lite"),
                 "-o", executable,
             ]
             subprocess.run(command, check=True)

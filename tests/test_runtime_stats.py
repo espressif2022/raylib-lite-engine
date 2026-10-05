@@ -17,9 +17,9 @@ class RuntimeStatsTests(unittest.TestCase):
                 "runtime_stats.exe" if os.name == "nt" else "runtime_stats")
             subprocess.run([
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
-                f"-I{ENGINE / 'components/raylib_lite_runner/include'}",
+                f"-I{ENGINE / 'include/raylib_lite'}",
                 str(ENGINE / "tests/test_runtime_stats.c"),
-                str(ENGINE / "components/raylib_lite_runner/raylib_lite_runtime_stats.c"),
+                str(ENGINE / "src/runner/raylib_lite_runtime_stats.c"),
                 "-o", str(executable),
             ], check=True)
             result = subprocess.run([str(executable)], check=True,
