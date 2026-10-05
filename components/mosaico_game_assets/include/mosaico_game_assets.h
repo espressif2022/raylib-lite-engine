@@ -45,6 +45,37 @@ esp_err_t mosaico_game_asset_open(const char *name, mosaico_asset_view_t *out);
 esp_err_t mosaico_game_asset_open_id(mosaico_asset_id_t id,
                                      mosaico_asset_view_t *out);
 
+/* Bounded read over an MMAP image; offset 0 is the image header. The callback
+ * must either fill the requested range or return an error. */
+typedef esp_err_t (*mosaico_asset_backing_read_fn)(void *ctx,
+        uint32_t offset, void *dst, size_t len);
+
+typedef struct {
+    uint32_t size;
+    void *ctx;
+    mosaico_asset_backing_read_fn read;
+    /* Optional resident alias of the full image. Non-NULL selects zero-copy
+     * views; the caller owns the alias and keeps it valid until unmount. */
+    const uint8_t *image;
+} mosaico_asset_backing_t;
+
+esp_err_t mosaico_game_assets_mount_backing(
+        const mosaico_asset_backing_t *backing, int max_files,
+        uint16_t checksum);
+void mosaico_game_asset_release(mosaico_asset_view_t *view);
+
+typedef struct mosaico_asset_stream mosaico_asset_stream_t;
+esp_err_t mosaico_game_asset_stream_open(const char *name, uint32_t skip,
+                                         mosaico_asset_stream_t **out);
+esp_err_t mosaico_game_asset_stream_read(mosaico_asset_stream_t *stream,
+                                         void *dst, size_t len,
+                                         size_t *read_out);
+void mosaico_game_asset_stream_close(mosaico_asset_stream_t *stream);
+
+size_t mosaico_game_assets_toc_bytes(void);
+size_t mosaico_game_assets_materialized_bytes(void);
+size_t mosaico_game_assets_materialized_peak(void);
+
 #ifdef __cplusplus
 }
 #endif

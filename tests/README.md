@@ -14,6 +14,8 @@ lazily so projects that leave block compression off keep the Pillow-only
 dependency set.
 
 Runtime-boundary coverage also includes `tests.test_game_action` for Action Mapper press/release/contact semantics and `tests.test_runtime_stats` for portable logic/display timing, counters, and 32-bit microsecond-clock wrap handling.
+`tests.test_game_save` compiles the save core without ESP-IDF and exercises a fake storage backend, defaults, debounce/force flush, CRC rejection, migration, and write failures.
+`tests.test_game_assets` compiles the asset core without ESP-IDF and checks image aliases, bounded read backing, lazy materialization/refcounts, release, streaming, counters, checksum/bounds failures, embedded fallback, and the partition-backend seam.
 
 # RGB565 raster regression
 

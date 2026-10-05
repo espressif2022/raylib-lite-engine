@@ -19,7 +19,7 @@ Use these public APIs before adding a game-local helper. If a helper is needed b
 | RGB565 shapes and compatible Raylib calls | fast drawing surface | [`mosaico_raylib_fast.h`](mosaico_raylib_fast/include/mosaico_raylib_fast.h) |
 | Texture, atlas, wall column, floor span, triangle or quad | `Mosaico2D*` | [`mosaico_game_2d.h`](mosaico_game_2d/include/mosaico_game_2d.h), [raster contract](../docs/raster-kernels.EN.md) |
 | Tile map lookup and drawing | `mosaico_game_tilemap_*` | [`mosaico_game_tilemap.h`](mosaico_game_tilemap/include/mosaico_game_tilemap.h) |
-| Asset packing and logical-name lookup | packer and `mosaico_game_asset_open` | [`mosaico_game_assets.h`](mosaico_game_assets/include/mosaico_game_assets.h), [`pack_game_assets.py`](../tools/pack_game_assets.py) |
+| Asset packing, backing providers, streaming, and logical-name lookup | packer, `mosaico_game_assets_mount_backing`, `mosaico_game_asset_open` | [`mosaico_game_assets.h`](mosaico_game_assets/include/mosaico_game_assets.h), [`pack_game_assets.py`](../tools/pack_game_assets.py) |
 | Sound/music playback and PCM device service | `MosaicoAudio*`, platform audio | [`mosaico_game_audio.h`](mosaico_game_audio/include/mosaico_game_audio.h), [`raylib_lite_audio.h`](raylib_lite_platform/include/raylib_lite_audio.h) |
 | Scene stack, UI controls, or effects | component-specific APIs | [`scene`](mosaico_game_scene/include/), [`ui`](mosaico_game_ui/include/), [`fx`](mosaico_game_fx/include/) |
 | Host replay or target build | `game_cli.py sim/build` | [`game_cli.py`](../tools/game_cli.py), [build paths](../docs/build-matrix.EN.md) |
@@ -34,7 +34,7 @@ Use these public APIs before adding a game-local helper. If a helper is needed b
 | `mosaico_game_app` | Portable Raylib game lifecycle over a supplied platform and one runner input queue | Device boot, BSP, legacy event queues, or task placement |
 | `mosaico_raylib_port` | consume a platform-neutral video backend | display construction or game content |
 | `mosaico_raylib_fast` | RGB565 drawing implementation | board startup |
-| `mosaico_game_assets` | asset view/registration contracts and ESP partition/mmap access | board-specific storage policy |
+| `mosaico_game_assets` | Asset registration/backing/stream/lifetime core plus the optional IDF mmap backend | Board-specific storage policy or `esp_mmap_assets` calls in the core |
 | `mosaico_game_2d` | textures, atlases, animation helpers, raycast columns/spans/walls, textured triangles | map rules, camera math, or audio |
 | `mosaico_game_tilemap` | packed tile-map access and drawing | game-specific collision behavior |
 | `mosaico_game_audio` | clip loading, decoding, mixing, backend contract | codec device and worker policy |
@@ -43,7 +43,7 @@ Use these public APIs before adding a game-local helper. If a helper is needed b
 | `mosaico_game_scene` | fixed-capacity scene stack and lifecycle dispatch | game-specific scene policy |
 | `mosaico_game_ui` | fixed retained panel/label/button tree and two tracked pointers | menus, layout engines, or board input |
 | `mosaico_game_fx` | fixed-capacity tweens, easing, and particle pools | heap allocation or rendering policy |
-| `mosaico_game_save` | versioned save and debounce contracts with ESP NVS implementation | game migration policy |
+| `mosaico_game_save` | Version/CRC/migration/debounce core over a storage callback contract, plus the optional ESP NVS backend | Game migration policy or storage-specific rules in the core |
 
 ## Public API rules
 

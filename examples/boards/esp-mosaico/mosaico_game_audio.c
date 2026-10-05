@@ -31,14 +31,29 @@ static raylib_lite_result_t asset_open(
     void *context, const char *path, raylib_lite_audio_asset_t *out_asset)
 {
     (void)context;
-    mosaico_asset_view_t view = {0};
-    if (mosaico_game_asset_open(path, &view) != ESP_OK) return RAYLIB_LITE_IO_ERROR;
+    if (!out_asset) return RAYLIB_LITE_INVALID_ARGUMENT;
+    mosaico_asset_view_t *view = calloc(1, sizeof(*view));
+    if (!view) return RAYLIB_LITE_NO_MEMORY;
+    if (mosaico_game_asset_open(path, view) != ESP_OK) {
+        free(view);
+        return RAYLIB_LITE_IO_ERROR;
+    }
     *out_asset = (raylib_lite_audio_asset_t) {
-        .data = view.data,
-        .size = view.size,
-        .lease = NULL,
+        .data = view->data,
+        .size = view->size,
+        .lease = view,
     };
     return RAYLIB_LITE_OK;
+}
+
+static void asset_close(void *context, raylib_lite_audio_asset_t *asset)
+{
+    (void)context;
+    if (!asset || !asset->lease) return;
+    mosaico_asset_view_t *view = asset->lease;
+    mosaico_game_asset_release(view);
+    free(view);
+    memset(asset, 0, sizeof(*asset));
 }
 
 static raylib_lite_result_t pull_audio(
@@ -101,7 +116,7 @@ void MosaicoAudioInit(void)
     raylib_lite_audio_mixer_config_t config = {
         .max_clips = CONFIG_MOSAICO_GAME_AUDIO_CLIPS,
         .max_sfx_voices = CONFIG_MOSAICO_GAME_AUDIO_VOICES,
-        .assets = {.open = asset_open},
+        .assets = {.open = asset_open, .close = asset_close},
         .sync = {
             .context = s_service,
             .lock = platform_esp_audio_service_lock,

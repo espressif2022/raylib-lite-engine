@@ -11,12 +11,20 @@ static struct platform_esp_audio_service fake_service;
 static platform_esp_audio_pull_fn fake_pull;
 static void *fake_pull_context;
 static uint8_t sound_file[24];
+static unsigned asset_releases;
 
 esp_err_t mosaico_game_asset_open(const char *name, mosaico_asset_view_t *out)
 {
     (void)name;
     *out = (mosaico_asset_view_t){.data = sound_file, .size = sizeof(sound_file)};
     return ESP_OK;
+}
+
+void mosaico_game_asset_release(mosaico_asset_view_t *view)
+{
+    assert(view && view->data == sound_file);
+    ++asset_releases;
+    view->data = NULL;
 }
 
 raylib_lite_result_t platform_esp_audio_service_create(
@@ -89,6 +97,7 @@ int main(void)
     assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
     assert(output[0] == 1000 && output[1] == 2000);
     CloseAudioDevice();
+    assert(asset_releases == 2);
     puts("audio facade: ok");
     return 0;
 }

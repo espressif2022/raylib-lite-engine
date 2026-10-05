@@ -31,7 +31,7 @@ RGB565 帧缓冲的借出、提交、释放必须明确所有权；繁忙、失�
 
 **反馈事件。** 模型只声明“发生了什么”和事件序号，不直接播放声音或驱动电机；消费端对每个新序号处理一次，视觉保持时长不充当事件计数。初始化时加载音频片段，更新时触发短音效并维护音乐流，退出时停止/释放输出；电机脉冲按真实时间关断。混音与编解码器后端分层，设备后端需处理部分写入和停止超时。公共入口见[音频服务](../components/mosaico_game_audio/include/mosaico_game_audio.h)、[PCM 后端](../components/raylib_lite_platform/include/raylib_lite_audio.h)；[Last Zone 模块](../examples/last_zone_extraction/main/game_module.c)展示一种事件映射，并非通用音效表。
 
-**资产管线。** 可编辑源和生成器放在 `assets_src/`，打包产物按逻辑名称访问；运行时不把 Host 路径、分区偏移或内嵌符号写进玩法模型。Host 从生成目录读取，设备可用只读分区、模块镜像或内嵌数据；若同名资源共存，当前实现优先分区/镜像再内嵌。资源视图是借用的，卸载或 unmount 前停止使用；加载失败应在初始化阶段报告。公共入口见 [资产 API](../components/mosaico_game_assets/include/mosaico_game_assets.h)、[打包器](../tools/pack_game_assets.py)和 [native 内嵌 helper](../cmake/raylib_lite_native_assets.cmake)。
+**资产管线。** 可编辑源和生成器放在 `assets_src/`，打包产物按逻辑名称访问；运行时不把 Host 路径、分区偏移或内嵌符号写进玩法模型。Host 从生成目录读取，设备可用 IDF mmap 分区 backend、内存 image alias、有界 read backing 或内嵌数据；若同名资源共存，当前实现先查挂载的 partition/backend，再查 backing/image，最后查内嵌数据。从 read backing 打开的 view 可能持有按需物化的缓冲区，用完必须调用 `mosaico_game_asset_release()`，并在 unmount 前释放所有 view；stream 可直接从 backing 读取，不需要整块物化。加载失败应在初始化阶段报告。公共入口见 [资产 API](../components/mosaico_game_assets/include/mosaico_game_assets.h)、[打包器](../tools/pack_game_assets.py)和 [native 内嵌 helper](../cmake/raylib_lite_native_assets.cmake)。
 
 ### 资源清单的最小格式
 
