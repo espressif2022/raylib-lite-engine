@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "raylib_lite_compat.h"
-#include "mosaico_game_assets.h"
+#include "raylib_lite_assets.h"
 #include "raylib_lite_result.h"
 
 #ifdef __cplusplus
@@ -23,7 +23,7 @@ typedef struct { float x, y, width, height; } raylib_lite_renderer_rect_t;
 typedef struct { uint8_t r, g, b, a; } raylib_lite_renderer_color_t;
 
 typedef struct {
-    mosaico_asset_id_t id;
+    raylib_lite_asset_id_t id;
     raylib_lite_renderer_rect_t source;
     raylib_lite_renderer_vec2_t pivot;
 } raylib_lite_renderer_sprite_frame_t;
@@ -153,17 +153,17 @@ void raylib_lite_renderer_draw_raycast_walls(raylib_lite_renderer_texture_t text
 
 raylib_lite_renderer_atlas_t raylib_lite_renderer_load_atlas(const char *asset_path);
 const raylib_lite_renderer_sprite_frame_t *raylib_lite_renderer_atlas_get_frame(
-    raylib_lite_renderer_atlas_t atlas, mosaico_asset_id_t frame_id);
+    raylib_lite_renderer_atlas_t atlas, raylib_lite_asset_id_t frame_id);
 raylib_lite_result_t raylib_lite_renderer_atlas_get_frame_copy(
-    raylib_lite_renderer_atlas_t atlas, mosaico_asset_id_t frame_id,
+    raylib_lite_renderer_atlas_t atlas, raylib_lite_asset_id_t frame_id,
     raylib_lite_renderer_sprite_frame_t *out_frame);
 void raylib_lite_renderer_unload_atlas(raylib_lite_renderer_atlas_t atlas);
 
 raylib_lite_wall_atlas_t raylib_lite_wall_atlas_load(const char *asset_path);
 raylib_lite_result_t raylib_lite_renderer_wall_atlas_get_frame(raylib_lite_wall_atlas_t atlas,
-    mosaico_asset_id_t frame_id, raylib_lite_renderer_sprite_frame_t *out_frame);
+    raylib_lite_asset_id_t frame_id, raylib_lite_renderer_sprite_frame_t *out_frame);
 void raylib_lite_wall_atlas_unload(raylib_lite_wall_atlas_t atlas);
-mosaico_asset_id_t raylib_lite_animation_frame_at(const mosaico_asset_id_t *frames,
+raylib_lite_asset_id_t raylib_lite_animation_frame_at(const raylib_lite_asset_id_t *frames,
     size_t frame_count, uint32_t frame_ticks, uint32_t elapsed_ticks, bool loop);
 
 void raylib_lite_2d_draw_indexed_textured_triangle(raylib_lite_wall_atlas_t atlas,

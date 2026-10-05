@@ -126,12 +126,12 @@ static int panorama_height(const last_zone_game_t *game)
 static void draw_panorama(const last_zone_game_t *game, raylib_lite_atlas_t environment,
                          int dest_height)
 {
-    static const mosaico_asset_id_t ids[LAST_ZONE_LAYOUTS][2] = {
-        {MOSAICO_ASSET_ID_PANORAMA_DOCK_LEFT, MOSAICO_ASSET_ID_PANORAMA_DOCK_RIGHT},
-        {MOSAICO_ASSET_ID_PANORAMA_DEPOT_LEFT, MOSAICO_ASSET_ID_PANORAMA_DEPOT_RIGHT},
-        {MOSAICO_ASSET_ID_PANORAMA_COMMAND_LEFT, MOSAICO_ASSET_ID_PANORAMA_COMMAND_RIGHT},
-        {MOSAICO_ASSET_ID_PANORAMA_GHOST_LEFT, MOSAICO_ASSET_ID_PANORAMA_GHOST_RIGHT},
-        {MOSAICO_ASSET_ID_PANORAMA_RUN_LEFT, MOSAICO_ASSET_ID_PANORAMA_RUN_RIGHT},
+    static const raylib_lite_asset_id_t ids[LAST_ZONE_LAYOUTS][2] = {
+        {RAYLIB_LITE_ASSET_ID_PANORAMA_DOCK_LEFT, RAYLIB_LITE_ASSET_ID_PANORAMA_DOCK_RIGHT},
+        {RAYLIB_LITE_ASSET_ID_PANORAMA_DEPOT_LEFT, RAYLIB_LITE_ASSET_ID_PANORAMA_DEPOT_RIGHT},
+        {RAYLIB_LITE_ASSET_ID_PANORAMA_COMMAND_LEFT, RAYLIB_LITE_ASSET_ID_PANORAMA_COMMAND_RIGHT},
+        {RAYLIB_LITE_ASSET_ID_PANORAMA_GHOST_LEFT, RAYLIB_LITE_ASSET_ID_PANORAMA_GHOST_RIGHT},
+        {RAYLIB_LITE_ASSET_ID_PANORAMA_RUN_LEFT, RAYLIB_LITE_ASSET_ID_PANORAMA_RUN_RIGHT},
     };
     if (dest_height <= 0) return;
     unsigned layout = game->layout < LAST_ZONE_LAYOUTS ? game->layout : 0;
@@ -233,8 +233,8 @@ static void draw_enemy_effect(const last_zone_game_t *game,
 
 static void draw_enemies(const last_zone_game_t *game, raylib_lite_atlas_t atlas)
 {
-    static const mosaico_asset_id_t run_frames[] = {MOSAICO_ASSET_ID_ENEMY_RUN_0,
-        MOSAICO_ASSET_ID_ENEMY_RUN_1, MOSAICO_ASSET_ID_ENEMY_RUN_2};
+    static const raylib_lite_asset_id_t run_frames[] = {RAYLIB_LITE_ASSET_ID_ENEMY_RUN_0,
+        RAYLIB_LITE_ASSET_ID_ENEMY_RUN_1, RAYLIB_LITE_ASSET_ID_ENEMY_RUN_2};
     int order[LAST_ZONE_ENEMIES];
     float distances[LAST_ZONE_ENEMIES];
     for (int i = 0; i < LAST_ZONE_ENEMIES; ++i) order[i] = i;
@@ -254,12 +254,12 @@ static void draw_enemies(const last_zone_game_t *game, raylib_lite_atlas_t atlas
         const last_zone_enemy_t *enemy = &game->enemies[order[n]];
         bool corpse = !enemy->active && !enemy->hp;
         if (!enemy->active && !corpse) continue;
-        mosaico_asset_id_t frame_id = MOSAICO_ASSET_ID_ENEMY_DOWN;
+        raylib_lite_asset_id_t frame_id = RAYLIB_LITE_ASSET_ID_ENEMY_DOWN;
         if (!corpse) {
-            frame_id = MOSAICO_ASSET_ID_ENEMY_RUN_1;
-            if (enemy->hit_flash) frame_id = MOSAICO_ASSET_ID_ENEMY_HIT;
-            else if (enemy->attack_flash) frame_id = MOSAICO_ASSET_ID_ENEMY_FIRE;
-            else if (enemy->aim_timer) frame_id = MOSAICO_ASSET_ID_ENEMY_AIM;
+            frame_id = RAYLIB_LITE_ASSET_ID_ENEMY_RUN_1;
+            if (enemy->hit_flash) frame_id = RAYLIB_LITE_ASSET_ID_ENEMY_HIT;
+            else if (enemy->attack_flash) frame_id = RAYLIB_LITE_ASSET_ID_ENEMY_FIRE;
+            else if (enemy->aim_timer) frame_id = RAYLIB_LITE_ASSET_ID_ENEMY_AIM;
             else frame_id = run_frames[((game->tick / 4U) + enemy->move_phase) % 3U];
         }
         const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, frame_id);
@@ -356,7 +356,7 @@ static void draw_billboard_box(const last_zone_game_t *game, float world_x, floa
 }
 
 static void draw_billboard_sprite(const last_zone_game_t *game, raylib_lite_atlas_t atlas,
-                                  mosaico_asset_id_t frame_id, float world_x,
+                                  raylib_lite_asset_id_t frame_id, float world_x,
                                   float world_y, float scale)
 {
     const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, frame_id);
@@ -392,10 +392,10 @@ static void draw_pickups(const last_zone_game_t *game, raylib_lite_atlas_t props
 {
     for (int i = 0; i < LAST_ZONE_PICKUPS; ++i) {
         if (game->pickups[i].taken) continue;
-        mosaico_asset_id_t id = game->pickups[i].kind == NEON_PICKUP_HEALTH
-            ? MOSAICO_ASSET_ID_PICKUP_HEALTH
+        raylib_lite_asset_id_t id = game->pickups[i].kind == NEON_PICKUP_HEALTH
+            ? RAYLIB_LITE_ASSET_ID_PICKUP_HEALTH
             : (game->pickups[i].kind == NEON_PICKUP_ARMOR
-                ? MOSAICO_ASSET_ID_PICKUP_ARMOR : MOSAICO_ASSET_ID_PICKUP_AMMO);
+                ? RAYLIB_LITE_ASSET_ID_PICKUP_ARMOR : RAYLIB_LITE_ASSET_ID_PICKUP_AMMO);
         if (props.texture.id)
             draw_billboard_sprite(game, props, id, game->pickups[i].x, game->pickups[i].y, 0.42f);
         else {
@@ -417,8 +417,8 @@ static void draw_pickups(const last_zone_game_t *game, raylib_lite_atlas_t props
             }
             continue;
         }
-        mosaico_asset_id_t id = game->props[i].kind ? MOSAICO_ASSET_ID_PROP_BAG
-                                                    : MOSAICO_ASSET_ID_PROP_BARREL;
+        raylib_lite_asset_id_t id = game->props[i].kind ? RAYLIB_LITE_ASSET_ID_PROP_BAG
+                                                    : RAYLIB_LITE_ASSET_ID_PROP_BARREL;
         if (props.texture.id)
             draw_billboard_sprite(game, props, id, game->props[i].x, game->props[i].y, 0.48f);
         else {
@@ -950,9 +950,9 @@ static void draw_walls(const last_zone_game_t *game, raylib_lite_wall_atlas_t wa
 
 static void load_material_frames(raylib_lite_atlas_t floor,raylib_lite_wall_atlas_t walls)
 {
-    static const mosaico_asset_id_t material_ids[] = {MOSAICO_ASSET_ID_WALL_CONCRETE,
-        MOSAICO_ASSET_ID_WALL_BRICK, MOSAICO_ASSET_ID_WALL_CONTAINER,
-        MOSAICO_ASSET_ID_FLOOR_DIRT};
+    static const raylib_lite_asset_id_t material_ids[] = {RAYLIB_LITE_ASSET_ID_WALL_CONCRETE,
+        RAYLIB_LITE_ASSET_ID_WALL_BRICK, RAYLIB_LITE_ASSET_ID_WALL_CONTAINER,
+        RAYLIB_LITE_ASSET_ID_FLOOR_DIRT};
     for (int i = 0; i < 4; ++i) {
         esp_err_t err=i==3?
             raylib_lite_renderer_atlas_get_frame(floor,material_ids[i],&s_material_copies[i]):
@@ -967,10 +967,10 @@ static void load_material_frames(raylib_lite_atlas_t floor,raylib_lite_wall_atla
 static void draw_weapon(const last_zone_game_t *game, raylib_lite_atlas_t atlas)
 {
     bool bolting = game->fire_cooldown > 4;
-    mosaico_asset_id_t frame_id = bolting ? MOSAICO_ASSET_ID_TACTICAL_BOLT
-                                         : MOSAICO_ASSET_ID_TACTICAL_RIFLE;
+    raylib_lite_asset_id_t frame_id = bolting ? RAYLIB_LITE_ASSET_ID_TACTICAL_BOLT
+                                         : RAYLIB_LITE_ASSET_ID_TACTICAL_RIFLE;
     const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, frame_id);
-    if (!frame) frame = raylib_lite_atlas_get_frame(atlas, MOSAICO_ASSET_ID_TACTICAL_RIFLE);
+    if (!frame) frame = raylib_lite_atlas_get_frame(atlas, RAYLIB_LITE_ASSET_ID_TACTICAL_RIFLE);
     if (!frame) return;
     float motion = sqrtf(game->move_forward * game->move_forward +
                          game->move_strafe * game->move_strafe);
@@ -1215,9 +1215,9 @@ static void draw_controls(const last_zone_game_t *game, raylib_lite_atlas_t cont
     int thumb_x = LAST_ZONE_MOVE_X + (int)(game->move_strafe * 28.0f);
     int thumb_y = LAST_ZONE_MOVE_Y - (int)(game->move_forward * 28.0f);
     const raylib_lite_sprite_frame_t *joystick = raylib_lite_atlas_get_frame(
-        controls, MOSAICO_ASSET_ID_JOYSTICK_BASE);
+        controls, RAYLIB_LITE_ASSET_ID_JOYSTICK_BASE);
     const raylib_lite_sprite_frame_t *fire = raylib_lite_atlas_get_frame(
-        controls, MOSAICO_ASSET_ID_FIRE_BUTTON);
+        controls, RAYLIB_LITE_ASSET_ID_FIRE_BUTTON);
     if (joystick) DrawTexturePro(controls.texture, joystick->source,
         (Rectangle){42, 352, joystick->source.width, joystick->source.height},
         (Vector2){0, 0}, 0, WHITE);

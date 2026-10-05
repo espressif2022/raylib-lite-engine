@@ -40,7 +40,7 @@ static void draw_background(const shooter_game_t *game)
     }
 }
 
-static void draw_sprite(raylib_lite_atlas_t atlas,mosaico_asset_id_t id,
+static void draw_sprite(raylib_lite_atlas_t atlas,raylib_lite_asset_id_t id,
                         float x,float y,float width,float height)
 {
     const raylib_lite_sprite_frame_t *frame=raylib_lite_atlas_get_frame(atlas,id);
@@ -53,15 +53,15 @@ static void draw_ship(const shooter_game_t *game,raylib_lite_atlas_t atlas,float
 {
     if(game->invulnerable&&(game->tick&2U))return;
     DrawEllipse((int)x+18,(int)y+35,25,12,(Color){7,43,76,255});
-    draw_sprite(atlas,MOSAICO_ASSET_ID_PLAYER_SHIP,x-9,y-8,54,58);
+    draw_sprite(atlas,RAYLIB_LITE_ASSET_ID_PLAYER_SHIP,x-9,y-8,54,58);
 }
 
 static void draw_enemy(raylib_lite_atlas_t atlas,const shooter_actor_t *enemy)
 {
-    static const mosaico_asset_id_t ids[]={
-        MOSAICO_ASSET_ID_ENEMY_SCOUT,
-        MOSAICO_ASSET_ID_ENEMY_ASSAULT,
-        MOSAICO_ASSET_ID_ENEMY_TANK
+    static const raylib_lite_asset_id_t ids[]={
+        RAYLIB_LITE_ASSET_ID_ENEMY_SCOUT,
+        RAYLIB_LITE_ASSET_ID_ENEMY_ASSAULT,
+        RAYLIB_LITE_ASSET_ID_ENEMY_TANK
     };
     static const Color colors[]={
         {255,105,62,255},{255,54,173,255},{72,238,170,255}

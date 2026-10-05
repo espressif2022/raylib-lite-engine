@@ -191,7 +191,7 @@ static void draw_quad(Color fill, rally_point2_t a, rally_point2_t b,
 static void draw_scenery_prop(const rally_game_t *g, float distance,
                               const rally_track_scenery_t *anchor,
                               rally_theme_t theme, raylib_lite_atlas_t art,
-                              mosaico_asset_id_t sprite)
+                              raylib_lite_asset_id_t sprite)
 {
     rally_point3_t center_world = {anchor->world_x, anchor->world_y,
                                    anchor->world_z};
@@ -249,9 +249,9 @@ static void draw_track_scenery(const rally_game_t *g, raylib_lite_atlas_t art)
             float distance = anchor.anchor_progress - wrapped;
             while (distance < RALLY_NEAR_Z) distance += RALLY_TRACK_LENGTH;
             if (distance >= RALLY_FAR_Z) continue;
-            mosaico_asset_id_t sprite = (anchor.kind & 1U) ?
-                MOSAICO_ASSET_ID_ROADSIDE_ROCK :
-                MOSAICO_ASSET_ID_ROADSIDE_BEACON;
+            raylib_lite_asset_id_t sprite = (anchor.kind & 1U) ?
+                RAYLIB_LITE_ASSET_ID_ROADSIDE_ROCK :
+                RAYLIB_LITE_ASSET_ID_ROADSIDE_BEACON;
             draw_scenery_prop(g, distance, &anchor, theme, art, sprite);
         }
     }
@@ -401,7 +401,7 @@ static void draw_route_props(const rally_game_t *g)
 
 static void draw_opponent_car(const rally_game_t *g, float distance,
                               float lateral, Color color, raylib_lite_atlas_t art,
-                              mosaico_asset_id_t sprite)
+                              raylib_lite_asset_id_t sprite)
 {
     rally_point3_t world;
     if (!track_world(g, distance, lateral, 0.35f, &world)) return;
@@ -440,9 +440,9 @@ static bool draw_opponents(const rally_game_t *g, raylib_lite_atlas_t art)
     static const Color colors[3] = {
         {113, 126, 255, 255}, {255, 84, 154, 255}, {87, 240, 190, 255}
     };
-    static const mosaico_asset_id_t sprites[3] = {
-        MOSAICO_ASSET_ID_CRAFT_RIVAL_CYAN, MOSAICO_ASSET_ID_CRAFT_RIVAL_PINK,
-        MOSAICO_ASSET_ID_CRAFT_RIVAL_GOLD
+    static const raylib_lite_asset_id_t sprites[3] = {
+        RAYLIB_LITE_ASSET_ID_CRAFT_RIVAL_CYAN, RAYLIB_LITE_ASSET_ID_CRAFT_RIVAL_PINK,
+        RAYLIB_LITE_ASSET_ID_CRAFT_RIVAL_GOLD
     };
     for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
         const rally_opponent_t *opponent = &g->opponents[i];
@@ -531,7 +531,7 @@ static void draw_vehicle(const rally_game_t *g, raylib_lite_atlas_t art)
                      (Vector2){x + 16, y + 65}, C_PINK);
     }
     const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(
-        art, MOSAICO_ASSET_ID_CRAFT_PLAYER);
+        art, RAYLIB_LITE_ASSET_ID_CRAFT_PLAYER);
     if (frame)
         DrawTexturePro(art.texture, frame->source,
                        (Rectangle){x - 120.0f, y - 75.0f, 240.0f, 180.0f},
@@ -618,7 +618,7 @@ int rally_view_render(const rally_game_t *state, raylib_lite_atlas_t rally_art,
     const rally_game_t *g = state ? state : &idle;
     BeginDrawing();
     const raylib_lite_sprite_frame_t *backdrop = raylib_lite_atlas_get_frame(
-        track_background, MOSAICO_ASSET_ID_TRACK_CANYON);
+        track_background, RAYLIB_LITE_ASSET_ID_TRACK_CANYON);
     if (backdrop) {
         DrawTexturePro(track_background.texture, backdrop->source,
                        (Rectangle){0, 0, RALLY_W, RALLY_H},

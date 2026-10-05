@@ -57,7 +57,7 @@ def write_asset_ids(destination: Path, names: set[str], animations: list[dict]) 
              "#pragma once", "#include <stdint.h>", ""]
     used: set[str] = set()
     for name in sorted(names):
-        symbol = f"MOSAICO_ASSET_ID_{c_identifier(name)}"
+        symbol = f"RAYLIB_LITE_ASSET_ID_{c_identifier(name)}"
         if not symbol.endswith("_") and symbol not in used:
             used.add(symbol)
             lines.append(f"#define {symbol} UINT32_C(0x{asset_id(name):08x})")

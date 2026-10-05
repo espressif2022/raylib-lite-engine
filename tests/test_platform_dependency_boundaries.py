@@ -8,9 +8,9 @@ import unittest
 ENGINE = Path(__file__).resolve().parents[1]
 ENGINE_SOURCE_ROOTS = ("src", "include/raylib_lite", "compat/raylib")
 ESP_IMPLEMENTATIONS = {
-    "src/idf/mosaico_game_assets_mmap.c",
+    "src/idf/raylib_lite_assets_mmap.c",
     "src/runtime/raylib_lite_debug.c",
-    "src/idf/mosaico_game_save_nvs.c",
+    "src/idf/raylib_lite_save_nvs.c",
     "src/renderer/raylib_lite_renderer_esp.c",
     "src/renderer/raylib_lite_raster_bench.c",
     "src/renderer/raylib_lite_wall_bench.c",
@@ -175,33 +175,33 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                         self.assertNotIn(token, source)
 
     def test_save_core_uses_storage_contract_not_nvs(self) -> None:
-        core = (ENGINE / "src/save/mosaico_game_save.c").read_text(
+        core = (ENGINE / "src/save/raylib_lite_save.c").read_text(
             encoding="utf-8")
-        header = (ENGINE / "include/raylib_lite/mosaico_game_save.h").read_text(
+        header = (ENGINE / "include/raylib_lite/raylib_lite_save.h").read_text(
             encoding="utf-8")
         self.assertNotIn('#include "nvs.h"', core)
         for symbol in ("nvs_open", "nvs_get_blob", "nvs_set_blob", "nvs_commit"):
             self.assertNotIn(symbol, core)
-        self.assertIn("mosaico_save_storage_t", header)
+        self.assertIn("raylib_lite_save_storage_t", header)
         root_cmake = (ENGINE / "CMakeLists.txt").read_text()
-        self.assertIn("src/idf/mosaico_game_save_nvs.c", root_cmake)
+        self.assertIn("src/idf/raylib_lite_save_nvs.c", root_cmake)
         self.assertIn("PRIV_REQUIRES esp_timer esp_system heap freertos esp_mmap_assets",
                       root_cmake)
         self.assertIn("nvs_flash log", root_cmake)
 
     def test_asset_core_uses_backing_contract_not_mmap_implementation(self) -> None:
-        core = (ENGINE / "src/assets/mosaico_game_assets.c").read_text(encoding="utf-8")
-        header = (ENGINE / "include/raylib_lite/mosaico_game_assets.h").read_text(encoding="utf-8")
-        backend = (ENGINE / "src/idf/mosaico_game_assets_mmap.c").read_text(encoding="utf-8")
+        core = (ENGINE / "src/assets/raylib_lite_assets.c").read_text(encoding="utf-8")
+        header = (ENGINE / "include/raylib_lite/raylib_lite_assets.h").read_text(encoding="utf-8")
+        backend = (ENGINE / "src/idf/raylib_lite_assets_mmap.c").read_text(encoding="utf-8")
         cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
         manifest = (ENGINE / "idf_component.yml").read_text(encoding="utf-8")
 
         for token in ("esp_mmap_assets.h", "mmap_assets_new",
                       "mmap_assets_get_mem", "mmap_assets_get_name"):
             self.assertNotIn(token, core)
-        self.assertIn("mosaico_asset_backing_t", header)
-        self.assertIn("mosaico_game_assets_mount_backing", header)
-        self.assertIn("mosaico_game_asset_stream_open", header)
+        self.assertIn("raylib_lite_asset_backing_t", header)
+        self.assertIn("raylib_lite_assets_mount_backing", header)
+        self.assertIn("raylib_lite_asset_stream_open", header)
         self.assertIn('#include "esp_mmap_assets.h"', backend)
         private_requires = re.search(r"PRIV_REQUIRES\s+([^)]*)", cmake, re.S)
         self.assertIsNotNone(private_requires)

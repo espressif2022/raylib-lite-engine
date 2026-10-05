@@ -77,7 +77,7 @@ raylib_lite_atlas_t raylib_lite_atlas_load(const char *asset_path)
 }
 
 const raylib_lite_sprite_frame_t *raylib_lite_atlas_get_frame(raylib_lite_atlas_t atlas,
-                                               mosaico_asset_id_t frame_id)
+                                               raylib_lite_asset_id_t frame_id)
 {
     static raylib_lite_sprite_frame_t result;
     const raylib_lite_renderer_sprite_frame_t *frame =
@@ -92,7 +92,7 @@ const raylib_lite_sprite_frame_t *raylib_lite_atlas_get_frame(raylib_lite_atlas_
 }
 
 raylib_lite_result_t raylib_lite_atlas_get_frame_copy(raylib_lite_atlas_t atlas,
-    mosaico_asset_id_t frame_id, raylib_lite_sprite_frame_t *out_frame)
+    raylib_lite_asset_id_t frame_id, raylib_lite_sprite_frame_t *out_frame)
 {
     if (!out_frame) return RAYLIB_LITE_INVALID_ARGUMENT;
     raylib_lite_renderer_sprite_frame_t frame;
@@ -107,7 +107,7 @@ raylib_lite_result_t raylib_lite_atlas_get_frame_copy(raylib_lite_atlas_t atlas,
 }
 
 raylib_lite_result_t raylib_lite_wall_atlas_get_frame(raylib_lite_wall_atlas_t atlas,
-    mosaico_asset_id_t frame_id, raylib_lite_sprite_frame_t *out_frame)
+    raylib_lite_asset_id_t frame_id, raylib_lite_sprite_frame_t *out_frame)
 {
     if (!out_frame) return RAYLIB_LITE_INVALID_ARGUMENT;
     raylib_lite_renderer_sprite_frame_t frame;

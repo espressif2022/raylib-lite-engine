@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 typedef struct {
-    mosaico_asset_id_t id;
+    raylib_lite_asset_id_t id;
     Rectangle source;
     Vector2 pivot;
 } raylib_lite_sprite_frame_t;
@@ -24,11 +24,11 @@ typedef struct {
 
 raylib_lite_atlas_t raylib_lite_atlas_load(const char *asset_path);
 const raylib_lite_sprite_frame_t *raylib_lite_atlas_get_frame(raylib_lite_atlas_t atlas,
-                                               mosaico_asset_id_t frame_id);
+                                               raylib_lite_asset_id_t frame_id);
 raylib_lite_result_t raylib_lite_atlas_get_frame_copy(raylib_lite_atlas_t atlas,
-    mosaico_asset_id_t frame_id, raylib_lite_sprite_frame_t *out_frame);
+    raylib_lite_asset_id_t frame_id, raylib_lite_sprite_frame_t *out_frame);
 raylib_lite_result_t raylib_lite_wall_atlas_get_frame(raylib_lite_wall_atlas_t atlas,
-    mosaico_asset_id_t frame_id, raylib_lite_sprite_frame_t *out_frame);
+    raylib_lite_asset_id_t frame_id, raylib_lite_sprite_frame_t *out_frame);
 void raylib_lite_atlas_unload(raylib_lite_atlas_t atlas);
 
 Texture2D raylib_lite_2d_load_texture(const char *asset_path);

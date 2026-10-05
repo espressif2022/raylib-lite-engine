@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include <stdint.h>
-#include "mosaico_game_save.h"
+#include "raylib_lite_save.h"
 #include "last_zone_game.h"
 
 #ifdef __cplusplus

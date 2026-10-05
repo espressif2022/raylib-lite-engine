@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "mosaico_game_audio.h"
-#include "mosaico_game_assets.h"
+#include "raylib_lite_assets.h"
 #include "platform_esp_audio.h"
 
 struct platform_esp_audio_service { bool ready; };
@@ -13,14 +13,14 @@ static void *fake_pull_context;
 static uint8_t sound_file[24];
 static unsigned asset_releases;
 
-esp_err_t mosaico_game_asset_open(const char *name, mosaico_asset_view_t *out)
+raylib_lite_result_t raylib_lite_asset_open(const char *name, raylib_lite_asset_view_t *out)
 {
     (void)name;
-    *out = (mosaico_asset_view_t){.data = sound_file, .size = sizeof(sound_file)};
-    return ESP_OK;
+    *out = (raylib_lite_asset_view_t){.data = sound_file, .size = sizeof(sound_file)};
+    return RAYLIB_LITE_OK;
 }
 
-void mosaico_game_asset_release(mosaico_asset_view_t *view)
+void raylib_lite_asset_release(raylib_lite_asset_view_t *view)
 {
     assert(view && view->data == sound_file);
     ++asset_releases;

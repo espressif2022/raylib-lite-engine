@@ -8,7 +8,7 @@
 #include "esp_log.h"
 #include "raylib_lite_example_board.h"
 #include "raylib_lite_2d.h"
-#include "mosaico_game_assets.h"
+#include "raylib_lite_assets.h"
 #include "raylib_lite_game_app.h"
 #include "raylib_lite_native_hooks.h"
 #include "living_worlds_session.h"
@@ -54,7 +54,7 @@ typedef struct {
 static esp_err_t register_asset(const char *name, const uint8_t *start,
                                 const uint8_t *end)
 {
-    return mosaico_game_asset_register_memory(name, start,
+    return raylib_lite_asset_register_memory(name, start,
                                               (size_t)(end - start));
 }
 
@@ -250,7 +250,7 @@ fail:
         jpeg_del_decoder_engine(state->jpeg);
         state->jpeg = NULL;
     }
-    mosaico_game_assets_unmount();
+    raylib_lite_assets_unmount();
     return err == ESP_ERR_NO_MEM ? RAYLIB_LITE_NO_MEMORY
                                  : RAYLIB_LITE_PLATFORM_ERROR;
 }
@@ -307,7 +307,7 @@ static void app_stop(void *user)
         jpeg_del_decoder_engine(state->jpeg);
         state->jpeg = NULL;
     }
-    mosaico_game_assets_unmount();
+    raylib_lite_assets_unmount();
 }
 
 esp_err_t living_worlds_native_run(raylib_lite_example_board_t *board)

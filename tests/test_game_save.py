@@ -19,7 +19,7 @@ class GameSaveTests(unittest.TestCase):
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
                 f"-I{ENGINE / 'include/raylib_lite'}",
                 str(ENGINE / "tests/test_game_save.c"),
-                str(ENGINE / "src/save/mosaico_game_save.c"),
+                str(ENGINE / "src/save/raylib_lite_save.c"),
                 "-o", str(executable),
             ], check=True)
             result = subprocess.run([str(executable)], check=True,

@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include "assets_ids.h"
-#include "mosaico_game_assets.h"
+#include "raylib_lite_assets.h"
 #include "raylib_lite_raylib.h"
 
 static const Color C_BG = {5, 10, 20, 255};
@@ -16,13 +16,13 @@ static const Color C_BLUE = {110, 145, 255, 255};
 static void draw_sprite(raylib_lite_atlas_t atlas, const char *name, float x, float y,
                         float size, float rotation, Color tint)
 {
-    const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, mosaico_game_asset_id(name));
+    const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, raylib_lite_asset_id(name));
     if (!frame) return;
     DrawTexturePro(atlas.texture, frame->source,
         (Rectangle){x, y, size, size}, (Vector2){size * .5f, size * .5f}, rotation, tint);
 }
 
-static void draw_sprite_id(raylib_lite_atlas_t atlas, mosaico_asset_id_t id, float x, float y,
+static void draw_sprite_id(raylib_lite_atlas_t atlas, raylib_lite_asset_id_t id, float x, float y,
                            float size, Color tint)
 {
     const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, id);
@@ -84,7 +84,7 @@ static void draw_effects(const tower_view_t *view)
     for (size_t i = 0; i < view->effect_count; ++i) {
         const tower_effect_t *effect = &view->effects[i];
         if (!effect->active) continue;
-        mosaico_asset_id_t frame = raylib_lite_animation_frame_at(
+        raylib_lite_asset_id_t frame = raylib_lite_animation_frame_at(
             MOSAICO_ANIMATION_EXPLOSION_FRAMES,
             MOSAICO_ANIMATION_EXPLOSION_FRAME_COUNT,
             MOSAICO_ANIMATION_EXPLOSION_FRAME_TICKS, 12U - effect->ticks, false);
@@ -213,7 +213,7 @@ bool tower_view_apply_map(tower_game_t *game, raylib_lite_tilemap_t map)
         char name[12];
         snprintf(name, sizeof(name), "pad_%u", i);
         raylib_lite_map_object_t object = {0};
-        if (raylib_lite_tilemap_find_object(map, mosaico_game_asset_id(name), &object)) {
+        if (raylib_lite_tilemap_find_object(map, raylib_lite_asset_id(name), &object)) {
             level.pads[i][0] = object.x;
             level.pads[i][1] = object.y;
         }

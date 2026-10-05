@@ -20,7 +20,7 @@ class GameAssetsTests(unittest.TestCase):
                 f"-I{ENGINE / 'include/raylib_lite'}",
                 f"-I{ENGINE / 'src/assets'}",
                 str(ENGINE / "tests/test_game_assets.c"),
-                str(ENGINE / "src/assets/mosaico_game_assets.c"),
+                str(ENGINE / "src/assets/raylib_lite_assets.c"),
                 "-o", str(executable),
             ], check=True)
             result = subprocess.run([str(executable)], check=True,

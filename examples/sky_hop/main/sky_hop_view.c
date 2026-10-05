@@ -9,7 +9,7 @@ static void centered(const char *text, int y, int size, Color color)
     DrawText(text, (480 - MeasureText(text, size)) / 2, y, size, color);
 }
 
-static void draw_sprite(raylib_lite_atlas_t atlas, mosaico_asset_id_t id, float x, float y,
+static void draw_sprite(raylib_lite_atlas_t atlas, raylib_lite_asset_id_t id, float x, float y,
                         float width, float height, bool flip)
 {
     const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, id);
@@ -126,7 +126,7 @@ bool sky_hop_view_render(const sky_hop_view_t *view)
         int x = (int)blocks[i].x;
         if (x + (int)blocks[i].width < camera || x >= camera + 480) continue;
         for (int tile_x = x; tile_x < x + (int)blocks[i].width; tile_x += 48)
-            draw_sprite(view->atlas, MOSAICO_ASSET_ID_TERRAIN_NATIVE, tile_x,
+            draw_sprite(view->atlas, RAYLIB_LITE_ASSET_ID_TERRAIN_NATIVE, tile_x,
                         blocks[i].y - 2, 50, 50, false);
         if (blocks[i].y >= 390)
             DrawRectangle(x, (int)blocks[i].y + 48, (int)blocks[i].width, 42,
@@ -151,27 +151,27 @@ bool sky_hop_view_render(const sky_hop_view_t *view)
         int x = (int)game->coins[i].x, y = (int)game->coins[i].y;
         unsigned pulse_index = (unsigned)((game->tick / 5 + i) % 3);
         float pulse = 25.0f + (float)pulse_index * 2.0f;
-        static const mosaico_asset_id_t coin_frames[] = {
-            MOSAICO_ASSET_ID_COIN_25, MOSAICO_ASSET_ID_COIN_27,
-            MOSAICO_ASSET_ID_COIN_29};
+        static const raylib_lite_asset_id_t coin_frames[] = {
+            RAYLIB_LITE_ASSET_ID_COIN_25, RAYLIB_LITE_ASSET_ID_COIN_27,
+            RAYLIB_LITE_ASSET_ID_COIN_29};
         draw_sprite(view->atlas, coin_frames[pulse_index], x - pulse / 2, y - pulse / 2,
                     pulse, pulse, false);
     }
     for (size_t i = 0; i < game->enemy_count; ++i) if (game->enemies[i].active) {
-        draw_sprite(view->atlas, MOSAICO_ASSET_ID_ENEMY_BEETLE_NATIVE,
+        draw_sprite(view->atlas, RAYLIB_LITE_ASSET_ID_ENEMY_BEETLE_NATIVE,
                     game->enemies[i].x - 7, game->enemies[i].y - 12, 44, 44,
                     game->enemies[i].speed < 0);
     }
-    mosaico_asset_id_t hero = !game->grounded ? MOSAICO_ASSET_ID_HERO_JUMP_NATIVE
+    raylib_lite_asset_id_t hero = !game->grounded ? RAYLIB_LITE_ASSET_ID_HERO_JUMP_NATIVE
         : (game->move_left || game->move_right)
         ? ((game->tick / MOSAICO_ANIMATION_HERO_RUN_FRAME_TICKS) & 1U
-           ? MOSAICO_ASSET_ID_HERO_RUN_NATIVE : MOSAICO_ASSET_ID_HERO_IDLE_NATIVE)
-        : MOSAICO_ASSET_ID_HERO_IDLE_NATIVE;
+           ? RAYLIB_LITE_ASSET_ID_HERO_RUN_NATIVE : RAYLIB_LITE_ASSET_ID_HERO_IDLE_NATIVE)
+        : RAYLIB_LITE_ASSET_ID_HERO_IDLE_NATIVE;
     draw_sprite(view->atlas, hero, game->player_x - 14, game->player_y - 22,
                 58, 64, game->facing_left);
     const float finish_x = platform_game_finish_x(game);
     if (finish_x - camera < 500)
-        draw_sprite(view->atlas, MOSAICO_ASSET_ID_FINISH_FLAG_NATIVE, finish_x - 12, 292,
+        draw_sprite(view->atlas, RAYLIB_LITE_ASSET_ID_FINISH_FLAG_NATIVE, finish_x - 12, 292,
                     70, 98, false);
     for (size_t i = 0; i < view->particle_count; ++i) {
         const mosaico_particle_t *particle = &view->particles[i];

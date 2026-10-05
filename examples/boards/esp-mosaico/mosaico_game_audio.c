@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "mosaico_game_assets.h"
+#include "raylib_lite_assets.h"
 #include "platform_esp_audio.h"
 #include "raylib_lite_audio_mixer.h"
 #include "sdkconfig.h"
@@ -32,9 +32,9 @@ static raylib_lite_result_t asset_open(
 {
     (void)context;
     if (!out_asset) return RAYLIB_LITE_INVALID_ARGUMENT;
-    mosaico_asset_view_t *view = calloc(1, sizeof(*view));
+    raylib_lite_asset_view_t *view = calloc(1, sizeof(*view));
     if (!view) return RAYLIB_LITE_NO_MEMORY;
-    if (mosaico_game_asset_open(path, view) != ESP_OK) {
+    if (raylib_lite_asset_open(path, view) != RAYLIB_LITE_OK) {
         free(view);
         return RAYLIB_LITE_IO_ERROR;
     }
@@ -50,8 +50,8 @@ static void asset_close(void *context, raylib_lite_audio_asset_t *asset)
 {
     (void)context;
     if (!asset || !asset->lease) return;
-    mosaico_asset_view_t *view = asset->lease;
-    mosaico_game_asset_release(view);
+    raylib_lite_asset_view_t *view = asset->lease;
+    raylib_lite_asset_release(view);
     free(view);
     memset(asset, 0, sizeof(*asset));
 }

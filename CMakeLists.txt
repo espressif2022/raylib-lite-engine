@@ -26,8 +26,8 @@ set(_runtime_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_game_app.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_native_hooks.c")
 set(_asset_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/assets/mosaico_game_assets.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/mosaico_game_assets_mmap.c")
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/assets/raylib_lite_assets.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/raylib_lite_assets_mmap.c")
 set(_audio_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/audio/raylib_lite_audio_decode.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/audio/raylib_lite_audio_mixer.c")
@@ -54,8 +54,8 @@ set(_feature_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/scene/mosaico_game_scene.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/ui/mosaico_game_ui.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/fx/mosaico_game_fx.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/save/mosaico_game_save.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/mosaico_game_save_nvs.c")
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/save/raylib_lite_save.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/raylib_lite_save_nvs.c")
 
 idf_component_register(
     SRCS ${_platform_sources} ${_runner_sources} ${_runtime_sources}

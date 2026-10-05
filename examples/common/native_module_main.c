@@ -10,7 +10,7 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "raylib_lite_example_board.h"
-#include "mosaico_game_assets.h"
+#include "raylib_lite_assets.h"
 #include "mosaico_game_module.h"
 #include "raylib_lite_game_app.h"
 #include "raylib_lite_native_hooks.h"
@@ -154,7 +154,7 @@ static void game_stop(void *user)
         game->module->shutdown(game->state);
     heap_caps_free(game->state);
     game->state = NULL;
-    mosaico_game_assets_unmount();
+    raylib_lite_assets_unmount();
 }
 
 static esp_err_t cleanup_board(raylib_lite_example_board_t *board)

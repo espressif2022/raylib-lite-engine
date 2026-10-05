@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "mosaico_game_save.h"
+#include "raylib_lite_save.h"
 
 #include <string.h>
 
@@ -8,7 +8,7 @@ typedef struct {
     uint16_t version;
     uint16_t size;
     uint32_t crc;
-    uint8_t data[MOSAICO_SAVE_MAX_PAYLOAD];
+    uint8_t data[RAYLIB_LITE_SAVE_MAX_PAYLOAD];
 } save_blob_t;
 
 #define SAVE_MAGIC UINT32_C(0x3156534d)
@@ -26,66 +26,66 @@ static uint32_t crc32(const void *data, size_t size)
     return ~crc;
 }
 
-esp_err_t mosaico_save_init(
-    mosaico_save_t *save, const mosaico_save_config_t *config)
+raylib_lite_result_t raylib_lite_save_init(
+    raylib_lite_save_t *save, const raylib_lite_save_config_t *config)
 {
     if (!save || !config || !config->storage || !config->storage->read ||
             !config->storage->write || !config->storage_namespace ||
             !config->key || !config->payload_size ||
-            config->payload_size > MOSAICO_SAVE_MAX_PAYLOAD) {
-        return ESP_ERR_INVALID_ARG;
+            config->payload_size > RAYLIB_LITE_SAVE_MAX_PAYLOAD) {
+        return RAYLIB_LITE_INVALID_ARGUMENT;
     }
     memset(save, 0, sizeof(*save));
     save->config = *config;
     save->initialized = true;
-    return ESP_OK;
+    return RAYLIB_LITE_OK;
 }
 
-esp_err_t mosaico_save_load(
-    mosaico_save_t *save, void *payload, const void *defaults)
+raylib_lite_result_t raylib_lite_save_load(
+    raylib_lite_save_t *save, void *payload, const void *defaults)
 {
-    if (!save || !save->initialized || !payload) return ESP_ERR_INVALID_STATE;
+    if (!save || !save->initialized || !payload) return RAYLIB_LITE_INVALID_STATE;
     if (defaults) memcpy(payload, defaults, save->config.payload_size);
     else memset(payload, 0, save->config.payload_size);
 
     save_blob_t blob;
     size_t size = sizeof(blob);
-    esp_err_t error = save->config.storage->read(
+    raylib_lite_result_t error = save->config.storage->read(
         save->config.storage->context, save->config.storage_namespace,
         save->config.key, &blob, &size);
-    if (error == ESP_ERR_NOT_FOUND) return ESP_OK;
-    if (error != ESP_OK) return error;
-    if (size < SAVE_HEADER_SIZE || blob.size > MOSAICO_SAVE_MAX_PAYLOAD ||
+    if (error == RAYLIB_LITE_NOT_FOUND) return RAYLIB_LITE_OK;
+    if (error != RAYLIB_LITE_OK) return error;
+    if (size < SAVE_HEADER_SIZE || blob.size > RAYLIB_LITE_SAVE_MAX_PAYLOAD ||
             SAVE_HEADER_SIZE + blob.size != size) {
-        return ESP_ERR_INVALID_CRC;
+        return RAYLIB_LITE_INVALID_CRC;
     }
     if (blob.magic != SAVE_MAGIC || crc32(blob.data, blob.size) != blob.crc)
-        return ESP_ERR_INVALID_CRC;
+        return RAYLIB_LITE_INVALID_CRC;
     if (blob.version == save->config.version &&
             blob.size == save->config.payload_size) {
         memcpy(payload, blob.data, blob.size);
-        return ESP_OK;
+        return RAYLIB_LITE_OK;
     }
     return save->config.migrate
         ? save->config.migrate(blob.version, blob.data, blob.size, payload,
                                save->config.payload_size)
-        : ESP_ERR_INVALID_VERSION;
+        : RAYLIB_LITE_INVALID_VERSION;
 }
 
-esp_err_t mosaico_save_request(
-    mosaico_save_t *save, const void *payload, uint64_t now_ms)
+raylib_lite_result_t raylib_lite_save_request(
+    raylib_lite_save_t *save, const void *payload, uint64_t now_ms)
 {
-    if (!save || !save->initialized || !payload) return ESP_ERR_INVALID_ARG;
+    if (!save || !save->initialized || !payload) return RAYLIB_LITE_INVALID_ARGUMENT;
     memcpy(save->pending, payload, save->config.payload_size);
     save->due_ms = now_ms + save->config.debounce_ms;
     save->dirty = true;
-    return ESP_OK;
+    return RAYLIB_LITE_OK;
 }
 
-esp_err_t mosaico_save_flush(mosaico_save_t *save, uint64_t now_ms, bool force)
+raylib_lite_result_t raylib_lite_save_flush(raylib_lite_save_t *save, uint64_t now_ms, bool force)
 {
-    if (!save || !save->initialized) return ESP_ERR_INVALID_STATE;
-    if (!save->dirty || (!force && now_ms < save->due_ms)) return ESP_OK;
+    if (!save || !save->initialized) return RAYLIB_LITE_INVALID_STATE;
+    if (!save->dirty || (!force && now_ms < save->due_ms)) return RAYLIB_LITE_OK;
 
     save_blob_t blob = {
         .magic = SAVE_MAGIC,
@@ -94,9 +94,9 @@ esp_err_t mosaico_save_flush(mosaico_save_t *save, uint64_t now_ms, bool force)
         .crc = crc32(save->pending, save->config.payload_size),
     };
     memcpy(blob.data, save->pending, save->config.payload_size);
-    esp_err_t error = save->config.storage->write(
+    raylib_lite_result_t error = save->config.storage->write(
         save->config.storage->context, save->config.storage_namespace,
         save->config.key, &blob, SAVE_HEADER_SIZE + save->config.payload_size);
-    if (error == ESP_OK) save->dirty = false;
+    if (error == RAYLIB_LITE_OK) save->dirty = false;
     return error;
 }

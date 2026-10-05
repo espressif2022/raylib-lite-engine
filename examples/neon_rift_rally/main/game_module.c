@@ -19,7 +19,7 @@
 #include "rally_view.h"
 #if defined(MOSAICO_GAME_NATIVE)
 #include "mosaico_game_audio.h"
-#include "mosaico_game_save.h"
+#include "raylib_lite_save.h"
 #include "native_feedback.h"
 #include "raylib_lite_clock.h"
 #endif
@@ -67,7 +67,7 @@ typedef struct {
 #if defined(MOSAICO_GAME_NATIVE)
     Sound sounds[8];
     Music engine;
-    mosaico_save_t save;
+    raylib_lite_save_t save;
     bool save_ready;
 #endif
 } neon_rift_rally_module_t;
@@ -219,7 +219,7 @@ static void select_course(neon_rift_rally_module_t *state, int direction)
 #if defined(MOSAICO_GAME_NATIVE)
     if (state->save_ready) {
         neon_rift_rally_record_t record = {0};
-        if (mosaico_save_load(&state->save, &record, NULL) == ESP_OK) {
+        if (raylib_lite_save_load(&state->save, &record, NULL) == RAYLIB_LITE_OK) {
             state->best_lap_ticks = record.best_lap_ticks[course];
             state->best_race_ticks = record.best_race_ticks[course];
         }
@@ -258,7 +258,7 @@ static esp_err_t migrate_record(uint16_t old_version, const void *old_data,
                                 size_t old_size, void *new_data, size_t new_size)
 {
     if (!new_data || new_size < sizeof(neon_rift_rally_record_t))
-        return ESP_ERR_INVALID_ARG;
+        return RAYLIB_LITE_INVALID_ARGUMENT;
     memset(new_data, 0, new_size);
     if (old_version == 1U && old_data && old_size >= sizeof(neon_rift_rally_record_v1_t)) {
         const neon_rift_rally_record_v1_t *old = old_data;
@@ -266,7 +266,7 @@ static esp_err_t migrate_record(uint16_t old_version, const void *old_data,
         record->best_lap_ticks[0] = old->best_lap_ticks;
         record->best_race_ticks[0] = old->best_race_ticks;
     }
-    return ESP_OK;
+    return RAYLIB_LITE_OK;
 }
 
 static uint64_t save_now_ms(void)
@@ -276,8 +276,8 @@ static uint64_t save_now_ms(void)
 
 static void load_record(neon_rift_rally_module_t *state)
 {
-    mosaico_save_config_t config = {
-        .storage = mosaico_save_nvs_storage(),
+    raylib_lite_save_config_t config = {
+        .storage = raylib_lite_save_nvs_storage(),
         .storage_namespace = "neon_rift_rally",
         .key = "record",
         .version = 2,
@@ -285,10 +285,10 @@ static void load_record(neon_rift_rally_module_t *state)
         .debounce_ms = 750,
         .migrate = migrate_record,
     };
-    state->save_ready = mosaico_save_init(&state->save, &config) == ESP_OK;
+    state->save_ready = raylib_lite_save_init(&state->save, &config) == RAYLIB_LITE_OK;
     if (!state->save_ready) return;
     neon_rift_rally_record_t record = {0};
-    if (mosaico_save_load(&state->save, &record, NULL) == ESP_OK) {
+    if (raylib_lite_save_load(&state->save, &record, NULL) == RAYLIB_LITE_OK) {
         state->best_lap_ticks = record.best_lap_ticks[state->course_id];
         state->best_race_ticks = record.best_race_ticks[state->course_id];
     }
@@ -300,12 +300,12 @@ static void save_record(neon_rift_rally_module_t *state, bool force)
     neon_rift_rally_record_t record = {
         {0}, {0}
     };
-    if (mosaico_save_load(&state->save, &record, NULL) != ESP_OK)
+    if (raylib_lite_save_load(&state->save, &record, NULL) != RAYLIB_LITE_OK)
         memset(&record, 0, sizeof(record));
     record.best_lap_ticks[state->course_id] = state->best_lap_ticks;
     record.best_race_ticks[state->course_id] = state->best_race_ticks;
-    (void)mosaico_save_request(&state->save, &record, save_now_ms());
-    (void)mosaico_save_flush(&state->save, save_now_ms(), force);
+    (void)raylib_lite_save_request(&state->save, &record, save_now_ms());
+    (void)raylib_lite_save_flush(&state->save, save_now_ms(), force);
 }
 #endif
 

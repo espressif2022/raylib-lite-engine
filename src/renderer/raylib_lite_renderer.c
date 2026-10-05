@@ -28,13 +28,13 @@ typedef struct __attribute__((packed)){uint32_t magic;uint16_t width,height,fram
 typedef struct __attribute__((packed)){uint32_t id;uint16_t x,y,width,height;int16_t pivot_x,pivot_y;} atlas_frame_t;
 typedef struct __attribute__((packed)){uint32_t magic;uint16_t width,height,frame_count,light_levels;uint32_t palette_entries,index_bytes;} wall_header_t;
 typedef struct{uint32_t id;uint16_t index_plus_one;} frame_cache_entry_t;
-typedef struct{bool used;mosaico_asset_view_t asset;atlas_header_t inline_header;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;uint16_t *light_cache;unsigned cached_light;const uint8_t *alpha;frame_cache_entry_t frame_cache[M2D_FRAME_CACHE_SIZE];} texture_slot_t;
+typedef struct{bool used;raylib_lite_asset_view_t asset;atlas_header_t inline_header;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;uint16_t *light_cache;unsigned cached_light;const uint8_t *alpha;frame_cache_entry_t frame_cache[M2D_FRAME_CACHE_SIZE];} texture_slot_t;
 static texture_slot_t s_textures[M2D_MAX_TEXTURES];
 static void texture_slot_release(texture_slot_t *slot)
 {
     if (!slot) return;
     free(slot->light_cache);
-    mosaico_game_asset_release(&slot->asset);
+    raylib_lite_asset_release(&slot->asset);
     memset(slot, 0, sizeof(*slot));
 }
 static uint16_t *s_target;static size_t s_stride;static int s_target_width,s_target_height;
@@ -67,11 +67,11 @@ void raylib_lite_renderer_set_phase_us(uint32_t sky_us,uint32_t floor_us,uint32_
 }
 raylib_lite_renderer_texture_t raylib_lite_renderer_load_texture(const char *path)
 {
-    mosaico_asset_view_t asset = {0};
-    if (mosaico_game_asset_open(path, &asset) != RAYLIB_LITE_OK)
+    raylib_lite_asset_view_t asset = {0};
+    if (raylib_lite_asset_open(path, &asset) != RAYLIB_LITE_OK)
         return (raylib_lite_renderer_texture_t){0};
     if (asset.size < sizeof(atlas_header_t)) {
-        mosaico_game_asset_release(&asset);
+        raylib_lite_asset_release(&asset);
         return (raylib_lite_renderer_texture_t){0};
     }
     const atlas_header_t *header = (const atlas_header_t *)asset.data;
@@ -81,7 +81,7 @@ raylib_lite_renderer_texture_t raylib_lite_renderer_load_texture(const char *pat
     if (header->magic != M2D_MAGIC || !header->width || !header->height ||
             expected > asset.size ||
             header->rgb_bytes != (uint32_t)header->width * header->height * 2U) {
-        mosaico_game_asset_release(&asset);
+        raylib_lite_asset_release(&asset);
         return (raylib_lite_renderer_texture_t){0};
     }
     for (unsigned i = 0; i < M2D_MAX_TEXTURES; ++i) {
@@ -99,7 +99,7 @@ raylib_lite_renderer_texture_t raylib_lite_renderer_load_texture(const char *pat
             .id = i + 1U, .width = header->width, .height = header->height,
         };
     }
-    mosaico_game_asset_release(&asset);
+    raylib_lite_asset_release(&asset);
     return (raylib_lite_renderer_texture_t){0};
 }
 
@@ -130,11 +130,11 @@ raylib_lite_renderer_texture_t raylib_lite_renderer_register_rgb565(
 
 raylib_lite_wall_atlas_t raylib_lite_wall_atlas_load(const char *path)
 {
-    mosaico_asset_view_t asset = {0};
-    if (mosaico_game_asset_open(path, &asset) != RAYLIB_LITE_OK)
+    raylib_lite_asset_view_t asset = {0};
+    if (raylib_lite_asset_open(path, &asset) != RAYLIB_LITE_OK)
         return (raylib_lite_wall_atlas_t){0};
     if (asset.size < sizeof(wall_header_t)) {
-        mosaico_game_asset_release(&asset);
+        raylib_lite_asset_release(&asset);
         return (raylib_lite_wall_atlas_t){0};
     }
     const wall_header_t *header = (const wall_header_t *)asset.data;
@@ -149,7 +149,7 @@ raylib_lite_wall_atlas_t raylib_lite_wall_atlas_load(const char *path)
             header->palette_entries != 256 ||
             header->index_bytes != (uint32_t)header->width * header->height ||
             expected > asset.size) {
-        mosaico_game_asset_release(&asset);
+        raylib_lite_asset_release(&asset);
         return (raylib_lite_wall_atlas_t){0};
     }
     const uint8_t *base = asset.data + sizeof(*header);
@@ -168,10 +168,10 @@ raylib_lite_wall_atlas_t raylib_lite_wall_atlas_load(const char *path)
 
 void raylib_lite_wall_atlas_unload(raylib_lite_wall_atlas_t atlas)
 {
-    mosaico_asset_view_t asset = {
+    raylib_lite_asset_view_t asset = {
         .data = (const uint8_t *)atlas.descriptor,
     };
-    mosaico_game_asset_release(&asset);
+    raylib_lite_asset_release(&asset);
 }
 
 void raylib_lite_renderer_unload_texture(raylib_lite_renderer_texture_t texture)
@@ -1769,7 +1769,7 @@ void raylib_lite_2d_draw_solid_raycast_walls(const raylib_lite_solid_wall_t *col
  s_raster_stats.column_pixels+=drawn;
 }
 raylib_lite_renderer_atlas_t raylib_lite_renderer_load_atlas(const char*path){raylib_lite_renderer_texture_t t=raylib_lite_renderer_load_texture(path);texture_slot_t*s=texture_slot(t);return(raylib_lite_renderer_atlas_t){.texture=t,.descriptor=s?s->header:NULL,.frame_count=s?s->header->frame_count:0};}
-static const atlas_frame_t*find_frame(texture_slot_t*s,mosaico_asset_id_t id){
+static const atlas_frame_t*find_frame(texture_slot_t*s,raylib_lite_asset_id_t id){
  if(!s)return NULL;
  frame_cache_entry_t*cached=&s->frame_cache[(id^(id>>16))&(M2D_FRAME_CACHE_SIZE-1U)];
  if(cached->index_plus_one&&cached->id==id){++s_raster_stats.frame_lookup_hits;
@@ -1779,15 +1779,15 @@ static const atlas_frame_t*find_frame(texture_slot_t*s,mosaico_asset_id_t id){
   *cached=(frame_cache_entry_t){.id=id,.index_plus_one=(uint16_t)(i+1U)};return&s->frames[i];}
  return NULL;
 }
-const raylib_lite_renderer_sprite_frame_t*raylib_lite_renderer_atlas_get_frame(raylib_lite_renderer_atlas_t a,mosaico_asset_id_t id){texture_slot_t*s=texture_slot(a.texture);const atlas_frame_t*f=find_frame(s,id);if(!f)return NULL;s_frame_result=(raylib_lite_renderer_sprite_frame_t){.id=id,.source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},.pivot={(float)f->pivot_x,(float)f->pivot_y}};return&s_frame_result;}
-raylib_lite_result_t raylib_lite_renderer_atlas_get_frame_copy(raylib_lite_renderer_atlas_t a,mosaico_asset_id_t id,raylib_lite_renderer_sprite_frame_t*out){
+const raylib_lite_renderer_sprite_frame_t*raylib_lite_renderer_atlas_get_frame(raylib_lite_renderer_atlas_t a,raylib_lite_asset_id_t id){texture_slot_t*s=texture_slot(a.texture);const atlas_frame_t*f=find_frame(s,id);if(!f)return NULL;s_frame_result=(raylib_lite_renderer_sprite_frame_t){.id=id,.source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},.pivot={(float)f->pivot_x,(float)f->pivot_y}};return&s_frame_result;}
+raylib_lite_result_t raylib_lite_renderer_atlas_get_frame_copy(raylib_lite_renderer_atlas_t a,raylib_lite_asset_id_t id,raylib_lite_renderer_sprite_frame_t*out){
  if(!out)return RAYLIB_LITE_INVALID_ARGUMENT;
  texture_slot_t*s=texture_slot(a.texture);
  if(!s)return RAYLIB_LITE_INVALID_STATE;
  const atlas_frame_t*f=find_frame(s,id);if(!f)return RAYLIB_LITE_NOT_FOUND;
  *out=(raylib_lite_renderer_sprite_frame_t){.id=id,.source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},.pivot={(float)f->pivot_x,(float)f->pivot_y}};return RAYLIB_LITE_OK;}
 raylib_lite_result_t raylib_lite_renderer_wall_atlas_get_frame(raylib_lite_wall_atlas_t atlas,
- mosaico_asset_id_t id,raylib_lite_renderer_sprite_frame_t*out)
+ raylib_lite_asset_id_t id,raylib_lite_renderer_sprite_frame_t*out)
 {
  if(!out||!atlas.descriptor||!atlas.frames)return RAYLIB_LITE_INVALID_ARGUMENT;
  const atlas_frame_t *frames=(const atlas_frame_t*)atlas.frames;
@@ -1800,5 +1800,5 @@ raylib_lite_result_t raylib_lite_renderer_wall_atlas_get_frame(raylib_lite_wall_
  }
  return RAYLIB_LITE_NOT_FOUND;
 }
-mosaico_asset_id_t raylib_lite_animation_frame_at(const mosaico_asset_id_t*frames,size_t count,uint32_t frame_ticks,uint32_t elapsed,bool loop){if(!frames||!count||!frame_ticks)return 0;size_t frame=elapsed/frame_ticks;if(loop)frame%=count;else if(frame>=count)frame=count-1;return frames[frame];}
+raylib_lite_asset_id_t raylib_lite_animation_frame_at(const raylib_lite_asset_id_t*frames,size_t count,uint32_t frame_ticks,uint32_t elapsed,bool loop){if(!frames||!count||!frame_ticks)return 0;size_t frame=elapsed/frame_ticks;if(loop)frame%=count;else if(frame>=count)frame=count-1;return frames[frame];}
 void raylib_lite_renderer_unload_atlas(raylib_lite_renderer_atlas_t a){raylib_lite_renderer_unload_texture(a.texture);}

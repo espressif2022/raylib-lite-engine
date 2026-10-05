@@ -558,9 +558,9 @@ static void draw_hud(const tomb_game_t *game, raylib_lite_atlas_t controls,
 {
     Rectangle stick_src={0}, jump_src={0};
     bool has_stick=false, has_jump=false;
-    const raylib_lite_sprite_frame_t *stick=raylib_lite_atlas_get_frame(controls,MOSAICO_ASSET_ID_JOYSTICK_BASE);
+    const raylib_lite_sprite_frame_t *stick=raylib_lite_atlas_get_frame(controls,RAYLIB_LITE_ASSET_ID_JOYSTICK_BASE);
     if(stick){stick_src=stick->source;has_stick=true;}
-    const raylib_lite_sprite_frame_t *jump=raylib_lite_atlas_get_frame(controls,MOSAICO_ASSET_ID_JUMP_BUTTON);
+    const raylib_lite_sprite_frame_t *jump=raylib_lite_atlas_get_frame(controls,RAYLIB_LITE_ASSET_ID_JUMP_BUTTON);
     if(jump){jump_src=jump->source;has_jump=true;}
     int stick_x=input&&input->stick_active?input->stick_x:TOMB_MOVE_X;
     int stick_y=input&&input->stick_active?input->stick_y:TOMB_MOVE_Y;

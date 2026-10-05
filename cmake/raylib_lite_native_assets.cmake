@@ -46,7 +46,7 @@ function(raylib_lite_native_embed_assets example_root)
         "${output_dir}/*.map" "${output_dir}/*.sound" "${output_dir}/*.jpg")
     target_include_directories(${COMPONENT_LIB} PRIVATE "${output_dir}")
     set(register_c "${CMAKE_CURRENT_BINARY_DIR}/register_native_assets.c")
-    file(WRITE "${register_c}" "#include \"mosaico_game_assets.h\"\nvoid raylib_lite_register_native_assets(void) {\n")
+    file(WRITE "${register_c}" "#include \"raylib_lite_assets.h\"\nvoid raylib_lite_register_native_assets(void) {\n")
     foreach(asset IN LISTS packed_assets)
         get_filename_component(name "${asset}" NAME)
         string(REPLACE "." "_" symbol "${name}")
@@ -55,7 +55,7 @@ function(raylib_lite_native_embed_assets example_root)
         file(APPEND "${register_c}"
             "  extern const unsigned char _binary_${symbol}_start[];\n"
             "  extern const unsigned char _binary_${symbol}_end[];\n"
-            "  mosaico_game_asset_register_memory(\"${name}\", _binary_${symbol}_start, _binary_${symbol}_end - _binary_${symbol}_start);\n")
+            "  raylib_lite_asset_register_memory(\"${name}\", _binary_${symbol}_start, _binary_${symbol}_end - _binary_${symbol}_start);\n")
     endforeach()
     file(APPEND "${register_c}" "}\n")
     target_sources(${COMPONENT_LIB} PRIVATE "${register_c}")

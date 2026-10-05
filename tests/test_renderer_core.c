@@ -44,34 +44,34 @@ static wall_blob_t s_wall = {
 static unsigned s_open_count;
 static unsigned s_release_count;
 
-esp_err_t mosaico_game_asset_open(const char *name, mosaico_asset_view_t *out)
+raylib_lite_result_t raylib_lite_asset_open(const char *name, raylib_lite_asset_view_t *out)
 {
-    if (!name || !out) return ESP_ERR_INVALID_ARG;
+    if (!name || !out) return RAYLIB_LITE_INVALID_ARGUMENT;
     ++s_open_count;
     if (strcmp(name, "texture") == 0) {
-        *out = (mosaico_asset_view_t) {
+        *out = (raylib_lite_asset_view_t) {
             .name = name, .data = (const uint8_t *)&s_texture,
             .size = sizeof(s_texture),
         };
-        return ESP_OK;
+        return RAYLIB_LITE_OK;
     }
     if (strcmp(name, "wall") == 0) {
-        *out = (mosaico_asset_view_t) {
+        *out = (raylib_lite_asset_view_t) {
             .name = name, .data = (const uint8_t *)&s_wall,
             .size = sizeof(s_wall),
         };
-        return ESP_OK;
+        return RAYLIB_LITE_OK;
     }
     if (strcmp(name, "invalid") == 0) {
-        *out = (mosaico_asset_view_t) {
+        *out = (raylib_lite_asset_view_t) {
             .name = name, .data = s_invalid, .size = sizeof(s_invalid),
         };
-        return ESP_OK;
+        return RAYLIB_LITE_OK;
     }
-    return ESP_ERR_NOT_FOUND;
+    return RAYLIB_LITE_NOT_FOUND;
 }
 
-void mosaico_game_asset_release(mosaico_asset_view_t *view)
+void raylib_lite_asset_release(raylib_lite_asset_view_t *view)
 {
     if (!view || !view->data) return;
     ++s_release_count;
