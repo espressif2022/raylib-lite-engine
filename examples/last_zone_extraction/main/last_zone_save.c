@@ -28,7 +28,8 @@ static esp_err_t ensure_ready(void)
 {
     if (s_ready) return ESP_OK;
     mosaico_save_config_t config = {
-        .nvs_namespace = "neon_maze",
+        .storage = mosaico_save_nvs_storage(),
+        .storage_namespace = "neon_maze",
         .key = "best",
         .version = LAST_ZONE_SAVE_VERSION,
         .payload_size = sizeof(last_zone_campaign_t),

@@ -1,12 +1,102 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "mosaico_game_save.h"
-#include "nvs.h"
+
 #include <string.h>
-typedef struct { uint32_t magic;uint16_t version,size;uint32_t crc;uint8_t data[MOSAICO_SAVE_MAX_PAYLOAD]; } save_blob_t;
+
+typedef struct {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t size;
+    uint32_t crc;
+    uint8_t data[MOSAICO_SAVE_MAX_PAYLOAD];
+} save_blob_t;
+
 #define SAVE_MAGIC UINT32_C(0x3156534d)
-#define SAVE_HEADER_SIZE offsetof(save_blob_t,data)
-static uint32_t crc32(const void *data,size_t size){uint32_t c=~0U;const uint8_t *p=data;while(size--){c^=*p++;for(int i=0;i<8;++i)c=(c>>1)^(0xedb88320U&-(int32_t)(c&1));}return ~c;}
-esp_err_t mosaico_save_init(mosaico_save_t *s,const mosaico_save_config_t *c){if(!s||!c||!c->nvs_namespace||!c->key||!c->payload_size||c->payload_size>MOSAICO_SAVE_MAX_PAYLOAD)return ESP_ERR_INVALID_ARG;memset(s,0,sizeof(*s));s->config=*c;s->initialized=true;return ESP_OK;}
-esp_err_t mosaico_save_load(mosaico_save_t *s,void *payload,const void *defaults){if(!s||!s->initialized||!payload)return ESP_ERR_INVALID_STATE;if(defaults)memcpy(payload,defaults,s->config.payload_size);else memset(payload,0,s->config.payload_size);nvs_handle_t h;esp_err_t e=nvs_open(s->config.nvs_namespace,NVS_READONLY,&h);if(e==ESP_ERR_NVS_NOT_FOUND)return ESP_OK;if(e!=ESP_OK)return e;save_blob_t v;size_t size=sizeof(v);e=nvs_get_blob(h,s->config.key,&v,&size);nvs_close(h);if(e==ESP_ERR_NVS_NOT_FOUND)return ESP_OK;if(e!=ESP_OK)return e;if(size<SAVE_HEADER_SIZE||v.size>MOSAICO_SAVE_MAX_PAYLOAD||SAVE_HEADER_SIZE+v.size!=size)return ESP_ERR_INVALID_CRC;if(v.magic!=SAVE_MAGIC||crc32(v.data,v.size)!=v.crc)return ESP_ERR_INVALID_CRC;if(v.version==s->config.version&&v.size==s->config.payload_size){memcpy(payload,v.data,v.size);return ESP_OK;}return s->config.migrate?s->config.migrate(v.version,v.data,v.size,payload,s->config.payload_size):ESP_ERR_INVALID_VERSION;}
-esp_err_t mosaico_save_request(mosaico_save_t *s,const void *p,uint64_t now){if(!s||!s->initialized||!p)return ESP_ERR_INVALID_ARG;memcpy(s->pending,p,s->config.payload_size);s->due_ms=now+s->config.debounce_ms;s->dirty=true;return ESP_OK;}
-esp_err_t mosaico_save_flush(mosaico_save_t *s,uint64_t now,bool force){if(!s||!s->initialized)return ESP_ERR_INVALID_STATE;if(!s->dirty||(!force&&now<s->due_ms))return ESP_OK;save_blob_t v={.magic=SAVE_MAGIC,.version=s->config.version,.size=(uint16_t)s->config.payload_size,.crc=crc32(s->pending,s->config.payload_size)};memcpy(v.data,s->pending,s->config.payload_size);nvs_handle_t h=0;esp_err_t e=nvs_open(s->config.nvs_namespace,NVS_READWRITE,&h);if(e==ESP_OK)e=nvs_set_blob(h,s->config.key,&v,SAVE_HEADER_SIZE+s->config.payload_size);if(e==ESP_OK)e=nvs_commit(h);if(e==ESP_OK)s->dirty=false;if(h)nvs_close(h);return e;}
+#define SAVE_HEADER_SIZE offsetof(save_blob_t, data)
+
+static uint32_t crc32(const void *data, size_t size)
+{
+    uint32_t crc = ~0U;
+    const uint8_t *p = data;
+    while (size--) {
+        crc ^= *p++;
+        for (int i = 0; i < 8; ++i)
+            crc = (crc >> 1) ^ (0xedb88320U & -(int32_t)(crc & 1));
+    }
+    return ~crc;
+}
+
+esp_err_t mosaico_save_init(
+    mosaico_save_t *save, const mosaico_save_config_t *config)
+{
+    if (!save || !config || !config->storage || !config->storage->read ||
+            !config->storage->write || !config->storage_namespace ||
+            !config->key || !config->payload_size ||
+            config->payload_size > MOSAICO_SAVE_MAX_PAYLOAD) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    memset(save, 0, sizeof(*save));
+    save->config = *config;
+    save->initialized = true;
+    return ESP_OK;
+}
+
+esp_err_t mosaico_save_load(
+    mosaico_save_t *save, void *payload, const void *defaults)
+{
+    if (!save || !save->initialized || !payload) return ESP_ERR_INVALID_STATE;
+    if (defaults) memcpy(payload, defaults, save->config.payload_size);
+    else memset(payload, 0, save->config.payload_size);
+
+    save_blob_t blob;
+    size_t size = sizeof(blob);
+    esp_err_t error = save->config.storage->read(
+        save->config.storage->context, save->config.storage_namespace,
+        save->config.key, &blob, &size);
+    if (error == ESP_ERR_NOT_FOUND) return ESP_OK;
+    if (error != ESP_OK) return error;
+    if (size < SAVE_HEADER_SIZE || blob.size > MOSAICO_SAVE_MAX_PAYLOAD ||
+            SAVE_HEADER_SIZE + blob.size != size) {
+        return ESP_ERR_INVALID_CRC;
+    }
+    if (blob.magic != SAVE_MAGIC || crc32(blob.data, blob.size) != blob.crc)
+        return ESP_ERR_INVALID_CRC;
+    if (blob.version == save->config.version &&
+            blob.size == save->config.payload_size) {
+        memcpy(payload, blob.data, blob.size);
+        return ESP_OK;
+    }
+    return save->config.migrate
+        ? save->config.migrate(blob.version, blob.data, blob.size, payload,
+                               save->config.payload_size)
+        : ESP_ERR_INVALID_VERSION;
+}
+
+esp_err_t mosaico_save_request(
+    mosaico_save_t *save, const void *payload, uint64_t now_ms)
+{
+    if (!save || !save->initialized || !payload) return ESP_ERR_INVALID_ARG;
+    memcpy(save->pending, payload, save->config.payload_size);
+    save->due_ms = now_ms + save->config.debounce_ms;
+    save->dirty = true;
+    return ESP_OK;
+}
+
+esp_err_t mosaico_save_flush(mosaico_save_t *save, uint64_t now_ms, bool force)
+{
+    if (!save || !save->initialized) return ESP_ERR_INVALID_STATE;
+    if (!save->dirty || (!force && now_ms < save->due_ms)) return ESP_OK;
+
+    save_blob_t blob = {
+        .magic = SAVE_MAGIC,
+        .version = save->config.version,
+        .size = (uint16_t)save->config.payload_size,
+        .crc = crc32(save->pending, save->config.payload_size),
+    };
+    memcpy(blob.data, save->pending, save->config.payload_size);
+    esp_err_t error = save->config.storage->write(
+        save->config.storage->context, save->config.storage_namespace,
+        save->config.key, &blob, SAVE_HEADER_SIZE + save->config.payload_size);
+    if (error == ESP_OK) save->dirty = false;
+    return error;
+}

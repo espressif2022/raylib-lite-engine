@@ -277,7 +277,8 @@ static uint64_t save_now_ms(void)
 static void load_record(neon_rift_rally_module_t *state)
 {
     mosaico_save_config_t config = {
-        .nvs_namespace = "neon_rift_rally",
+        .storage = mosaico_save_nvs_storage(),
+        .storage_namespace = "neon_rift_rally",
         .key = "record",
         .version = 2,
         .payload_size = sizeof(neon_rift_rally_record_t),
