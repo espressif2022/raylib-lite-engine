@@ -285,6 +285,8 @@ int main(void) {{ return M2D_WALL_MODE; }}
         self.assertIn("Texture2D", legacy)
         self.assertIn("to_renderer_texture", adapter)
         self.assertIn("mosaico_game_2d_raylib.c", cmake)
+        self.assertIn("REQUIRES mosaico_game_assets raylib raylib_lite_platform",
+                      cmake)
         legacy_header = (renderer / "include/mosaico_game_2d.h").read_text(
             encoding="utf-8")
         for hot in ("Mosaico2DDrawTexturePro", "Mosaico2DDrawTexturedTriangle",

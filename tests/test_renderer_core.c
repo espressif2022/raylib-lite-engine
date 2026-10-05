@@ -102,18 +102,22 @@ int main(void)
     mosaico_renderer_unload_texture(registered);
     assert(s_release_count == 2);
 
-    MosaicoWallAtlas wall_a = LoadMosaicoWallAtlas("wall");
-    MosaicoWallAtlas wall_b = LoadMosaicoWallAtlas("wall");
-    assert(wall_a.descriptor && wall_b.descriptor);
-    assert(wall_a.descriptor != wall_b.descriptor);
-    assert(s_open_count == 4 && s_release_count == 2);
+    MosaicoWallAtlas walls[20] = {0};
+    for (size_t i = 0; i < 20; ++i) {
+        walls[i] = LoadMosaicoWallAtlas("wall");
+        assert(walls[i].descriptor);
+        for (size_t j = 0; j < i; ++j)
+            assert(walls[i].descriptor != walls[j].descriptor);
+    }
+    assert(s_open_count == 22 && s_release_count == 2);
 
-    UnloadMosaicoWallAtlas(wall_a);
+    UnloadMosaicoWallAtlas(walls[0]);
     assert(s_release_count == 3);
-    UnloadMosaicoWallAtlas(wall_a);
+    UnloadMosaicoWallAtlas(walls[0]);
     assert(s_release_count == 3);
-    UnloadMosaicoWallAtlas(wall_b);
-    assert(s_release_count == 4);
+    for (size_t i = 1; i < 20; ++i)
+        UnloadMosaicoWallAtlas(walls[i]);
+    assert(s_release_count == 22);
 
     puts("renderer core: ok");
     return 0;

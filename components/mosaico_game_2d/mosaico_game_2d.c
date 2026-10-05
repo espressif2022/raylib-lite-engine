@@ -30,8 +30,11 @@ typedef struct __attribute__((packed)){uint32_t magic;uint16_t width,height,fram
 typedef struct{uint32_t id;uint16_t index_plus_one;} frame_cache_entry_t;
 typedef struct{bool used;mosaico_asset_view_t asset;atlas_header_t inline_header;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;uint16_t *light_cache;unsigned cached_light;const uint8_t *alpha;frame_cache_entry_t frame_cache[M2D_FRAME_CACHE_SIZE];} texture_slot_t;
 static texture_slot_t s_textures[M2D_MAX_TEXTURES];
-typedef struct { bool used; mosaico_asset_view_t asset; } wall_lease_t;
-static wall_lease_t s_wall_leases[M2D_MAX_TEXTURES];
+typedef struct wall_lease {
+    struct wall_lease *next;
+    mosaico_asset_view_t asset;
+} wall_lease_t;
+static wall_lease_t *s_wall_leases;
 
 static void texture_slot_release(texture_slot_t *slot)
 {
@@ -43,23 +46,29 @@ static void texture_slot_release(texture_slot_t *slot)
 
 static const void *wall_lease_take(mosaico_asset_view_t asset)
 {
-    for (uint16_t i = 0; i < M2D_MAX_TEXTURES; ++i) {
-        if (s_wall_leases[i].used) continue;
-        s_wall_leases[i].used = true;
-        s_wall_leases[i].asset = asset;
-        return &s_wall_leases[i];
-    }
-    return NULL;
+    wall_lease_t *lease = malloc(sizeof(*lease));
+    if (!lease) return NULL;
+    *lease = (wall_lease_t) {
+        .next = s_wall_leases,
+        .asset = asset,
+    };
+    s_wall_leases = lease;
+    return lease;
 }
 
 static void wall_lease_release(const void *descriptor)
 {
     if (!descriptor) return;
-    for (uint16_t i = 0; i < M2D_MAX_TEXTURES; ++i) {
-        wall_lease_t *lease = &s_wall_leases[i];
-        if (descriptor != lease || !lease->used) continue;
+    wall_lease_t **link = &s_wall_leases;
+    while (*link) {
+        wall_lease_t *lease = *link;
+        if (lease != descriptor) {
+            link = &lease->next;
+            continue;
+        }
+        *link = lease->next;
         mosaico_game_asset_release(&lease->asset);
-        memset(lease, 0, sizeof(*lease));
+        free(lease);
         return;
     }
 }

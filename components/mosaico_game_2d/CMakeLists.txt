@@ -19,7 +19,8 @@ if(M2D_WALL_BENCHMARK)
     list(APPEND srcs "mosaico_wall_bench.c")
 endif()
 idf_component_register(SRCS ${srcs} INCLUDE_DIRS "include"
-    REQUIRES mosaico_game_assets raylib PRIV_REQUIRES esp_timer)
+    REQUIRES mosaico_game_assets raylib raylib_lite_platform
+    PRIV_REQUIRES esp_timer)
 target_compile_options(${COMPONENT_LIB} PRIVATE -O3 -funroll-loops
     "$<$<COMPILE_LANGUAGE:C>:-include${CMAKE_CURRENT_LIST_DIR}/raster_esp_config.h>")
 target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_LIST_DIR}")
