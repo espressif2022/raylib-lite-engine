@@ -19,7 +19,6 @@ idf_component_register(
     REQUIRES
         raylib_lite_platform
         raylib_lite_runner
-        mosaico_game
         mosaico_game_input
         mosaico_game_assets
         raylib

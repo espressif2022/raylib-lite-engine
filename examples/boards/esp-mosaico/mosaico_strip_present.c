@@ -9,7 +9,7 @@
 #include "esp_async_color_convert.h"
 #include "esp_log.h"
 #endif
-#include "mosaico_game.h"
+#include "raylib_lite_runtime_stats.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -84,7 +84,9 @@ static void strip_worker(void *arg)
             video->worker_error = err;
         }
         xSemaphoreGive(video->mutex);
-        if (err == ESP_OK) MosaicoGameRecordDisplayRelease(submit_us, 0);
+        if (err == ESP_OK)
+            raylib_lite_runtime_stats_record_display_release(
+                (uint64_t)esp_timer_get_time(), submit_us, 0);
 #ifdef ESP_PLATFORM
         if (err == ESP_OK && ++video->completed_frames % 300 == 0) {
             ESP_LOGI("strip_present",

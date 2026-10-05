@@ -2,9 +2,6 @@
 #pragma once
 #include <stdint.h>
 
-#define MOSAICO_GAME_WIDTH 480
-#define MOSAICO_GAME_HEIGHT 480
-
 typedef enum {
     MOSAICO_GAME_FRAME_ACCEPTED = 0,
     MOSAICO_GAME_FRAME_BUSY,

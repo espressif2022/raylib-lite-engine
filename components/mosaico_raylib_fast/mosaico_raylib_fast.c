@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "mosaico_game.h"
 #include "mosaico_game_2d.h"
 #include "mosaico_raylib_port.h"
 #include "mosaico_rgb565.h"
@@ -19,8 +18,8 @@ static Camera2D s_camera;
 static bool s_camera_active;
 static bool s_window_ready;
 static bool s_window_should_close;
-static int s_screen_width = MOSAICO_GAME_WIDTH;
-static int s_screen_height = MOSAICO_GAME_HEIGHT;
+static int s_screen_width;
+static int s_screen_height;
 static int s_target_fps = 30;
 static uint64_t s_presented_frames;
 static raylib_lite_result_t s_last_acquire = RAYLIB_LITE_NOT_READY;
@@ -161,8 +160,8 @@ static inline void put_pixel(int x, int y, Color color)
 void MosaicoFastInitWindow(int width, int height, const char *title)
 {
     (void)title;
-    s_screen_width = width > 0 ? width : MOSAICO_GAME_WIDTH;
-    s_screen_height = height > 0 ? height : MOSAICO_GAME_HEIGHT;
+    s_screen_width = width > 0 ? width : 0;
+    s_screen_height = height > 0 ? height : 0;
     s_window_ready = true;
     s_window_should_close = false;
     s_presented_frames = 0;

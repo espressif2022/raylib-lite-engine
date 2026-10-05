@@ -11,8 +11,6 @@ extern "C" {
 #endif
 
 #define MOSAICO_GAME_API_VERSION 3U
-#define MOSAICO_GAME_WIDTH 480
-#define MOSAICO_GAME_HEIGHT 480
 #ifndef MOSAICO_GAME_DEFAULT_FPS
 #ifdef CONFIG_MOSAICO_GAME_DEFAULT_FPS
 #define MOSAICO_GAME_DEFAULT_FPS CONFIG_MOSAICO_GAME_DEFAULT_FPS
@@ -25,14 +23,12 @@ typedef struct {
     int width;
     int height;
     int target_fps;
-    size_t game_task_stack;
 } mosaico_game_config_t;
 
 #define MOSAICO_GAME_CONFIG_DEFAULT() { \
-    .width = MOSAICO_GAME_WIDTH, \
-    .height = MOSAICO_GAME_HEIGHT, \
+    .width = 0, \
+    .height = 0, \
     .target_fps = MOSAICO_GAME_DEFAULT_FPS, \
-    .game_task_stack = 12288U, \
 }
 
 typedef enum {

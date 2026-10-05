@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <stddef.h>
-#include "mosaico_game.h"
 #include "mosaico_raylib_fast.h"
 #include "shooter_view.h"
 #include "assets_ids.h"
@@ -12,7 +11,7 @@ static const Color C_MINT={70,242,174,255};
 
 static void draw_centered(const char *text,int y,int size,Color color)
 {
-    DrawText(text,(MOSAICO_GAME_WIDTH-MeasureText(text,size))/2,y,size,color);
+    DrawText(text,(GetScreenWidth()-MeasureText(text,size))/2,y,size,color);
 }
 
 static void draw_background(const shooter_game_t *game)

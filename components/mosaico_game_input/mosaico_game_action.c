@@ -87,12 +87,12 @@ void mosaico_action_begin_frame(void)
     }
 }
 
-void mosaico_action_apply_event(const mosaico_device_event_t *event)
+void mosaico_action_apply_event(const raylib_lite_input_event_t *event)
 {
     if (!event) return;
-    if (event->type == MOSAICO_DEVICE_EVENT_TOUCH ||
-            event->type == MOSAICO_DEVICE_EVENT_POINTER) {
-        int32_t track = event->type == MOSAICO_DEVICE_EVENT_TOUCH ? event->value : 0;
+    if (event->type == RAYLIB_LITE_INPUT_TOUCH ||
+            event->type == RAYLIB_LITE_INPUT_POINTER) {
+        int32_t track = event->type == RAYLIB_LITE_INPUT_TOUCH ? event->value : 0;
         mosaico_input_contact_t *contact = contact_for(track, event->pressed);
         if (contact) {
             bool was_active = contact->active;
@@ -103,13 +103,13 @@ void mosaico_action_apply_event(const mosaico_device_event_t *event)
             if (event->pressed && !was_active) pulse(MOSAICO_ACTION_RESTART);
         }
         sync_zones();
-    } else if (event->type == MOSAICO_DEVICE_EVENT_BUTTON) {
+    } else if (event->type == RAYLIB_LITE_INPUT_BUTTON) {
         int action = event->value;
         if (action < 0 || action >= MOSAICO_ACTION_COUNT) action = MOSAICO_ACTION_PAUSE;
         set_held(action, event->pressed);
         if (event->pressed) pulse(action);
-    } else if (event->type == MOSAICO_DEVICE_EVENT_JOYSTICK ||
-               event->type == MOSAICO_DEVICE_EVENT_IMU) {
+    } else if (event->type == RAYLIB_LITE_INPUT_JOYSTICK ||
+               event->type == RAYLIB_LITE_INPUT_IMU) {
         set_held(MOSAICO_ACTION_LEFT, event->x < -s_axis_threshold);
         set_held(MOSAICO_ACTION_RIGHT, event->x > s_axis_threshold);
     }

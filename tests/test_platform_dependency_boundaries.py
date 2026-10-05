@@ -35,10 +35,15 @@ ESP_BENCHMARK_SOURCES = {
 
 class PlatformDependencyBoundaryTests(unittest.TestCase):
     def test_runtime_frame_backpressure_is_not_terminal(self):
+        source = (ENGINE / "components/mosaico_game_app/mosaico_game_app.c").read_text()
+        for legacy in ("MosaicoGameInit", "MosaicoGameShutdown",
+                       "MosaicoGamePollDeviceEvent", "MosaicoGamePostDeviceEvent"):
+            self.assertNotIn(legacy, source)
+
         source = (ENGINE / "components" / "mosaico_game_app" /
                   "mosaico_game_app.c").read_text()
         fatal = source[source.index("static bool frame_result_is_fatal"):
-                       source.index("static mosaico_device_event_type_t")]
+                       source.index("static void poll_input")]
         for transient in ("RAYLIB_LITE_NOT_READY", "RAYLIB_LITE_BUSY",
                           "RAYLIB_LITE_TIMEOUT", "RAYLIB_LITE_IO_ERROR",
                           "RAYLIB_LITE_PLATFORM_ERROR"):
@@ -112,6 +117,68 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                 for token in ("heap_caps_", "esp_timer_", "bsp_",
                               "platform_esp_", "ESP_PLATFORM"):
                     self.assertNotIn(token, source)
+
+    def test_engine_has_no_fixed_board_resolution_or_task_stack_policy(self) -> None:
+        forbidden = ("MOSAICO_GAME_WIDTH", "MOSAICO_GAME_HEIGHT",
+                     "game_task_stack")
+        for root_name in ("components",):
+            for path in (ENGINE / root_name).rglob("*"):
+                if not path.is_file() or path.suffix not in {".c", ".h"}:
+                    continue
+                source = path.read_text(encoding="utf-8")
+                with self.subTest(path=path.relative_to(ENGINE)):
+                    for token in forbidden:
+                        self.assertNotIn(token, source)
+
+    def test_legacy_input_producer_is_not_built(self) -> None:
+        component = ENGINE / "components/mosaico_game_input"
+        cmake = (component / "CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertNotIn("mosaico_game_input.c", cmake)
+        self.assertFalse((component / "mosaico_game_input.c").exists())
+        self.assertFalse((component / "include/mosaico_game_input.h").exists())
+        action = (component / "include/mosaico_game_action.h").read_text(
+            encoding="utf-8")
+        self.assertIn('#include "raylib_lite_input.h"', action)
+        self.assertNotIn('#include "mosaico_game.h"', action)
+
+    def test_default_runtime_path_does_not_link_legacy_mosaico_game(self) -> None:
+        for relative in (
+                "components/mosaico_game_app/CMakeLists.txt",
+                "components/mosaico_raylib_fast/CMakeLists.txt",
+                "components/mosaico_game_debug/CMakeLists.txt",
+                "examples/boards/esp-mosaico/CMakeLists.txt"):
+            source = (ENGINE / relative).read_text(encoding="utf-8")
+            with self.subTest(path=relative):
+                self.assertNotRegex(source, r"(?<![_A-Za-z])mosaico_game(?![_A-Za-z])")
+
+        helper = (ENGINE / "cmake/raylib_lite_esp.cmake").read_text(
+            encoding="utf-8")
+        self.assertNotIn("set(_components mosaico_game ", helper)
+        self.assertIn("set(_components raylib_lite_platform raylib_lite_runner",
+                      helper)
+
+        for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
+            if cmake.parent.parent.name == "render_benchmark":
+                continue
+            source = cmake.read_text(encoding="utf-8")
+            with self.subTest(path=cmake.relative_to(ENGINE)):
+                self.assertNotRegex(
+                    source, r"REQUIRES[^)]*(?<![_A-Za-z])mosaico_game(?![_A-Za-z])")
+
+    def test_legacy_runtime_isolated_to_compatibility_component(self) -> None:
+        forbidden = ("MosaicoGameInit", "MosaicoGameShutdown",
+                     "MosaicoGamePollDeviceEvent", "MosaicoGamePostDeviceEvent",
+                     "MosaicoGameGetStats", "MosaicoGameRecord")
+        for root_name in ("components", "examples"):
+            for path in (ENGINE / root_name).rglob("*"):
+                if not path.is_file() or path.suffix not in {".c", ".h"}:
+                    continue
+                if "components/mosaico_game/" in path.as_posix():
+                    continue
+                source = path.read_text(encoding="utf-8")
+                with self.subTest(path=path.relative_to(ENGINE)):
+                    for token in forbidden:
+                        self.assertNotIn(token, source)
 
     def test_error_compatibility_header_compiles_without_sdk(self) -> None:
         header = ENGINE / "components/raylib_lite_platform/include/raylib_lite_compat.h"

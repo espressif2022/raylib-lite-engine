@@ -17,8 +17,8 @@
 #include "last_zone_game.h"
 #include "last_zone_view.h"
 #if defined(MOSAICO_GAME_NATIVE)
-#include "mosaico_game.h"
 #include "native_feedback.h"
+#include "raylib_lite_runtime_stats.h"
 #endif
 
 typedef struct {
@@ -353,8 +353,8 @@ static int render(void *value)
     }
 #else
 #if defined(MOSAICO_GAME_NATIVE)
-    mosaico_game_stats_t stats = {0};
-    MosaicoGameGetStats(&stats);
+    raylib_lite_runtime_stats_t stats = {0};
+    raylib_lite_runtime_stats_get(&stats);
     logic_fps = stats.logic_fps;
     display_fps = stats.display_fps;
 #else

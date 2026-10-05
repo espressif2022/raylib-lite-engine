@@ -5,18 +5,16 @@ function(mosaico_game_sdk_add_components)
     set(options RAYLIB AUDIO TILEMAP SCENE UI FX SAVE)
     cmake_parse_arguments(GAME "${options}" "" "" ${ARGN})
 
-    set(_components mosaico_game mosaico_game_input mosaico_game_debug)
+    set(_components raylib_lite_platform raylib_lite_runner
+        mosaico_game_input mosaico_game_debug)
     if(GAME_RAYLIB OR GAME_AUDIO OR GAME_TILEMAP)
         list(APPEND _components mosaico_game_assets)
-    endif()
-    if(GAME_RAYLIB OR GAME_AUDIO)
-        list(APPEND _components raylib_lite_platform)
     endif()
     if(GAME_RAYLIB OR GAME_TILEMAP)
         list(APPEND _components mosaico_game_2d)
     endif()
     if(GAME_RAYLIB)
-        list(APPEND _components raylib_lite_runner mosaico_raylib_fast
+        list(APPEND _components mosaico_raylib_fast
              mosaico_raylib_port mosaico_game_app)
     endif()
     if(GAME_TILEMAP)

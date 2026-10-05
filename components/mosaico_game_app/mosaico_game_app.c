@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "raylib_lite_game_app.h"
 
-#include "mosaico_game.h"
+#include "raylib_lite_runtime_stats.h"
 #include "mosaico_game_action.h"
 #include "mosaico_game_debug.h"
 #include "mosaico_raylib_fast.h"
@@ -33,69 +33,27 @@ static bool frame_result_is_fatal(raylib_lite_result_t result)
         result == RAYLIB_LITE_NO_MEMORY;
 }
 
-static mosaico_device_event_type_t legacy_event_type(
-    raylib_lite_input_type_t type)
-{
-    switch (type) {
-    case RAYLIB_LITE_INPUT_POINTER: return MOSAICO_DEVICE_EVENT_POINTER;
-    case RAYLIB_LITE_INPUT_TOUCH: return MOSAICO_DEVICE_EVENT_TOUCH;
-    case RAYLIB_LITE_INPUT_BUTTON: return MOSAICO_DEVICE_EVENT_BUTTON;
-    case RAYLIB_LITE_INPUT_JOYSTICK: return MOSAICO_DEVICE_EVENT_JOYSTICK;
-    case RAYLIB_LITE_INPUT_IMU: return MOSAICO_DEVICE_EVENT_IMU;
-    case RAYLIB_LITE_INPUT_ATTACHED: return MOSAICO_DEVICE_EVENT_ATTACHED;
-    case RAYLIB_LITE_INPUT_DETACHED: return MOSAICO_DEVICE_EVENT_DETACHED;
-    default: return MOSAICO_DEVICE_EVENT_NONE;
-    }
-}
-
 static void poll_input(void *context)
 {
     app_runtime_t *runtime = context;
     raylib_lite_input_event_t input;
     while (runtime->app->input &&
             raylib_lite_input_poll(runtime->app->input, &input)) {
-        mosaico_device_event_t event = {
-            .type = legacy_event_type(input.type),
-            .x = input.x,
-            .y = input.y,
-            .value = input.value,
-            .pressed = input.pressed,
-            .timestamp_us = input.timestamp_us,
-        };
-        if (event.type == MOSAICO_DEVICE_EVENT_POINTER)
-            MosaicoFastInjectPointer(0, event.x, event.y, event.pressed);
-        else if (event.type == MOSAICO_DEVICE_EVENT_TOUCH)
-            MosaicoFastInjectPointer(event.value, event.x, event.y, event.pressed);
-        else if (event.type == MOSAICO_DEVICE_EVENT_IMU)
-            MosaicoFastInjectImu(event.x / 1000.0f, event.y / 1000.0f,
-                                 event.value / 1000.0f);
-        mosaico_action_apply_event(&event);
+        if (input.type == RAYLIB_LITE_INPUT_POINTER)
+            MosaicoFastInjectPointer(0, input.x, input.y, input.pressed);
+        else if (input.type == RAYLIB_LITE_INPUT_TOUCH)
+            MosaicoFastInjectPointer(input.value, input.x, input.y,
+                                     input.pressed);
+        else if (input.type == RAYLIB_LITE_INPUT_IMU)
+            MosaicoFastInjectImu(input.x / 1000.0f, input.y / 1000.0f,
+                                 input.value / 1000.0f);
+        mosaico_action_apply_event(&input);
         if (runtime->app->on_event)
             runtime->app->on_event(runtime->app->user, &input);
     }
-    /* Compatibility bridge: callers using the legacy MosaicoGamePostDeviceEvent
-     * producer must continue to reach games during the migration. */
-    mosaico_device_event_t legacy;
-    while (MosaicoGamePollDeviceEvent(&legacy)) {
-        if (legacy.type == MOSAICO_DEVICE_EVENT_POINTER)
-            MosaicoFastInjectPointer(0, legacy.x, legacy.y, legacy.pressed);
-        else if (legacy.type == MOSAICO_DEVICE_EVENT_TOUCH)
-            MosaicoFastInjectPointer(legacy.value, legacy.x, legacy.y,
-                                     legacy.pressed);
-        else if (legacy.type == MOSAICO_DEVICE_EVENT_IMU)
-            MosaicoFastInjectImu(legacy.x / 1000.0f, legacy.y / 1000.0f,
-                                 legacy.value / 1000.0f);
-        mosaico_action_apply_event(&legacy);
-        if (runtime->app->on_event) {
-            input = (raylib_lite_input_event_t) {
-                .type = (raylib_lite_input_type_t)legacy.type,
-                .x = legacy.x, .y = legacy.y, .value = legacy.value,
-                .pressed = legacy.pressed,
-                .timestamp_us = legacy.timestamp_us,
-            };
-            runtime->app->on_event(runtime->app->user, &input);
-        }
-    }
+    if (runtime->app->input)
+        raylib_lite_runtime_stats_set_queue_overflows(
+            raylib_lite_input_dropped(runtime->app->input));
 }
 
 static bool should_close(void *context)
@@ -118,11 +76,11 @@ static void update(void *context)
     mosaico_action_begin_frame();
     if (runtime->app->on_update)
         runtime->app->on_update(runtime->app->user);
-    uint32_t elapsed = (uint32_t)(
-        runtime->app->platform.clock.monotonic_us(
-            runtime->app->platform.clock.context) - started);
+    uint64_t finished = runtime->app->platform.clock.monotonic_us(
+        runtime->app->platform.clock.context);
+    uint32_t elapsed = (uint32_t)(finished - started);
     runtime->update_us += elapsed;
-    MosaicoGameRecordLogic(0, elapsed);
+    raylib_lite_runtime_stats_record_logic(finished, 0, elapsed);
     MosaicoFastConsumeInputEdges();
 }
 
@@ -137,10 +95,12 @@ static void render(void *context)
      * loop. They must not unwind the launcher and trigger app_main's reset. */
     if (frame_result_is_fatal(frame_result))
         runtime->terminal_result = frame_result;
-    uint32_t elapsed = (uint32_t)(
-        runtime->app->platform.clock.monotonic_us(
-            runtime->app->platform.clock.context) - started);
-    MosaicoGameRecordTiming(runtime->update_us, elapsed);
+    uint64_t finished = runtime->app->platform.clock.monotonic_us(
+        runtime->app->platform.clock.context);
+    uint32_t elapsed = (uint32_t)(finished - started);
+    raylib_lite_runtime_stats_record_frame(
+        finished, runtime->update_us, elapsed, 0,
+        frame_result != RAYLIB_LITE_OK);
     runtime->update_us = 0;
     uint32_t interval = runtime->app->stats_interval
         ? runtime->app->stats_interval : 100;
@@ -167,14 +127,13 @@ raylib_lite_result_t raylib_lite_game_app_run(
             !app->platform.clock.sleep_for_us)
         return RAYLIB_LITE_INVALID_ARGUMENT;
 
-    mosaico_game_config_t game = MOSAICO_GAME_CONFIG_DEFAULT();
-    game.target_fps = (int)app->target_fps;
-    if (MosaicoGameInit(&game) != 0) return RAYLIB_LITE_PLATFORM_ERROR;
+    raylib_lite_runtime_stats_reset();
+
     mosaico_action_reset();
     bool started = false;
     raylib_lite_result_t result = mosaico_raylib_port_init_backend(
         &app->platform.video);
-    if (result != RAYLIB_LITE_OK) goto shutdown_game;
+    if (result != RAYLIB_LITE_OK) return result;
 
     uint16_t width = 0, height = 0;
     mosaico_raylib_port_get_dimensions(&width, &height);
@@ -229,7 +188,5 @@ shutdown_port:
     if (started && app->on_stop) app->on_stop(app->user);
     CloseWindow();
     mosaico_raylib_port_deinit();
-shutdown_game:
-    MosaicoGameShutdown();
     return result;
 }

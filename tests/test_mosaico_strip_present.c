@@ -28,8 +28,6 @@ typedef struct {
 } fake_presenter_t;
 
 int64_t esp_timer_get_time(void) { return 0; }
-void MosaicoGameRecordDisplayRelease(uint32_t elapsed_us, uint32_t queued)
-{ (void)elapsed_us; (void)queued; }
 
 void *heap_caps_malloc(size_t n, unsigned caps) { (void)caps; return malloc(n); }
 void heap_caps_free(void *p) { free(p); }

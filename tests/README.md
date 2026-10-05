@@ -13,6 +13,8 @@ flash is not covered here. Packing an atlas with
 lazily so projects that leave block compression off keep the Pillow-only
 dependency set.
 
+Runtime-boundary coverage also includes `tests.test_game_action` for Action Mapper press/release/contact semantics and `tests.test_runtime_stats` for portable logic/display timing, counters, and 32-bit microsecond-clock wrap handling.
+
 # RGB565 raster regression
 
 ## Generic solid primitives

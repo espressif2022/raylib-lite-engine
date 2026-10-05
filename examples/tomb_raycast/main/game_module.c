@@ -13,8 +13,8 @@
 #endif
 #include "mosaico_raylib_fast.h"
 #if defined(MOSAICO_GAME_NATIVE)
-#include "mosaico_game.h"
 #include "native_feedback.h"
+#include "raylib_lite_runtime_stats.h"
 #endif
 #include "tomb_game.h"
 #include "tomb_view.h"
@@ -192,8 +192,8 @@ static int render(void *value)
 #else
     float display_fps=(float)GetFPS();
 #if defined(MOSAICO_GAME_NATIVE)
-    mosaico_game_stats_t stats;
-    MosaicoGameGetStats(&stats);
+    raylib_lite_runtime_stats_t stats = {0};
+    raylib_lite_runtime_stats_get(&stats);
     display_fps=stats.display_fps;
 #endif
 #endif

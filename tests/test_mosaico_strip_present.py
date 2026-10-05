@@ -22,7 +22,9 @@ class StripPresentTests(unittest.TestCase):
                 f"-I{fake}",
                 f"-I{PORT}",
                 f"-I{ENGINE / 'components/raylib_lite_platform/include'}",
+                f"-I{ENGINE / 'components/raylib_lite_runner/include'}",
                 str(ENGINE / "tests/test_mosaico_strip_present.c"), str(source),
+                str(ENGINE / "components/raylib_lite_runner/raylib_lite_runtime_stats.c"),
                 "-o", str(exe),
             ], check=True)
             result = subprocess.run([str(exe)], check=True, text=True, capture_output=True)

@@ -11,11 +11,12 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "mosaico_strip_present.h"
-#include "mosaico_game.h"
 #include "mosaico_game_action.h"
 #include "nvs_flash.h"
 
 #define INPUT_CAPACITY 32U
+#define ESP_MOSAICO_GAME_WIDTH 480
+#define ESP_MOSAICO_GAME_HEIGHT 480
 
 struct raylib_lite_example_board {
     raylib_lite_example_board_config_t config;
@@ -249,8 +250,8 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
         goto failed;
     }
     esp_display_presenter_config_t present_config = {
-        .width = MOSAICO_GAME_WIDTH,
-        .height = MOSAICO_GAME_HEIGHT,
+        .width = ESP_MOSAICO_GAME_WIDTH,
+        .height = ESP_MOSAICO_GAME_HEIGHT,
         .pixel_format = ESP_DISPLAY_PRESENT_PIXEL_FORMAT_RGB565,
         .max_damage_areas = 1,
         .target = {
@@ -286,7 +287,7 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
     }
 
     raylib_lite_result_t rr = mosaico_strip_present_open(
-        p->presenter, MOSAICO_GAME_WIDTH, MOSAICO_GAME_HEIGHT, &p->video);
+        p->presenter, ESP_MOSAICO_GAME_WIDTH, ESP_MOSAICO_GAME_HEIGHT, &p->video);
     if (rr != RAYLIB_LITE_OK) {
         err = to_esp(rr);
         goto failed;

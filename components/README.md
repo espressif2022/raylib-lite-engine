@@ -14,6 +14,7 @@ Use these public APIs before adding a game-local helper. If a helper is needed b
 | Need | Start with | Public header or tool |
 | --- | --- | --- |
 | Fixed-step game loop and event queue | `raylib_lite_game_app_run`, runner input | [`raylib_lite_game_app.h`](mosaico_game_app/include/raylib_lite_game_app.h), [`raylib_lite_input.h`](raylib_lite_runner/include/raylib_lite_input.h) |
+| Runtime timing and display/input counters | `raylib_lite_runtime_stats_*` | [`raylib_lite_runtime_stats.h`](raylib_lite_runner/include/raylib_lite_runtime_stats.h) |
 | Touch or button to game action | `mosaico_action_*` | [`mosaico_game_action.h`](mosaico_game_input/include/mosaico_game_action.h) |
 | RGB565 shapes and compatible Raylib calls | fast drawing surface | [`mosaico_raylib_fast.h`](mosaico_raylib_fast/include/mosaico_raylib_fast.h) |
 | Texture, atlas, wall column, floor span, triangle or quad | `Mosaico2D*` | [`mosaico_game_2d.h`](mosaico_game_2d/include/mosaico_game_2d.h), [raster contract](../docs/raster-kernels.EN.md) |
@@ -27,18 +28,18 @@ Use these public APIs before adding a game-local helper. If a helper is needed b
 
 | Component | Owns | Must not own |
 | --- | --- | --- |
-| `mosaico_game` | runtime configuration, device events and ESP task/statistics services | BSP or product policy |
+| `mosaico_game` | Legacy compatibility wrappers for the old event/config/statistics API | Default runtime scheduling, board ownership, or new APIs |
 | `raylib_lite_platform` | video/audio/clock contracts and ESP clock implementation | BSP or product policy |
-| `raylib_lite_runner` | deterministic update/render scheduling and input queue | task creation or board input |
-| `mosaico_game_app` | portable Raylib game lifecycle over a supplied platform | device boot, BSP, GSP, or task placement |
+| `raylib_lite_runner` | Deterministic update/render scheduling, the bounded input queue, and board-neutral runtime statistics | Task creation or board input |
+| `mosaico_game_app` | Portable Raylib game lifecycle over a supplied platform and one runner input queue | Device boot, BSP, legacy event queues, or task placement |
 | `mosaico_raylib_port` | consume a platform-neutral video backend | display construction or game content |
 | `mosaico_raylib_fast` | RGB565 drawing implementation | board startup |
 | `mosaico_game_assets` | asset view/registration contracts and ESP partition/mmap access | board-specific storage policy |
 | `mosaico_game_2d` | textures, atlases, animation helpers, raycast columns/spans/walls, textured triangles | map rules, camera math, or audio |
 | `mosaico_game_tilemap` | packed tile-map access and drawing | game-specific collision behavior |
 | `mosaico_game_audio` | clip loading, decoding, mixing, backend contract | codec device and worker policy |
-| `mosaico_game_input` | device-event types, posting, Action Mapper | board driver ownership |
-| `mosaico_game_debug` | shared statistics interfaces and IDF logging implementation | product telemetry transport |
+| `mosaico_game_input` | Action Mapper over `raylib_lite_input_event_t` | Device event queues or board driver ownership |
+| `mosaico_game_debug` | IDF logging of board-neutral runtime statistics plus heap/PSRAM diagnostics | Runtime ownership or product telemetry transport |
 | `mosaico_game_scene` | fixed-capacity scene stack and lifecycle dispatch | game-specific scene policy |
 | `mosaico_game_ui` | fixed retained panel/label/button tree and two tracked pointers | menus, layout engines, or board input |
 | `mosaico_game_fx` | fixed-capacity tweens, easing, and particle pools | heap allocation or rendering policy |
