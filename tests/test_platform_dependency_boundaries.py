@@ -8,9 +8,8 @@ import unittest
 ENGINE = Path(__file__).resolve().parents[1]
 ENGINE_SOURCE_ROOTS = ("src", "include/raylib_lite", "compat/raylib")
 ESP_IMPLEMENTATIONS = {
-    "src/runtime/mosaico_game.c",
     "src/idf/mosaico_game_assets_mmap.c",
-    "src/runtime/mosaico_game_debug.c",
+    "src/runtime/raylib_lite_debug.c",
     "src/idf/mosaico_game_save_nvs.c",
     "src/renderer/mosaico_game_2d_esp.c",
     "src/renderer/mosaico_raster_bench.c",
@@ -27,12 +26,12 @@ ESP_BENCHMARK_SOURCES = {
 
 class PlatformDependencyBoundaryTests(unittest.TestCase):
     def test_runtime_frame_backpressure_is_not_terminal(self):
-        source = (ENGINE / "src/runtime/mosaico_game_app.c").read_text()
+        source = (ENGINE / "src/runtime/raylib_lite_game_app.c").read_text()
         for legacy in ("MosaicoGameInit", "MosaicoGameShutdown",
                        "MosaicoGamePollDeviceEvent", "MosaicoGamePostDeviceEvent"):
             self.assertNotIn(legacy, source)
 
-        source = (ENGINE / "src/runtime/mosaico_game_app.c").read_text()
+        source = (ENGINE / "src/runtime/raylib_lite_game_app.c").read_text()
         fatal = source[source.index("static bool frame_result_is_fatal"):
                        source.index("static void poll_input")]
         for transient in ("RAYLIB_LITE_NOT_READY", "RAYLIB_LITE_BUSY",
@@ -42,7 +41,7 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
         self.assertIn("if (frame_result_is_fatal(frame_result))", source)
 
     def test_portable_app_stops_after_failed_start(self) -> None:
-        source = (ENGINE / "src/runtime/mosaico_game_app.c").read_text(
+        source = (ENGINE / "src/runtime/raylib_lite_game_app.c").read_text(
             encoding="utf-8")
         entered = source.index("started = true;", source.index("if (app->on_start)"))
         called = source.index("result = app->on_start", entered)
@@ -120,7 +119,7 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
         self.assertNotIn("mosaico_game_input.c", cmake)
         self.assertFalse((ENGINE / "src/input/mosaico_game_input.c").exists())
         self.assertFalse((ENGINE / "include/raylib_lite/mosaico_game_input.h").exists())
-        action = (ENGINE / "include/raylib_lite/mosaico_game_action.h").read_text(
+        action = (ENGINE / "include/raylib_lite/raylib_lite_action.h").read_text(
             encoding="utf-8")
         self.assertIn('#include "raylib_lite_input.h"', action)
         self.assertNotIn('#include "mosaico_game.h"', action)
@@ -157,18 +156,18 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                             "raylib_lite_runner"):
                     self.assertNotIn(old, requirements)
 
-    def test_legacy_runtime_isolated_to_compatibility_component(self) -> None:
+    def test_legacy_runtime_wrapper_has_been_removed(self) -> None:
+        self.assertFalse((ENGINE / "src/runtime/mosaico_game.c").exists())
+        self.assertFalse((ENGINE / "include/raylib_lite/mosaico_game.h").exists())
         forbidden = ("MosaicoGameInit", "MosaicoGameShutdown",
                      "MosaicoGamePollDeviceEvent", "MosaicoGamePostDeviceEvent",
                      "MosaicoGameGetStats", "MosaicoGameRecord")
-        for root_name in ("src", "examples"):
+        for root_name in ("src", "include/raylib_lite", "examples"):
             for path in (ENGINE / root_name).rglob("*"):
                 if not path.is_file() or path.suffix not in {".c", ".h"}:
                     continue
                 if "managed_components" in path.parts or any(
                         part.startswith("build") for part in path.parts):
-                    continue
-                if path == ENGINE / "src/runtime/mosaico_game.c":
                     continue
                 source = path.read_text(encoding="utf-8")
                 with self.subTest(path=path.relative_to(ENGINE)):
@@ -256,7 +255,7 @@ int main(void) {{ return M2D_WALL_MODE; }}
                 with self.subTest(path=path.relative_to(ENGINE)):
                     self.assertNotIn('#include "mosaico_raylib_fast.h"', source)
 
-        for relative in ("src/runtime/mosaico_game_app.c",
+        for relative in ("src/runtime/raylib_lite_game_app.c",
                          "src/ui/mosaico_game_ui.c"):
             source = (ENGINE / relative).read_text(encoding="utf-8")
             self.assertNotIn('#include "raylib_lite_raylib.h"', source)

@@ -181,7 +181,7 @@ class GenericHostRuntime:
             ENGINE_ROOT / "host/host_module_bridge.c",
             ENGINE_ROOT / "host/host_video_backend.c",
             ENGINE_ROOT / "host/host_clock.c",
-            ENGINE_ROOT / "src/runtime/mosaico_raylib_port.c",
+            ENGINE_ROOT / "src/runtime/raylib_lite_raylib_port.c",
             ENGINE_ROOT / "host/host_asset_runtime.c",
             ENGINE_ROOT / "src/renderer/mosaico_game_2d.c",
             ENGINE_ROOT / "src/renderer/mosaico_game_2d_raylib.c",

@@ -18,7 +18,7 @@ class PrimitiveTests(unittest.TestCase):
             command = [os.environ.get("CC", "cc"), "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"]
             command += shlex.split(os.environ.get("CFLAGS", ""))
             command += [str(ROOT / path) for path in ["tests/test_primitives.c", "host/host_video_backend.c",
-                        "src/runtime/mosaico_raylib_port.c",
+                        "src/runtime/raylib_lite_raylib_port.c",
                         "host/host_asset_runtime.c", "src/renderer/mosaico_game_2d.c",
                         "src/renderer/mosaico_game_2d_raylib.c",
                         "src/renderer/mosaico_rgb565.c"]]

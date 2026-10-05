@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-void mosaico_game_debug_log(const char *tag);
+void raylib_lite_debug_log(const char *tag);
 
 #ifdef __cplusplus
 }

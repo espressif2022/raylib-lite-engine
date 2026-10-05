@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "mosaico_game_debug.h"
+#include "raylib_lite_debug.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #include "raylib_lite_runtime_stats.h"
@@ -10,7 +10,7 @@
    without making the whole component depend on it. */
 __attribute__((weak)) void mosaico_game_2d_log_raster_shape(const char *tag) { (void)tag; }
 
-void mosaico_game_debug_log(const char *tag){
+void raylib_lite_debug_log(const char *tag){
     raylib_lite_runtime_stats_t s = {0};
     raylib_lite_runtime_stats_get(&s);
     size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);

@@ -21,7 +21,7 @@ class GameActionTests(unittest.TestCase):
                 f"-I{ENGINE / 'include/raylib_lite'}",
                 f"-I{ENGINE / 'include/raylib_lite'}",
                 str(ENGINE / "tests/test_game_action.c"),
-                str(ENGINE / "src/input/mosaico_game_action.c"),
+                str(ENGINE / "src/input/raylib_lite_action.c"),
                 "-o", str(executable),
             ], check=True)
             result = subprocess.run([str(executable)], check=True,

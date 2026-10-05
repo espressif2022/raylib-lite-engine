@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "mosaico_raylib_port.h"
+#include "raylib_lite_raylib_port.h"
 
 #include <stdbool.h>
 #include <string.h>
@@ -21,7 +21,7 @@ static void clear_frame(raylib_lite_frame_t *frame)
     memset(frame, 0, sizeof(*frame));
 }
 
-raylib_lite_result_t mosaico_raylib_port_init_backend(
+raylib_lite_result_t raylib_lite_raylib_port_init_backend(
     const raylib_lite_video_backend_t *backend)
 {
     if (!backend || !backend->get_info || !backend->acquire ||
@@ -46,7 +46,7 @@ raylib_lite_result_t mosaico_raylib_port_init_backend(
     return RAYLIB_LITE_OK;
 }
 
-void mosaico_raylib_port_deinit(void)
+void raylib_lite_raylib_port_deinit(void)
 {
     if (s_port.frame_acquired) {
         s_port.backend.discard(s_port.backend.context, &s_port.frame);
@@ -54,7 +54,7 @@ void mosaico_raylib_port_deinit(void)
     memset(&s_port, 0, sizeof(s_port));
 }
 
-raylib_lite_result_t mosaico_raylib_port_begin_frame(
+raylib_lite_result_t raylib_lite_raylib_port_begin_frame(
     uint16_t **out_pixels, size_t *out_stride_pixels)
 {
     if (!out_pixels || !out_stride_pixels) {
@@ -93,7 +93,7 @@ raylib_lite_result_t mosaico_raylib_port_begin_frame(
     return RAYLIB_LITE_OK;
 }
 
-raylib_lite_result_t mosaico_raylib_port_present_frame(void)
+raylib_lite_result_t raylib_lite_raylib_port_present_frame(void)
 {
     if (!s_port.initialized || !s_port.frame_acquired) {
         s_port.last_present = RAYLIB_LITE_INVALID_STATE;
@@ -110,7 +110,7 @@ raylib_lite_result_t mosaico_raylib_port_present_frame(void)
     return result;
 }
 
-void mosaico_raylib_port_discard_frame(void)
+void raylib_lite_raylib_port_discard_frame(void)
 {
     if (!s_port.initialized || !s_port.frame_acquired) return;
     s_port.frame_acquired = false;
@@ -118,24 +118,24 @@ void mosaico_raylib_port_discard_frame(void)
     clear_frame(&s_port.frame);
 }
 
-raylib_lite_result_t mosaico_raylib_port_last_acquire_result(void)
+raylib_lite_result_t raylib_lite_raylib_port_last_acquire_result(void)
 {
     return s_port.initialized ? s_port.last_acquire : RAYLIB_LITE_NOT_READY;
 }
 
-raylib_lite_result_t mosaico_raylib_port_last_present_result(void)
+raylib_lite_result_t raylib_lite_raylib_port_last_present_result(void)
 {
     return s_port.initialized ? s_port.last_present : RAYLIB_LITE_NOT_READY;
 }
 
-raylib_lite_result_t mosaico_raylib_port_flush(uint32_t timeout_ms)
+raylib_lite_result_t raylib_lite_raylib_port_flush(uint32_t timeout_ms)
 {
     if (!s_port.initialized) return RAYLIB_LITE_INVALID_STATE;
     if (s_port.frame_acquired) return RAYLIB_LITE_INVALID_STATE;
     return s_port.backend.flush(s_port.backend.context, timeout_ms);
 }
 
-raylib_lite_result_t mosaico_raylib_port_copy_latest(
+raylib_lite_result_t raylib_lite_raylib_port_copy_latest(
     uint16_t *out_pixels, size_t pixel_capacity)
 {
     if (!out_pixels) return RAYLIB_LITE_INVALID_ARGUMENT;
@@ -145,7 +145,7 @@ raylib_lite_result_t mosaico_raylib_port_copy_latest(
                                       pixel_capacity);
 }
 
-void mosaico_raylib_port_get_dimensions(uint16_t *width, uint16_t *height)
+void raylib_lite_raylib_port_get_dimensions(uint16_t *width, uint16_t *height)
 {
     if (width) *width = s_port.initialized ? s_port.info.width : 0;
     if (height) *height = s_port.initialized ? s_port.info.height : 0;

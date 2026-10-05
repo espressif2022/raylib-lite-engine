@@ -11,7 +11,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "mosaico_strip_present.h"
-#include "mosaico_game_action.h"
+#include "raylib_lite_action.h"
 #include "nvs_flash.h"
 
 #define INPUT_CAPACITY 32U
@@ -110,17 +110,17 @@ static void touch_worker(void *ctx)
 {
     struct raylib_lite_example_board *p = ctx;
     uint8_t max = p->config.touch_points ? p->config.touch_points : 1;
-    if (max > MOSAICO_CONTACT_CAPACITY) {
-        max = MOSAICO_CONTACT_CAPACITY;
+    if (max > RAYLIB_LITE_ACTION_CONTACT_CAPACITY) {
+        max = RAYLIB_LITE_ACTION_CONTACT_CAPACITY;
     }
 
-    mosaico_input_contact_t old[MOSAICO_CONTACT_CAPACITY] = {0};
+    raylib_lite_input_contact_t old[RAYLIB_LITE_ACTION_CONTACT_CAPACITY] = {0};
     bool was_pressed = false;
     int last_x = 0;
     int last_y = 0;
 
     while (atomic_load_explicit(&p->sampling, memory_order_acquire)) {
-        esp_lcd_touch_point_data_t points[MOSAICO_CONTACT_CAPACITY] = {0};
+        esp_lcd_touch_point_data_t points[RAYLIB_LITE_ACTION_CONTACT_CAPACITY] = {0};
         uint8_t count = 0;
         uint64_t now = now_us(NULL);
 
@@ -158,7 +158,7 @@ static void touch_worker(void *ctx)
                     };
                     push(p, &e);
                 }
-                for (size_t i = 0; i < MOSAICO_CONTACT_CAPACITY; i++) {
+                for (size_t i = 0; i < RAYLIB_LITE_ACTION_CONTACT_CAPACITY; i++) {
                     if (!old[i].active) {
                         continue;
                     }
@@ -183,7 +183,7 @@ static void touch_worker(void *ctx)
                 }
                 memset(old, 0, sizeof(old));
                 for (uint8_t i = 0; i < count; i++) {
-                    old[i] = (mosaico_input_contact_t){
+                    old[i] = (raylib_lite_input_contact_t){
                         .track_id = points[i].track_id,
                         .x = points[i].x,
                         .y = points[i].y,

@@ -2,10 +2,10 @@
 #include "raylib_lite_game_app.h"
 
 #include "raylib_lite_runtime_stats.h"
-#include "mosaico_game_action.h"
-#include "mosaico_game_debug.h"
+#include "raylib_lite_action.h"
+#include "raylib_lite_debug.h"
 #include "mosaico_raylib_fast.h"
-#include "mosaico_raylib_port.h"
+#include "raylib_lite_raylib_port.h"
 #include "raylib.h"
 #include "raylib_lite_runner.h"
 
@@ -47,7 +47,7 @@ static void poll_input(void *context)
         else if (input.type == RAYLIB_LITE_INPUT_IMU)
             MosaicoFastInjectImu(input.x / 1000.0f, input.y / 1000.0f,
                                  input.value / 1000.0f);
-        mosaico_action_apply_event(&input);
+        raylib_lite_action_apply_event(&input);
         if (runtime->app->on_event)
             runtime->app->on_event(runtime->app->user, &input);
     }
@@ -73,7 +73,7 @@ static void update(void *context)
     app_runtime_t *runtime = context;
     uint64_t started = runtime->app->platform.clock.monotonic_us(
         runtime->app->platform.clock.context);
-    mosaico_action_begin_frame();
+    raylib_lite_action_begin_frame();
     if (runtime->app->on_update)
         runtime->app->on_update(runtime->app->user);
     uint64_t finished = runtime->app->platform.clock.monotonic_us(
@@ -105,7 +105,7 @@ static void render(void *context)
     uint32_t interval = runtime->app->stats_interval
         ? runtime->app->stats_interval : 100;
     if (++runtime->rendered_frames % interval == 0) {
-        mosaico_game_debug_log(runtime->app->tag
+        raylib_lite_debug_log(runtime->app->tag
             ? runtime->app->tag : "raylib_lite");
         if (runtime->app->on_stats)
             runtime->app->on_stats(runtime->app->user);
@@ -129,14 +129,14 @@ raylib_lite_result_t raylib_lite_game_app_run(
 
     raylib_lite_runtime_stats_reset();
 
-    mosaico_action_reset();
+    raylib_lite_action_reset();
     bool started = false;
-    raylib_lite_result_t result = mosaico_raylib_port_init_backend(
+    raylib_lite_result_t result = raylib_lite_raylib_port_init_backend(
         &app->platform.video);
     if (result != RAYLIB_LITE_OK) return result;
 
     uint16_t width = 0, height = 0;
-    mosaico_raylib_port_get_dimensions(&width, &height);
+    raylib_lite_raylib_port_get_dimensions(&width, &height);
     if (!width || !height) {
         result = RAYLIB_LITE_INVALID_STATE;
         goto shutdown_port;
@@ -154,7 +154,7 @@ raylib_lite_result_t raylib_lite_game_app_run(
     app->on_render(app->user);
     result = last_frame_result();
     if (frame_result_is_fatal(result)) goto shutdown_port;
-    result = mosaico_raylib_port_flush(3000);
+    result = raylib_lite_raylib_port_flush(3000);
     if (result != RAYLIB_LITE_OK) goto shutdown_port;
     if (app->on_first_present) {
         result = app->on_first_present(app->user);
@@ -187,6 +187,6 @@ raylib_lite_result_t raylib_lite_game_app_run(
 shutdown_port:
     if (started && app->on_stop) app->on_stop(app->user);
     MosaicoFastCloseWindow();
-    mosaico_raylib_port_deinit();
+    raylib_lite_raylib_port_deinit();
     return result;
 }

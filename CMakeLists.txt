@@ -21,10 +21,9 @@ set(_runner_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/runner/raylib_lite_input_queue.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/runner/raylib_lite_runtime_stats.c")
 set(_runtime_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/mosaico_game.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/input/mosaico_game_action.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/mosaico_game_debug.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/mosaico_game_app.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/input/raylib_lite_action.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_debug.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_game_app.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_native_hooks.c")
 set(_asset_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/assets/mosaico_game_assets.c"
@@ -48,7 +47,7 @@ if(M2D_WALL_BENCHMARK)
         "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_wall_bench.c")
 endif()
 set(_raylib_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/mosaico_raylib_port.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_raylib_port.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_raylib_fast.c")
 set(_feature_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_game_tilemap.c"

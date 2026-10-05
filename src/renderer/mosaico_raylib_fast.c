@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "mosaico_game_2d.h"
-#include "mosaico_raylib_port.h"
+#include "raylib_lite_raylib_port.h"
 #include "mosaico_rgb565.h"
 
 static uint16_t *s_pixels;
@@ -277,10 +277,10 @@ void MosaicoFastBeginDrawing(void)
 {
     s_pixels = NULL;
     s_stride = 0;
-    s_last_acquire = mosaico_raylib_port_begin_frame(&s_pixels, &s_stride);
+    s_last_acquire = raylib_lite_raylib_port_begin_frame(&s_pixels, &s_stride);
     s_last_present = RAYLIB_LITE_NOT_READY;
     uint16_t backend_width = 0, backend_height = 0;
-    mosaico_raylib_port_get_dimensions(&backend_width, &backend_height);
+    raylib_lite_raylib_port_get_dimensions(&backend_width, &backend_height);
     if (backend_width && backend_height) {
         s_screen_width = backend_width;
         s_screen_height = backend_height;
@@ -320,7 +320,7 @@ void MosaicoFastEndDrawing(void)
 {
     if (s_pixels) {
         mosaico_game_2d_note_primitives(s_primitive_pixels,s_primitive_runs,s_clear_pixels);
-        s_last_present = mosaico_raylib_port_present_frame();
+        s_last_present = raylib_lite_raylib_port_present_frame();
     }
     s_pixels = NULL;
     s_stride = 0;
