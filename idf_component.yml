@@ -1,0 +1,4 @@
+dependencies:
+  idf: ">=6.2"
+  georgik/raylib: "==6.0.0~2"
+  espressif/esp_mmap_assets: "^2.0.0"

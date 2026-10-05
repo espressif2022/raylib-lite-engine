@@ -1,45 +1,13 @@
 # ESP-IDF integration for Raylib Lite Engine.
 get_filename_component(RAYLIB_LITE_ENGINE_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 
+# Options are retained during the migration so existing callers do not need a
+# flag-day CMake change. The engine is now one IDF component; the linker still
+# discards unreferenced objects from its static library.
 function(mosaico_game_sdk_add_components)
-    set(options RAYLIB AUDIO TILEMAP SCENE UI FX SAVE)
-    cmake_parse_arguments(GAME "${options}" "" "" ${ARGN})
-
-    set(_components raylib_lite_platform raylib_lite_runner
-        mosaico_game_input mosaico_game_debug)
-    if(GAME_RAYLIB OR GAME_AUDIO OR GAME_TILEMAP)
-        list(APPEND _components mosaico_game_assets)
-    endif()
-    if(GAME_RAYLIB OR GAME_AUDIO)
-        list(APPEND _components mosaico_game_audio)
-    endif()
-    if(GAME_RAYLIB OR GAME_TILEMAP)
-        list(APPEND _components mosaico_game_2d)
-    endif()
-    if(GAME_RAYLIB)
-        list(APPEND _components mosaico_raylib_fast
-             mosaico_raylib_port mosaico_game_app)
-    endif()
-    if(GAME_TILEMAP)
-        list(APPEND _components mosaico_game_tilemap)
-    endif()
-    if(GAME_SCENE)
-        list(APPEND _components mosaico_game_scene)
-    endif()
-    if(GAME_UI)
-        list(APPEND _components mosaico_game_ui)
-    endif()
-    if(GAME_FX)
-        list(APPEND _components mosaico_game_fx)
-    endif()
-    if(GAME_SAVE)
-        list(APPEND _components mosaico_game_save)
-    endif()
-
-    foreach(_component IN LISTS _components)
-        list(APPEND EXTRA_COMPONENT_DIRS
-            "${RAYLIB_LITE_ENGINE_ROOT}/components/${_component}")
-    endforeach()
+    cmake_parse_arguments(GAME "RAYLIB;AUDIO;TILEMAP;SCENE;UI;FX;SAVE" "" "" ${ARGN})
+    list(APPEND EXTRA_COMPONENT_DIRS
+        "${RAYLIB_LITE_ENGINE_ROOT}/components/raylib_lite_engine")
     list(REMOVE_DUPLICATES EXTRA_COMPONENT_DIRS)
     set(EXTRA_COMPONENT_DIRS "${EXTRA_COMPONENT_DIRS}" PARENT_SCOPE)
 endfunction()

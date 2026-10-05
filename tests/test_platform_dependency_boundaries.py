@@ -107,7 +107,11 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                 continue
             with self.subTest(path=path.relative_to(ENGINE)):
                 if path.name == "CMakeLists.txt":
-                    self.assertIn("idf_component_register", path.read_text())
+                    cmake = path.read_text()
+                    if relative == "raylib_lite_engine/CMakeLists.txt":
+                        self.assertIn('include("${CMAKE_CURRENT_LIST_DIR}/../../CMakeLists.txt")', cmake)
+                    else:
+                        self.assertIn("idf_component_register", cmake)
                 if path.suffix not in {".c", ".h"}:
                     continue
                 if path.name == "raylib_lite_compat.h":
@@ -141,29 +145,42 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
         self.assertIn('#include "raylib_lite_input.h"', action)
         self.assertNotIn('#include "mosaico_game.h"', action)
 
-    def test_default_runtime_path_does_not_link_legacy_mosaico_game(self) -> None:
-        for relative in (
-                "components/mosaico_game_app/CMakeLists.txt",
-                "components/mosaico_raylib_fast/CMakeLists.txt",
-                "components/mosaico_game_debug/CMakeLists.txt",
-                "examples/boards/esp-mosaico/CMakeLists.txt"):
-            source = (ENGINE / relative).read_text(encoding="utf-8")
-            with self.subTest(path=relative):
-                self.assertNotRegex(source, r"(?<![_A-Za-z])mosaico_game(?![_A-Za-z])")
+    def test_single_engine_component_registration(self) -> None:
+        root_cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertEqual(root_cmake.count("idf_component_register("), 1)
+        self.assertTrue((ENGINE / "idf_component.yml").is_file())
+        self.assertTrue((ENGINE / "Kconfig").is_file())
+
+        shim = ENGINE / "components/raylib_lite_engine"
+        self.assertTrue((shim / "CMakeLists.txt").is_file())
+        self.assertEqual((shim / "idf_component.yml").read_text(),
+                         (ENGINE / "idf_component.yml").read_text())
+        self.assertEqual((shim / "Kconfig").read_text(),
+                         (ENGINE / "Kconfig").read_text())
 
         helper = (ENGINE / "cmake/raylib_lite_esp.cmake").read_text(
             encoding="utf-8")
-        self.assertNotIn("set(_components mosaico_game ", helper)
-        self.assertIn("set(_components raylib_lite_platform raylib_lite_runner",
-                      helper)
+        self.assertIn("components/raylib_lite_engine", helper)
+        for old in ("mosaico_game_app", "mosaico_game_assets",
+                    "mosaico_game_2d", "mosaico_raylib_fast",
+                    "raylib_lite_platform", "raylib_lite_runner"):
+            self.assertNotIn(f"components/${{{old}}}", helper)
 
         for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
             if cmake.parent.parent.name == "render_benchmark":
                 continue
             source = cmake.read_text(encoding="utf-8")
             with self.subTest(path=cmake.relative_to(ENGINE)):
-                self.assertNotRegex(
-                    source, r"REQUIRES[^)]*(?<![_A-Za-z])mosaico_game(?![_A-Za-z])")
+                match = re.search(r"REQUIRES\s+([^)]*)", source, re.S)
+                self.assertIsNotNone(match)
+                requirements = match.group(1).split()
+                self.assertIn("raylib_lite_engine", requirements)
+                for old in ("mosaico_game", "mosaico_game_app",
+                            "mosaico_game_assets", "mosaico_game_audio",
+                            "mosaico_game_2d", "mosaico_raylib_fast",
+                            "mosaico_raylib_port", "raylib_lite_platform",
+                            "raylib_lite_runner"):
+                    self.assertNotIn(old, requirements)
 
     def test_legacy_runtime_isolated_to_compatibility_component(self) -> None:
         forbidden = ("MosaicoGameInit", "MosaicoGameShutdown",
@@ -389,7 +406,10 @@ int main(void) {{ return M2D_WALL_MODE; }}
         self.assertIn("raylib_lite_audio_mixer.c", cmake)
 
         board_cmake = (ENGINE / "examples/boards/esp-mosaico/CMakeLists.txt").read_text()
-        self.assertIn("mosaico_game_audio", board_cmake)
+        self.assertIn("raylib_lite_engine", board_cmake)
+        board_requires = re.search(r"REQUIRES\s+([^)]*)", board_cmake, re.S)
+        self.assertIsNotNone(board_requires)
+        self.assertNotIn("mosaico_game_audio", board_requires.group(1).split())
         self.assertNotIn("raylib_lite_audio_decode.c", board_cmake)
         self.assertNotIn("raylib_lite_audio_mixer.c", board_cmake)
 
@@ -401,8 +421,9 @@ int main(void) {{ return M2D_WALL_MODE; }}
         self.assertTrue(users)
         for main in users:
             with self.subTest(path=main.relative_to(ENGINE)):
-                self.assertIn("mosaico_game_audio",
-                              (main / "CMakeLists.txt").read_text())
+                cmake = (main / "CMakeLists.txt").read_text()
+                self.assertIn("raylib_lite_engine", cmake)
+                self.assertNotIn("mosaico_game_audio", cmake)
 
     def test_game_manifests_do_not_own_board_dependencies(self) -> None:
         forbidden = ("esp_display_present", "lvgl/lvgl", "esp-mosaico")

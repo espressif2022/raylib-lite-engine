@@ -17,13 +17,13 @@ static const char *TAG = "mosaico_game";
 static mosaico_game_config_t s_config;
 static QueueHandle_t s_events;
 
-_Static_assert(MOSAICO_GAME_FRAME_ACCEPTED == RAYLIB_LITE_FRAME_ACCEPTED,
+_Static_assert((int)MOSAICO_GAME_FRAME_ACCEPTED == (int)RAYLIB_LITE_FRAME_ACCEPTED,
                "frame result compatibility");
-_Static_assert(MOSAICO_GAME_FRAME_BUSY == RAYLIB_LITE_FRAME_BUSY,
+_Static_assert((int)MOSAICO_GAME_FRAME_BUSY == (int)RAYLIB_LITE_FRAME_BUSY,
                "frame result compatibility");
-_Static_assert(MOSAICO_GAME_FRAME_SUPERSEDED == RAYLIB_LITE_FRAME_SUPERSEDED,
+_Static_assert((int)MOSAICO_GAME_FRAME_SUPERSEDED == (int)RAYLIB_LITE_FRAME_SUPERSEDED,
                "frame result compatibility");
-_Static_assert(MOSAICO_GAME_FRAME_DISPLAY_ERROR == RAYLIB_LITE_FRAME_DISPLAY_ERROR,
+_Static_assert((int)MOSAICO_GAME_FRAME_DISPLAY_ERROR == (int)RAYLIB_LITE_FRAME_DISPLAY_ERROR,
                "frame result compatibility");
 
 esp_err_t MosaicoGameInit(const mosaico_game_config_t *config)

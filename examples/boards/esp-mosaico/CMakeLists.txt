@@ -11,12 +11,7 @@ idf_component_register(
         "."
         "${RAYLIB_LITE_ENGINE_ROOT}/examples/common"
     REQUIRES
-        raylib_lite_platform
-        raylib_lite_runner
-        mosaico_game_input
-        mosaico_game_assets
-        mosaico_game_audio
-        raylib
+        raylib_lite_engine
         esp_display_present
         esp-mosaico-bsp
         nvs_flash
