@@ -67,6 +67,24 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                 with self.subTest(path=path.relative_to(ENGINE)):
                     self.assertNotIn("platform_mosaico_launcher", text)
 
+    def test_engine_components_do_not_depend_on_concrete_boards(self) -> None:
+        forbidden = (
+            "esp-mosaico-bsp",
+            "mosaico_board_platform",
+            "ports/esp_mosaico",
+            "MOSAICO_BSP_ROOT",
+        )
+        for path in (ENGINE / "components").rglob("*"):
+            if not path.is_file():
+                continue
+            if path.suffix not in {".c", ".h", ".S", ".txt", ".cmake"} and path.name not in {
+                    "CMakeLists.txt", "Kconfig"}:
+                continue
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path.relative_to(ENGINE)):
+                for token in forbidden:
+                    self.assertNotIn(token, text)
+
     def test_mosaico_launcher_has_been_removed(self) -> None:
         self.assertFalse((ENGINE / "components/platform_mosaico_launcher").exists())
         self.assertFalse((ENGINE / "cmake/mosaico_game_example.cmake").exists())
@@ -108,6 +126,17 @@ int main(void) {{ return ESP_OK; }}
             subprocess.run(["cc", "-std=c11", "-Wall", "-Werror", "-x", "c",
                             "-c", "-o", output, "-"], input=source,
                            text=True, check=True)
+
+    def test_wall_config_header_compiles_with_strict_c11(self) -> None:
+        header = ENGINE / "components/mosaico_game_2d/include/mosaico_wall_config.h"
+        source = f'''#include "{header}"
+int main(void) {{ return M2D_WALL_MODE; }}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            output = str(Path(directory) / "wall-config.o")
+            subprocess.run(["cc", "-std=c11", "-Wall", "-Werror", "-pedantic",
+                            "-x", "c", "-c", "-o", output, "-"],
+                           input=source, text=True, check=True)
 
     def test_product_app_integrations_are_external(self) -> None:
         examples = (("raylib_shooter", "shooter"),

@@ -172,7 +172,9 @@ assert.equal(plays,2);
                             "components/raylib_lite_platform/include",
                             "components/mosaico_raylib_fast/include"]:
                 command += ["-I", str(ENGINE / include)]
-            command += [str(ENGINE / "tests/test_sewer_model.c"), "-Wl,--gc-sections", "-lm", "-o", str(executable)]
+            linker_gc = "-Wl,-dead_strip" if sys.platform == "darwin" else "-Wl,--gc-sections"
+            command += [str(ENGINE / "tests/test_sewer_model.c"), linker_gc,
+                        "-lm", "-o", str(executable)]
             subprocess.run(command, check=True)
             subprocess.run([str(executable)], check=True)
 

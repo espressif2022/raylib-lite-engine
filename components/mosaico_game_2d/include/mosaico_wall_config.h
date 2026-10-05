@@ -21,8 +21,9 @@
 #if M2D_WALL_FIXED_PIXELS < 1 || M2D_WALL_FIXED_PIXELS > 480
 #error M2D_WALL_FIXED_PIXELS must be in [1,480]
 #endif
-_Static_assert(M2D_WALL_ERROR_TEXELS > 0.0f && M2D_WALL_ERROR_TEXELS <= 1.0f,
-               "M2D_WALL_ERROR_TEXELS must be in (0,1]");
+/* C11 integer constant expressions cannot portably compare floating constants.
+ * IDF/CMake validates the configurable error bound before defining this macro;
+ * standalone Host builds use the valid default above. */
 
 /* Audit builds are deliberately separate from timing builds. */
 #ifdef M2D_WALL_AUDIT
