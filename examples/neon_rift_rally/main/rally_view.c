@@ -190,13 +190,13 @@ static void draw_quad(Color fill, rally_point2_t a, rally_point2_t b,
 
 static void draw_scenery_prop(const rally_game_t *g, float distance,
                               const rally_track_scenery_t *anchor,
-                              rally_theme_t theme, MosaicoAtlas art,
+                              rally_theme_t theme, raylib_lite_atlas_t art,
                               mosaico_asset_id_t sprite)
 {
     rally_point3_t center_world = {anchor->world_x, anchor->world_y,
                                    anchor->world_z};
     rally_point2_t center = project(g, center_world);
-    const MosaicoSpriteFrame *frame = MosaicoAtlasGetFrame(art, sprite);
+    const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(art, sprite);
     if (frame && center.visible) {
         /* The authored asset becomes a readable 80–140px landmark at the
          * near edge, while the same world anchor shrinks naturally into the
@@ -229,7 +229,7 @@ static void draw_scenery_prop(const rally_game_t *g, float distance,
     draw_quad(side < 0 ? theme.accent2 : theme.accent, a, b, c, d);
 }
 
-static void draw_track_scenery(const rally_game_t *g, MosaicoAtlas art)
+static void draw_track_scenery(const rally_game_t *g, raylib_lite_atlas_t art)
 {
     rally_theme_t theme = theme_for(g->progress);
     float wrapped = fmodf(g->progress, RALLY_TRACK_LENGTH);
@@ -400,7 +400,7 @@ static void draw_route_props(const rally_game_t *g)
 }
 
 static void draw_opponent_car(const rally_game_t *g, float distance,
-                              float lateral, Color color, MosaicoAtlas art,
+                              float lateral, Color color, raylib_lite_atlas_t art,
                               mosaico_asset_id_t sprite)
 {
     rally_point3_t world;
@@ -425,7 +425,7 @@ static void draw_opponent_car(const rally_game_t *g, float distance,
                   (int)(scale * .42f), (int)(scale * .16f), C_GOLD);
     DrawRectangle((int)(x + scale * .68f), (int)(y + scale * .38f),
                   (int)(scale * .42f), (int)(scale * .16f), C_GOLD);
-    const MosaicoSpriteFrame *frame = MosaicoAtlasGetFrame(art, sprite);
+    const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(art, sprite);
     if (frame) {
         float size = scale * 6.1f;
         DrawTexturePro(art.texture, frame->source,
@@ -435,7 +435,7 @@ static void draw_opponent_car(const rally_game_t *g, float distance,
     }
 }
 
-static bool draw_opponents(const rally_game_t *g, MosaicoAtlas art)
+static bool draw_opponents(const rally_game_t *g, raylib_lite_atlas_t art)
 {
     static const Color colors[3] = {
         {113, 126, 255, 255}, {255, 84, 154, 255}, {87, 240, 190, 255}
@@ -487,7 +487,7 @@ static void draw_drift_sparks(const rally_game_t *g, rally_theme_t theme)
     }
 }
 
-static void draw_vehicle(const rally_game_t *g, MosaicoAtlas art)
+static void draw_vehicle(const rally_game_t *g, raylib_lite_atlas_t art)
 {
     float bob = sinf((float)g->tick * .24f) * .035f;
     float x = 240.0f + g->lateral * 10.0f;
@@ -530,7 +530,7 @@ static void draw_vehicle(const rally_game_t *g, MosaicoAtlas art)
         DrawTriangle((Vector2){x + 6, y + 35}, (Vector2){x + 29, y + 35},
                      (Vector2){x + 16, y + 65}, C_PINK);
     }
-    const MosaicoSpriteFrame *frame = MosaicoAtlasGetFrame(
+    const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(
         art, MOSAICO_ASSET_ID_CRAFT_PLAYER);
     if (frame)
         DrawTexturePro(art.texture, frame->source,
@@ -611,13 +611,13 @@ static void draw_race_alert(const rally_game_t *g, bool near_miss,
     }
 }
 
-int rally_view_render(const rally_game_t *state, MosaicoAtlas rally_art,
-                      MosaicoAtlas track_background)
+int rally_view_render(const rally_game_t *state, raylib_lite_atlas_t rally_art,
+                      raylib_lite_atlas_t track_background)
 {
     rally_game_t idle = {0};
     const rally_game_t *g = state ? state : &idle;
     BeginDrawing();
-    const MosaicoSpriteFrame *backdrop = MosaicoAtlasGetFrame(
+    const raylib_lite_sprite_frame_t *backdrop = raylib_lite_atlas_get_frame(
         track_background, MOSAICO_ASSET_ID_TRACK_CANYON);
     if (backdrop) {
         DrawTexturePro(track_background.texture, backdrop->source,

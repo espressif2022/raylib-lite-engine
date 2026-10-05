@@ -5,8 +5,8 @@
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #endif
-#include "mosaico_game_2d.h"
-#include "mosaico_wall_config.h"
+#include "raylib_lite_2d.h"
+#include "raylib_lite_wall_config.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,8 +58,8 @@ static void oracle(double x,double y,double *u,double *v,double *q){
  *u=(5.375+7*t+0.875*s)*base*16/(*q);
  *v=(3.125+1.125*t+6*s)*base*16/(*q);
 }
-void mosaico_wall_audit_divide(void){++divides;}
-void mosaico_wall_audit_span(uint16_t *dst,int32_t u,int32_t v,int32_t du,int32_t dv,int count){
+void raylib_lite_wall_audit_divide(void){++divides;}
+void raylib_lite_wall_audit_span(uint16_t *dst,int32_t u,int32_t v,int32_t du,int32_t dv,int count){
  ++segments;
  size_t offset=(size_t)(dst-target);
  for(int i=0;i<count;++i){
@@ -70,22 +70,22 @@ void mosaico_wall_audit_span(uint16_t *dst,int32_t u,int32_t v,int32_t du,int32_
   sum_uv+=error;++uv_samples;
  }
 }
-static void draw(MosaicoWallAtlas atlas,int frame){
+static void draw(raylib_lite_wall_atlas_t atlas,int frame){
  origin_x=48+frame*.25;origin_y=32+frame*.25;
- mosaico_textured_vertex_t p[4];
+ raylib_lite_textured_vertex_t p[4];
  for(int i=0;i<4;++i){
   double x=origin_x+(i&1)*256+(i>>1)*current->shear;
   double y=origin_y+(i>>1)*128,u,v,q;oracle(x,y,&u,&v,&q);
-  p[i]=(mosaico_textured_vertex_t){x,y,u,v,current->affine?0:q};
+  p[i]=(raylib_lite_textured_vertex_t){x,y,u,v,current->affine?0:q};
  }
- if(current->clipped)mosaico_game_2d_set_clip(100,60,180,80);
- else mosaico_game_2d_set_clip(0,0,BW,BH);
+ if(current->clipped)raylib_lite_renderer_set_clip(100,60,180,80);
+ else raylib_lite_renderer_set_clip(0,0,BW,BH);
  if(current->triangles){
-  Mosaico2DDrawIndexedTexturedTriangle(atlas,p[0],p[2],p[1],256);
-  Mosaico2DDrawIndexedTexturedTriangle(atlas,p[1],p[2],p[3],256);
- }else Mosaico2DDrawIndexedTexturedQuad(atlas,p[0],p[1],p[2],p[3],256);
+  raylib_lite_2d_draw_indexed_textured_triangle(atlas,p[0],p[2],p[1],256);
+  raylib_lite_2d_draw_indexed_textured_triangle(atlas,p[1],p[2],p[3],256);
+ }else raylib_lite_2d_draw_indexed_textured_quad(atlas,p[0],p[1],p[2],p[3],256);
 }
-int mosaico_wall_benchmark(void){
+int raylib_lite_wall_benchmark(void){
  target=bench_alloc(BS*BH*sizeof(*target));
  uint8_t *indices=bench_alloc(256*256);
 #if defined(ESP_PLATFORM) && defined(M2D_BENCH_LUT_INTERNAL)
@@ -95,9 +95,9 @@ int mosaico_wall_benchmark(void){
 #endif
  if(!target||!indices||!lut){free(target);free(indices);free(lut);return 2;}
  for(int i=0;i<16*256;++i)lut[i]=(uint16_t)((i%256)+1);
- MosaicoWallAtlas atlas={.descriptor=indices,.indices=indices,.light_lut=lut,
+ raylib_lite_wall_atlas_t atlas={.descriptor=indices,.indices=indices,.light_lut=lut,
   .width=256,.height=256,.light_levels=16,.row_major=1};
- mosaico_game_2d_set_target(target,BS,BW,BH);
+ raylib_lite_renderer_set_target(target,BS,BW,BH);
  for(unsigned scene=0;scene<sizeof(scenes)/sizeof(scenes[0]);++scene){
   current=&scenes[scene];max_uv=sum_uv=0;uv_samples=segments=divides=0;
   unsigned long long coverage=0,mismatch=0,pixels=0;
@@ -142,10 +142,10 @@ int mosaico_wall_benchmark(void){
   }
   puts("]}");
  }
- mosaico_game_2d_set_target(NULL,0,0,0);
- mosaico_game_2d_reset_raster_stats();free(target);free(indices);free(lut);
+ raylib_lite_renderer_set_target(NULL,0,0,0);
+ raylib_lite_renderer_reset_raster_stats();free(target);free(indices);free(lut);
  return 0;
 }
 #ifdef WALL_BENCH_HOST
-int main(void){return mosaico_wall_benchmark();}
+int main(void){return raylib_lite_wall_benchmark();}
 #endif

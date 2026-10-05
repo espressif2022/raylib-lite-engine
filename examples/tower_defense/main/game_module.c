@@ -21,8 +21,8 @@
 
 typedef struct {
     tower_game_t game;
-    MosaicoAtlas atlas;
-    MosaicoTilemap map;
+    raylib_lite_atlas_t atlas;
+    raylib_lite_tilemap_t map;
     tower_effect_t effects[TOWER_EFFECT_COUNT];
     bool paused;
 } tower_module_state_t;
@@ -48,8 +48,8 @@ static int initialize(void *value
 #if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
     mosaico_host_assets_set_root(asset_root);
 #endif
-    state->atlas = LoadMosaicoAtlas("tower.atlas");
-    state->map = LoadMosaicoTilemap("level01.map");
+    state->atlas = raylib_lite_atlas_load("tower.atlas");
+    state->map = raylib_lite_tilemap_load("level01.map");
     if (!state->atlas.texture.id || !state->map) return -1;
     (void)tower_view_apply_map(&state->game, state->map);
 #if !defined(MOSAICO_GAME_NATIVE)
@@ -64,8 +64,8 @@ static void shutdown(void *value)
 {
     tower_module_state_t *state = value;
     if (!state) return;
-    UnloadMosaicoTilemap(state->map);
-    UnloadMosaicoAtlas(state->atlas);
+    raylib_lite_tilemap_unload(state->map);
+    raylib_lite_atlas_unload(state->atlas);
 }
 
 static void input(void *value, const mosaico_host_input_v1_t *event)

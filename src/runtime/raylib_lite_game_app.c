@@ -4,7 +4,7 @@
 #include "raylib_lite_runtime_stats.h"
 #include "raylib_lite_action.h"
 #include "raylib_lite_debug.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib_impl.h"
 #include "raylib_lite_raylib_port.h"
 #include "raylib.h"
 #include "raylib_lite_runner.h"
@@ -18,9 +18,9 @@ typedef struct {
 
 static raylib_lite_result_t last_frame_result(void)
 {
-    raylib_lite_result_t acquire = MosaicoFastGetLastAcquireResult();
+    raylib_lite_result_t acquire = raylib_lite_raylib_get_last_acquire_result();
     if (acquire != RAYLIB_LITE_OK) return acquire;
-    return MosaicoFastGetLastPresentResult();
+    return raylib_lite_raylib_get_last_present_result();
 }
 
 static bool frame_result_is_fatal(raylib_lite_result_t result)
@@ -40,12 +40,12 @@ static void poll_input(void *context)
     while (runtime->app->input &&
             raylib_lite_input_poll(runtime->app->input, &input)) {
         if (input.type == RAYLIB_LITE_INPUT_POINTER)
-            MosaicoFastInjectPointer(0, input.x, input.y, input.pressed);
+            raylib_lite_raylib_inject_pointer(0, input.x, input.y, input.pressed);
         else if (input.type == RAYLIB_LITE_INPUT_TOUCH)
-            MosaicoFastInjectPointer(input.value, input.x, input.y,
+            raylib_lite_raylib_inject_pointer(input.value, input.x, input.y,
                                      input.pressed);
         else if (input.type == RAYLIB_LITE_INPUT_IMU)
-            MosaicoFastInjectImu(input.x / 1000.0f, input.y / 1000.0f,
+            raylib_lite_raylib_inject_imu(input.x / 1000.0f, input.y / 1000.0f,
                                  input.value / 1000.0f);
         raylib_lite_action_apply_event(&input);
         if (runtime->app->on_event)
@@ -59,7 +59,7 @@ static void poll_input(void *context)
 static bool should_close(void *context)
 {
     app_runtime_t *runtime = context;
-    return runtime->terminal_result != RAYLIB_LITE_OK || MosaicoFastWindowShouldClose();
+    return runtime->terminal_result != RAYLIB_LITE_OK || raylib_lite_raylib_window_should_close();
 }
 
 static bool idle(void *context)
@@ -81,7 +81,7 @@ static void update(void *context)
     uint32_t elapsed = (uint32_t)(finished - started);
     runtime->update_us += elapsed;
     raylib_lite_runtime_stats_record_logic(finished, 0, elapsed);
-    MosaicoFastConsumeInputEdges();
+    raylib_lite_raylib_consume_input_edges();
 }
 
 static void render(void *context)
@@ -115,7 +115,7 @@ static void render(void *context)
 static uint32_t render_fps(void *context)
 {
     app_runtime_t *runtime = context;
-    int fps = MosaicoFastGetFPS();
+    int fps = raylib_lite_raylib_get_fps();
     return fps > 0 ? (uint32_t)fps : runtime->app->target_fps;
 }
 
@@ -141,9 +141,9 @@ raylib_lite_result_t raylib_lite_game_app_run(
         result = RAYLIB_LITE_INVALID_STATE;
         goto shutdown_port;
     }
-    MosaicoFastInitWindow((int)width, (int)height,
+    raylib_lite_raylib_init_window((int)width, (int)height,
                app->window_title ? app->window_title : "Raylib Lite");
-    MosaicoFastSetTargetFPS((int)app->target_fps);
+    raylib_lite_raylib_set_target_fps((int)app->target_fps);
     if (app->on_start) {
         /* Once entered, on_start owns a matching on_stop even when startup
          * reports failure after partially acquiring application resources. */
@@ -186,7 +186,7 @@ raylib_lite_result_t raylib_lite_game_app_run(
 
 shutdown_port:
     if (started && app->on_stop) app->on_stop(app->user);
-    MosaicoFastCloseWindow();
+    raylib_lite_raylib_close_window();
     raylib_lite_raylib_port_deinit();
     return result;
 }

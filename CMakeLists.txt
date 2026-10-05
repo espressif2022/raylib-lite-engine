@@ -32,25 +32,25 @@ set(_audio_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/audio/raylib_lite_audio_decode.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/audio/raylib_lite_audio_mixer.c")
 set(_renderer_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_game_2d.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_game_2d_esp.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_game_2d_raylib.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_rgb565.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_mtx2.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_raster_bench.c")
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_esp.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_raylib.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_rgb565.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_mtx2.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_raster_bench.c")
 if(IDF_TARGET STREQUAL "esp32s31")
     list(APPEND _renderer_sources
-        "${RAYLIB_LITE_ENGINE_ROOT}/src/arch/esp32s31/mosaico_rgb565_pie.S")
+        "${RAYLIB_LITE_ENGINE_ROOT}/src/arch/esp32s31/raylib_lite_rgb565_pie.S")
 endif()
 if(M2D_WALL_BENCHMARK)
     list(APPEND _renderer_sources
-        "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_wall_bench.c")
+        "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_wall_bench.c")
 endif()
 set(_raylib_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_raylib_port.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_raylib_fast.c")
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_raylib_impl.c")
 set(_feature_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_game_tilemap.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_tilemap.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/scene/mosaico_game_scene.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/ui/mosaico_game_ui.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/fx/mosaico_game_fx.c"
@@ -76,15 +76,15 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
     MOSAICO_GAME_DEFAULT_FPS=${CONFIG_MOSAICO_GAME_DEFAULT_FPS})
 
 set(_renderer_c_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_game_2d.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_game_2d_esp.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_game_2d_raylib.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_rgb565.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_mtx2.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_raster_bench.c")
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_esp.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_raylib.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_rgb565.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_mtx2.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_raster_bench.c")
 if(M2D_WALL_BENCHMARK)
     list(APPEND _renderer_c_sources
-        "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_wall_bench.c")
+        "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_wall_bench.c")
 endif()
 foreach(_source IN LISTS _renderer_c_sources)
     set_property(SOURCE "${_source}" APPEND PROPERTY COMPILE_OPTIONS
@@ -97,7 +97,7 @@ foreach(_source IN LISTS _renderer_c_sources)
 endforeach()
 if(IDF_TARGET STREQUAL "esp32s31")
     set_property(SOURCE
-        "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/mosaico_rgb565.c"
+        "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_rgb565.c"
         APPEND PROPERTY COMPILE_DEFINITIONS MOSAICO_RGB565_PIE=1)
 endif()
 if(M2D_WALL_BENCHMARK)

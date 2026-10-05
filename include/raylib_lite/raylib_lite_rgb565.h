@@ -5,17 +5,17 @@
 
 /* 8-wide RGB565 primitives. Device (ESP32-S31 PIE) and Host share the
  * same pixel results. Short runs stay on the scalar path. */
-void mosaico_fill_rgb565(uint16_t *dst, uint16_t color, size_t count);
-void mosaico_copy_rgb565(uint16_t *dst, const uint16_t *src, size_t count);
-void mosaico_shade_rgb565(uint16_t *dst, const uint16_t *src, size_t count,
+void raylib_lite_rgb565_fill(uint16_t *dst, uint16_t color, size_t count);
+void raylib_lite_rgb565_copy(uint16_t *dst, const uint16_t *src, size_t count);
+void raylib_lite_rgb565_shade(uint16_t *dst, const uint16_t *src, size_t count,
                           unsigned light256);
-void mosaico_shade_lut_init(void);
+void raylib_lite_rgb565_shade_lut_init(void);
 
-extern uint8_t mosaico_shade_r_lut[16][32];
-extern uint8_t mosaico_shade_g_lut[16][64];
-extern uint8_t mosaico_shade_b_lut[16][32];
+extern uint8_t raylib_lite_rgb565_shade_r_lut[16][32];
+extern uint8_t raylib_lite_rgb565_shade_g_lut[16][64];
+extern uint8_t raylib_lite_rgb565_shade_b_lut[16][32];
 
-static inline uint16_t mosaico_shade565(uint16_t pixel, unsigned light)
+static inline uint16_t raylib_lite_rgb565_shade_pixel(uint16_t pixel, unsigned light)
 {
     if (light >= 256U) {
         return pixel;

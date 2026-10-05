@@ -45,8 +45,8 @@ static const neon_rift_course_t COURSES[NEON_RIFT_COURSE_COUNT] = {
 
 typedef struct {
     rally_game_t game;
-    MosaicoAtlas rally_art;
-    MosaicoAtlas track_background;
+    raylib_lite_atlas_t rally_art;
+    raylib_lite_atlas_t track_background;
     bool paused;
     bool steer_left;
     bool steer_right;
@@ -336,8 +336,8 @@ static int initialize(void *value, const char *asset_root)
     InitWindow(480, 480, "Neon Rift Rally");
     SetTargetFPS(30);
 #endif
-    state->rally_art = LoadMosaicoAtlas("rally.atlas");
-    state->track_background = LoadMosaicoAtlas("track_background.atlas");
+    state->rally_art = raylib_lite_atlas_load("rally.atlas");
+    state->track_background = raylib_lite_atlas_load("track_background.atlas");
     return state->rally_art.texture.id && state->track_background.texture.id ? 0 : -1;
 }
 
@@ -345,8 +345,8 @@ static void shutdown(void *value)
 {
     neon_rift_rally_module_t *state = value;
     if (state) {
-        UnloadMosaicoAtlas(state->rally_art);
-        UnloadMosaicoAtlas(state->track_background);
+        raylib_lite_atlas_unload(state->rally_art);
+        raylib_lite_atlas_unload(state->track_background);
     }
 #if defined(MOSAICO_GAME_NATIVE)
 #if NEON_RIFT_HAPTICS_ENABLED

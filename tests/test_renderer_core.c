@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "mosaico_renderer.h"
+#include "raylib_lite_renderer.h"
 
 #define ATLAS_MAGIC 0x3141534dU
 #define WALL_MAGIC 0x3157534dU
@@ -81,36 +81,36 @@ void mosaico_game_asset_release(mosaico_asset_view_t *view)
 
 int main(void)
 {
-    mosaico_renderer_texture_t invalid =
-        mosaico_renderer_load_texture("invalid");
+    raylib_lite_renderer_texture_t invalid =
+        raylib_lite_renderer_load_texture("invalid");
     assert(invalid.id == 0);
     assert(s_open_count == 1 && s_release_count == 1);
 
-    mosaico_renderer_texture_t texture =
-        mosaico_renderer_load_texture("texture");
+    raylib_lite_renderer_texture_t texture =
+        raylib_lite_renderer_load_texture("texture");
     assert(texture.id && texture.width == 2 && texture.height == 2);
     assert(s_open_count == 2 && s_release_count == 1);
-    mosaico_renderer_unload_texture(texture);
+    raylib_lite_renderer_unload_texture(texture);
     assert(s_release_count == 2);
-    mosaico_renderer_unload_texture(texture);
+    raylib_lite_renderer_unload_texture(texture);
     assert(s_release_count == 2);
 
     uint16_t pixels[4] = {5, 6, 7, 8};
-    mosaico_renderer_texture_t registered =
-        mosaico_renderer_register_rgb565(pixels, 2, 2);
+    raylib_lite_renderer_texture_t registered =
+        raylib_lite_renderer_register_rgb565(pixels, 2, 2);
     assert(registered.id);
-    mosaico_renderer_unload_texture(registered);
+    raylib_lite_renderer_unload_texture(registered);
     assert(s_release_count == 2);
 
-    MosaicoWallAtlas walls[20] = {0};
+    raylib_lite_wall_atlas_t walls[20] = {0};
     for (size_t i = 0; i < 20; ++i) {
-        walls[i] = LoadMosaicoWallAtlas("wall");
+        walls[i] = raylib_lite_wall_atlas_load("wall");
         assert(walls[i].descriptor == &s_wall);
     }
     assert(s_open_count == 22 && s_release_count == 2);
 
     for (size_t i = 0; i < 20; ++i)
-        UnloadMosaicoWallAtlas(walls[i]);
+        raylib_lite_wall_atlas_unload(walls[i]);
     assert(s_release_count == 22);
 
     puts("renderer core: ok");

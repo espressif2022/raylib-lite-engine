@@ -138,7 +138,7 @@ class RenderedPose(unittest.TestCase):
             exe = out / "render"
             subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", str(out),
                             "-I", str(RUNTIME), "-I", str(ENGINE_INCLUDE), str(out / "main.c"), str(out / "rig.c"),
-                            str(RUNTIME / "vg_asset.c"), str(RUNTIME / "vg_raster.c"), str(RENDERER / "mosaico_rgb565.c"),
+                            str(RUNTIME / "vg_asset.c"), str(RUNTIME / "vg_raster.c"), str(RENDERER / "raylib_lite_rgb565.c"),
                             "-lm", "-o", str(exe)], check=True)
             return subprocess.run([str(exe)] + (["rotate"] if rotate or hide_arm else [])
                                   + (["hide"] if hide_arm else []),

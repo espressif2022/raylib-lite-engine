@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib_impl.h"
 
 #include <stdint.h>
 #include <math.h>
@@ -7,9 +7,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "mosaico_game_2d.h"
+#include "raylib_lite_2d.h"
 #include "raylib_lite_raylib_port.h"
-#include "mosaico_rgb565.h"
+#include "raylib_lite_rgb565.h"
 
 static uint16_t *s_pixels;
 static uint32_t s_primitive_pixels,s_primitive_runs,s_clear_pixels;
@@ -39,7 +39,7 @@ static fast_pointer_t s_pointers[MOSAICO_FAST_POINTER_COUNT];
 static Vector2 s_imu_xy;
 static float s_imu_z;
 
-Vector2 MosaicoFastGetWorldToScreen2D(Vector2 position, Camera2D camera)
+Vector2 raylib_lite_raylib_get_world_to_screen2_d(Vector2 position, Camera2D camera)
 {
     float zoom = camera.zoom == 0 ? 1.0f : camera.zoom;
     float radians = camera.rotation * (3.14159265358979323846f / 180.0f);
@@ -50,7 +50,7 @@ Vector2 MosaicoFastGetWorldToScreen2D(Vector2 position, Camera2D camera)
                      camera.offset.y + x*sn + y*cs};
 }
 
-Vector2 MosaicoFastGetScreenToWorld2D(Vector2 position, Camera2D camera)
+Vector2 raylib_lite_raylib_get_screen_to_world2_d(Vector2 position, Camera2D camera)
 {
     float zoom = camera.zoom == 0 ? 1.0f : camera.zoom;
     float radians = -camera.rotation * (3.14159265358979323846f / 180.0f);
@@ -63,18 +63,18 @@ Vector2 MosaicoFastGetScreenToWorld2D(Vector2 position, Camera2D camera)
 
 static Vector2 active_to_screen(Vector2 position)
 {
-    return s_camera_active ? MosaicoFastGetWorldToScreen2D(position, s_camera)
+    return s_camera_active ? raylib_lite_raylib_get_world_to_screen2_d(position, s_camera)
                            : position;
 }
 
-void MosaicoFastBeginMode2D(Camera2D camera)
+void raylib_lite_raylib_begin_mode2_d(Camera2D camera)
 {
     s_camera = camera;
     if (s_camera.zoom == 0) s_camera.zoom = 1.0f;
     s_camera_active = true;
 }
 
-void MosaicoFastEndMode2D(void) { s_camera_active = false; }
+void raylib_lite_raylib_end_mode2_d(void) { s_camera_active = false; }
 
 static inline uint16_t rgb565(Color c)
 {
@@ -124,7 +124,7 @@ static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
     if (paint->alpha == 255) {
         /* Long opaque spans use the existing S31 eight-pixel PIE stores.
          * Keep tiny glyph and ray fragments on the inline scalar path. */
-        if(count>=32){mosaico_fill_rgb565(dst,paint->pixel,(size_t)count);return;}
+        if(count>=32){raylib_lite_rgb565_fill(dst,paint->pixel,(size_t)count);return;}
         uint16_t pixel = paint->pixel;
         uint32_t pair = (uint32_t)pixel | ((uint32_t)pixel << 16);
         if ((uintptr_t)dst & 3U) { *dst++ = pixel; --count; }
@@ -157,7 +157,7 @@ static inline void put_pixel(int x, int y, Color color)
     }
 }
 
-void MosaicoFastInitWindow(int width, int height, const char *title)
+void raylib_lite_raylib_init_window(int width, int height, const char *title)
 {
     (void)title;
     s_screen_width = width > 0 ? width : 0;
@@ -175,28 +175,28 @@ void MosaicoFastInitWindow(int width, int height, const char *title)
     s_imu_z = 0;
 }
 
-void MosaicoFastCloseWindow(void)
+void raylib_lite_raylib_close_window(void)
 {
     s_window_should_close = true;
     s_window_ready = false;
 }
 
-bool MosaicoFastWindowShouldClose(void) { return s_window_should_close; }
-bool MosaicoFastIsWindowReady(void) { return s_window_ready; }
-int MosaicoFastGetScreenWidth(void) { return s_screen_width; }
-int MosaicoFastGetScreenHeight(void) { return s_screen_height; }
-int MosaicoFastGetRenderWidth(void) { return s_screen_width; }
-int MosaicoFastGetRenderHeight(void) { return s_screen_height; }
-void MosaicoFastSetTargetFPS(int fps) { if (fps > 0) s_target_fps = fps; }
-float MosaicoFastGetFrameTime(void) { return 1.0f / (float)s_target_fps; }
-double MosaicoFastGetTime(void)
+bool raylib_lite_raylib_window_should_close(void) { return s_window_should_close; }
+bool raylib_lite_raylib_is_window_ready(void) { return s_window_ready; }
+int raylib_lite_raylib_get_screen_width(void) { return s_screen_width; }
+int raylib_lite_raylib_get_screen_height(void) { return s_screen_height; }
+int raylib_lite_raylib_get_render_width(void) { return s_screen_width; }
+int raylib_lite_raylib_get_render_height(void) { return s_screen_height; }
+void raylib_lite_raylib_set_target_fps(int fps) { if (fps > 0) s_target_fps = fps; }
+float raylib_lite_raylib_get_frame_time(void) { return 1.0f / (float)s_target_fps; }
+double raylib_lite_raylib_get_time(void)
 { return (double)s_presented_frames / (double)s_target_fps; }
-int MosaicoFastGetFPS(void) { return s_target_fps; }
+int raylib_lite_raylib_get_fps(void) { return s_target_fps; }
 
 static bool valid_key(int key)
 { return key >= 0 && key < MOSAICO_FAST_KEY_COUNT; }
 
-void MosaicoFastInjectKey(int key, bool pressed)
+void raylib_lite_raylib_inject_key(int key, bool pressed)
 {
     if (!valid_key(key) || s_key_down[key] == pressed) return;
     s_key_down[key] = pressed;
@@ -204,16 +204,16 @@ void MosaicoFastInjectKey(int key, bool pressed)
     else s_key_released[key] = true;
 }
 
-void MosaicoFastInjectAction(int action, bool pressed)
+void raylib_lite_raylib_inject_action(int action, bool pressed)
 {
     static const int primary[] = {KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_P, KEY_ENTER};
     static const int alias[] = {KEY_A, KEY_D, KEY_SPACE, KEY_P, KEY_ENTER};
     if ((unsigned)action >= sizeof(primary)/sizeof(primary[0])) return;
-    MosaicoFastInjectKey(primary[action], pressed);
-    MosaicoFastInjectKey(alias[action], pressed);
+    raylib_lite_raylib_inject_key(primary[action], pressed);
+    raylib_lite_raylib_inject_key(alias[action], pressed);
 }
 
-void MosaicoFastInjectPointer(int track_id, int x, int y, bool pressed)
+void raylib_lite_raylib_inject_pointer(int track_id, int x, int y, bool pressed)
 {
     fast_pointer_t *slot = NULL;
     for (int i = 0; i < MOSAICO_FAST_POINTER_COUNT; ++i)
@@ -227,26 +227,26 @@ void MosaicoFastInjectPointer(int track_id, int x, int y, bool pressed)
     slot->active = pressed;
 }
 
-void MosaicoFastInjectImu(float x, float y, float z)
+void raylib_lite_raylib_inject_imu(float x, float y, float z)
 { s_imu_xy = (Vector2){x, y}; s_imu_z = z; }
 
-bool MosaicoFastIsKeyPressed(int key) { return valid_key(key) && s_key_pressed[key]; }
-bool MosaicoFastIsKeyDown(int key) { return valid_key(key) && s_key_down[key]; }
-bool MosaicoFastIsKeyReleased(int key) { return valid_key(key) && s_key_released[key]; }
-bool MosaicoFastIsKeyUp(int key) { return !MosaicoFastIsKeyDown(key); }
-bool MosaicoFastIsMouseButtonPressed(int button)
+bool raylib_lite_raylib_is_key_pressed(int key) { return valid_key(key) && s_key_pressed[key]; }
+bool raylib_lite_raylib_is_key_down(int key) { return valid_key(key) && s_key_down[key]; }
+bool raylib_lite_raylib_is_key_released(int key) { return valid_key(key) && s_key_released[key]; }
+bool raylib_lite_raylib_is_key_up(int key) { return !raylib_lite_raylib_is_key_down(key); }
+bool raylib_lite_raylib_is_mouse_button_pressed(int button)
 { return button == MOUSE_BUTTON_LEFT && s_pointers[0].pressed; }
-bool MosaicoFastIsMouseButtonDown(int button)
+bool raylib_lite_raylib_is_mouse_button_down(int button)
 { return button == MOUSE_BUTTON_LEFT && s_pointers[0].active; }
-bool MosaicoFastIsMouseButtonReleased(int button)
+bool raylib_lite_raylib_is_mouse_button_released(int button)
 { return button == MOUSE_BUTTON_LEFT && s_pointers[0].released; }
-bool MosaicoFastIsMouseButtonUp(int button)
-{ return !MosaicoFastIsMouseButtonDown(button); }
-int MosaicoFastGetMouseX(void) { return s_pointers[0].x; }
-int MosaicoFastGetMouseY(void) { return s_pointers[0].y; }
-Vector2 MosaicoFastGetMousePosition(void)
+bool raylib_lite_raylib_is_mouse_button_up(int button)
+{ return !raylib_lite_raylib_is_mouse_button_down(button); }
+int raylib_lite_raylib_get_mouse_x(void) { return s_pointers[0].x; }
+int raylib_lite_raylib_get_mouse_y(void) { return s_pointers[0].y; }
+Vector2 raylib_lite_raylib_get_mouse_position(void)
 { return (Vector2){(float)s_pointers[0].x, (float)s_pointers[0].y}; }
-int MosaicoFastGetTouchPointCount(void)
+int raylib_lite_raylib_get_touch_point_count(void)
 {
     int count = 0;
     for (int i = 0; i < MOSAICO_FAST_POINTER_COUNT; ++i) count += s_pointers[i].active;
@@ -258,22 +258,22 @@ static fast_pointer_t *active_pointer(int index)
         if (s_pointers[i].active && index-- == 0) return &s_pointers[i];
     return NULL;
 }
-Vector2 MosaicoFastGetTouchPosition(int index)
+Vector2 raylib_lite_raylib_get_touch_position(int index)
 {
     fast_pointer_t *pointer = active_pointer(index);
     return pointer ? (Vector2){(float)pointer->x, (float)pointer->y} : (Vector2){-1, -1};
 }
-int MosaicoFastGetTouchPointId(int index)
+int raylib_lite_raylib_get_touch_point_id(int index)
 {
     fast_pointer_t *pointer = active_pointer(index);
     return pointer ? pointer->track_id : -1;
 }
-int MosaicoFastGetTouchX(void) { return (int)MosaicoFastGetTouchPosition(0).x; }
-int MosaicoFastGetTouchY(void) { return (int)MosaicoFastGetTouchPosition(0).y; }
-Vector3 MosaicoFastGetImuAcceleration(void)
+int raylib_lite_raylib_get_touch_x(void) { return (int)raylib_lite_raylib_get_touch_position(0).x; }
+int raylib_lite_raylib_get_touch_y(void) { return (int)raylib_lite_raylib_get_touch_position(0).y; }
+Vector3 raylib_lite_raylib_get_imu_acceleration(void)
 { return (Vector3){s_imu_xy.x, s_imu_xy.y, s_imu_z}; }
 
-void MosaicoFastBeginDrawing(void)
+void raylib_lite_raylib_begin_drawing(void)
 {
     s_pixels = NULL;
     s_stride = 0;
@@ -285,19 +285,19 @@ void MosaicoFastBeginDrawing(void)
         s_screen_width = backend_width;
         s_screen_height = backend_height;
     }
-    mosaico_game_2d_set_target(s_pixels, s_stride, s_screen_width,
+    raylib_lite_renderer_set_target(s_pixels, s_stride, s_screen_width,
                                s_screen_height);
-    mosaico_game_2d_reset_raster_stats();
+    raylib_lite_renderer_reset_raster_stats();
     s_primitive_pixels=s_primitive_runs=s_clear_pixels=0;
 }
 
-bool MosaicoFastFrameAvailable(void) { return s_pixels != NULL; }
-raylib_lite_result_t MosaicoFastGetLastAcquireResult(void)
+bool raylib_lite_raylib_frame_available(void) { return s_pixels != NULL; }
+raylib_lite_result_t raylib_lite_raylib_get_last_acquire_result(void)
 { return s_last_acquire; }
-raylib_lite_result_t MosaicoFastGetLastPresentResult(void)
+raylib_lite_result_t raylib_lite_raylib_get_last_present_result(void)
 { return s_last_present; }
 
-uint16_t *MosaicoFastGetFramebuffer(int *width, int *height,
+uint16_t *raylib_lite_raylib_get_framebuffer(int *width, int *height,
                                     size_t *stride_pixels)
 {
     if (width) *width = s_screen_width;
@@ -306,7 +306,7 @@ uint16_t *MosaicoFastGetFramebuffer(int *width, int *height,
     return s_pixels;
 }
 
-void MosaicoFastConsumeInputEdges(void)
+void raylib_lite_raylib_consume_input_edges(void)
 {
     memset(s_key_pressed, 0, sizeof(s_key_pressed));
     memset(s_key_released, 0, sizeof(s_key_released));
@@ -316,22 +316,22 @@ void MosaicoFastConsumeInputEdges(void)
     }
 }
 
-void MosaicoFastEndDrawing(void)
+void raylib_lite_raylib_end_drawing(void)
 {
     if (s_pixels) {
-        mosaico_game_2d_note_primitives(s_primitive_pixels,s_primitive_runs,s_clear_pixels);
+        raylib_lite_renderer_note_primitives(s_primitive_pixels,s_primitive_runs,s_clear_pixels);
         s_last_present = raylib_lite_raylib_port_present_frame();
     }
     s_pixels = NULL;
     s_stride = 0;
-    mosaico_game_2d_set_target(NULL, 0, 0, 0);
+    raylib_lite_renderer_set_target(NULL, 0, 0, 0);
     s_camera_active = false;
     s_scissor_active = false;
     if (s_last_present == RAYLIB_LITE_OK) ++s_presented_frames;
-    MosaicoFastConsumeInputEdges();
+    raylib_lite_raylib_consume_input_edges();
 }
 
-void MosaicoFastBeginScissorMode(int x, int y, int width, int height)
+void raylib_lite_raylib_begin_scissor_mode(int x, int y, int width, int height)
 {
     s_scissor_x0 = x < 0 ? 0 : x;
     s_scissor_y0 = y < 0 ? 0 : y;
@@ -339,21 +339,21 @@ void MosaicoFastBeginScissorMode(int x, int y, int width, int height)
     s_scissor_y1 = y + height > s_screen_height ? s_screen_height : y + height;
     s_scissor_active = width > 0 && height > 0 &&
         s_scissor_x0 < s_scissor_x1 && s_scissor_y0 < s_scissor_y1;
-    mosaico_game_2d_set_clip(s_scissor_x0, s_scissor_y0,
+    raylib_lite_renderer_set_clip(s_scissor_x0, s_scissor_y0,
         s_scissor_x1 - s_scissor_x0, s_scissor_y1 - s_scissor_y0);
 }
 
-void MosaicoFastEndScissorMode(void)
+void raylib_lite_raylib_end_scissor_mode(void)
 {
     s_scissor_active = false;
-    mosaico_game_2d_set_clip(0, 0, s_screen_width, s_screen_height);
+    raylib_lite_renderer_set_clip(0, 0, s_screen_width, s_screen_height);
 }
 
-Texture2D MosaicoFastLoadTexture(const char *asset_path)
-{ return Mosaico2DLoadTexture(asset_path); }
-void MosaicoFastUnloadTexture(Texture2D texture)
-{ Mosaico2DUnloadTexture(texture); }
-void MosaicoFastDrawTexturePro(Texture2D texture, Rectangle source,
+Texture2D raylib_lite_raylib_load_texture(const char *asset_path)
+{ return raylib_lite_2d_load_texture(asset_path); }
+void raylib_lite_raylib_unload_texture(Texture2D texture)
+{ raylib_lite_2d_unload_texture(texture); }
+void raylib_lite_raylib_draw_texture_pro(Texture2D texture, Rectangle source,
                                Rectangle dest, Vector2 origin,
                                float rotation, Color tint)
 {
@@ -364,58 +364,58 @@ void MosaicoFastDrawTexturePro(Texture2D texture, Rectangle source,
         origin = (Vector2){origin.x*zoom, origin.y*zoom};
         rotation += s_camera.rotation;
     }
-    Mosaico2DDrawTexturePro(texture, source, dest, origin, rotation, tint);
+    raylib_lite_2d_draw_texture_pro(texture, source, dest, origin, rotation, tint);
 }
-void MosaicoFastDrawTexture(Texture2D texture, int x, int y, Color tint)
+void raylib_lite_raylib_draw_texture(Texture2D texture, int x, int y, Color tint)
 {
-    MosaicoFastDrawTexturePro(texture,(Rectangle){0,0,(float)texture.width,(float)texture.height},
+    raylib_lite_raylib_draw_texture_pro(texture,(Rectangle){0,0,(float)texture.width,(float)texture.height},
         (Rectangle){(float)x,(float)y,(float)texture.width,(float)texture.height},
         (Vector2){0,0},0,tint);
 }
-void MosaicoFastDrawTextureV(Texture2D texture, Vector2 position, Color tint)
-{ MosaicoFastDrawTexture(texture,(int)position.x,(int)position.y,tint); }
-void MosaicoFastDrawTextureRec(Texture2D texture, Rectangle source,
+void raylib_lite_raylib_draw_texture_v(Texture2D texture, Vector2 position, Color tint)
+{ raylib_lite_raylib_draw_texture(texture,(int)position.x,(int)position.y,tint); }
+void raylib_lite_raylib_draw_texture_rec(Texture2D texture, Rectangle source,
                                Vector2 position, Color tint)
 {
-    MosaicoFastDrawTexturePro(texture,source,
+    raylib_lite_raylib_draw_texture_pro(texture,source,
         (Rectangle){position.x,position.y,fabsf(source.width),fabsf(source.height)},
         (Vector2){0,0},0,tint);
 }
 
-void MosaicoFastDrawTextureEx(Texture2D texture, Vector2 position,
+void raylib_lite_raylib_draw_texture_ex(Texture2D texture, Vector2 position,
                               float rotation, float scale, Color tint)
 {
-    MosaicoFastDrawTexturePro(texture,
+    raylib_lite_raylib_draw_texture_pro(texture,
         (Rectangle){0, 0, (float)texture.width, (float)texture.height},
         (Rectangle){position.x, position.y, texture.width*scale, texture.height*scale},
         (Vector2){0, 0}, rotation, tint);
 }
 
-void MosaicoFastClearBackground(Color color)
+void raylib_lite_raylib_clear_background(Color color)
 {
     if (!s_pixels) return;
     s_clear_pixels+=(uint32_t)s_screen_width*(uint32_t)s_screen_height;
     uint16_t px = rgb565(color);
     if (s_stride == (size_t)s_screen_width) {
-        mosaico_fill_rgb565(s_pixels, px,
+        raylib_lite_rgb565_fill(s_pixels, px,
             (size_t)s_screen_width * (size_t)s_screen_height);
         return;
     }
     for (int y = 0; y < s_screen_height; ++y)
-        mosaico_fill_rgb565(s_pixels + (size_t)y * s_stride, px,
+        raylib_lite_rgb565_fill(s_pixels + (size_t)y * s_stride, px,
             (size_t)s_screen_width);
 }
 
-void MosaicoFastDrawPixel(int x, int y, Color color)
+void raylib_lite_raylib_draw_pixel(int x, int y, Color color)
 {
     Vector2 p = active_to_screen((Vector2){(float)x, (float)y});
     put_pixel((int)p.x, (int)p.y, color);
 }
 
-void MosaicoFastDrawPixelV(Vector2 position, Color color)
-{ MosaicoFastDrawPixel((int)position.x, (int)position.y, color); }
+void raylib_lite_raylib_draw_pixel_v(Vector2 position, Color color)
+{ raylib_lite_raylib_draw_pixel((int)position.x, (int)position.y, color); }
 
-void MosaicoFastDrawRectangle(int x, int y, int width, int height, Color color)
+void raylib_lite_raylib_draw_rectangle(int x, int y, int width, int height, Color color)
 {
     if (s_camera_active) {
         Vector2 p = active_to_screen((Vector2){(float)x, (float)y});
@@ -452,14 +452,14 @@ void MosaicoFastDrawRectangle(int x, int y, int width, int height, Color color)
     for (int yy=y0; yy<y1; ++yy) fill_span(yy, x0, x1, &paint);
 }
 
-void MosaicoFastDrawRectangleV(Vector2 position,Vector2 size,Color color)
-{ MosaicoFastDrawRectangle((int)position.x,(int)position.y,(int)size.x,(int)size.y,color); }
+void raylib_lite_raylib_draw_rectangle_v(Vector2 position,Vector2 size,Color color)
+{ raylib_lite_raylib_draw_rectangle((int)position.x,(int)position.y,(int)size.x,(int)size.y,color); }
 
-void MosaicoFastDrawRectangleRec(Rectangle rectangle,Color color)
-{ MosaicoFastDrawRectangle((int)rectangle.x,(int)rectangle.y,
+void raylib_lite_raylib_draw_rectangle_rec(Rectangle rectangle,Color color)
+{ raylib_lite_raylib_draw_rectangle((int)rectangle.x,(int)rectangle.y,
     (int)rectangle.width,(int)rectangle.height,color); }
 
-void MosaicoFastDrawRectanglePro(Rectangle r,Vector2 origin,float rotation,Color color)
+void raylib_lite_raylib_draw_rectangle_pro(Rectangle r,Vector2 origin,float rotation,Color color)
 {
     float angle=rotation*0.01745329252f,cs=cosf(angle),sn=sinf(angle);
     Vector2 local[4]={{-origin.x,-origin.y},{r.width-origin.x,-origin.y},
@@ -468,8 +468,8 @@ void MosaicoFastDrawRectanglePro(Rectangle r,Vector2 origin,float rotation,Color
     for(int i=0;i<4;++i)point[i]=(Vector2){
         r.x+local[i].x*cs-local[i].y*sn,
         r.y+local[i].x*sn+local[i].y*cs};
-    MosaicoFastDrawTriangle(point[0],point[1],point[2],color);
-    MosaicoFastDrawTriangle(point[0],point[2],point[3],color);
+    raylib_lite_raylib_draw_triangle(point[0],point[1],point[2],color);
+    raylib_lite_raylib_draw_triangle(point[0],point[2],point[3],color);
 }
 
 static Color mix_color(Color a,Color b,unsigned value,unsigned limit)
@@ -483,25 +483,25 @@ static Color mix_color(Color a,Color b,unsigned value,unsigned limit)
         (uint8_t)((a.a*inverse+b.a*value)/limit)};
 }
 
-void MosaicoFastDrawRectangleGradientV(int x,int y,int width,int height,
+void raylib_lite_raylib_draw_rectangle_gradient_v(int x,int y,int width,int height,
                                        Color top,Color bottom)
 {
     if(height<=0)return;
     unsigned limit=(unsigned)(height>1?height-1:1);
     for(int row=0;row<height;++row)
-        MosaicoFastDrawRectangle(x,y+row,width,1,mix_color(top,bottom,(unsigned)row,limit));
+        raylib_lite_raylib_draw_rectangle(x,y+row,width,1,mix_color(top,bottom,(unsigned)row,limit));
 }
 
-void MosaicoFastDrawRectangleGradientH(int x,int y,int width,int height,
+void raylib_lite_raylib_draw_rectangle_gradient_h(int x,int y,int width,int height,
                                        Color left,Color right)
 {
     if(width<=0)return;
     unsigned limit=(unsigned)(width>1?width-1:1);
     for(int column=0;column<width;++column)
-        MosaicoFastDrawRectangle(x+column,y,1,height,mix_color(left,right,(unsigned)column,limit));
+        raylib_lite_raylib_draw_rectangle(x+column,y,1,height,mix_color(left,right,(unsigned)column,limit));
 }
 
-void MosaicoFastDrawLine(int x0, int y0, int x1, int y1, Color color)
+void raylib_lite_raylib_draw_line(int x0, int y0, int x1, int y1, Color color)
 {
     Vector2 a = active_to_screen((Vector2){(float)x0, (float)y0});
     Vector2 b = active_to_screen((Vector2){(float)x1, (float)y1});
@@ -517,10 +517,10 @@ void MosaicoFastDrawLine(int x0, int y0, int x1, int y1, Color color)
     }
 }
 
-void MosaicoFastDrawLineV(Vector2 start, Vector2 end, Color color)
-{ MosaicoFastDrawLine((int)start.x, (int)start.y, (int)end.x, (int)end.y, color); }
+void raylib_lite_raylib_draw_line_v(Vector2 start, Vector2 end, Color color)
+{ raylib_lite_raylib_draw_line((int)start.x, (int)start.y, (int)end.x, (int)end.y, color); }
 
-void MosaicoFastDrawLineEx(Vector2 start, Vector2 end, float thick, Color color)
+void raylib_lite_raylib_draw_line_ex(Vector2 start, Vector2 end, float thick, Color color)
 {
     start = active_to_screen(start);
     end = active_to_screen(end);
@@ -528,13 +528,13 @@ void MosaicoFastDrawLineEx(Vector2 start, Vector2 end, float thick, Color color)
     if (thick <= 1.6f) {
         bool camera = s_camera_active;
         s_camera_active = false;
-        MosaicoFastDrawLine((int)start.x, (int)start.y, (int)end.x, (int)end.y, color);
+        raylib_lite_raylib_draw_line((int)start.x, (int)start.y, (int)end.x, (int)end.y, color);
         if (thick > 1.05f) {
             float dx=end.x-start.x, dy=end.y-start.y;
             if (fabsf(dx) >= fabsf(dy))
-                MosaicoFastDrawLine((int)start.x, (int)start.y+1, (int)end.x, (int)end.y+1, color);
+                raylib_lite_raylib_draw_line((int)start.x, (int)start.y+1, (int)end.x, (int)end.y+1, color);
             else
-                MosaicoFastDrawLine((int)start.x+1, (int)start.y, (int)end.x+1, (int)end.y, color);
+                raylib_lite_raylib_draw_line((int)start.x+1, (int)start.y, (int)end.x+1, (int)end.y, color);
         }
         s_camera_active = camera;
         return;
@@ -553,10 +553,10 @@ void MosaicoFastDrawLineEx(Vector2 start, Vector2 end, float thick, Color color)
     }
 }
 
-void MosaicoFastDrawLineStrip(const Vector2 *points,int count,Color color)
-{ if(!points)return;for(int i=1;i<count;++i)MosaicoFastDrawLineV(points[i-1],points[i],color); }
+void raylib_lite_raylib_draw_line_strip(const Vector2 *points,int count,Color color)
+{ if(!points)return;for(int i=1;i<count;++i)raylib_lite_raylib_draw_line_v(points[i-1],points[i],color); }
 
-void MosaicoFastDrawLineDashed(Vector2 start,Vector2 end,int dash,int space,Color color)
+void raylib_lite_raylib_draw_line_dashed(Vector2 start,Vector2 end,int dash,int space,Color color)
 {
     float dx=end.x-start.x,dy=end.y-start.y,length=sqrtf(dx*dx+dy*dy);
     if(length<=0||dash<=0)return;
@@ -564,12 +564,12 @@ void MosaicoFastDrawLineDashed(Vector2 start,Vector2 end,int dash,int space,Colo
     float ux=dx/length,uy=dy/length,step=(float)(dash+space);
     for(float at=0;at<length;at+=step){
         float stop=fminf(at+dash,length);
-        MosaicoFastDrawLineV((Vector2){start.x+ux*at,start.y+uy*at},
+        raylib_lite_raylib_draw_line_v((Vector2){start.x+ux*at,start.y+uy*at},
             (Vector2){start.x+ux*stop,start.y+uy*stop},color);
     }
 }
 
-void MosaicoFastDrawCircle(int center_x, int center_y, float radius, Color color)
+void raylib_lite_raylib_draw_circle(int center_x, int center_y, float radius, Color color)
 {
     Vector2 center=active_to_screen((Vector2){(float)center_x,(float)center_y});
     int r=(int)(radius*(s_camera_active?s_camera.zoom:1.0f));
@@ -581,10 +581,10 @@ void MosaicoFastDrawCircle(int center_x, int center_y, float radius, Color color
     }
 }
 
-void MosaicoFastDrawCircleV(Vector2 center,float radius,Color color)
-{ MosaicoFastDrawCircle((int)center.x,(int)center.y,radius,color); }
+void raylib_lite_raylib_draw_circle_v(Vector2 center,float radius,Color color)
+{ raylib_lite_raylib_draw_circle((int)center.x,(int)center.y,radius,color); }
 
-void MosaicoFastDrawCircleLines(int center_x,int center_y,float radius,Color color)
+void raylib_lite_raylib_draw_circle_lines(int center_x,int center_y,float radius,Color color)
 {
     Vector2 center=active_to_screen((Vector2){(float)center_x,(float)center_y});
     float zoom=s_camera_active?s_camera.zoom:1.0f;
@@ -598,8 +598,8 @@ void MosaicoFastDrawCircleLines(int center_x,int center_y,float radius,Color col
     }
 }
 
-void MosaicoFastDrawCircleLinesV(Vector2 center,float radius,Color color)
-{ MosaicoFastDrawCircleLines((int)center.x,(int)center.y,radius,color); }
+void raylib_lite_raylib_draw_circle_lines_v(Vector2 center,float radius,Color color)
+{ raylib_lite_raylib_draw_circle_lines((int)center.x,(int)center.y,radius,color); }
 
 static void draw_ellipse(Vector2 center,float rh,float rv,Color color,bool outline)
 {
@@ -620,31 +620,31 @@ static void draw_ellipse(Vector2 center,float rh,float rv,Color color,bool outli
     }
 }
 
-void MosaicoFastDrawEllipse(int x,int y,float rh,float rv,Color color)
+void raylib_lite_raylib_draw_ellipse(int x,int y,float rh,float rv,Color color)
 { draw_ellipse((Vector2){(float)x,(float)y},rh,rv,color,false); }
-void MosaicoFastDrawEllipseV(Vector2 center,float rh,float rv,Color color)
+void raylib_lite_raylib_draw_ellipse_v(Vector2 center,float rh,float rv,Color color)
 { draw_ellipse(center,rh,rv,color,false); }
-void MosaicoFastDrawEllipseLines(int x,int y,float rh,float rv,Color color)
+void raylib_lite_raylib_draw_ellipse_lines(int x,int y,float rh,float rv,Color color)
 { draw_ellipse((Vector2){(float)x,(float)y},rh,rv,color,true); }
-void MosaicoFastDrawEllipseLinesV(Vector2 center,float rh,float rv,Color color)
+void raylib_lite_raylib_draw_ellipse_lines_v(Vector2 center,float rh,float rv,Color color)
 { draw_ellipse(center,rh,rv,color,true); }
 
-void MosaicoFastDrawRectangleLines(int x, int y, int width, int height,
+void raylib_lite_raylib_draw_rectangle_lines(int x, int y, int width, int height,
                                    Color color)
 {
-    MosaicoFastDrawRectangle(x, y, width, 1, color);
-    MosaicoFastDrawRectangle(x, y + height - 1, width, 1, color);
-    MosaicoFastDrawRectangle(x, y + 1, 1, height - 2, color);
-    MosaicoFastDrawRectangle(x + width - 1, y + 1, 1, height - 2, color);
+    raylib_lite_raylib_draw_rectangle(x, y, width, 1, color);
+    raylib_lite_raylib_draw_rectangle(x, y + height - 1, width, 1, color);
+    raylib_lite_raylib_draw_rectangle(x, y + 1, 1, height - 2, color);
+    raylib_lite_raylib_draw_rectangle(x + width - 1, y + 1, 1, height - 2, color);
 }
 
-void MosaicoFastDrawRectangleLinesEx(Rectangle r,float thick,Color color)
+void raylib_lite_raylib_draw_rectangle_lines_ex(Rectangle r,float thick,Color color)
 {
     int t=(int)ceilf(thick);if(t<1)t=1;
-    MosaicoFastDrawRectangle((int)r.x,(int)r.y,(int)r.width,t,color);
-    MosaicoFastDrawRectangle((int)r.x,(int)(r.y+r.height)-t,(int)r.width,t,color);
-    MosaicoFastDrawRectangle((int)r.x,(int)r.y+t,t,(int)r.height-2*t,color);
-    MosaicoFastDrawRectangle((int)(r.x+r.width)-t,(int)r.y+t,t,(int)r.height-2*t,color);
+    raylib_lite_raylib_draw_rectangle((int)r.x,(int)r.y,(int)r.width,t,color);
+    raylib_lite_raylib_draw_rectangle((int)r.x,(int)(r.y+r.height)-t,(int)r.width,t,color);
+    raylib_lite_raylib_draw_rectangle((int)r.x,(int)r.y+t,t,(int)r.height-2*t,color);
+    raylib_lite_raylib_draw_rectangle((int)(r.x+r.width)-t,(int)r.y+t,t,(int)r.height-2*t,color);
 }
 
 static float rounded_radius(Rectangle r,float roundness)
@@ -654,33 +654,33 @@ static float rounded_radius(Rectangle r,float roundness)
     return fminf(fabsf(r.width),fabsf(r.height))*roundness*.5f;
 }
 
-void MosaicoFastDrawRectangleRounded(Rectangle r,float roundness,int segments,
+void raylib_lite_raylib_draw_rectangle_rounded(Rectangle r,float roundness,int segments,
                                      Color color)
 {
     (void)segments;
     float radius=rounded_radius(r,roundness);
-    if(radius<1){MosaicoFastDrawRectangleRec(r,color);return;}
+    if(radius<1){raylib_lite_raylib_draw_rectangle_rec(r,color);return;}
     int rad=(int)ceilf(radius);
-    MosaicoFastDrawRectangle((int)r.x+rad,(int)r.y,(int)r.width-2*rad,(int)r.height,color);
-    MosaicoFastDrawRectangle((int)r.x,(int)r.y+rad,(int)r.width,(int)r.height-2*rad,color);
-    MosaicoFastDrawCircle((int)r.x+rad,(int)r.y+rad,radius,color);
-    MosaicoFastDrawCircle((int)(r.x+r.width)-rad-1,(int)r.y+rad,radius,color);
-    MosaicoFastDrawCircle((int)r.x+rad,(int)(r.y+r.height)-rad-1,radius,color);
-    MosaicoFastDrawCircle((int)(r.x+r.width)-rad-1,(int)(r.y+r.height)-rad-1,radius,color);
+    raylib_lite_raylib_draw_rectangle((int)r.x+rad,(int)r.y,(int)r.width-2*rad,(int)r.height,color);
+    raylib_lite_raylib_draw_rectangle((int)r.x,(int)r.y+rad,(int)r.width,(int)r.height-2*rad,color);
+    raylib_lite_raylib_draw_circle((int)r.x+rad,(int)r.y+rad,radius,color);
+    raylib_lite_raylib_draw_circle((int)(r.x+r.width)-rad-1,(int)r.y+rad,radius,color);
+    raylib_lite_raylib_draw_circle((int)r.x+rad,(int)(r.y+r.height)-rad-1,radius,color);
+    raylib_lite_raylib_draw_circle((int)(r.x+r.width)-rad-1,(int)(r.y+r.height)-rad-1,radius,color);
 }
 
-void MosaicoFastDrawRectangleRoundedLines(Rectangle r,float roundness,int segments,
+void raylib_lite_raylib_draw_rectangle_rounded_lines(Rectangle r,float roundness,int segments,
                                           Color color)
 {
     float radius=rounded_radius(r,roundness);
-    if(radius<1){MosaicoFastDrawRectangleLines((int)r.x,(int)r.y,(int)r.width,(int)r.height,color);return;}
+    if(radius<1){raylib_lite_raylib_draw_rectangle_lines((int)r.x,(int)r.y,(int)r.width,(int)r.height,color);return;}
     int rad=(int)ceilf(radius),steps=segments>0?segments/4:6;
     if(steps<2)steps=2;
     float left=r.x,right=r.x+r.width-1,top=r.y,bottom=r.y+r.height-1;
-    MosaicoFastDrawLineV((Vector2){left+rad,top},(Vector2){right-rad,top},color);
-    MosaicoFastDrawLineV((Vector2){right,top+rad},(Vector2){right,bottom-rad},color);
-    MosaicoFastDrawLineV((Vector2){right-rad,bottom},(Vector2){left+rad,bottom},color);
-    MosaicoFastDrawLineV((Vector2){left,bottom-rad},(Vector2){left,top+rad},color);
+    raylib_lite_raylib_draw_line_v((Vector2){left+rad,top},(Vector2){right-rad,top},color);
+    raylib_lite_raylib_draw_line_v((Vector2){right,top+rad},(Vector2){right,bottom-rad},color);
+    raylib_lite_raylib_draw_line_v((Vector2){right-rad,bottom},(Vector2){left+rad,bottom},color);
+    raylib_lite_raylib_draw_line_v((Vector2){left,bottom-rad},(Vector2){left,top+rad},color);
     const Vector2 centers[4]={{left+rad,top+rad},{right-rad,top+rad},
         {right-rad,bottom-rad},{left+rad,bottom-rad}};
     const float starts[4]={180,270,0,90};
@@ -692,7 +692,7 @@ void MosaicoFastDrawRectangleRoundedLines(Rectangle r,float roundness,int segmen
             float angle=(starts[corner]+90.0f*(float)i/(float)steps)*0.01745329252f;
             Vector2 next={centers[corner].x+cosf(angle)*radius,
                           centers[corner].y+sinf(angle)*radius};
-            MosaicoFastDrawLineV(previous,next,color);
+            raylib_lite_raylib_draw_line_v(previous,next,color);
             previous=next;
         }
     }
@@ -703,7 +703,7 @@ static inline int edge(int ax, int ay, int bx, int by, int px, int py)
     return (px-ax)*(by-ay) - (py-ay)*(bx-ax);
 }
 
-void MosaicoFastDrawTriangle(Vector2 av, Vector2 bv, Vector2 cv, Color color)
+void raylib_lite_raylib_draw_triangle(Vector2 av, Vector2 bv, Vector2 cv, Color color)
 {
     av=active_to_screen(av); bv=active_to_screen(bv); cv=active_to_screen(cv);
     int ax=(int)av.x, ay=(int)av.y, bx=(int)bv.x, by=(int)bv.y;
@@ -744,25 +744,25 @@ void MosaicoFastDrawTriangle(Vector2 av, Vector2 bv, Vector2 cv, Color color)
     }
 }
 
-void MosaicoFastDrawTriangleLines(Vector2 a,Vector2 b,Vector2 c,Color color)
+void raylib_lite_raylib_draw_triangle_lines(Vector2 a,Vector2 b,Vector2 c,Color color)
 {
-    MosaicoFastDrawLineV(a,b,color);
-    MosaicoFastDrawLineV(b,c,color);
-    MosaicoFastDrawLineV(c,a,color);
+    raylib_lite_raylib_draw_line_v(a,b,color);
+    raylib_lite_raylib_draw_line_v(b,c,color);
+    raylib_lite_raylib_draw_line_v(c,a,color);
 }
 
-void MosaicoFastDrawTriangleFan(const Vector2 *points,int count,Color color)
+void raylib_lite_raylib_draw_triangle_fan(const Vector2 *points,int count,Color color)
 {
     if(!points)return;
     for(int i=1;i+1<count;++i)
-        MosaicoFastDrawTriangle(points[0],points[i],points[i+1],color);
+        raylib_lite_raylib_draw_triangle(points[0],points[i],points[i+1],color);
 }
 
-void MosaicoFastDrawTriangleStrip(const Vector2 *points,int count,Color color)
+void raylib_lite_raylib_draw_triangle_strip(const Vector2 *points,int count,Color color)
 {
     if(!points)return;
     for(int i=0;i+2<count;++i)
-        MosaicoFastDrawTriangle(points[i],points[i+1],points[i+2],color);
+        raylib_lite_raylib_draw_triangle(points[i],points[i+1],points[i+2],color);
 }
 
 static Vector2 polygon_point(Vector2 center,int sides,float radius,
@@ -772,27 +772,27 @@ static Vector2 polygon_point(Vector2 center,int sides,float radius,
     return(Vector2){center.x+cosf(angle)*radius,center.y+sinf(angle)*radius};
 }
 
-void MosaicoFastDrawPoly(Vector2 center,int sides,float radius,float rotation,
+void raylib_lite_raylib_draw_poly(Vector2 center,int sides,float radius,float rotation,
                          Color color)
 {
     if(sides<3)return;
     for(int i=0;i<sides;++i)
-        MosaicoFastDrawTriangle(center,polygon_point(center,sides,radius,rotation,i),
+        raylib_lite_raylib_draw_triangle(center,polygon_point(center,sides,radius,rotation,i),
             polygon_point(center,sides,radius,rotation,i+1),color);
 }
 
-void MosaicoFastDrawPolyLinesEx(Vector2 center,int sides,float radius,
+void raylib_lite_raylib_draw_poly_lines_ex(Vector2 center,int sides,float radius,
                                 float rotation,float thick,Color color)
 {
     if(sides<3)return;
     for(int i=0;i<sides;++i)
-        MosaicoFastDrawLineEx(polygon_point(center,sides,radius,rotation,i),
+        raylib_lite_raylib_draw_line_ex(polygon_point(center,sides,radius,rotation,i),
             polygon_point(center,sides,radius,rotation,i+1),thick,color);
 }
 
-void MosaicoFastDrawPolyLines(Vector2 center,int sides,float radius,
+void raylib_lite_raylib_draw_poly_lines(Vector2 center,int sides,float radius,
                               float rotation,Color color)
-{ MosaicoFastDrawPolyLinesEx(center,sides,radius,rotation,1,color); }
+{ raylib_lite_raylib_draw_poly_lines_ex(center,sides,radius,rotation,1,color); }
 
 static const uint8_t DIGITS[10][7] = {
     {14,17,19,21,25,17,14},{4,12,4,4,4,4,14},{14,17,1,2,4,8,31},
@@ -828,7 +828,7 @@ static const uint8_t *glyph(char ch)
     return NULL;
 }
 
-void MosaicoFastDrawText(const char *text, int x, int y, int font_size,
+void raylib_lite_raylib_draw_text(const char *text, int x, int y, int font_size,
                          Color color)
 {
     if(!text) return;
@@ -843,7 +843,7 @@ void MosaicoFastDrawText(const char *text, int x, int y, int font_size,
                 while(xx<5&&!(rows[yy]&(1U<<(4-xx))))++xx;
                 int start=xx;
                 while(xx<5&&(rows[yy]&(1U<<(4-xx))))++xx;
-                if(start<xx)MosaicoFastDrawRectangle(x+start*scale,y+yy*scale,
+                if(start<xx)raylib_lite_raylib_draw_rectangle(x+start*scale,y+yy*scale,
                     (xx-start)*scale,scale,color);
             }
         }
@@ -851,14 +851,14 @@ void MosaicoFastDrawText(const char *text, int x, int y, int font_size,
     s_camera_active=restore_camera;
 }
 
-int MosaicoFastMeasureText(const char *text, int font_size)
+int raylib_lite_raylib_measure_text(const char *text, int font_size)
 {
     if(!text||!*text) return 0;
     int scale=font_size/8; if(scale<1)scale=1;
     return (int)strlen(text)*6*scale-scale;
 }
 
-const char *MosaicoFastTextFormatV(const char *format, va_list args)
+const char *raylib_lite_raylib_text_format_v(const char *format, va_list args)
 {
     static char buffers[2][64];
     static unsigned index;
@@ -867,33 +867,33 @@ const char *MosaicoFastTextFormatV(const char *format, va_list args)
     return out;
 }
 
-const char *MosaicoFastTextFormat(const char *format, ...)
+const char *raylib_lite_raylib_text_format(const char *format, ...)
 {
     va_list args;
     va_start(args, format);
-    const char *out = MosaicoFastTextFormatV(format, args);
+    const char *out = raylib_lite_raylib_text_format_v(format, args);
     va_end(args);
     return out;
 }
 
-bool MosaicoFastCheckCollisionRecs(Rectangle a, Rectangle b)
+bool raylib_lite_raylib_check_collision_recs(Rectangle a, Rectangle b)
 {
     return a.x < b.x+b.width && a.x+a.width > b.x &&
            a.y < b.y+b.height && a.y+a.height > b.y;
 }
 
-bool MosaicoFastCheckCollisionCircles(Vector2 a,float ar,Vector2 b,float br)
+bool raylib_lite_raylib_check_collision_circles(Vector2 a,float ar,Vector2 b,float br)
 {
     float dx=a.x-b.x,dy=a.y-b.y,r=ar+br;
     return dx*dx+dy*dy <= r*r;
 }
 
-bool MosaicoFastCheckCollisionPointRec(Vector2 p,Rectangle r)
+bool raylib_lite_raylib_check_collision_point_rec(Vector2 p,Rectangle r)
 {
     return p.x>=r.x && p.x<=r.x+r.width && p.y>=r.y && p.y<=r.y+r.height;
 }
 
-bool MosaicoFastCheckCollisionCircleRec(Vector2 center,float radius,Rectangle r)
+bool raylib_lite_raylib_check_collision_circle_rec(Vector2 center,float radius,Rectangle r)
 {
     float x=fmaxf(r.x,fminf(center.x,r.x+r.width));
     float y=fmaxf(r.y,fminf(center.y,r.y+r.height));
@@ -901,13 +901,13 @@ bool MosaicoFastCheckCollisionCircleRec(Vector2 center,float radius,Rectangle r)
     return dx*dx+dy*dy<=radius*radius;
 }
 
-bool MosaicoFastCheckCollisionPointCircle(Vector2 point,Vector2 center,float radius)
+bool raylib_lite_raylib_check_collision_point_circle(Vector2 point,Vector2 center,float radius)
 {
     float dx=point.x-center.x,dy=point.y-center.y;
     return dx*dx+dy*dy<=radius*radius;
 }
 
-bool MosaicoFastCheckCollisionPointTriangle(Vector2 p,Vector2 a,Vector2 b,Vector2 c)
+bool raylib_lite_raylib_check_collision_point_triangle(Vector2 p,Vector2 a,Vector2 b,Vector2 c)
 {
     float d1=(p.x-b.x)*(a.y-b.y)-(a.x-b.x)*(p.y-b.y);
     float d2=(p.x-c.x)*(b.y-c.y)-(b.x-c.x)*(p.y-c.y);
@@ -917,7 +917,7 @@ bool MosaicoFastCheckCollisionPointTriangle(Vector2 p,Vector2 a,Vector2 b,Vector
     return !(negative&&positive);
 }
 
-Rectangle MosaicoFastGetCollisionRec(Rectangle a,Rectangle b)
+Rectangle raylib_lite_raylib_get_collision_rec(Rectangle a,Rectangle b)
 {
     float x=fmaxf(a.x,b.x),y=fmaxf(a.y,b.y);
     float right=fminf(a.x+a.width,b.x+b.width);
@@ -929,7 +929,7 @@ Rectangle MosaicoFastGetCollisionRec(Rectangle a,Rectangle b)
 static uint8_t clamp_byte(float value)
 { return(uint8_t)(value<0?0:value>255?255:value+.5f); }
 
-Color MosaicoFastColorAlpha(Color color,float alpha)
+Color raylib_lite_raylib_color_alpha(Color color,float alpha)
 {
     if (alpha < 0) alpha = 0;
     if (alpha > 1) alpha = 1;
@@ -937,16 +937,16 @@ Color MosaicoFastColorAlpha(Color color,float alpha)
     return color;
 }
 
-Color MosaicoFastFade(Color color,float alpha)
-{ return MosaicoFastColorAlpha(color,alpha); }
+Color raylib_lite_raylib_fade(Color color,float alpha)
+{ return raylib_lite_raylib_color_alpha(color,alpha); }
 
-Color MosaicoFastColorTint(Color color,Color tint)
+Color raylib_lite_raylib_color_tint(Color color,Color tint)
 {
     return(Color){(uint8_t)(color.r*tint.r/255U),(uint8_t)(color.g*tint.g/255U),
         (uint8_t)(color.b*tint.b/255U),(uint8_t)(color.a*tint.a/255U)};
 }
 
-Color MosaicoFastColorBrightness(Color color,float factor)
+Color raylib_lite_raylib_color_brightness(Color color,float factor)
 {
     if (factor < -1) factor = -1;
     if (factor > 1) factor = 1;

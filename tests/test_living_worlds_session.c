@@ -8,14 +8,14 @@ static unsigned atlas_loads, atlas_unloads, background_loads, background_release
 static unsigned audio_inits, audio_closes, music_loads, music_unloads;
 static unsigned music_plays[SCENE_AUDIO_COUNT], music_stops, music_updates;
 
-MosaicoAtlas LoadMosaicoAtlas(const char *path)
+raylib_lite_atlas_t raylib_lite_atlas_load(const char *path)
 {
     ++atlas_loads;
     if (fail_aurora && strcmp(path, "aurora_ice_side.atlas") == 0)
-        return (MosaicoAtlas){0};
-    return (MosaicoAtlas){.texture.id = atlas_loads};
+        return (raylib_lite_atlas_t){0};
+    return (raylib_lite_atlas_t){.texture.id = atlas_loads};
 }
-void UnloadMosaicoAtlas(MosaicoAtlas atlas)
+void raylib_lite_atlas_unload(raylib_lite_atlas_t atlas)
 {
     assert(atlas.texture.id);
     ++atlas_unloads;

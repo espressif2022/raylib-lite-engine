@@ -40,23 +40,23 @@ static void draw_background(const shooter_game_t *game)
     }
 }
 
-static void draw_sprite(MosaicoAtlas atlas,mosaico_asset_id_t id,
+static void draw_sprite(raylib_lite_atlas_t atlas,mosaico_asset_id_t id,
                         float x,float y,float width,float height)
 {
-    const MosaicoSpriteFrame *frame=MosaicoAtlasGetFrame(atlas,id);
+    const raylib_lite_sprite_frame_t *frame=raylib_lite_atlas_get_frame(atlas,id);
     if(!frame)return;
     DrawTexturePro(atlas.texture,frame->source,(Rectangle){x,y,width,height},
                    (Vector2){0,0},0,WHITE);
 }
 
-static void draw_ship(const shooter_game_t *game,MosaicoAtlas atlas,float x,float y)
+static void draw_ship(const shooter_game_t *game,raylib_lite_atlas_t atlas,float x,float y)
 {
     if(game->invulnerable&&(game->tick&2U))return;
     DrawEllipse((int)x+18,(int)y+35,25,12,(Color){7,43,76,255});
     draw_sprite(atlas,MOSAICO_ASSET_ID_PLAYER_SHIP,x-9,y-8,54,58);
 }
 
-static void draw_enemy(MosaicoAtlas atlas,const shooter_actor_t *enemy)
+static void draw_enemy(raylib_lite_atlas_t atlas,const shooter_actor_t *enemy)
 {
     static const mosaico_asset_id_t ids[]={
         MOSAICO_ASSET_ID_ENEMY_SCOUT,
@@ -161,7 +161,7 @@ static void draw_status_card(const shooter_game_t *game,const char *title,Color 
     }
 }
 
-void shooter_view_render(const shooter_game_t *game,MosaicoAtlas atlas)
+void shooter_view_render(const shooter_game_t *game,raylib_lite_atlas_t atlas)
 {
     if(!game)return;
     BeginDrawing();

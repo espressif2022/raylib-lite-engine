@@ -12,16 +12,16 @@
 
 typedef living_worlds_session_t module_state_t;
 
-static void unload_atlas(MosaicoAtlas *atlas)
+static void unload_atlas(raylib_lite_atlas_t *atlas)
 {
     if (!atlas->texture.id) return;
-    UnloadMosaicoAtlas(*atlas);
-    *atlas = (MosaicoAtlas){0};
+    raylib_lite_atlas_unload(*atlas);
+    *atlas = (raylib_lite_atlas_t){0};
 }
 
-static int load_atlas(MosaicoAtlas *atlas, const char *path)
+static int load_atlas(raylib_lite_atlas_t *atlas, const char *path)
 {
-    *atlas = LoadMosaicoAtlas(path);
+    *atlas = raylib_lite_atlas_load(path);
     return atlas->texture.id ? 0 : -1;
 }
 
@@ -29,10 +29,10 @@ static void clear_backgrounds(living_worlds_atlases_t *atlases)
 {
 #if defined(MOSAICO_GAME_ELF)
     /* The runtime owns the decoded JPEG texture. */
-    atlases->aurora = (MosaicoAtlas){0};
-    atlases->ocean = (MosaicoAtlas){0};
-    atlases->sunrise = (MosaicoAtlas){0};
-    atlases->rainforest = (MosaicoAtlas){0};
+    atlases->aurora = (raylib_lite_atlas_t){0};
+    atlases->ocean = (raylib_lite_atlas_t){0};
+    atlases->sunrise = (raylib_lite_atlas_t){0};
+    atlases->rainforest = (raylib_lite_atlas_t){0};
 #else
     unload_atlas(&atlases->aurora);
     unload_atlas(&atlases->ocean);
@@ -56,7 +56,7 @@ static int load_background(void *context, living_worlds_atlases_t *atlases,
 {
     (void)context;
 #if defined(MOSAICO_GAME_ELF)
-    MosaicoAtlas photo = MosaicoJpegLoad(background_path(scene));
+    raylib_lite_atlas_t photo = MosaicoJpegLoad(background_path(scene));
     if (!photo.texture.id) return -1;
     clear_backgrounds(atlases);
     if (scene == LIVING_SCENE_AURORA) atlases->aurora = photo;
@@ -64,7 +64,7 @@ static int load_background(void *context, living_worlds_atlases_t *atlases,
     else if (scene == LIVING_SCENE_RAINFOREST) atlases->rainforest = photo;
     else {
         atlases->ocean = photo;
-        (void)Mosaico2DCacheTextureLight(photo.texture, 232);
+        (void)raylib_lite_2d_cache_texture_light(photo.texture, 232);
     }
 #else
     (void)atlases;
@@ -103,7 +103,7 @@ static int initialize(void *value
         clear_backgrounds(&s->atlases);
         return -1;
     }
-    (void)Mosaico2DCacheTextureLight(s->atlases.ocean.texture, 232);
+    (void)raylib_lite_2d_cache_texture_light(s->atlases.ocean.texture, 232);
 #endif
     if (living_worlds_session_start(s, &s_assets, s) != 0) return -1;
     InitWindow(480, 480, "Living Worlds");

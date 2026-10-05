@@ -27,8 +27,8 @@
 
 typedef struct {
     tomb_game_t game;
-    MosaicoWallAtlas textures;
-    MosaicoAtlas controls;
+    raylib_lite_wall_atlas_t textures;
+    raylib_lite_atlas_t controls;
     bool paused, left, right, forward, backward, jump, strafe_left, strafe_right;
     int32_t joystick_track, look_track, jump_track, look_x, look_y, stick_x, stick_y;
     float move_forward, move_strafe;
@@ -72,8 +72,8 @@ static int initialize(void *value
 #if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
     mosaico_host_assets_set_root(asset_root);
 #endif
-    state->textures=LoadMosaicoWallAtlas("textures.wall");
-    state->controls=LoadMosaicoAtlas("controls.atlas");
+    state->textures=raylib_lite_wall_atlas_load("textures.wall");
+    state->controls=raylib_lite_atlas_load("controls.atlas");
     if(!state->textures.descriptor||!state->controls.texture.id)return -1;
     tomb_reset(&state->game);
     clear_tracks(state);
@@ -94,8 +94,8 @@ static void shutdown(void *value)
 #if defined(MOSAICO_GAME_NATIVE)
     mosaico_native_feedback_stop();
 #endif
-    UnloadMosaicoWallAtlas(state->textures);
-    UnloadMosaicoAtlas(state->controls);
+    raylib_lite_wall_atlas_unload(state->textures);
+    raylib_lite_atlas_unload(state->controls);
 }
 
 static void input(void *value, const mosaico_host_input_v1_t *event)

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <stdio.h>
-#include "mosaico_wall_config.h"
+#include "raylib_lite_wall_config.h"
 #ifdef ESP_PLATFORM
 #include "sdkconfig.h"
 #include "esp_chip_info.h"
@@ -23,8 +23,8 @@ int main(int argc,char **argv){
 #endif
 #else
 #ifdef RENDER_BENCH_WALL
-int mosaico_wall_benchmark(void);
-#define RUN_BENCHMARK mosaico_wall_benchmark
+int raylib_lite_wall_benchmark(void);
+#define RUN_BENCHMARK raylib_lite_wall_benchmark
 #define SUITE "wall"
 #else
 int render_core_benchmark(void);

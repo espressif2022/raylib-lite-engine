@@ -21,7 +21,7 @@
 
 typedef struct {
     platform_game_t game;
-    MosaicoAtlas atlas;
+    raylib_lite_atlas_t atlas;
     mosaico_particle_t particles[SKY_HOP_PARTICLE_COUNT];
     mosaico_particle_pool_t pool;
     sky_hop_overlay_t overlay;
@@ -51,7 +51,7 @@ static int initialize(void *value
 #if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
     mosaico_host_assets_set_root(asset_root);
 #endif
-    state->atlas = LoadMosaicoAtlas("tower.atlas");
+    state->atlas = raylib_lite_atlas_load("tower.atlas");
     if (!state->atlas.texture.id) return -1;
 #if !defined(MOSAICO_GAME_NATIVE)
     InitWindow(480, 480, "Sky Hop");
@@ -66,7 +66,7 @@ static int initialize(void *value
 static void shutdown(void *value)
 {
     sky_hop_module_state_t *state = value;
-    if (state) UnloadMosaicoAtlas(state->atlas);
+    if (state) raylib_lite_atlas_unload(state->atlas);
 }
 
 static void input(void *value, const mosaico_host_input_v1_t *event)

@@ -11,7 +11,7 @@
 #include "host_asset_runtime.h"
 #endif
 #endif
-#include "mosaico_game_2d.h"
+#include "raylib_lite_2d.h"
 #include "raylib_lite_raylib.h"
 #include "shooter_game.h"
 #include "shooter_view.h"
@@ -24,7 +24,7 @@
 
 typedef struct {
     shooter_game_t game;
-    MosaicoAtlas atlas;
+    raylib_lite_atlas_t atlas;
     bool paused, left, right;
     float imu_x, imu_y;
 } shooter_module_state_t;
@@ -39,7 +39,7 @@ static int initialize(void *value
 #if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
     mosaico_host_assets_set_root(asset_root);
 #endif
-    state->atlas=LoadMosaicoAtlas("shooter.atlas");
+    state->atlas=raylib_lite_atlas_load("shooter.atlas");
     if(!state->atlas.texture.id)return -1;
     shooter_game_reset(&state->game,0x4d4f5341U);
 #if !defined(MOSAICO_GAME_NATIVE)
@@ -52,7 +52,7 @@ static int initialize(void *value
 static void shutdown(void *value)
 {
     shooter_module_state_t *state=value;
-    if(state)UnloadMosaicoAtlas(state->atlas);
+    if(state)raylib_lite_atlas_unload(state->atlas);
 }
 
 static void input(void *value,const mosaico_host_input_v1_t *event)

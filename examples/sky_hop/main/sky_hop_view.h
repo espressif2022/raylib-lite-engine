@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include "mosaico_game_2d.h"
+#include "raylib_lite_2d.h"
 #include "mosaico_game_fx.h"
 #include "platform_game.h"
 
@@ -15,7 +15,7 @@ typedef struct {
 
 typedef struct {
     const platform_game_t *game;
-    MosaicoAtlas atlas;
+    raylib_lite_atlas_t atlas;
     uint16_t best_score;
     float overlay_y;
     const mosaico_particle_t *particles;

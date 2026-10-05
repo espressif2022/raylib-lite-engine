@@ -14,14 +14,14 @@ class PrimitiveTests(unittest.TestCase):
     def test_reference_pixels(self):
         with tempfile.TemporaryDirectory() as directory:
             executable = str(Path(directory) / "primitives")
-            source = os.environ.get("FAST_TEST_SOURCE", str(ROOT / "src/renderer/mosaico_raylib_fast.c"))
+            source = os.environ.get("FAST_TEST_SOURCE", str(ROOT / "src/renderer/raylib_lite_raylib_impl.c"))
             command = [os.environ.get("CC", "cc"), "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"]
             command += shlex.split(os.environ.get("CFLAGS", ""))
             command += [str(ROOT / path) for path in ["tests/test_primitives.c", "host/host_video_backend.c",
                         "src/runtime/raylib_lite_raylib_port.c",
-                        "host/host_asset_runtime.c", "src/renderer/mosaico_game_2d.c",
-                        "src/renderer/mosaico_game_2d_raylib.c",
-                        "src/renderer/mosaico_rgb565.c"]]
+                        "host/host_asset_runtime.c", "src/renderer/raylib_lite_renderer.c",
+                        "src/renderer/raylib_lite_renderer_raylib.c",
+                        "src/renderer/raylib_lite_rgb565.c"]]
             command += [source]
             for path in ["host/include", "host", "include/raylib_lite",
                          "include/raylib_lite",

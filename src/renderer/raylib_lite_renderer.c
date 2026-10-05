@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "mosaico_renderer.h"
-#include "mosaico_rgb565.h"
-#include "mosaico_wall_config.h"
+#include "raylib_lite_renderer.h"
+#include "raylib_lite_rgb565.h"
+#include "raylib_lite_wall_config.h"
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
@@ -39,40 +39,40 @@ static void texture_slot_release(texture_slot_t *slot)
 }
 static uint16_t *s_target;static size_t s_stride;static int s_target_width,s_target_height;
 static int s_clip_x0,s_clip_y0,s_clip_x1,s_clip_y1;
-static mosaico_renderer_sprite_frame_t s_frame_result;
-static mosaico_game_2d_raster_stats_t s_raster_stats;
+static raylib_lite_renderer_sprite_frame_t s_frame_result;
+static raylib_lite_renderer_raster_stats_t s_raster_stats;
 static uint32_t s_rejected_draw_calls;
-static texture_slot_t *texture_slot(mosaico_renderer_texture_t texture){if(!texture.id||texture.id>M2D_MAX_TEXTURES)return NULL;texture_slot_t *slot=&s_textures[texture.id-1];return slot->used?slot:NULL;}
-void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int height){s_target=pixels;s_stride=stride;s_target_width=width;s_target_height=height;s_clip_x0=0;s_clip_y0=0;s_clip_x1=width;s_clip_y1=height;}
-void mosaico_game_2d_set_clip(int x,int y,int width,int height){
+static texture_slot_t *texture_slot(raylib_lite_renderer_texture_t texture){if(!texture.id||texture.id>M2D_MAX_TEXTURES)return NULL;texture_slot_t *slot=&s_textures[texture.id-1];return slot->used?slot:NULL;}
+void raylib_lite_renderer_set_target(uint16_t *pixels,size_t stride,int width,int height){s_target=pixels;s_stride=stride;s_target_width=width;s_target_height=height;s_clip_x0=0;s_clip_y0=0;s_clip_x1=width;s_clip_y1=height;}
+void raylib_lite_renderer_set_clip(int x,int y,int width,int height){
  s_clip_x0=x<0?0:x;s_clip_y0=y<0?0:y;
  s_clip_x1=x+width>s_target_width?s_target_width:x+width;
  s_clip_y1=y+height>s_target_height?s_target_height:y+height;
  if(width<=0||height<=0||s_clip_x0>s_clip_x1||s_clip_y0>s_clip_y1)
   s_clip_x1=s_clip_x0,s_clip_y1=s_clip_y0;
 }
-void mosaico_game_2d_reset_raster_stats(void){memset(&s_raster_stats,0,sizeof(s_raster_stats));s_rejected_draw_calls=0;}
-void mosaico_game_2d_get_raster_stats(mosaico_game_2d_raster_stats_t*out){if(out)*out=s_raster_stats;}
-uint32_t mosaico_game_2d_get_rejected_draw_calls(void){return s_rejected_draw_calls;}
-void mosaico_game_2d_note_primitives(uint32_t pixels,uint32_t runs,uint32_t clear_pixels){
+void raylib_lite_renderer_reset_raster_stats(void){memset(&s_raster_stats,0,sizeof(s_raster_stats));s_rejected_draw_calls=0;}
+void raylib_lite_renderer_get_raster_stats(raylib_lite_renderer_raster_stats_t*out){if(out)*out=s_raster_stats;}
+uint32_t raylib_lite_renderer_get_rejected_draw_calls(void){return s_rejected_draw_calls;}
+void raylib_lite_renderer_note_primitives(uint32_t pixels,uint32_t runs,uint32_t clear_pixels){
  s_raster_stats.primitive_pixels+=pixels;s_raster_stats.primitive_runs+=runs;
  s_raster_stats.clear_pixels+=clear_pixels;
  s_raster_stats.fb_pixels+=pixels+clear_pixels;
  s_raster_stats.fb_runs+=runs+(clear_pixels&&s_target_width>0?(clear_pixels/(uint32_t)s_target_width):0);
 }
-void mosaico_game_2d_set_phase_us(uint32_t sky_us,uint32_t floor_us,uint32_t wall_us,
+void raylib_lite_renderer_set_phase_us(uint32_t sky_us,uint32_t floor_us,uint32_t wall_us,
  uint32_t enemy_us,uint32_t hud_us){
  s_raster_stats.sky_us=sky_us;s_raster_stats.floor_us=floor_us;s_raster_stats.wall_us=wall_us;
  s_raster_stats.enemy_us=enemy_us;s_raster_stats.hud_us=hud_us;
 }
-mosaico_renderer_texture_t mosaico_renderer_load_texture(const char *path)
+raylib_lite_renderer_texture_t raylib_lite_renderer_load_texture(const char *path)
 {
     mosaico_asset_view_t asset = {0};
-    if (mosaico_game_asset_open(path, &asset) != ESP_OK)
-        return (mosaico_renderer_texture_t){0};
+    if (mosaico_game_asset_open(path, &asset) != RAYLIB_LITE_OK)
+        return (raylib_lite_renderer_texture_t){0};
     if (asset.size < sizeof(atlas_header_t)) {
         mosaico_game_asset_release(&asset);
-        return (mosaico_renderer_texture_t){0};
+        return (raylib_lite_renderer_texture_t){0};
     }
     const atlas_header_t *header = (const atlas_header_t *)asset.data;
     size_t frame_bytes = (size_t)header->frame_count * sizeof(atlas_frame_t);
@@ -82,7 +82,7 @@ mosaico_renderer_texture_t mosaico_renderer_load_texture(const char *path)
             expected > asset.size ||
             header->rgb_bytes != (uint32_t)header->width * header->height * 2U) {
         mosaico_game_asset_release(&asset);
-        return (mosaico_renderer_texture_t){0};
+        return (raylib_lite_renderer_texture_t){0};
     }
     for (unsigned i = 0; i < M2D_MAX_TEXTURES; ++i) {
         if (s_textures[i].used) continue;
@@ -95,20 +95,20 @@ mosaico_renderer_texture_t mosaico_renderer_load_texture(const char *path)
         slot->rgb = (const uint16_t *)(asset.data + sizeof(*header) + frame_bytes);
         slot->alpha = header->alpha_bytes ?
             asset.data + sizeof(*header) + frame_bytes + header->rgb_bytes : NULL;
-        return (mosaico_renderer_texture_t) {
+        return (raylib_lite_renderer_texture_t) {
             .id = i + 1U, .width = header->width, .height = header->height,
         };
     }
     mosaico_game_asset_release(&asset);
-    return (mosaico_renderer_texture_t){0};
+    return (raylib_lite_renderer_texture_t){0};
 }
 
-mosaico_renderer_texture_t mosaico_renderer_register_rgb565(
+raylib_lite_renderer_texture_t raylib_lite_renderer_register_rgb565(
     const void *pixels, int width, int height)
 {
     if (!pixels || width <= 0 || height <= 0 ||
             width > UINT16_MAX || height > UINT16_MAX)
-        return (mosaico_renderer_texture_t){0};
+        return (raylib_lite_renderer_texture_t){0};
     for (unsigned i = 0; i < M2D_MAX_TEXTURES; ++i) {
         if (s_textures[i].used) continue;
         texture_slot_t *slot = &s_textures[i];
@@ -121,21 +121,21 @@ mosaico_renderer_texture_t mosaico_renderer_register_rgb565(
         };
         slot->header = &slot->inline_header;
         slot->rgb = (const uint16_t *)pixels;
-        return (mosaico_renderer_texture_t) {
+        return (raylib_lite_renderer_texture_t) {
             .id = i + 1U, .width = width, .height = height,
         };
     }
-    return (mosaico_renderer_texture_t){0};
+    return (raylib_lite_renderer_texture_t){0};
 }
 
-MosaicoWallAtlas LoadMosaicoWallAtlas(const char *path)
+raylib_lite_wall_atlas_t raylib_lite_wall_atlas_load(const char *path)
 {
     mosaico_asset_view_t asset = {0};
-    if (mosaico_game_asset_open(path, &asset) != ESP_OK)
-        return (MosaicoWallAtlas){0};
+    if (mosaico_game_asset_open(path, &asset) != RAYLIB_LITE_OK)
+        return (raylib_lite_wall_atlas_t){0};
     if (asset.size < sizeof(wall_header_t)) {
         mosaico_game_asset_release(&asset);
-        return (MosaicoWallAtlas){0};
+        return (raylib_lite_wall_atlas_t){0};
     }
     const wall_header_t *header = (const wall_header_t *)asset.data;
     size_t frame_bytes = (size_t)header->frame_count * sizeof(atlas_frame_t);
@@ -150,10 +150,10 @@ MosaicoWallAtlas LoadMosaicoWallAtlas(const char *path)
             header->index_bytes != (uint32_t)header->width * header->height ||
             expected > asset.size) {
         mosaico_game_asset_release(&asset);
-        return (MosaicoWallAtlas){0};
+        return (raylib_lite_wall_atlas_t){0};
     }
     const uint8_t *base = asset.data + sizeof(*header);
-    return (MosaicoWallAtlas) {
+    return (raylib_lite_wall_atlas_t) {
         .descriptor = header,
         .frames = base,
         .light_lut = (const uint16_t *)(base + frame_bytes),
@@ -166,7 +166,7 @@ MosaicoWallAtlas LoadMosaicoWallAtlas(const char *path)
     };
 }
 
-void UnloadMosaicoWallAtlas(MosaicoWallAtlas atlas)
+void raylib_lite_wall_atlas_unload(raylib_lite_wall_atlas_t atlas)
 {
     mosaico_asset_view_t asset = {
         .data = (const uint8_t *)atlas.descriptor,
@@ -174,20 +174,20 @@ void UnloadMosaicoWallAtlas(MosaicoWallAtlas atlas)
     mosaico_game_asset_release(&asset);
 }
 
-void mosaico_renderer_unload_texture(mosaico_renderer_texture_t texture)
+void raylib_lite_renderer_unload_texture(raylib_lite_renderer_texture_t texture)
 {
     texture_slot_t *slot = texture_slot(texture);
     if (slot) texture_slot_release(slot);
 }
 
-static inline uint16_t tint565(uint16_t p,mosaico_renderer_color_t t){if(t.r==255&&t.g==255&&t.b==255)return p;return(uint16_t)((((p>>11)&31U)*t.r/255U)<<11|(((p>>5)&63U)*t.g/255U)<<5|((p&31U)*t.b/255U));}
+static inline uint16_t tint565(uint16_t p,raylib_lite_renderer_color_t t){if(t.r==255&&t.g==255&&t.b==255)return p;return(uint16_t)((((p>>11)&31U)*t.r/255U)<<11|(((p>>5)&63U)*t.g/255U)<<5|((p&31U)*t.b/255U));}
 static inline unsigned quantize_light(unsigned light256)
 {
  unsigned light=light256>256U?256U:light256;
  if(light>=248U)return 256U;
  return(light+8U)&~15U;
 }
-bool mosaico_renderer_cache_texture_light(mosaico_renderer_texture_t texture,unsigned light256)
+bool raylib_lite_renderer_cache_texture_light(raylib_lite_renderer_texture_t texture,unsigned light256)
 {
  texture_slot_t *s=texture_slot(texture);
  if(!s)return false;
@@ -198,7 +198,7 @@ bool mosaico_renderer_cache_texture_light(mosaico_renderer_texture_t texture,uns
  if(count>SIZE_MAX/sizeof(uint16_t))return false;
  uint16_t *cache=RAYLIB_LITE_RASTER_ALLOC(count*sizeof(uint16_t));
  if(!cache)return false;
- mosaico_shade_rgb565(cache,s->rgb,count,light);
+ raylib_lite_rgb565_shade(cache,s->rgb,count,light);
  free(s->light_cache);s->light_cache=cache;s->cached_light=light;
  return true;
 }
@@ -209,7 +209,7 @@ static inline unsigned indexed_light_level(unsigned light256)
 }
 static inline uint16_t shade565(uint16_t p,unsigned light)
 {
- return mosaico_shade565(p,light);
+ return raylib_lite_rgb565_shade_pixel(p,light);
 }
 /* Store-shape accounting. A run is one contiguous-address write sequence, so a
  * blit row counts once even when an alpha mask leaves holes in it. Sampling
@@ -237,7 +237,7 @@ static inline void fill_shaded(uint16_t *dst,int count,uint16_t px)
  if(count==1){dst[0]=px;return;}
  if(count==2){dst[0]=px;dst[1]=px;return;}
  if(count==4){dst[0]=px;dst[1]=px;dst[2]=px;dst[3]=px;return;}
- mosaico_fill_rgb565(dst,px,(size_t)count);
+ raylib_lite_rgb565_fill(dst,px,(size_t)count);
 }
 static inline uint16_t blend565(uint16_t d,uint16_t s,unsigned a){if(a>=255)return s;unsigned ia=255-a;return(uint16_t)(((((s&0xf81fU)*a+(d&0xf81fU)*ia)>>8)&0xf81fU)|((((s&0x07e0U)*a+(d&0x07e0U)*ia)>>8)&0x07e0U));}
 typedef struct{int value,base,remainder,denominator,error;} sample_step_t;
@@ -251,7 +251,7 @@ static inline int sample_next(sample_step_t*step){
  if(step->error>=step->denominator){++step->value;step->error-=step->denominator;}
  return value;
 }
-void mosaico_renderer_draw_texture_pro(mosaico_renderer_texture_t texture,mosaico_renderer_rect_t source,mosaico_renderer_rect_t dest,mosaico_renderer_vec2_t origin,float rotation,mosaico_renderer_color_t tint){
+void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t texture,raylib_lite_renderer_rect_t source,raylib_lite_renderer_rect_t dest,raylib_lite_renderer_vec2_t origin,float rotation,raylib_lite_renderer_color_t tint){
  texture_slot_t*s=texture_slot(texture);if(!s||!s_target||source.width==0||source.height==0||dest.width==0||dest.height==0){++s_rejected_draw_calls;return;}
  if(!tint.a)return;
  bool fx=source.width<0,fy=source.height<0;float sw=fabsf(source.width),sh=fabsf(source.height),rad=rotation*0.01745329252f,cs=cosf(rad),sn=sinf(rad);int dw=(int)fabsf(dest.width),dh=(int)fabsf(dest.height),extent=dw>dh?dw:dh;bool identity=fabsf(rotation)<.001f;
@@ -271,7 +271,7 @@ void mosaico_renderer_draw_texture_pro(mosaico_renderer_texture_t texture,mosaic
   int sx=(int)source.x+(x0-left),sy=(int)source.y+(y0-top),copy=x1-x0;
   if(copy>0&&sx>=0&&sy>=0&&sx+copy<=s->header->width&&
      sy+(y1-y0)<=s->header->height){
-   for(int y=y0;y<y1;++y,++sy)mosaico_copy_rgb565(&s_target[(size_t)y*s_stride+x0],
+   for(int y=y0;y<y1;++y,++sy)raylib_lite_rgb565_copy(&s_target[(size_t)y*s_stride+x0],
       &s->rgb[(size_t)sy*s->header->width+sx],(size_t)copy);
    ++s_raster_stats.opaque_copy_calls;
    s_raster_stats.opaque_copy_pixels+=(uint32_t)copy*(uint32_t)(y1-y0);
@@ -326,7 +326,7 @@ void mosaico_renderer_draw_texture_pro(mosaico_renderer_texture_t texture,mosaic
      while(x<copy&&!mask[x])++x;
      int start=x;
      while(x<copy&&mask[x])++x;
-     if(start<x){mosaico_copy_rgb565(dst+start,src+start,(size_t)(x-start));
+     if(start<x){raylib_lite_rgb565_copy(dst+start,src+start,(size_t)(x-start));
       drawn+=(uint32_t)(x-start);m2d_note_store(x-start);}
     }
    }
@@ -466,8 +466,8 @@ static inline bool uv_inside(float u,float v,float max_u,float max_v)
  return u>=0&&u<=max_u&&v>=0&&v<=max_v;
 }
 
-static void fold_triangle_uv(mosaico_textured_vertex_t *a, mosaico_textured_vertex_t *b,
- mosaico_textured_vertex_t *c, float max_u, float max_v)
+static void fold_triangle_uv(raylib_lite_textured_vertex_t *a, raylib_lite_textured_vertex_t *b,
+ raylib_lite_textured_vertex_t *c, float max_u, float max_v)
 {
  if (uv_inside(a->u,a->v,max_u,max_v)&&uv_inside(b->u,b->v,max_u,max_v)&&
      uv_inside(c->u,c->v,max_u,max_v))
@@ -490,8 +490,8 @@ static void fold_triangle_uv(mosaico_textured_vertex_t *a, mosaico_textured_vert
  }
 }
 
-static void fold_quad_uv(mosaico_textured_vertex_t *a,mosaico_textured_vertex_t *b,
- mosaico_textured_vertex_t *c,mosaico_textured_vertex_t *d,float max_u,float max_v)
+static void fold_quad_uv(raylib_lite_textured_vertex_t *a,raylib_lite_textured_vertex_t *b,
+ raylib_lite_textured_vertex_t *c,raylib_lite_textured_vertex_t *d,float max_u,float max_v)
 {
  if (uv_inside(a->u,a->v,max_u,max_v)&&uv_inside(b->u,b->v,max_u,max_v)&&
      uv_inside(c->u,c->v,max_u,max_v)&&uv_inside(d->u,d->v,max_u,max_v))
@@ -518,8 +518,8 @@ static void fold_quad_uv(mosaico_textured_vertex_t *a,mosaico_textured_vertex_t 
 
 typedef struct { int32_t x,u,v,dx,du,dv; } triangle_scan_edge_t;
 
-static triangle_scan_edge_t triangle_scan_edge(mosaico_textured_vertex_t a,
- mosaico_textured_vertex_t b,float scan_y)
+static triangle_scan_edge_t triangle_scan_edge(raylib_lite_textured_vertex_t a,
+ raylib_lite_textured_vertex_t b,float scan_y)
 {
  float inverse_height=1.0f/(b.y-a.y);
  float position=(scan_y-a.y)*inverse_height;
@@ -602,8 +602,8 @@ static M2D_HOT void fill_direct_shaded(uint16_t *dst,const uint16_t *rgb,int wid
 }
 
 static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
- mosaico_textured_vertex_t long_a,mosaico_textured_vertex_t long_b,
- mosaico_textured_vertex_t short_a,mosaico_textured_vertex_t short_b,
+ raylib_lite_textured_vertex_t long_a,raylib_lite_textured_vertex_t long_b,
+ raylib_lite_textured_vertex_t short_a,raylib_lite_textured_vertex_t short_b,
  int y0,int y1,int32_t du_16,int32_t dv_16,unsigned light,bool direct_uv)
 {
  if(y0<s_clip_y0)y0=s_clip_y0;
@@ -717,13 +717,13 @@ static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
 }
 
 static void draw_textured_triangle_prepared(texture_slot_t *s,
- mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
- mosaico_textured_vertex_t c,unsigned light,bool skip_fold)
+ raylib_lite_textured_vertex_t a,raylib_lite_textured_vertex_t b,
+ raylib_lite_textured_vertex_t c,unsigned light,bool skip_fold)
 {
  PROFILE_START(setup_started);
- if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
- if(b.y>c.y){mosaico_textured_vertex_t swap=b;b=c;c=swap;}
- if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
+ if(a.y>b.y){raylib_lite_textured_vertex_t swap=a;a=b;b=swap;}
+ if(b.y>c.y){raylib_lite_textured_vertex_t swap=b;b=c;c=swap;}
+ if(a.y>b.y){raylib_lite_textured_vertex_t swap=a;a=b;b=swap;}
  if(c.y-a.y<.001f)return;
  if(c.y<s_clip_y0||a.y>=s_clip_y1)return;
  float min_x=a.x<b.x?a.x:b.x;if(c.x<min_x)min_x=c.x;
@@ -751,21 +751,21 @@ static void draw_textured_triangle_prepared(texture_slot_t *s,
  PROFILE_ADD(triangle_raster_us,raster_started);
 }
 
-void mosaico_renderer_draw_textured_triangle(mosaico_renderer_texture_t texture,
- mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
- mosaico_textured_vertex_t c,unsigned light256)
+void raylib_lite_renderer_draw_textured_triangle(raylib_lite_renderer_texture_t texture,
+ raylib_lite_textured_vertex_t a,raylib_lite_textured_vertex_t b,
+ raylib_lite_textured_vertex_t c,unsigned light256)
 {
  texture_slot_t*s=texture_slot(texture);if(!s||!s_target){++s_rejected_draw_calls;return;}
  draw_textured_triangle_prepared(s,a,b,c,quantize_light(light256),false);
 }
 
 static void draw_rgb_quad_direct(texture_slot_t *s,
- mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
- mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light);
+ raylib_lite_textured_vertex_t a,raylib_lite_textured_vertex_t b,
+ raylib_lite_textured_vertex_t c,raylib_lite_textured_vertex_t d,unsigned light);
 
-void mosaico_renderer_draw_textured_quad(mosaico_renderer_texture_t texture,
- mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
- mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light256)
+void raylib_lite_renderer_draw_textured_quad(raylib_lite_renderer_texture_t texture,
+ raylib_lite_textured_vertex_t a,raylib_lite_textured_vertex_t b,
+ raylib_lite_textured_vertex_t c,raylib_lite_textured_vertex_t d,unsigned light256)
 {
  texture_slot_t*s=texture_slot(texture);if(!s||!s_target){++s_rejected_draw_calls;return;}
  unsigned light=quantize_light(light256);
@@ -783,7 +783,7 @@ void mosaico_renderer_draw_textured_quad(mosaico_renderer_texture_t texture,
  draw_textured_triangle_prepared(s,b,c,d,light,inside);
 }
 
-static inline uint16_t sample_indexed_texel(const MosaicoWallAtlas *atlas,int x,int y,
+static inline uint16_t sample_indexed_texel(const raylib_lite_wall_atlas_t *atlas,int x,int y,
  unsigned level)
 {
  if((unsigned)x>=atlas->width||(unsigned)y>=atlas->height)return 0;
@@ -792,7 +792,7 @@ static inline uint16_t sample_indexed_texel(const MosaicoWallAtlas *atlas,int x,
  return atlas->light_lut[(size_t)level*256U+atlas->indices[offset]];
 }
 
-static M2D_HOT void fill_indexed_row_major(uint16_t *dst,const MosaicoWallAtlas *atlas,
+static M2D_HOT void fill_indexed_row_major(uint16_t *dst,const raylib_lite_wall_atlas_t *atlas,
  int32_t u,int32_t v,int32_t du,int32_t dv,int count,unsigned level)
 {
  WALL_AUDIT_SPAN(dst,u,v,du,dv,count);
@@ -860,8 +860,8 @@ typedef struct {
  float uq,vq,q,duq,dvq,dq;
 } persp_edge_t;
 
-static persp_edge_t persp_scan_edge(mosaico_textured_vertex_t a,
- mosaico_textured_vertex_t b,float scan_y)
+static persp_edge_t persp_scan_edge(raylib_lite_textured_vertex_t a,
+ raylib_lite_textured_vertex_t b,float scan_y)
 {
  float inverse_height=1.0f/(b.y-a.y);
  float position=(scan_y-a.y)*inverse_height;
@@ -945,7 +945,7 @@ static int32_t clamp_texel_fixed(float value,int limit)
  return fixed_from_float(value);
 }
 
-static void fill_indexed_affine(const MosaicoWallAtlas *atlas,uint16_t *dst,
+static void fill_indexed_affine(const raylib_lite_wall_atlas_t *atlas,uint16_t *dst,
  float u0,float v0,float u1,float v1,int count,unsigned level,bool direct_uv)
 {
  if(count<=0)return;
@@ -971,7 +971,7 @@ static void fill_indexed_affine(const MosaicoWallAtlas *atlas,uint16_t *dst,
 /* Ends of the span are perspective-correct. A row whose 1/z stays within
  * 15% is one affine fill. Steeper rows take the longest piece that still
  * does, and stop at 4 pixels. */
-static void fill_indexed_persp_span(const MosaicoWallAtlas *atlas,
+static void fill_indexed_persp_span(const raylib_lite_wall_atlas_t *atlas,
  const persp_edge_t *left,const persp_edge_t *right,int x0,int x1,
  unsigned level,bool direct_uv,int y)
 {
@@ -1022,9 +1022,9 @@ static void fill_indexed_persp_span(const MosaicoWallAtlas *atlas,
  }
 }
 
-static M2D_HOT void draw_indexed_triangle_section(const MosaicoWallAtlas *atlas,
- mosaico_textured_vertex_t long_a,mosaico_textured_vertex_t long_b,
- mosaico_textured_vertex_t short_a,mosaico_textured_vertex_t short_b,
+static M2D_HOT void draw_indexed_triangle_section(const raylib_lite_wall_atlas_t *atlas,
+ raylib_lite_textured_vertex_t long_a,raylib_lite_textured_vertex_t long_b,
+ raylib_lite_textured_vertex_t short_a,raylib_lite_textured_vertex_t short_b,
  int y0,int y1,int32_t du_16,int32_t dv_16,unsigned level,bool direct_uv)
 {
  if(y0<s_clip_y0)y0=s_clip_y0;
@@ -1076,9 +1076,9 @@ static M2D_HOT void draw_indexed_triangle_section(const MosaicoWallAtlas *atlas,
  s_raster_stats.triangle_direct_pixels+=pixels;
 }
 
-static void draw_indexed_triangle_section_persp(const MosaicoWallAtlas *atlas,
- mosaico_textured_vertex_t long_a,mosaico_textured_vertex_t long_b,
- mosaico_textured_vertex_t short_a,mosaico_textured_vertex_t short_b,
+static void draw_indexed_triangle_section_persp(const raylib_lite_wall_atlas_t *atlas,
+ raylib_lite_textured_vertex_t long_a,raylib_lite_textured_vertex_t long_b,
+ raylib_lite_textured_vertex_t short_a,raylib_lite_textured_vertex_t short_b,
  int y0,int y1,unsigned level,bool direct_uv)
 {
  if(y0<s_clip_y0)y0=s_clip_y0;
@@ -1107,14 +1107,14 @@ static void draw_indexed_triangle_section_persp(const MosaicoWallAtlas *atlas,
  s_raster_stats.triangle_direct_pixels+=pixels;
 }
 
-static void draw_indexed_triangle_prepared(const MosaicoWallAtlas *atlas,
- mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
- mosaico_textured_vertex_t c,unsigned level,bool skip_fold)
+static void draw_indexed_triangle_prepared(const raylib_lite_wall_atlas_t *atlas,
+ raylib_lite_textured_vertex_t a,raylib_lite_textured_vertex_t b,
+ raylib_lite_textured_vertex_t c,unsigned level,bool skip_fold)
 {
  PROFILE_START(setup_started);
- if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
- if(b.y>c.y){mosaico_textured_vertex_t swap=b;b=c;c=swap;}
- if(a.y>b.y){mosaico_textured_vertex_t swap=a;a=b;b=swap;}
+ if(a.y>b.y){raylib_lite_textured_vertex_t swap=a;a=b;b=swap;}
+ if(b.y>c.y){raylib_lite_textured_vertex_t swap=b;b=c;c=swap;}
+ if(a.y>b.y){raylib_lite_textured_vertex_t swap=a;a=b;b=swap;}
  if(c.y-a.y<.001f)return;
  if(c.y<s_clip_y0||a.y>=s_clip_y1)return;
  float min_x=a.x<b.x?a.x:b.x;if(c.x<min_x)min_x=c.x;
@@ -1153,7 +1153,7 @@ static void draw_indexed_triangle_prepared(const MosaicoWallAtlas *atlas,
 }
 
 typedef struct {
- const mosaico_textured_vertex_t *vertices;
+ const raylib_lite_textured_vertex_t *vertices;
  int index,step,remaining,end_y;
  triangle_scan_edge_t edge;
 } indexed_quad_chain_t;
@@ -1163,8 +1163,8 @@ static bool indexed_quad_chain_advance(indexed_quad_chain_t *chain,int row)
  while(chain->remaining>0){
   --chain->remaining;
   int next=(chain->index+chain->step+4)&3;
-  mosaico_textured_vertex_t a=chain->vertices[chain->index];
-  mosaico_textured_vertex_t b=chain->vertices[next];
+  raylib_lite_textured_vertex_t a=chain->vertices[chain->index];
+  raylib_lite_textured_vertex_t b=chain->vertices[next];
   chain->index=next;
   int end=raster_ceil_half(b.y);
   if(b.y<=a.y+.001f||end<=row)continue;
@@ -1176,7 +1176,7 @@ static bool indexed_quad_chain_advance(indexed_quad_chain_t *chain,int row)
 }
 
 typedef struct {
- const mosaico_textured_vertex_t *vertices;
+ const raylib_lite_textured_vertex_t *vertices;
  int index,step,remaining,end_y;
  persp_edge_t edge;
 } persp_quad_chain_t;
@@ -1186,8 +1186,8 @@ static bool persp_quad_chain_advance(persp_quad_chain_t *chain,int row)
  while(chain->remaining>0){
   --chain->remaining;
   int next=(chain->index+chain->step+4)&3;
-  mosaico_textured_vertex_t a=chain->vertices[chain->index];
-  mosaico_textured_vertex_t b=chain->vertices[next];
+  raylib_lite_textured_vertex_t a=chain->vertices[chain->index];
+  raylib_lite_textured_vertex_t b=chain->vertices[next];
   chain->index=next;
   int end=raster_ceil_half(b.y);
   if(b.y<=a.y+.001f||end<=row)continue;
@@ -1198,11 +1198,11 @@ static bool persp_quad_chain_advance(persp_quad_chain_t *chain,int row)
  return false;
 }
 
-static void draw_indexed_quad_persp(const MosaicoWallAtlas *atlas,
- mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
- mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned level)
+static void draw_indexed_quad_persp(const raylib_lite_wall_atlas_t *atlas,
+ raylib_lite_textured_vertex_t a,raylib_lite_textured_vertex_t b,
+ raylib_lite_textured_vertex_t c,raylib_lite_textured_vertex_t d,unsigned level)
 {
- mosaico_textured_vertex_t p[4]={a,b,d,c};
+ raylib_lite_textured_vertex_t p[4]={a,b,d,c};
  int top=0;
  float min_y=p[0].y,max_y=p[0].y,min_x=p[0].x,max_x=p[0].x;
  /* Screen-space coordinates are clipped to a 480x480 target. Float has ample
@@ -1255,12 +1255,12 @@ static void draw_indexed_quad_persp(const MosaicoWallAtlas *atlas,
 /* Convex opaque INDEX8 quad. Unlike the compatibility implementation that
  * emits two independent triangles, this walks the two polygon edge chains
  * once and produces one continuous texture span per row. */
-static M2D_HOT void draw_indexed_quad_direct(const MosaicoWallAtlas *atlas,
- mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
- mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned level)
+static M2D_HOT void draw_indexed_quad_direct(const raylib_lite_wall_atlas_t *atlas,
+ raylib_lite_textured_vertex_t a,raylib_lite_textured_vertex_t b,
+ raylib_lite_textured_vertex_t c,raylib_lite_textured_vertex_t d,unsigned level)
 {
  /* Public quad order is a--b / c--d; the edge walker needs perimeter order. */
- mosaico_textured_vertex_t p[4]={a,b,d,c};
+ raylib_lite_textured_vertex_t p[4]={a,b,d,c};
  int top=0;
  float min_y=p[0].y,max_y=p[0].y,min_x=p[0].x,max_x=p[0].x;
  float area=0.0f;
@@ -1323,10 +1323,10 @@ static M2D_HOT void draw_indexed_quad_direct(const MosaicoWallAtlas *atlas,
 /* RGB565 counterpart of draw_indexed_quad_direct. One edge walk, one span
  * per row, same shade565 sampler as the triangle path. */
 static void draw_rgb_quad_direct(texture_slot_t *s,
- mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
- mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light)
+ raylib_lite_textured_vertex_t a,raylib_lite_textured_vertex_t b,
+ raylib_lite_textured_vertex_t c,raylib_lite_textured_vertex_t d,unsigned light)
 {
- mosaico_textured_vertex_t p[4]={a,b,d,c};
+ raylib_lite_textured_vertex_t p[4]={a,b,d,c};
  int top=0;
  float min_y=p[0].y,max_y=p[0].y,min_x=p[0].x,max_x=p[0].x;
  float area=0.0f;
@@ -1390,18 +1390,18 @@ static void draw_rgb_quad_direct(texture_slot_t *s,
  s_raster_stats.quad_pixels+=pixels;
 }
 
-void Mosaico2DDrawIndexedTexturedTriangle(MosaicoWallAtlas atlas,
- mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
- mosaico_textured_vertex_t c,unsigned light256)
+void raylib_lite_2d_draw_indexed_textured_triangle(raylib_lite_wall_atlas_t atlas,
+ raylib_lite_textured_vertex_t a,raylib_lite_textured_vertex_t b,
+ raylib_lite_textured_vertex_t c,unsigned light256)
 {
  if(!atlas.descriptor||!atlas.indices||!atlas.light_lut||!s_target||
     !atlas.width||!atlas.height||atlas.light_levels!=16){++s_rejected_draw_calls;return;}
  draw_indexed_triangle_prepared(&atlas,a,b,c,indexed_light_level(light256),false);
 }
 
-void Mosaico2DDrawIndexedTexturedQuad(MosaicoWallAtlas atlas,
- mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
- mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light256)
+void raylib_lite_2d_draw_indexed_textured_quad(raylib_lite_wall_atlas_t atlas,
+ raylib_lite_textured_vertex_t a,raylib_lite_textured_vertex_t b,
+ raylib_lite_textured_vertex_t c,raylib_lite_textured_vertex_t d,unsigned light256)
 {
  if(!atlas.descriptor||!atlas.indices||!atlas.light_lut||!s_target||
     !atlas.width||!atlas.height||atlas.light_levels!=16){++s_rejected_draw_calls;return;}
@@ -1420,14 +1420,14 @@ void Mosaico2DDrawIndexedTexturedQuad(MosaicoWallAtlas atlas,
  draw_indexed_triangle_prepared(&atlas,a,c,b,level,inside);
  draw_indexed_triangle_prepared(&atlas,b,c,d,level,inside);
 }
-void mosaico_renderer_draw_tile_row(mosaico_renderer_texture_t texture,const uint16_t*ids,size_t count,
+void raylib_lite_renderer_draw_tile_row(raylib_lite_renderer_texture_t texture,const uint16_t*ids,size_t count,
  int tw,int th,int dx,int dy){
  texture_slot_t*s=texture_slot(texture);if(!count)return;
  if(!s||!ids||tw<=0||th<=0||!s_target){++s_rejected_draw_calls;return;}
- if(s->alpha){for(size_t i=0;i<count;++i)if(ids[i])mosaico_renderer_draw_texture_pro(texture,
-   (mosaico_renderer_rect_t){(float)((ids[i]-1U)*tw),0,(float)tw,(float)th},
-   (mosaico_renderer_rect_t){(float)(dx+(int)i*tw),(float)dy,(float)tw,(float)th},
-   (mosaico_renderer_vec2_t){0,0},0,(mosaico_renderer_color_t){255,255,255,255});return;}
+ if(s->alpha){for(size_t i=0;i<count;++i)if(ids[i])raylib_lite_renderer_draw_texture_pro(texture,
+   (raylib_lite_renderer_rect_t){(float)((ids[i]-1U)*tw),0,(float)tw,(float)th},
+   (raylib_lite_renderer_rect_t){(float)(dx+(int)i*tw),(float)dy,(float)tw,(float)th},
+   (raylib_lite_renderer_vec2_t){0,0},0,(raylib_lite_renderer_color_t){255,255,255,255});return;}
  int y0=dy>s_clip_y0?dy:s_clip_y0,y1=dy+th<s_clip_y1?dy+th:s_clip_y1;
  if(y0>=y1)return;
  uint32_t pixels=0;
@@ -1436,7 +1436,7 @@ void mosaico_renderer_draw_tile_row(mosaico_renderer_texture_t texture,const uin
   int x1=left+tw<s_clip_x1?left+tw:s_clip_x1;
   if(x0>=x1||sx<0||sx+tw>s->header->width||th>s->header->height)continue;
   int source_x=sx+(x0-left),copy=x1-x0;
-  for(int y=y0;y<y1;++y)mosaico_copy_rgb565(&s_target[(size_t)y*s_stride+x0],
+  for(int y=y0;y<y1;++y)raylib_lite_rgb565_copy(&s_target[(size_t)y*s_stride+x0],
     &s->rgb[(size_t)(y-dy)*s->header->width+source_x],(size_t)copy);
   pixels+=(uint32_t)copy*(uint32_t)(y1-y0);
   m2d_note_store_rows(copy,y1-y0);
@@ -1450,7 +1450,7 @@ static int wrap_coord(int value,int size)
  int wrapped=value%size;
  return wrapped<0?wrapped+size:wrapped;
 }
-void mosaico_renderer_draw_column(mosaico_renderer_texture_t texture,mosaico_renderer_rect_t source,int dest_x,int dest_y,
+void raylib_lite_renderer_draw_column(raylib_lite_renderer_texture_t texture,raylib_lite_renderer_rect_t source,int dest_x,int dest_y,
  int dest_width,int dest_height,unsigned light256)
 {
  texture_slot_t *s=texture_slot(texture);
@@ -1477,7 +1477,7 @@ void mosaico_renderer_draw_column(mosaico_renderer_texture_t texture,mosaico_ren
  }
  ++s_raster_stats.column_calls;s_raster_stats.column_pixels+=drawn;
 }
-void mosaico_renderer_draw_span(mosaico_renderer_texture_t texture,mosaico_renderer_rect_t source,int dest_y,int dest_x0,
+void raylib_lite_renderer_draw_span(raylib_lite_renderer_texture_t texture,raylib_lite_renderer_rect_t source,int dest_y,int dest_x0,
  int dest_x1,int u_16,int v_16,int du_16,int dv_16,unsigned light256)
 {
  texture_slot_t *s=texture_slot(texture);
@@ -1513,7 +1513,7 @@ void mosaico_renderer_draw_span(mosaico_renderer_texture_t texture,mosaico_rende
  }
  ++s_raster_stats.span_calls;s_raster_stats.span_pixels+=drawn;
 }
-void mosaico_renderer_draw_floor_rows(mosaico_renderer_texture_t texture,mosaico_renderer_rect_t source,int dest_y,int dest_x,
+void raylib_lite_renderer_draw_floor_rows(raylib_lite_renderer_texture_t texture,raylib_lite_renderer_rect_t source,int dest_y,int dest_x,
  int column_width,int columns,const uint16_t *wall_bottom,int u_16,int v_16,
  int du_16,int dv_16,unsigned light256,int row_repeat)
 {
@@ -1560,14 +1560,14 @@ void mosaico_renderer_draw_floor_rows(mosaico_renderer_texture_t texture,mosaico
  }
  ++s_raster_stats.span_calls;s_raster_stats.span_pixels+=drawn;
 }
-void mosaico_renderer_draw_floor_row(mosaico_renderer_texture_t texture,mosaico_renderer_rect_t source,int dest_y,int dest_x,
+void raylib_lite_renderer_draw_floor_row(raylib_lite_renderer_texture_t texture,raylib_lite_renderer_rect_t source,int dest_y,int dest_x,
  int column_width,int columns,const uint16_t *wall_bottom,int u_16,int v_16,
  int du_16,int dv_16,unsigned light256)
 {
- mosaico_renderer_draw_floor_rows(texture,source,dest_y,dest_x,column_width,columns,wall_bottom,
+ raylib_lite_renderer_draw_floor_rows(texture,source,dest_y,dest_x,column_width,columns,wall_bottom,
   u_16,v_16,du_16,dv_16,light256,1);
 }
-void Mosaico2DCopyScanline(int src_y,int dst_y)
+void raylib_lite_2d_copy_scanline(int src_y,int dst_y)
 {
  if(src_y==dst_y)return;
  if(!s_target){++s_rejected_draw_calls;return;}
@@ -1575,7 +1575,7 @@ void Mosaico2DCopyScanline(int src_y,int dst_y)
  int x0=s_clip_x0,x1=s_clip_x1;
  if(x0>=x1)return;
  m2d_note_store(x1-x0);
- mosaico_copy_rgb565(&s_target[(size_t)dst_y*s_stride+x0],
+ raylib_lite_rgb565_copy(&s_target[(size_t)dst_y*s_stride+x0],
   &s_target[(size_t)src_y*s_stride+x0],(size_t)(x1-x0));
 }
 /* Bounded stack workspace, no frame-time allocation. Process columns in input
@@ -1588,7 +1588,7 @@ typedef struct {
  sample_step_t sample;
  int32_t phase,step;
 } prepared_wall_t;
-void mosaico_renderer_draw_raycast_walls(mosaico_renderer_texture_t texture,const mosaico_raycast_wall_t *columns,
+void raylib_lite_renderer_draw_raycast_walls(raylib_lite_renderer_texture_t texture,const raylib_lite_raycast_wall_t *columns,
  int column_count)
 {
  texture_slot_t *s=texture_slot(texture);
@@ -1603,7 +1603,7 @@ void mosaico_renderer_draw_raycast_walls(mosaico_renderer_texture_t texture,cons
   if(count>M2D_WALL_BLOCK)count=M2D_WALL_BLOCK;
   int used=0,y_min=s_clip_y1,y_max=s_clip_y0;
   for(int i=0;i<count;++i){
-   const mosaico_raycast_wall_t *c=&columns[first+i];
+   const raylib_lite_raycast_wall_t *c=&columns[first+i];
    if(c->dest_width<=0||c->dest_height<=0||c->src_width==0||c->src_height==0)continue;
    int y0=c->dest_y>s_clip_y0?c->dest_y:s_clip_y0;
    int y1=c->dest_y+c->dest_height<s_clip_y1?c->dest_y+c->dest_height:s_clip_y1;
@@ -1644,8 +1644,8 @@ void mosaico_renderer_draw_raycast_walls(mosaico_renderer_texture_t texture,cons
  if(any_rows)++s_raster_stats.column_calls;
  s_raster_stats.column_pixels+=drawn;
 }
-void Mosaico2DDrawIndexedRaycastWalls(MosaicoWallAtlas atlas,
- const mosaico_raycast_wall_t *columns,int column_count)
+void raylib_lite_2d_draw_indexed_raycast_walls(raylib_lite_wall_atlas_t atlas,
+ const raylib_lite_raycast_wall_t *columns,int column_count)
 {
  if(column_count<=0)return;
  if(!atlas.descriptor||!atlas.indices||!atlas.light_lut||!s_target||
@@ -1658,7 +1658,7 @@ void Mosaico2DDrawIndexedRaycastWalls(MosaicoWallAtlas atlas,
   * per-pixel descriptor search or general draw call remains in the loop. */
  if(!atlas.row_major){
   for(int i=0;i<column_count;++i){
-   const mosaico_raycast_wall_t *c=&columns[i];
+   const raylib_lite_raycast_wall_t *c=&columns[i];
    if(c->dest_width<=0||c->dest_height<=0||c->src_width==0||c->src_height==0)continue;
    int y0=c->dest_y>s_clip_y0?c->dest_y:s_clip_y0;
    int y1=c->dest_y+c->dest_height<s_clip_y1?c->dest_y+c->dest_height:s_clip_y1;
@@ -1706,7 +1706,7 @@ void Mosaico2DDrawIndexedRaycastWalls(MosaicoWallAtlas atlas,
   if(count>M2D_WALL_BLOCK)count=M2D_WALL_BLOCK;
   int used=0,y_min=s_clip_y1,y_max=s_clip_y0;
   for(int i=0;i<count;++i){
-   const mosaico_raycast_wall_t *c=&columns[first+i];
+   const raylib_lite_raycast_wall_t *c=&columns[first+i];
    if(c->dest_width<=0||c->dest_height<=0||c->src_width==0||c->src_height==0)continue;
    int y0=c->dest_y>s_clip_y0?c->dest_y:s_clip_y0;
    int y1=c->dest_y+c->dest_height<s_clip_y1?c->dest_y+c->dest_height:s_clip_y1;
@@ -1742,7 +1742,7 @@ void Mosaico2DDrawIndexedRaycastWalls(MosaicoWallAtlas atlas,
  if(any_rows)++s_raster_stats.column_calls;
  s_raster_stats.column_pixels+=drawn;
 }
-void Mosaico2DDrawSolidRaycastWalls(const mosaico_solid_wall_t *columns,
+void raylib_lite_2d_draw_solid_raycast_walls(const raylib_lite_solid_wall_t *columns,
  int column_count)
 {
  if(column_count<=0)return;
@@ -1750,7 +1750,7 @@ void Mosaico2DDrawSolidRaycastWalls(const mosaico_solid_wall_t *columns,
  uint32_t drawn=0;
  bool any=false;
  for(int i=0;i<column_count;++i){
-  const mosaico_solid_wall_t *c=&columns[i];
+  const raylib_lite_solid_wall_t *c=&columns[i];
   if(c->dest_width<=0||c->dest_height<=0)continue;
   int x0=c->dest_x>s_clip_x0?c->dest_x:s_clip_x0;
   int x1=c->dest_x+c->dest_width<s_clip_x1?c->dest_x+c->dest_width:s_clip_x1;
@@ -1768,7 +1768,7 @@ void Mosaico2DDrawSolidRaycastWalls(const mosaico_solid_wall_t *columns,
  if(any)++s_raster_stats.column_calls;
  s_raster_stats.column_pixels+=drawn;
 }
-mosaico_renderer_atlas_t mosaico_renderer_load_atlas(const char*path){mosaico_renderer_texture_t t=mosaico_renderer_load_texture(path);texture_slot_t*s=texture_slot(t);return(mosaico_renderer_atlas_t){.texture=t,.descriptor=s?s->header:NULL,.frame_count=s?s->header->frame_count:0};}
+raylib_lite_renderer_atlas_t raylib_lite_renderer_load_atlas(const char*path){raylib_lite_renderer_texture_t t=raylib_lite_renderer_load_texture(path);texture_slot_t*s=texture_slot(t);return(raylib_lite_renderer_atlas_t){.texture=t,.descriptor=s?s->header:NULL,.frame_count=s?s->header->frame_count:0};}
 static const atlas_frame_t*find_frame(texture_slot_t*s,mosaico_asset_id_t id){
  if(!s)return NULL;
  frame_cache_entry_t*cached=&s->frame_cache[(id^(id>>16))&(M2D_FRAME_CACHE_SIZE-1U)];
@@ -1779,26 +1779,26 @@ static const atlas_frame_t*find_frame(texture_slot_t*s,mosaico_asset_id_t id){
   *cached=(frame_cache_entry_t){.id=id,.index_plus_one=(uint16_t)(i+1U)};return&s->frames[i];}
  return NULL;
 }
-const mosaico_renderer_sprite_frame_t*mosaico_renderer_atlas_get_frame(mosaico_renderer_atlas_t a,mosaico_asset_id_t id){texture_slot_t*s=texture_slot(a.texture);const atlas_frame_t*f=find_frame(s,id);if(!f)return NULL;s_frame_result=(mosaico_renderer_sprite_frame_t){.id=id,.source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},.pivot={(float)f->pivot_x,(float)f->pivot_y}};return&s_frame_result;}
-esp_err_t mosaico_renderer_atlas_get_frame_copy(mosaico_renderer_atlas_t a,mosaico_asset_id_t id,mosaico_renderer_sprite_frame_t*out){
- if(!out)return ESP_ERR_INVALID_ARG;
+const raylib_lite_renderer_sprite_frame_t*raylib_lite_renderer_atlas_get_frame(raylib_lite_renderer_atlas_t a,mosaico_asset_id_t id){texture_slot_t*s=texture_slot(a.texture);const atlas_frame_t*f=find_frame(s,id);if(!f)return NULL;s_frame_result=(raylib_lite_renderer_sprite_frame_t){.id=id,.source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},.pivot={(float)f->pivot_x,(float)f->pivot_y}};return&s_frame_result;}
+raylib_lite_result_t raylib_lite_renderer_atlas_get_frame_copy(raylib_lite_renderer_atlas_t a,mosaico_asset_id_t id,raylib_lite_renderer_sprite_frame_t*out){
+ if(!out)return RAYLIB_LITE_INVALID_ARGUMENT;
  texture_slot_t*s=texture_slot(a.texture);
- if(!s)return ESP_ERR_INVALID_STATE;
- const atlas_frame_t*f=find_frame(s,id);if(!f)return ESP_ERR_NOT_FOUND;
- *out=(mosaico_renderer_sprite_frame_t){.id=id,.source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},.pivot={(float)f->pivot_x,(float)f->pivot_y}};return ESP_OK;}
-esp_err_t mosaico_renderer_wall_atlas_get_frame(MosaicoWallAtlas atlas,
- mosaico_asset_id_t id,mosaico_renderer_sprite_frame_t*out)
+ if(!s)return RAYLIB_LITE_INVALID_STATE;
+ const atlas_frame_t*f=find_frame(s,id);if(!f)return RAYLIB_LITE_NOT_FOUND;
+ *out=(raylib_lite_renderer_sprite_frame_t){.id=id,.source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},.pivot={(float)f->pivot_x,(float)f->pivot_y}};return RAYLIB_LITE_OK;}
+raylib_lite_result_t raylib_lite_renderer_wall_atlas_get_frame(raylib_lite_wall_atlas_t atlas,
+ mosaico_asset_id_t id,raylib_lite_renderer_sprite_frame_t*out)
 {
- if(!out||!atlas.descriptor||!atlas.frames)return ESP_ERR_INVALID_ARG;
+ if(!out||!atlas.descriptor||!atlas.frames)return RAYLIB_LITE_INVALID_ARGUMENT;
  const atlas_frame_t *frames=(const atlas_frame_t*)atlas.frames;
  for(uint16_t i=0;i<atlas.frame_count;++i)if(frames[i].id==id){
   const atlas_frame_t *f=&frames[i];
-  *out=(mosaico_renderer_sprite_frame_t){.id=id,
+  *out=(raylib_lite_renderer_sprite_frame_t){.id=id,
    .source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},
    .pivot={(float)f->pivot_x,(float)f->pivot_y}};
-  return ESP_OK;
+  return RAYLIB_LITE_OK;
  }
- return ESP_ERR_NOT_FOUND;
+ return RAYLIB_LITE_NOT_FOUND;
 }
-mosaico_asset_id_t MosaicoAnimationFrameAt(const mosaico_asset_id_t*frames,size_t count,uint32_t frame_ticks,uint32_t elapsed,bool loop){if(!frames||!count||!frame_ticks)return 0;size_t frame=elapsed/frame_ticks;if(loop)frame%=count;else if(frame>=count)frame=count-1;return frames[frame];}
-void mosaico_renderer_unload_atlas(mosaico_renderer_atlas_t a){mosaico_renderer_unload_texture(a.texture);}
+mosaico_asset_id_t raylib_lite_animation_frame_at(const mosaico_asset_id_t*frames,size_t count,uint32_t frame_ticks,uint32_t elapsed,bool loop){if(!frames||!count||!frame_ticks)return 0;size_t frame=elapsed/frame_ticks;if(loop)frame%=count;else if(frame>=count)frame=count-1;return frames[frame];}
+void raylib_lite_renderer_unload_atlas(raylib_lite_renderer_atlas_t a){raylib_lite_renderer_unload_texture(a.texture);}

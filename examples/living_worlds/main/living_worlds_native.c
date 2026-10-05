@@ -7,7 +7,7 @@
 #include "driver/jpeg_decode.h"
 #include "esp_log.h"
 #include "raylib_lite_example_board.h"
-#include "mosaico_game_2d.h"
+#include "raylib_lite_2d.h"
 #include "mosaico_game_assets.h"
 #include "raylib_lite_game_app.h"
 #include "raylib_lite_native_hooks.h"
@@ -96,7 +96,7 @@ static esp_err_t register_assets(void)
 
 static esp_err_t decode_background(jpeg_decoder_handle_t decoder,
                                    const char *name, const uint8_t *start,
-                                   const uint8_t *end, MosaicoAtlas *out,
+                                   const uint8_t *end, raylib_lite_atlas_t *out,
                                    void **out_pixels)
 {
     jpeg_decode_picture_info_t info = {0};
@@ -130,14 +130,14 @@ static esp_err_t decode_background(jpeg_decoder_handle_t decoder,
         free(pixels);
         return err;
     }
-    Texture2D texture = Mosaico2DRegisterRGB565(
+    Texture2D texture = raylib_lite_2d_register_rgb565(
         pixels, (int)info.width, (int)info.height);
     if (!texture.id) {
         free(pixels);
         return ESP_ERR_NO_MEM;
     }
     *out_pixels = pixels;
-    *out = (MosaicoAtlas){.texture = texture};
+    *out = (raylib_lite_atlas_t){.texture = texture};
     ESP_LOGI(TAG, "JPEG %s: %ux%u, %u bytes -> %u bytes RGB565", name,
              (unsigned)info.width, (unsigned)info.height,
              (unsigned)stream_size, (unsigned)output_size);
@@ -146,10 +146,10 @@ static esp_err_t decode_background(jpeg_decoder_handle_t decoder,
 
 static void clear_background_aliases(living_worlds_atlases_t *atlases)
 {
-    atlases->aurora = (MosaicoAtlas){0};
-    atlases->ocean = (MosaicoAtlas){0};
-    atlases->sunrise = (MosaicoAtlas){0};
-    atlases->rainforest = (MosaicoAtlas){0};
+    atlases->aurora = (raylib_lite_atlas_t){0};
+    atlases->ocean = (raylib_lite_atlas_t){0};
+    atlases->sunrise = (raylib_lite_atlas_t){0};
+    atlases->rainforest = (raylib_lite_atlas_t){0};
 }
 
 static esp_err_t load_background(living_worlds_native_t *state,
@@ -183,21 +183,21 @@ static esp_err_t load_background(living_worlds_native_t *state,
         break;
     }
 
-    MosaicoAtlas next = {0};
+    raylib_lite_atlas_t next = {0};
     void *next_pixels = NULL;
     esp_err_t err = decode_background(state->jpeg, name, start, end,
                                       &next, &next_pixels);
     if (err != ESP_OK) return err;
 
     if (atlases->aurora.texture.id)
-        Mosaico2DUnloadTexture(atlases->aurora.texture);
+        raylib_lite_2d_unload_texture(atlases->aurora.texture);
     free(state->background_pixels);
     clear_background_aliases(atlases);
     state->background_pixels = next_pixels;
     atlases->aurora = atlases->ocean =
         atlases->sunrise = atlases->rainforest = next;
     if (scene == LIVING_SCENE_OCEAN)
-        (void)Mosaico2DCacheTextureLight(next.texture, 232);
+        (void)raylib_lite_2d_cache_texture_light(next.texture, 232);
     return ESP_OK;
 }
 
@@ -215,7 +215,7 @@ static void session_release_background(void *context,
 {
     living_worlds_native_t *state = context;
     if (atlases->aurora.texture.id)
-        Mosaico2DUnloadTexture(atlases->aurora.texture);
+        raylib_lite_2d_unload_texture(atlases->aurora.texture);
     free(state->background_pixels);
     state->background_pixels = NULL;
     clear_background_aliases(atlases);

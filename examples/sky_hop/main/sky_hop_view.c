@@ -9,10 +9,10 @@ static void centered(const char *text, int y, int size, Color color)
     DrawText(text, (480 - MeasureText(text, size)) / 2, y, size, color);
 }
 
-static void draw_sprite(MosaicoAtlas atlas, mosaico_asset_id_t id, float x, float y,
+static void draw_sprite(raylib_lite_atlas_t atlas, mosaico_asset_id_t id, float x, float y,
                         float width, float height, bool flip)
 {
-    const MosaicoSpriteFrame *frame = MosaicoAtlasGetFrame(atlas, id);
+    const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, id);
     if (!frame) return;
     Rectangle source = frame->source;
     if (flip) source.width = -source.width;
@@ -92,7 +92,7 @@ bool sky_hop_view_render(const sky_hop_view_t *view)
     Camera2D world_camera = {.offset={0, 0}, .target={game->camera_x, 0},
                              .rotation=0, .zoom=1};
     BeginDrawing();
-    if (!MosaicoFastFrameAvailable()) {
+    if (!raylib_lite_raylib_frame_available()) {
         EndDrawing();
         return false;
     }

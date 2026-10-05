@@ -12,7 +12,7 @@ void PlaySound(Sound sound){assert(sound.frameCount);++plays;}
 void StopSound(Sound sound){assert(sound.frameCount);++stops;}
 void UnloadSound(Sound sound){assert(sound.frameCount);++unloads;}
 void CloseAudioDevice(void){++closes;}
-void UnloadMosaicoWallAtlas(MosaicoWallAtlas atlas){(void)atlas;}
+void raylib_lite_wall_atlas_unload(raylib_lite_wall_atlas_t atlas){(void)atlas;}
 
 static float distance(sl_vec3_t a,sl_vec3_t b)
 {sl_vec3_t d=vsub(a,b);return sqrtf(vdot(d,d));}

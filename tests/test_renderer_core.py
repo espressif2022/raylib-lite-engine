@@ -22,8 +22,8 @@ class RendererCoreTests(unittest.TestCase):
                 f"-I{ROOT / 'include/raylib_lite'}",
                 f"-I{ROOT / 'include/raylib_lite'}",
                 str(ROOT / "tests/test_renderer_core.c"),
-                str(ROOT / "src/renderer/mosaico_game_2d.c"),
-                str(ROOT / "src/renderer/mosaico_rgb565.c"),
+                str(ROOT / "src/renderer/raylib_lite_renderer.c"),
+                str(ROOT / "src/renderer/raylib_lite_rgb565.c"),
                 "-lm", "-o", str(executable),
             ]
             subprocess.run(command, check=True)

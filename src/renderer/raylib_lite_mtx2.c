@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "mosaico_mtx2.h"
+#include "raylib_lite_mtx2.h"
 
-#include "mosaico_rgb565.h"
+#include "raylib_lite_rgb565.h"
 
 #include "raylib_lite_raster_config.h"
 #define MTX2_HOT RAYLIB_LITE_RASTER_HOT
@@ -24,7 +24,7 @@ static inline uint16_t pack565(unsigned r, unsigned g, unsigned b)
     return (uint16_t)((r << 11) | (g << 5) | b);
 }
 
-bool mosaico_mtx2_palette(const uint8_t *block, unsigned light256, uint16_t out_palette[4])
+bool raylib_lite_mtx2_palette(const uint8_t *block, unsigned light256, uint16_t out_palette[4])
 {
     const uint16_t c0 = load16(block);
     const uint16_t c1 = load16(block + 2);
@@ -48,43 +48,43 @@ bool mosaico_mtx2_palette(const uint8_t *block, unsigned light256, uint16_t out_
         out_palette[2] = p2;
         out_palette[3] = p3;
     } else {
-        out_palette[0] = mosaico_shade565(c0, light256);
-        out_palette[1] = mosaico_shade565(c1, light256);
-        out_palette[2] = mosaico_shade565(p2, light256);
-        out_palette[3] = punch ? 0 : mosaico_shade565(p3, light256);
+        out_palette[0] = raylib_lite_rgb565_shade_pixel(c0, light256);
+        out_palette[1] = raylib_lite_rgb565_shade_pixel(c1, light256);
+        out_palette[2] = raylib_lite_rgb565_shade_pixel(p2, light256);
+        out_palette[3] = punch ? 0 : raylib_lite_rgb565_shade_pixel(p3, light256);
     }
     return punch;
 }
 
-bool mosaico_mtx2_open(const void *data, size_t size, mosaico_mtx2_t *out_texture)
+bool raylib_lite_mtx2_open(const void *data, size_t size, raylib_lite_mtx2_t *out_texture)
 {
-    if (!data || !out_texture || size < MOSAICO_MTX2_HEADER_BYTES) {
+    if (!data || !out_texture || size < RAYLIB_LITE_MTX2_HEADER_BYTES) {
         return false;
     }
-    const mosaico_mtx2_header_t *header = (const mosaico_mtx2_header_t *)data;
-    if (header->magic != MOSAICO_MTX2_MAGIC || !header->width || !header->height) {
+    const raylib_lite_mtx2_header_t *header = (const raylib_lite_mtx2_header_t *)data;
+    if (header->magic != RAYLIB_LITE_MTX2_MAGIC || !header->width || !header->height) {
         return false;
     }
     const size_t frames = (size_t)header->frame_count * 16U;
-    const size_t offset = MOSAICO_MTX2_HEADER_BYTES + frames;
+    const size_t offset = RAYLIB_LITE_MTX2_HEADER_BYTES + frames;
     const int block_width = (header->width + 3) >> 2;
     const int block_height = (header->height + 3) >> 2;
-    const size_t level0 = (size_t)block_width * (size_t)block_height * MOSAICO_MTX2_BLOCK_BYTES;
+    const size_t level0 = (size_t)block_width * (size_t)block_height * RAYLIB_LITE_MTX2_BLOCK_BYTES;
     if (offset > size || size - offset < level0 || header->block_bytes < level0) {
         return false;
     }
-    *out_texture = (mosaico_mtx2_t){
+    *out_texture = (raylib_lite_mtx2_t){
         .blocks = (const uint8_t *)data + offset,
         .width = header->width,
         .height = header->height,
         .block_width = block_width,
         .block_height = block_height,
-        .punch_through = (header->flags & MOSAICO_MTX2_FLAG_OPAQUE) == 0U,
+        .punch_through = (header->flags & RAYLIB_LITE_MTX2_FLAG_OPAQUE) == 0U,
     };
     return true;
 }
 
-MTX2_HOT void mosaico_mtx2_span_constv(uint16_t *dst, const mosaico_mtx2_t *texture,
+MTX2_HOT void raylib_lite_mtx2_span_constv(uint16_t *dst, const raylib_lite_mtx2_t *texture,
                                        int32_t u_16, int32_t du_16, int v_texel,
                                        int count, unsigned light256)
 {
@@ -98,7 +98,7 @@ MTX2_HOT void mosaico_mtx2_span_constv(uint16_t *dst, const mosaico_mtx2_t *text
     }
     const uint8_t *row = texture->blocks
                        + (size_t)(v_texel >> 2) * (size_t)texture->block_width
-                             * MOSAICO_MTX2_BLOCK_BYTES;
+                             * RAYLIB_LITE_MTX2_BLOCK_BYTES;
     /* Bit position of this texel row inside the block's index word. */
     const unsigned row_shift = (unsigned)(v_texel & 3) * 8U;
 
@@ -116,9 +116,9 @@ MTX2_HOT void mosaico_mtx2_span_constv(uint16_t *dst, const mosaico_mtx2_t *text
         int i = 0;
         while (i < count) {
             const int sub = x & 3;
-            const uint8_t *block = row + (size_t)(x >> 2) * MOSAICO_MTX2_BLOCK_BYTES;
-            mosaico_mtx2_palette(block, light256, palette);
-            const unsigned idx = index_byte[(size_t)(x >> 2) * MOSAICO_MTX2_BLOCK_BYTES];
+            const uint8_t *block = row + (size_t)(x >> 2) * RAYLIB_LITE_MTX2_BLOCK_BYTES;
+            raylib_lite_mtx2_palette(block, light256, palette);
+            const unsigned idx = index_byte[(size_t)(x >> 2) * RAYLIB_LITE_MTX2_BLOCK_BYTES];
             int run = 4 - sub;
             if (run > count - i) {
                 run = count - i;
@@ -140,8 +140,8 @@ MTX2_HOT void mosaico_mtx2_span_constv(uint16_t *dst, const mosaico_mtx2_t *text
             const int x = u_16 >> 16;
             const int bx = x >> 2;
             if (bx != cached) {
-                const uint8_t *block = row + (size_t)bx * MOSAICO_MTX2_BLOCK_BYTES;
-                mosaico_mtx2_palette(block, light256, palette);
+                const uint8_t *block = row + (size_t)bx * RAYLIB_LITE_MTX2_BLOCK_BYTES;
+                raylib_lite_mtx2_palette(block, light256, palette);
                 bits = load32(block + 4);
                 cached = bx;
             }
@@ -156,8 +156,8 @@ MTX2_HOT void mosaico_mtx2_span_constv(uint16_t *dst, const mosaico_mtx2_t *text
         const int x = u_16 >> 16;
         const int bx = x >> 2;
         if (bx != cached) {
-            const uint8_t *block = row + (size_t)bx * MOSAICO_MTX2_BLOCK_BYTES;
-            punch = mosaico_mtx2_palette(block, light256, palette);
+            const uint8_t *block = row + (size_t)bx * RAYLIB_LITE_MTX2_BLOCK_BYTES;
+            punch = raylib_lite_mtx2_palette(block, light256, palette);
             bits = load32(block + 4);
             cached = bx;
         }
@@ -169,21 +169,21 @@ MTX2_HOT void mosaico_mtx2_span_constv(uint16_t *dst, const mosaico_mtx2_t *text
     }
 }
 
-MTX2_HOT void mosaico_mtx2_decode_block_row(const mosaico_mtx2_t *texture, int block_y,
+MTX2_HOT void raylib_lite_mtx2_decode_block_row(const raylib_lite_mtx2_t *texture, int block_y,
                                             int first_block, int block_count,
                                             unsigned light256, uint16_t *palettes)
 {
     const uint8_t *block = texture->blocks
                          + ((size_t)block_y * (size_t)texture->block_width
                             + (size_t)first_block)
-                               * MOSAICO_MTX2_BLOCK_BYTES;
+                               * RAYLIB_LITE_MTX2_BLOCK_BYTES;
     for (int i = 0; i < block_count; ++i) {
-        mosaico_mtx2_palette(block, light256, palettes + 4 * (size_t)i);
-        block += MOSAICO_MTX2_BLOCK_BYTES;
+        raylib_lite_mtx2_palette(block, light256, palettes + 4 * (size_t)i);
+        block += RAYLIB_LITE_MTX2_BLOCK_BYTES;
     }
 }
 
-MTX2_HOT void mosaico_mtx2_blit(uint16_t *dst, int dst_stride, const mosaico_mtx2_t *texture,
+MTX2_HOT void raylib_lite_mtx2_blit(uint16_t *dst, int dst_stride, const raylib_lite_mtx2_t *texture,
                                 int u0, int v0, int width, int height, unsigned light256)
 {
     if (width <= 0 || height <= 0) {
@@ -210,19 +210,19 @@ MTX2_HOT void mosaico_mtx2_blit(uint16_t *dst, int dst_stride, const mosaico_mtx
             const int v = v0 + y;
             const int block_y = v >> 2;
             if (block_y != cached_block_y) {
-                mosaico_mtx2_decode_block_row(texture, block_y, first_block, blocks,
+                raylib_lite_mtx2_decode_block_row(texture, block_y, first_block, blocks,
                                               light256, palettes);
                 cached_block_y = block_y;
             }
             const uint8_t *index_row = texture->blocks
                                      + ((size_t)block_y * (size_t)texture->block_width
                                         + (size_t)first_block)
-                                           * MOSAICO_MTX2_BLOCK_BYTES
+                                           * RAYLIB_LITE_MTX2_BLOCK_BYTES
                                      + 4 + (size_t)(v & 3);
             uint16_t *out = dst + (size_t)y * (size_t)dst_stride + (size_t)x;
             int i = 0, sub = sub_u, b = 0;
             while (i < span) {
-                const unsigned idx = index_row[(size_t)b * MOSAICO_MTX2_BLOCK_BYTES];
+                const unsigned idx = index_row[(size_t)b * RAYLIB_LITE_MTX2_BLOCK_BYTES];
                 const uint16_t *palette = palettes + 4 * (size_t)b;
                 int run = 4 - sub;
                 if (run > span - i) {
@@ -240,7 +240,7 @@ MTX2_HOT void mosaico_mtx2_blit(uint16_t *dst, int dst_stride, const mosaico_mtx
     }
 }
 
-MTX2_HOT void mosaico_mtx2_span(uint16_t *dst, const mosaico_mtx2_t *texture,
+MTX2_HOT void raylib_lite_mtx2_span(uint16_t *dst, const raylib_lite_mtx2_t *texture,
                                 int32_t u_16, int32_t v_16, int32_t du_16, int32_t dv_16,
                                 int count, unsigned light256)
 {
@@ -248,7 +248,7 @@ MTX2_HOT void mosaico_mtx2_span(uint16_t *dst, const mosaico_mtx2_t *texture,
         return;
     }
     if (dv_16 == 0) {
-        mosaico_mtx2_span_constv(dst, texture, u_16, du_16, v_16 >> 16, count, light256);
+        raylib_lite_mtx2_span_constv(dst, texture, u_16, du_16, v_16 >> 16, count, light256);
         return;
     }
     const int max_x = texture->width - 1;
@@ -268,8 +268,8 @@ MTX2_HOT void mosaico_mtx2_span(uint16_t *dst, const mosaico_mtx2_t *texture,
         if (bx != cached_bx || by != cached_by) {
             const uint8_t *block = texture->blocks
                                  + ((size_t)by * (size_t)texture->block_width + (size_t)bx)
-                                       * MOSAICO_MTX2_BLOCK_BYTES;
-            punch = mosaico_mtx2_palette(block, light256, palette);
+                                       * RAYLIB_LITE_MTX2_BLOCK_BYTES;
+            punch = raylib_lite_mtx2_palette(block, light256, palette);
             bits = load32(block + 4);
             cached_bx = bx;
             cached_by = by;

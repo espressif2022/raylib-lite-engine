@@ -11,9 +11,9 @@ ESP_IMPLEMENTATIONS = {
     "src/idf/mosaico_game_assets_mmap.c",
     "src/runtime/raylib_lite_debug.c",
     "src/idf/mosaico_game_save_nvs.c",
-    "src/renderer/mosaico_game_2d_esp.c",
-    "src/renderer/mosaico_raster_bench.c",
-    "src/renderer/mosaico_wall_bench.c",
+    "src/renderer/raylib_lite_renderer_esp.c",
+    "src/renderer/raylib_lite_raster_bench.c",
+    "src/renderer/raylib_lite_wall_bench.c",
     "src/renderer/raster_log.c",
     "src/renderer/raster_esp_config.h",
     "src/idf/clock_esp.c",
@@ -136,7 +136,7 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
             encoding="utf-8")
         self.assertIn('"${RAYLIB_LITE_ENGINE_ROOT}"', helper)
         for old in ("mosaico_game_app", "mosaico_game_assets",
-                    "mosaico_game_2d", "mosaico_raylib_fast",
+                    "raylib_lite_renderer", "mosaico_raylib_fast",
                     "raylib_lite_platform", "raylib_lite_runner"):
             self.assertNotIn(f"components/${{{old}}}", helper)
 
@@ -151,7 +151,7 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                 self.assertIn("raylib-lite-engine", requirements)
                 for old in ("mosaico_game", "mosaico_game_app",
                             "mosaico_game_assets", "mosaico_game_audio",
-                            "mosaico_game_2d", "mosaico_raylib_fast",
+                            "raylib_lite_renderer", "mosaico_raylib_fast",
                             "mosaico_raylib_port", "raylib_lite_platform",
                             "raylib_lite_runner"):
                     self.assertNotIn(old, requirements)
@@ -227,7 +227,7 @@ int main(void) {{ return ESP_OK; }}
                            text=True, check=True)
 
     def test_wall_config_header_compiles_with_strict_c11(self) -> None:
-        header = ENGINE / "include/raylib_lite/mosaico_wall_config.h"
+        header = ENGINE / "include/raylib_lite/raylib_lite_wall_config.h"
         source = f'''#include "{header}"
 int main(void) {{ return M2D_WALL_MODE; }}
 '''
@@ -238,12 +238,12 @@ int main(void) {{ return M2D_WALL_MODE; }}
                            input=source, text=True, check=True)
 
     def test_raylib_name_compatibility_is_explicit(self) -> None:
-        fast = (ENGINE / "include/raylib_lite/mosaico_raylib_fast.h").read_text()
+        fast = (ENGINE / "include/raylib_lite/raylib_lite_raylib_impl.h").read_text()
         compat = (ENGINE / "compat/raylib/include/raylib_lite_raylib.h").read_text()
         for macro in ("InitWindow", "BeginDrawing", "DrawRectangle",
                       "DrawTexture", "DrawText"):
             self.assertNotIn(f"#define {macro} ", fast)
-            self.assertIn(f"#define {macro} MosaicoFast", compat)
+            self.assertIn(f"#define {macro} raylib_lite_raylib_", compat)
 
         for root in (ENGINE / "examples").glob("*/main"):
             if root.parent.name == "render_benchmark":
@@ -253,7 +253,7 @@ int main(void) {{ return M2D_WALL_MODE; }}
                     continue
                 source = path.read_text(encoding="utf-8")
                 with self.subTest(path=path.relative_to(ENGINE)):
-                    self.assertNotIn('#include "mosaico_raylib_fast.h"', source)
+                    self.assertNotIn('#include "raylib_lite_raylib_impl.h"', source)
 
         for relative in ("src/runtime/raylib_lite_game_app.c",
                          "src/ui/mosaico_game_ui.c"):
@@ -262,39 +262,39 @@ int main(void) {{ return M2D_WALL_MODE; }}
 
     def test_renderer_core_is_raylib_type_neutral(self) -> None:
         renderer = ENGINE / "src/renderer"
-        core = (renderer / "mosaico_game_2d.c").read_text(encoding="utf-8")
-        neutral = (ENGINE / "include/raylib_lite/mosaico_renderer.h").read_text(encoding="utf-8")
-        legacy = (ENGINE / "include/raylib_lite/mosaico_game_2d.h").read_text(encoding="utf-8")
-        adapter = (renderer / "mosaico_game_2d_raylib.c").read_text(encoding="utf-8")
+        core = (renderer / "raylib_lite_renderer.c").read_text(encoding="utf-8")
+        neutral = (ENGINE / "include/raylib_lite/raylib_lite_renderer.h").read_text(encoding="utf-8")
+        legacy = (ENGINE / "include/raylib_lite/raylib_lite_2d.h").read_text(encoding="utf-8")
+        adapter = (renderer / "raylib_lite_renderer_raylib.c").read_text(encoding="utf-8")
         cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
 
         for source in (core, neutral):
             for token in ("raylib.h", "Texture2D", "Rectangle", "Vector2",
                           "Color", "PIXELFORMAT_"):
                 self.assertNotIn(token, source)
-        self.assertIn('#include "mosaico_renderer.h"', core)
+        self.assertIn('#include "raylib_lite_renderer.h"', core)
         self.assertIn('#include "raylib.h"', legacy)
         self.assertIn("Texture2D", legacy)
         self.assertIn("to_renderer_texture", adapter)
-        self.assertIn("mosaico_game_2d_raylib.c", cmake)
+        self.assertIn("raylib_lite_renderer_raylib.c", cmake)
         self.assertIn("REQUIRES raylib", cmake)
-        legacy_header = (ENGINE / "include/raylib_lite/mosaico_game_2d.h").read_text(
+        legacy_header = (ENGINE / "include/raylib_lite/raylib_lite_2d.h").read_text(
             encoding="utf-8")
-        for hot in ("Mosaico2DDrawTexturePro", "Mosaico2DDrawTexturedTriangle",
-                    "Mosaico2DDrawTexturedQuad", "Mosaico2DDrawColumn",
-                    "Mosaico2DDrawSpan", "Mosaico2DDrawFloorRow",
-                    "Mosaico2DDrawFloorRows", "Mosaico2DDrawRaycastWalls"):
+        for hot in ("raylib_lite_2d_draw_texture_pro", "raylib_lite_2d_draw_textured_triangle",
+                    "raylib_lite_2d_draw_textured_quad", "raylib_lite_2d_draw_column",
+                    "raylib_lite_2d_draw_span", "raylib_lite_2d_draw_floor_row",
+                    "raylib_lite_2d_draw_floor_rows", "raylib_lite_2d_draw_raycast_walls"):
             self.assertIn(f"static inline void {hot}", legacy_header)
             self.assertNotIn(f"void {hot}(", adapter)
 
     def test_s31_rgb565_acceleration_is_arch_scoped(self) -> None:
         renderer = ENGINE / "src/renderer"
         cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
-        arch = ENGINE / "src/arch/esp32s31/mosaico_rgb565_pie.S"
+        arch = ENGINE / "src/arch/esp32s31/raylib_lite_rgb565_pie.S"
         self.assertTrue(arch.is_file())
-        self.assertFalse((renderer / "mosaico_rgb565_pie.S").exists())
-        self.assertIn('src/renderer/mosaico_rgb565.c', cmake)
-        self.assertIn('src/arch/esp32s31/mosaico_rgb565_pie.S', cmake)
+        self.assertFalse((renderer / "raylib_lite_rgb565_pie.S").exists())
+        self.assertIn('src/renderer/raylib_lite_rgb565.c', cmake)
+        self.assertIn('src/arch/esp32s31/raylib_lite_rgb565_pie.S', cmake)
         self.assertIn('IDF_TARGET STREQUAL "esp32s31"', cmake)
 
     def test_product_app_integrations_are_external(self) -> None:

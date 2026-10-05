@@ -2,11 +2,11 @@
 #include "living_worlds_session.h"
 #include <stddef.h>
 
-static void unload_atlas(MosaicoAtlas *atlas)
+static void unload_atlas(raylib_lite_atlas_t *atlas)
 {
     if (!atlas->texture.id) return;
-    UnloadMosaicoAtlas(*atlas);
-    *atlas = (MosaicoAtlas){0};
+    raylib_lite_atlas_unload(*atlas);
+    *atlas = (raylib_lite_atlas_t){0};
 }
 
 static void unload_volumes(living_worlds_atlases_t *a)
@@ -26,10 +26,10 @@ static void unload_volumes(living_worlds_atlases_t *a)
     unload_atlas(&a->rainforest_falls);
 }
 
-static int load_atlas(MosaicoAtlas *atlas, const char *path)
+static int load_atlas(raylib_lite_atlas_t *atlas, const char *path)
 {
     if (atlas->texture.id) return 0;
-    *atlas = LoadMosaicoAtlas(path);
+    *atlas = raylib_lite_atlas_load(path);
     return atlas->texture.id ? 0 : -1;
 }
 

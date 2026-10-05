@@ -18,7 +18,7 @@ class Rgb565Tests(unittest.TestCase):
             command += shlex.split(os.environ.get("CFLAGS", ""))
             command += [
                 str(ROOT / "tests/test_rgb565.c"),
-                str(ROOT / "src/renderer/mosaico_rgb565.c"),
+                str(ROOT / "src/renderer/raylib_lite_rgb565.c"),
                 "-I", str(ROOT / "include/raylib_lite"),
                 "-o", executable,
             ]

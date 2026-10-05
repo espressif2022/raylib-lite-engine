@@ -15,12 +15,12 @@ class LivingWorldsSessionTests(unittest.TestCase):
         self.assertIsNotNone(compiler)
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
-            (temporary / "mosaico_game_2d.h").write_text(
+            (temporary / "raylib_lite_2d.h").write_text(
                 """#pragma once
 typedef struct { unsigned id; } Texture2D;
-typedef struct { Texture2D texture; } MosaicoAtlas;
-MosaicoAtlas LoadMosaicoAtlas(const char *path);
-void UnloadMosaicoAtlas(MosaicoAtlas atlas);
+typedef struct { Texture2D texture; } raylib_lite_atlas_t;
+raylib_lite_atlas_t raylib_lite_atlas_load(const char *path);
+void raylib_lite_atlas_unload(raylib_lite_atlas_t atlas);
 """, encoding="utf-8")
             (temporary / "mosaico_game_audio.h").write_text(
                 """#pragma once

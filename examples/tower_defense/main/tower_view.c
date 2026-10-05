@@ -13,19 +13,19 @@ static const Color C_CYAN = {42, 224, 231, 255};
 static const Color C_RED = {255, 73, 105, 255};
 static const Color C_BLUE = {110, 145, 255, 255};
 
-static void draw_sprite(MosaicoAtlas atlas, const char *name, float x, float y,
+static void draw_sprite(raylib_lite_atlas_t atlas, const char *name, float x, float y,
                         float size, float rotation, Color tint)
 {
-    const MosaicoSpriteFrame *frame = MosaicoAtlasGetFrame(atlas, mosaico_game_asset_id(name));
+    const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, mosaico_game_asset_id(name));
     if (!frame) return;
     DrawTexturePro(atlas.texture, frame->source,
         (Rectangle){x, y, size, size}, (Vector2){size * .5f, size * .5f}, rotation, tint);
 }
 
-static void draw_sprite_id(MosaicoAtlas atlas, mosaico_asset_id_t id, float x, float y,
+static void draw_sprite_id(raylib_lite_atlas_t atlas, mosaico_asset_id_t id, float x, float y,
                            float size, Color tint)
 {
-    const MosaicoSpriteFrame *frame = MosaicoAtlasGetFrame(atlas, id);
+    const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, id);
     if (frame) DrawTexturePro(atlas.texture, frame->source,
         (Rectangle){x, y, size, size}, (Vector2){size * .5f, size * .5f}, 0, tint);
 }
@@ -55,7 +55,7 @@ static void draw_pad(const tower_view_t *view, const tower_slot_t *tower)
         i < tower->level ? main : (Color){39, 67, 70, 255});
 }
 
-static void draw_enemy(MosaicoAtlas atlas, const tower_enemy_t *enemy)
+static void draw_enemy(raylib_lite_atlas_t atlas, const tower_enemy_t *enemy)
 {
     int x = (int)enemy->x, y = (int)enemy->y;
     const char *names[] = {"enemy_drone", "enemy_brute", "enemy_scout"};
@@ -84,7 +84,7 @@ static void draw_effects(const tower_view_t *view)
     for (size_t i = 0; i < view->effect_count; ++i) {
         const tower_effect_t *effect = &view->effects[i];
         if (!effect->active) continue;
-        mosaico_asset_id_t frame = MosaicoAnimationFrameAt(
+        mosaico_asset_id_t frame = raylib_lite_animation_frame_at(
             MOSAICO_ANIMATION_EXPLOSION_FRAMES,
             MOSAICO_ANIMATION_EXPLOSION_FRAME_COUNT,
             MOSAICO_ANIMATION_EXPLOSION_FRAME_TICKS, 12U - effect->ticks, false);
@@ -199,11 +199,11 @@ static void draw_overlay(const char *title, const char *line, const char *action
     draw_centered(action, 279, 15, RAYWHITE);
 }
 
-bool tower_view_apply_map(tower_game_t *game, MosaicoTilemap map)
+bool tower_view_apply_map(tower_game_t *game, raylib_lite_tilemap_t map)
 {
     (void)game;
     const Vector2 *points = NULL;
-    size_t count = MosaicoTilemapPathPoints(map, &points);
+    size_t count = raylib_lite_tilemap_path_points(map, &points);
     tower_level_t level = {.path_count = (uint8_t)count};
     for (size_t i = 0; i < count && i < TOWER_MAX_PATH_POINTS; ++i) {
         level.path[i][0] = points[i].x;
@@ -212,8 +212,8 @@ bool tower_view_apply_map(tower_game_t *game, MosaicoTilemap map)
     for (unsigned i = 0; i < TOWER_PAD_COUNT; ++i) {
         char name[12];
         snprintf(name, sizeof(name), "pad_%u", i);
-        MosaicoMapObject object = {0};
-        if (MosaicoTilemapFindObject(map, mosaico_game_asset_id(name), &object)) {
+        raylib_lite_map_object_t object = {0};
+        if (raylib_lite_tilemap_find_object(map, mosaico_game_asset_id(name), &object)) {
             level.pads[i][0] = object.x;
             level.pads[i][1] = object.y;
         }
@@ -242,12 +242,12 @@ void tower_view_render(const tower_view_t *view)
     if (!view || !view->game) return;
     const tower_game_t *game = view->game;
     BeginDrawing();
-    if (!MosaicoFastFrameAvailable()) {
+    if (!raylib_lite_raylib_frame_available()) {
         EndDrawing();
         return;
     }
     ClearBackground(C_GRASS);
-    DrawMosaicoTilemapLayer(view->map, 0, (Rectangle){0, 0, 480, 320});
+    raylib_lite_tilemap_draw_layer(view->map, 0, (Rectangle){0, 0, 480, 320});
     draw_core(view);
     for (size_t i = 0; i < TOWER_PAD_COUNT; ++i) draw_pad(view, &game->towers[i]);
     for (size_t i = 0; i < TOWER_MAX_ENEMIES; ++i)

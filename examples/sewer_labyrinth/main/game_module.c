@@ -8,7 +8,7 @@
 #if !defined(MOSAICO_GAME_NATIVE) && !defined(MOSAICO_GAME_ELF)
 #include "host_asset_runtime.h"
 #endif
-#include "mosaico_game_2d.h"
+#include "raylib_lite_2d.h"
 #include "mosaico_game_module.h"
 #include "raylib_lite_raylib.h"
 #if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
@@ -91,7 +91,7 @@ typedef struct {uint32_t best_ticks;uint16_t wins;uint8_t badges;} sl_run_record
 typedef struct {
     sl_game_t game;
     sl_game_t checkpoint;
-    MosaicoWallAtlas materials;
+    raylib_lite_wall_atlas_t materials;
     bool left,right,forward,back,strafe_left,strafe_right,fire,fire_edge,sneak,touch_sneak,has_checkpoint;
     uint32_t consumed_sfx;
     uint16_t menu_down;
@@ -687,7 +687,7 @@ static int ground_layer(const sl_face_t *f)
     return 2;
 }
 
-static void draw_face(const sl_face_t *f,MosaicoWallAtlas materials,Texture2D details)
+static void draw_face(const sl_face_t *f,raylib_lite_wall_atlas_t materials,Texture2D details)
 {
     sl_view_t input[4],clipped[SL_MAX_POLY];
     for(int i=0;i<4;++i){
@@ -714,16 +714,16 @@ static void draw_face(const sl_face_t *f,MosaicoWallAtlas materials,Texture2D de
         unsigned light=(unsigned)clampf(226.0f*room_light-
             clampf((f->depth-2.0f)*4.0f,0,82),116,226);
         for(int i=1;i<n-1;++i){
-            mosaico_textured_vertex_t a={p[0].x,p[0].y,ox+clipped[0].u,oy+clipped[0].v,
+            raylib_lite_textured_vertex_t a={p[0].x,p[0].y,ox+clipped[0].u,oy+clipped[0].v,
                                           1.0f/clipped[0].z};
-            mosaico_textured_vertex_t b={p[i].x,p[i].y,ox+clipped[i].u,oy+clipped[i].v,
+            raylib_lite_textured_vertex_t b={p[i].x,p[i].y,ox+clipped[i].u,oy+clipped[i].v,
                                           1.0f/clipped[i].z};
-            mosaico_textured_vertex_t d={p[i+1].x,p[i+1].y,ox+clipped[i+1].u,oy+clipped[i+1].v,
+            raylib_lite_textured_vertex_t d={p[i+1].x,p[i+1].y,ox+clipped[i+1].u,oy+clipped[i+1].v,
                                           1.0f/clipped[i+1].z};
             if(f->material>=SL_MAT_PANEL)
-                Mosaico2DDrawTexturedTriangle(details,a,b,d,light);
+                raylib_lite_2d_draw_textured_triangle(details,a,b,d,light);
             else
-                Mosaico2DDrawIndexedTexturedTriangle(materials,a,b,d,light);
+                raylib_lite_2d_draw_indexed_textured_triangle(materials,a,b,d,light);
         }
     }else for(int i=1;i<n-1;++i)DrawTriangle(p[0],p[i],p[i+1],c);
 }
@@ -1694,7 +1694,7 @@ static void draw_hud(const sl_game_t *g)
     }
 }
 
-static void render_game(sl_game_t *g,MosaicoWallAtlas materials)
+static void render_game(sl_game_t *g,raylib_lite_wall_atlas_t materials)
 {
     s_cam_x=g->cam_x;s_cam_y=g->cam_y;s_cam_z=g->cam_z;
     s_room_power=true;
@@ -1777,7 +1777,7 @@ static int initialize(void *value
     (void)asset_root;
 #endif
     sl_module_t *s=value;reset_dispatch(&s->game,0,0,0,true);restore_survey(s);
-    s->materials=LoadMosaicoWallAtlas("materials.wall");
+    s->materials=raylib_lite_wall_atlas_load("materials.wall");
     if(!s->materials.descriptor)return -1;
     clear_input(s);
 #if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
@@ -1804,7 +1804,7 @@ static void shutdown(void *value)
     }
     CloseAudioDevice();
 #endif
-    if(s&&s->materials.descriptor)UnloadMosaicoWallAtlas(s->materials);
+    if(s&&s->materials.descriptor)raylib_lite_wall_atlas_unload(s->materials);
 }
 static void dispatch_choice(sl_module_t *s,int code)
 {

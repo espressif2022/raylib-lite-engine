@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <stdlib.h>
 #include "mosaico_game_module.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib_impl.h"
 #include "raylib_lite_host_video.h"
 
 typedef struct {
@@ -47,12 +47,12 @@ void mosaico_host_game_input_v1(void *value, const mosaico_host_input_v1_t *inpu
     module_instance_t *instance = value;
     if (input) {
         if (input->type == MOSAICO_HOST_INPUT_ACTION)
-            MosaicoFastInjectAction(input->code, input->pressed);
+            raylib_lite_raylib_inject_action(input->code, input->pressed);
         else if (input->type == MOSAICO_HOST_INPUT_POINTER)
-            MosaicoFastInjectPointer(input->track_id, input->x, input->y,
+            raylib_lite_raylib_inject_pointer(input->track_id, input->x, input->y,
                                      input->pressed);
         else if (input->type == MOSAICO_HOST_INPUT_IMU)
-            MosaicoFastInjectImu(input->value_x, input->value_y, input->value_z);
+            raylib_lite_raylib_inject_imu(input->value_x, input->value_y, input->value_z);
     }
     if (instance && instance->module->input)
         instance->module->input(instance->state, input);

@@ -41,7 +41,7 @@ bool living_project_xyz(const living_camera_t *camera,float x,float y,float z,Ve
 void living_draw_volume_uv(const living_camera_t *camera,
                            const living_volume_vertex_t *vertices,int vertex_count,
                            const living_volume_face_t *faces,int face_count,
-                           MosaicoAtlas atlas,float src_w,float src_h,
+                           raylib_lite_atlas_t atlas,float src_w,float src_h,
                            float dst_u0,float dst_v0,float dst_u1,float dst_v1,
                            int part)
 {
@@ -74,10 +74,10 @@ void living_draw_volume_uv(const living_camera_t *camera,
         float min_y=fminf(pa.y,fminf(pb.y,pc.y));
         float max_y=fmaxf(pa.y,fmaxf(pb.y,pc.y));
         if(max_x<0||min_x>=480||max_y<0||min_y>=480)continue;
-        mosaico_textured_vertex_t va={pa.x,pa.y,dst_u0+a->u*su,dst_v0+a->v*sv,0.f};
-        mosaico_textured_vertex_t vb={pb.x,pb.y,dst_u0+b->u*su,dst_v0+b->v*sv,0.f};
-        mosaico_textured_vertex_t vc={pc.x,pc.y,dst_u0+c->u*su,dst_v0+c->v*sv,0.f};
-        Mosaico2DDrawTexturedTriangle(atlas.texture,va,vb,vc,faces[i].light);
+        raylib_lite_textured_vertex_t va={pa.x,pa.y,dst_u0+a->u*su,dst_v0+a->v*sv,0.f};
+        raylib_lite_textured_vertex_t vb={pb.x,pb.y,dst_u0+b->u*su,dst_v0+b->v*sv,0.f};
+        raylib_lite_textured_vertex_t vc={pc.x,pc.y,dst_u0+c->u*su,dst_v0+c->v*sv,0.f};
+        raylib_lite_2d_draw_textured_triangle(atlas.texture,va,vb,vc,faces[i].light);
     }
 }
 
@@ -201,7 +201,7 @@ int living_cover_quad(Vector2 a,Vector2 b,Vector2 c,Vector2 d)
 void living_draw_volume(const living_camera_t *camera,
                         const living_volume_vertex_t *vertices,int vertex_count,
                         const living_volume_face_t *faces,int face_count,
-                        MosaicoAtlas atlas,float authored_width,float authored_height,
+                        raylib_lite_atlas_t atlas,float authored_width,float authored_height,
                         int part)
 {
     living_draw_volume_uv(camera,vertices,vertex_count,faces,face_count,atlas,

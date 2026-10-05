@@ -183,12 +183,12 @@ class GenericHostRuntime:
             ENGINE_ROOT / "host/host_clock.c",
             ENGINE_ROOT / "src/runtime/raylib_lite_raylib_port.c",
             ENGINE_ROOT / "host/host_asset_runtime.c",
-            ENGINE_ROOT / "src/renderer/mosaico_game_2d.c",
-            ENGINE_ROOT / "src/renderer/mosaico_game_2d_raylib.c",
-            ENGINE_ROOT / "src/renderer/mosaico_rgb565.c",
-            ENGINE_ROOT / "src/renderer/mosaico_raylib_fast.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_renderer.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_renderer_raylib.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_rgb565.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_raylib_impl.c",
             ENGINE_ROOT / "src/fx/mosaico_game_fx.c",
-            ENGINE_ROOT / "src/renderer/mosaico_game_tilemap.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_tilemap.c",
         ]
         includes = [ENGINE_ROOT / "host/include", ENGINE_ROOT / "host",
                     ENGINE_ROOT / "include/raylib_lite",
@@ -231,8 +231,8 @@ class GenericHostRuntime:
             ctypes.POINTER(ctypes.c_uint16), ctypes.c_size_t]
         self.api.mosaico_host_game_state_json_v1.argtypes = [ctypes.c_void_p,
             ctypes.c_char_p, ctypes.c_size_t]
-        self.api.mosaico_game_2d_get_raster_stats.argtypes = [ctypes.POINTER(RasterStats)]
-        self.api.mosaico_game_2d_reset_raster_stats.argtypes = []
+        self.api.raylib_lite_renderer_get_raster_stats.argtypes = [ctypes.POINTER(RasterStats)]
+        self.api.raylib_lite_renderer_reset_raster_stats.argtypes = []
         self.context = self.api.mosaico_host_game_create_v1(
             str(project / "assets/generated").encode())
         if not self.context: raise RuntimeError("host adapter create failed")
@@ -243,7 +243,7 @@ class GenericHostRuntime:
         self.encode_ns = 0
         self.last_render_ns = 0
         self.last_encode_ns = 0
-        self.api.mosaico_game_2d_reset_raster_stats()
+        self.api.raylib_lite_renderer_reset_raster_stats()
         self.lock = threading.Lock()
 
     def close(self) -> None:
@@ -284,7 +284,7 @@ class GenericHostRuntime:
             return {"error": "state unavailable"}
         value = json.loads(output.value)
         raster = RasterStats()
-        self.api.mosaico_game_2d_get_raster_stats(ctypes.byref(raster))
+        self.api.raylib_lite_renderer_get_raster_stats(ctypes.byref(raster))
         value.update({"frames": self.frames, "abi": 1,
                       "game_id": self.descriptor.game_id.decode(),
                       "title": self.descriptor.title.decode(),

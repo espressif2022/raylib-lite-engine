@@ -10,7 +10,7 @@
 #include "mosaico_game_module.h"
 #endif
 #include "raylib_lite_raylib.h"
-#include "mosaico_rgb565.h"
+#include "raylib_lite_rgb565.h"
 #include "puppet_draw.h"
 #include "puppet_rig.h"
 #include "vg_raster.h"
@@ -274,13 +274,13 @@ static int render(void *value)
 {
     vector_puppet_state_t *state = value;
     BeginDrawing();
-    if (!MosaicoFastFrameAvailable()) {
+    if (!raylib_lite_raylib_frame_available()) {
         EndDrawing();
         return -1;
     }
     int width = 0, height = 0;
     size_t stride = 0;
-    uint16_t *fb = MosaicoFastGetFramebuffer(&width, &height, &stride);
+    uint16_t *fb = raylib_lite_raylib_get_framebuffer(&width, &height, &stride);
     if (!fb || width <= 0 || height <= 0) {
         EndDrawing();
         return -1;
@@ -289,7 +289,7 @@ static int render(void *value)
     int copy_w = width < SCREEN ? width : SCREEN;
     int copy_h = height < SCREEN ? height : SCREEN;
     for (int y = 0; y < copy_h; ++y)
-        mosaico_copy_rgb565(fb + (size_t)y * stride,
+        raylib_lite_rgb565_copy(fb + (size_t)y * stride,
                             state->background + (size_t)y * SCREEN, (size_t)copy_w);
 
     vg_begin(fb, width, height, stride);

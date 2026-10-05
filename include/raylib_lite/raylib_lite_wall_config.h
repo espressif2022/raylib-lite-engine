@@ -28,11 +28,11 @@
 /* Audit builds are deliberately separate from timing builds. */
 #ifdef M2D_WALL_AUDIT
 #include <stdint.h>
-void mosaico_wall_audit_span(uint16_t *dst, int32_t u, int32_t v,
+void raylib_lite_wall_audit_span(uint16_t *dst, int32_t u, int32_t v,
                            int32_t du, int32_t dv, int count);
-void mosaico_wall_audit_divide(void);
-#define WALL_AUDIT_SPAN(...) mosaico_wall_audit_span(__VA_ARGS__)
-#define WALL_AUDIT_DIVIDE() mosaico_wall_audit_divide()
+void raylib_lite_wall_audit_divide(void);
+#define WALL_AUDIT_SPAN(...) raylib_lite_wall_audit_span(__VA_ARGS__)
+#define WALL_AUDIT_DIVIDE() raylib_lite_wall_audit_divide()
 #else
 #define WALL_AUDIT_SPAN(...) ((void)0)
 #define WALL_AUDIT_DIVIDE() ((void)0)

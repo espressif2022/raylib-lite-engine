@@ -7,9 +7,9 @@
     .option norvc
     .text
     .balign 4
-    .global mosaico_rgb565_copy_pie
-    .type mosaico_rgb565_copy_pie, @function
-mosaico_rgb565_copy_pie:
+    .global raylib_lite_rgb565_copy_pie
+    .type raylib_lite_rgb565_copy_pie, @function
+raylib_lite_rgb565_copy_pie:
     /* a0=dst, a1=src, a2=count */
     beqz    a2, 1f
     esp.movx.r.cfg t6
@@ -26,12 +26,12 @@ mosaico_rgb565_copy_pie:
     bnez    t5, 0b
 1:
     ret
-    .size mosaico_rgb565_copy_pie, .-mosaico_rgb565_copy_pie
+    .size raylib_lite_rgb565_copy_pie, .-raylib_lite_rgb565_copy_pie
 
     .balign 4
-    .global mosaico_rgb565_fill_pie
-    .type mosaico_rgb565_fill_pie, @function
-mosaico_rgb565_fill_pie:
+    .global raylib_lite_rgb565_fill_pie
+    .type raylib_lite_rgb565_fill_pie, @function
+raylib_lite_rgb565_fill_pie:
     /* a0=dst, a1=color, a2=count */
     beqz    a2, 1f
     addi    sp, sp, -16
@@ -52,6 +52,6 @@ mosaico_rgb565_fill_pie:
     addi    sp, sp, 16
 1:
     ret
-    .size mosaico_rgb565_fill_pie, .-mosaico_rgb565_fill_pie
+    .size raylib_lite_rgb565_fill_pie, .-raylib_lite_rgb565_fill_pie
 
 #endif

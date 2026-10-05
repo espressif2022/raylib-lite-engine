@@ -2,7 +2,7 @@
 /* Synchronous full-frame preview: one DMA strip in flight, buffer reuse only
  * after on_color_trans_done. Deliberately independent of game frame queues. */
 #include "render_preview.h"
-#include "mosaico_wall_config.h"
+#include "raylib_lite_wall_config.h"
 #include "bsp/esp_mosaico.h"
 #include "esp_attr.h"
 #include "esp_check.h"

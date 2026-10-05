@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "raylib_lite_clock.h"
-#include "mosaico_game_2d.h"
+#include "raylib_lite_2d.h"
 #if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
 #include "last_zone_feedback.h"
 #endif
@@ -23,8 +23,8 @@
 
 typedef struct {
     last_zone_game_t game;
-    MosaicoAtlas enemies, weapon, environment, floor, controls, props;
-    MosaicoWallAtlas walls;
+    raylib_lite_atlas_t enemies, weapon, environment, floor, controls, props;
+    raylib_lite_wall_atlas_t walls;
     bool paused, left, right, forward, backward, fire, sprint, strafe_left, strafe_right;
     int32_t joystick_track, look_track, fire_track, radar_track, look_x, look_y;
     int32_t radar_dx, radar_dy, stick_x, stick_y;
@@ -120,13 +120,13 @@ static int initialize(void *value
 #elif defined(MOSAICO_GAME_NATIVE)
     (void)asset_root;
 #endif
-    state->enemies = LoadMosaicoAtlas("enemy.atlas");
-    state->weapon = LoadMosaicoAtlas("weapon.atlas");
-    state->controls = LoadMosaicoAtlas("controls.atlas");
-    state->environment = LoadMosaicoAtlas("environment.atlas");
-    state->floor = LoadMosaicoAtlas("floor.atlas");
-    state->walls = LoadMosaicoWallAtlas("walls.wall");
-    state->props = LoadMosaicoAtlas("props.atlas");
+    state->enemies = raylib_lite_atlas_load("enemy.atlas");
+    state->weapon = raylib_lite_atlas_load("weapon.atlas");
+    state->controls = raylib_lite_atlas_load("controls.atlas");
+    state->environment = raylib_lite_atlas_load("environment.atlas");
+    state->floor = raylib_lite_atlas_load("floor.atlas");
+    state->walls = raylib_lite_wall_atlas_load("walls.wall");
+    state->props = raylib_lite_atlas_load("props.atlas");
     if (!state->enemies.texture.id || !state->weapon.texture.id ||
         !state->controls.texture.id || !state->environment.texture.id ||
         !state->floor.texture.id || !state->walls.descriptor ||
@@ -166,13 +166,13 @@ static void shutdown(void *value)
 #if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
     last_zone_feedback_close(&state->feedback);
 #endif
-    UnloadMosaicoAtlas(state->enemies);
-    UnloadMosaicoAtlas(state->weapon);
-    UnloadMosaicoAtlas(state->controls);
-    UnloadMosaicoAtlas(state->environment);
-    UnloadMosaicoAtlas(state->floor);
-    UnloadMosaicoWallAtlas(state->walls);
-    UnloadMosaicoAtlas(state->props);
+    raylib_lite_atlas_unload(state->enemies);
+    raylib_lite_atlas_unload(state->weapon);
+    raylib_lite_atlas_unload(state->controls);
+    raylib_lite_atlas_unload(state->environment);
+    raylib_lite_atlas_unload(state->floor);
+    raylib_lite_wall_atlas_unload(state->walls);
+    raylib_lite_atlas_unload(state->props);
 }
 
 #if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
@@ -423,9 +423,9 @@ static int state_json(const void *value, char *output, size_t capacity)
         }
     static const char *phases[] = {"start", "playing", "won", "dead"};
     const char *phase = g->phase <= LAST_ZONE_PHASE_DEAD ? phases[g->phase] : "playing";
-    mosaico_game_2d_raster_stats_t raster = {0};
+    raylib_lite_renderer_raster_stats_t raster = {0};
     last_zone_view_stats_t view = {0};
-    mosaico_game_2d_get_raster_stats(&raster);
+    raylib_lite_renderer_get_raster_stats(&raster);
     last_zone_view_get_stats(&view);
     return snprintf(output, capacity,
         "{\"phase\":\"%s\",\"x\":%.2f,\"y\":%.2f,"

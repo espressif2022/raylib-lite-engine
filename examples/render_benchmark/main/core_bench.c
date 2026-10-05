@@ -4,9 +4,9 @@
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #endif
-#include "mosaico_game_2d.h"
-#include "mosaico_rgb565.h"
-#include "mosaico_mtx2.h"
+#include "raylib_lite_2d.h"
+#include "raylib_lite_rgb565.h"
+#include "raylib_lite_mtx2.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,28 +32,28 @@ static const char *names[]={"copy_rgb565","fill_rgb565","shade_rgb565",
  "span_rgb565","quad_rgb565","quad_index8","span_mtx2"};
 static uint16_t *dst,*source,*lut;
 static Texture2D rgb;
-static MosaicoWallAtlas row_atlas,col_atlas;
-static mosaico_mtx2_t mtx;
-static mosaico_raycast_wall_t columns[64];
+static raylib_lite_wall_atlas_t row_atlas,col_atlas;
+static raylib_lite_mtx2_t mtx;
+static raylib_lite_raycast_wall_t columns[64];
 static uint8_t *rows,*cols,*blocks;
 static bool fixture_ready;
 static uint16_t color(int x,int y){return (uint16_t)(((y*64+x)%256)*197+37);}
 static uint16_t scalar_shade(uint16_t p){return (uint16_t)((((p>>11)*160/256)<<11)|
  (((((p>>5)&63)*160)/256)<<5)|((p&31)*160/256));}
 static void draw(int which){
- mosaico_textured_vertex_t a={16,16,0,0,0},b={80,16,63,0,0},
+ raylib_lite_textured_vertex_t a={16,16,0,0,0},b={80,16,63,0,0},
   c={16,80,0,63,0},d={80,80,63,63,0};
  switch(which){
- case 0:for(int y=0;y<64;++y)mosaico_copy_rgb565(dst+(16+y)*S+16,source+y*64,64);break;
- case 1:for(int y=0;y<64;++y)mosaico_fill_rgb565(dst+(16+y)*S+16,0x1234,64);break;
- case 2:for(int y=0;y<64;++y)mosaico_shade_rgb565(dst+(16+y)*S+16,source+y*64,64,160);break;
- case 3:Mosaico2DDrawRaycastWalls(rgb,columns,64);break;
- case 4:Mosaico2DDrawIndexedRaycastWalls(row_atlas,columns,64);break;
- case 5:Mosaico2DDrawIndexedRaycastWalls(col_atlas,columns,64);break;
- case 6:for(int y=0;y<64;++y)Mosaico2DDrawSpan(rgb,(Rectangle){0,0,64,64},16+y,16,80,0,y<<16,65536,0,256);break;
- case 7:Mosaico2DDrawTexturedQuad(rgb,a,b,c,d,256);break;
- case 8:Mosaico2DDrawIndexedTexturedQuad(row_atlas,a,b,c,d,256);break;
- case 9:for(int y=0;y<64;++y)mosaico_mtx2_span_constv(dst+(16+y)*S+16,&mtx,0,65536,y,64,256);break;
+ case 0:for(int y=0;y<64;++y)raylib_lite_rgb565_copy(dst+(16+y)*S+16,source+y*64,64);break;
+ case 1:for(int y=0;y<64;++y)raylib_lite_rgb565_fill(dst+(16+y)*S+16,0x1234,64);break;
+ case 2:for(int y=0;y<64;++y)raylib_lite_rgb565_shade(dst+(16+y)*S+16,source+y*64,64,160);break;
+ case 3:raylib_lite_2d_draw_raycast_walls(rgb,columns,64);break;
+ case 4:raylib_lite_2d_draw_indexed_raycast_walls(row_atlas,columns,64);break;
+ case 5:raylib_lite_2d_draw_indexed_raycast_walls(col_atlas,columns,64);break;
+ case 6:for(int y=0;y<64;++y)raylib_lite_2d_draw_span(rgb,(Rectangle){0,0,64,64},16+y,16,80,0,y<<16,65536,0,256);break;
+ case 7:raylib_lite_2d_draw_textured_quad(rgb,a,b,c,d,256);break;
+ case 8:raylib_lite_2d_draw_indexed_textured_quad(row_atlas,a,b,c,d,256);break;
+ case 9:for(int y=0;y<64;++y)raylib_lite_mtx2_span_constv(dst+(16+y)*S+16,&mtx,0,65536,y,64,256);break;
  }
 }
 static uint16_t expected(int which,int x,int y){
@@ -89,19 +89,19 @@ static int fixture_init(void){
  for(int i=0;i<16*256;++i)lut[i]=color(i%64,(i%256)/64);
  for(int y=0;y<64;++y)for(int x=0;x<64;++x){source[y*64+x]=color(x,y);rows[y*64+x]=(uint8_t)(y*64+x);cols[x*64+y]=(uint8_t)(y*64+x);}
  for(int i=0;i<256;++i){blocks[i*8]=blocks[i*8+1]=255;for(int j=4;j<8;++j)blocks[i*8+j]=0xe4;}
- mtx=(mosaico_mtx2_t){.blocks=blocks,.width=64,.height=64,.block_width=16,.block_height=16};
- rgb=Mosaico2DRegisterRGB565(source,64,64);
+ mtx=(raylib_lite_mtx2_t){.blocks=blocks,.width=64,.height=64,.block_width=16,.block_height=16};
+ rgb=raylib_lite_2d_register_rgb565(source,64,64);
  if(!rgb.id)return 2;
- row_atlas=(MosaicoWallAtlas){.descriptor=rows,.indices=rows,.light_lut=lut,.width=64,.height=64,.light_levels=16,.row_major=1};
+ row_atlas=(raylib_lite_wall_atlas_t){.descriptor=rows,.indices=rows,.light_lut=lut,.width=64,.height=64,.light_levels=16,.row_major=1};
  col_atlas=row_atlas;col_atlas.indices=cols;col_atlas.row_major=0;
- for(int x=0;x<64;++x)columns[x]=(mosaico_raycast_wall_t){16+x,16,1,64,x,0,1,64,256,0,0};
- mosaico_game_2d_set_target(dst,S,W,H);
+ for(int x=0;x<64;++x)columns[x]=(raylib_lite_raycast_wall_t){16+x,16,1,64,x,0,1,64,256,0,0};
+ raylib_lite_renderer_set_target(dst,S,W,H);
  fixture_ready=true;
  return 0;
 }
 static void fixture_shutdown(void){
- if(rgb.id)Mosaico2DUnloadTexture(rgb);
- rgb=(Texture2D){0};mosaico_game_2d_set_target(NULL,0,0,0);
+ if(rgb.id)raylib_lite_2d_unload_texture(rgb);
+ rgb=(Texture2D){0};raylib_lite_renderer_set_target(NULL,0,0,0);
  free(dst);free(source);free(lut);free(rows);free(cols);free(blocks);
  dst=source=lut=NULL;rows=cols=blocks=NULL;fixture_ready=false;
 }
@@ -118,7 +118,7 @@ bool render_core_preview_case(unsigned which,uint16_t *actual,uint16_t *referenc
  if(!fixture_ready||!actual||!reference||which>=12)return false;
  if(which<10){
   for(int i=0;i<S*H;++i)dst[i]=GUARD;
-  mosaico_game_2d_set_target(dst,S,W,H);
+  raylib_lite_renderer_set_target(dst,S,W,H);
   draw((int)which);
   for(int y=0;y<64;++y)for(int x=0;x<64;++x){
    actual[y*64+x]=dst[(y+16)*S+x+16];
