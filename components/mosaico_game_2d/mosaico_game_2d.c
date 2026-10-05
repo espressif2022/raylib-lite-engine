@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "mosaico_game_2d.h"
+#include "mosaico_renderer.h"
 #include "mosaico_rgb565.h"
 #include "mosaico_wall_config.h"
 #include <math.h>
@@ -30,12 +30,45 @@ typedef struct __attribute__((packed)){uint32_t magic;uint16_t width,height,fram
 typedef struct{uint32_t id;uint16_t index_plus_one;} frame_cache_entry_t;
 typedef struct{bool used;mosaico_asset_view_t asset;atlas_header_t inline_header;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;uint16_t *light_cache;unsigned cached_light;const uint8_t *alpha;frame_cache_entry_t frame_cache[M2D_FRAME_CACHE_SIZE];} texture_slot_t;
 static texture_slot_t s_textures[M2D_MAX_TEXTURES];
+typedef struct { bool used; mosaico_asset_view_t asset; } wall_lease_t;
+static wall_lease_t s_wall_leases[M2D_MAX_TEXTURES];
+
+static void texture_slot_release(texture_slot_t *slot)
+{
+    if (!slot) return;
+    free(slot->light_cache);
+    mosaico_game_asset_release(&slot->asset);
+    memset(slot, 0, sizeof(*slot));
+}
+
+static const void *wall_lease_take(mosaico_asset_view_t asset)
+{
+    for (uint16_t i = 0; i < M2D_MAX_TEXTURES; ++i) {
+        if (s_wall_leases[i].used) continue;
+        s_wall_leases[i].used = true;
+        s_wall_leases[i].asset = asset;
+        return &s_wall_leases[i];
+    }
+    return NULL;
+}
+
+static void wall_lease_release(const void *descriptor)
+{
+    if (!descriptor) return;
+    for (uint16_t i = 0; i < M2D_MAX_TEXTURES; ++i) {
+        wall_lease_t *lease = &s_wall_leases[i];
+        if (descriptor != lease || !lease->used) continue;
+        mosaico_game_asset_release(&lease->asset);
+        memset(lease, 0, sizeof(*lease));
+        return;
+    }
+}
 static uint16_t *s_target;static size_t s_stride;static int s_target_width,s_target_height;
 static int s_clip_x0,s_clip_y0,s_clip_x1,s_clip_y1;
-static MosaicoSpriteFrame s_frame_result;
+static mosaico_renderer_sprite_frame_t s_frame_result;
 static mosaico_game_2d_raster_stats_t s_raster_stats;
 static uint32_t s_rejected_draw_calls;
-static texture_slot_t *texture_slot(Texture2D texture){if(!texture.id||texture.id>M2D_MAX_TEXTURES)return NULL;texture_slot_t *slot=&s_textures[texture.id-1];return slot->used?slot:NULL;}
+static texture_slot_t *texture_slot(mosaico_renderer_texture_t texture){if(!texture.id||texture.id>M2D_MAX_TEXTURES)return NULL;texture_slot_t *slot=&s_textures[texture.id-1];return slot->used?slot:NULL;}
 void mosaico_game_2d_set_target(uint16_t *pixels,size_t stride,int width,int height){s_target=pixels;s_stride=stride;s_target_width=width;s_target_height=height;s_clip_x0=0;s_clip_y0=0;s_clip_x1=width;s_clip_y1=height;}
 void mosaico_game_2d_set_clip(int x,int y,int width,int height){
  s_clip_x0=x<0?0:x;s_clip_y0=y<0?0:y;
@@ -58,53 +91,131 @@ void mosaico_game_2d_set_phase_us(uint32_t sky_us,uint32_t floor_us,uint32_t wal
  s_raster_stats.sky_us=sky_us;s_raster_stats.floor_us=floor_us;s_raster_stats.wall_us=wall_us;
  s_raster_stats.enemy_us=enemy_us;s_raster_stats.hud_us=hud_us;
 }
-Texture2D Mosaico2DLoadTexture(const char *path){
- mosaico_asset_view_t asset={0};if(mosaico_game_asset_open(path,&asset)!=ESP_OK||asset.size<sizeof(atlas_header_t))return(Texture2D){0};
- const atlas_header_t *h=(const atlas_header_t*)asset.data;size_t fb=(size_t)h->frame_count*sizeof(atlas_frame_t),expected=sizeof(*h)+fb+h->rgb_bytes+h->alpha_bytes;
- if(h->magic!=M2D_MAGIC||!h->width||!h->height||expected>asset.size||h->rgb_bytes!=(uint32_t)h->width*h->height*2U)return(Texture2D){0};
- for(unsigned i=0;i<M2D_MAX_TEXTURES;++i)if(!s_textures[i].used){texture_slot_t *s=&s_textures[i];s->used=true;s->asset=asset;s->header=h;s->frames=(const atlas_frame_t*)(asset.data+sizeof(*h));s->rgb=(const uint16_t*)(asset.data+sizeof(*h)+fb);s->alpha=h->alpha_bytes?asset.data+sizeof(*h)+fb+h->rgb_bytes:NULL;return(Texture2D){.id=i+1U,.width=h->width,.height=h->height,.mipmaps=1,.format=PIXELFORMAT_UNCOMPRESSED_R5G6B5};}
- return(Texture2D){0};}
-Texture2D Mosaico2DRegisterRGB565(const void *pixels,int width,int height){
- if(!pixels||width<=0||height<=0||width>UINT16_MAX||height>UINT16_MAX)return(Texture2D){0};
- for(unsigned i=0;i<M2D_MAX_TEXTURES;++i)if(!s_textures[i].used){
-  texture_slot_t *s=&s_textures[i];memset(s,0,sizeof(*s));s->used=true;
-  s->inline_header=(atlas_header_t){.magic=M2D_MAGIC,.width=(uint16_t)width,
-   .height=(uint16_t)height,.rgb_bytes=(uint32_t)width*(uint32_t)height*2U};
-  s->header=&s->inline_header;s->rgb=(const uint16_t *)pixels;
-  return(Texture2D){.id=i+1U,.width=width,.height=height,.mipmaps=1,
-   .format=PIXELFORMAT_UNCOMPRESSED_R5G6B5};
+mosaico_renderer_texture_t mosaico_renderer_load_texture(const char *path)
+{
+    mosaico_asset_view_t asset = {0};
+    if (mosaico_game_asset_open(path, &asset) != ESP_OK)
+        return (mosaico_renderer_texture_t){0};
+    if (asset.size < sizeof(atlas_header_t)) {
+        mosaico_game_asset_release(&asset);
+        return (mosaico_renderer_texture_t){0};
+    }
+    const atlas_header_t *header = (const atlas_header_t *)asset.data;
+    size_t frame_bytes = (size_t)header->frame_count * sizeof(atlas_frame_t);
+    uint64_t expected = (uint64_t)sizeof(*header) + frame_bytes +
+                        header->rgb_bytes + header->alpha_bytes;
+    if (header->magic != M2D_MAGIC || !header->width || !header->height ||
+            expected > asset.size ||
+            header->rgb_bytes != (uint32_t)header->width * header->height * 2U) {
+        mosaico_game_asset_release(&asset);
+        return (mosaico_renderer_texture_t){0};
+    }
+    for (unsigned i = 0; i < M2D_MAX_TEXTURES; ++i) {
+        if (s_textures[i].used) continue;
+        texture_slot_t *slot = &s_textures[i];
+        memset(slot, 0, sizeof(*slot));
+        slot->used = true;
+        slot->asset = asset;
+        slot->header = header;
+        slot->frames = (const atlas_frame_t *)(asset.data + sizeof(*header));
+        slot->rgb = (const uint16_t *)(asset.data + sizeof(*header) + frame_bytes);
+        slot->alpha = header->alpha_bytes ?
+            asset.data + sizeof(*header) + frame_bytes + header->rgb_bytes : NULL;
+        return (mosaico_renderer_texture_t) {
+            .id = i + 1U, .width = header->width, .height = header->height,
+        };
+    }
+    mosaico_game_asset_release(&asset);
+    return (mosaico_renderer_texture_t){0};
 }
-return(Texture2D){0};
+
+mosaico_renderer_texture_t mosaico_renderer_register_rgb565(
+    const void *pixels, int width, int height)
+{
+    if (!pixels || width <= 0 || height <= 0 ||
+            width > UINT16_MAX || height > UINT16_MAX)
+        return (mosaico_renderer_texture_t){0};
+    for (unsigned i = 0; i < M2D_MAX_TEXTURES; ++i) {
+        if (s_textures[i].used) continue;
+        texture_slot_t *slot = &s_textures[i];
+        memset(slot, 0, sizeof(*slot));
+        slot->used = true;
+        slot->inline_header = (atlas_header_t) {
+            .magic = M2D_MAGIC, .width = (uint16_t)width,
+            .height = (uint16_t)height,
+            .rgb_bytes = (uint32_t)width * (uint32_t)height * 2U,
+        };
+        slot->header = &slot->inline_header;
+        slot->rgb = (const uint16_t *)pixels;
+        return (mosaico_renderer_texture_t) {
+            .id = i + 1U, .width = width, .height = height,
+        };
+    }
+    return (mosaico_renderer_texture_t){0};
 }
-MosaicoWallAtlas LoadMosaicoWallAtlas(const char *path){
- mosaico_asset_view_t asset={0};
- if(mosaico_game_asset_open(path,&asset)!=ESP_OK||asset.size<sizeof(wall_header_t))return(MosaicoWallAtlas){0};
- const wall_header_t *h=(const wall_header_t*)asset.data;
- size_t frame_bytes=(size_t)h->frame_count*sizeof(atlas_frame_t);
- size_t lut_entries=(size_t)h->light_levels*h->palette_entries;
- size_t lut_bytes=lut_entries*sizeof(uint16_t);
- size_t expected=sizeof(*h)+frame_bytes+lut_bytes+h->index_bytes;
- if((h->magic!=M2D_WALL_MAGIC_COLUMN&&h->magic!=M2D_WALL_MAGIC_ROW)||
-    !h->width||!h->height||h->light_levels!=16||
-    h->palette_entries!=256||h->index_bytes!=(uint32_t)h->width*h->height||
-    expected>asset.size)return(MosaicoWallAtlas){0};
- const uint8_t *base=asset.data+sizeof(*h);
- return(MosaicoWallAtlas){.descriptor=h,.frames=base,
-  .light_lut=(const uint16_t*)(base+frame_bytes),
-  .indices=base+frame_bytes+lut_bytes,.width=h->width,.height=h->height,
-  .frame_count=h->frame_count,.light_levels=h->light_levels,
-  .row_major=h->magic==M2D_WALL_MAGIC_ROW};
+
+MosaicoWallAtlas LoadMosaicoWallAtlas(const char *path)
+{
+    mosaico_asset_view_t asset = {0};
+    if (mosaico_game_asset_open(path, &asset) != ESP_OK)
+        return (MosaicoWallAtlas){0};
+    if (asset.size < sizeof(wall_header_t)) {
+        mosaico_game_asset_release(&asset);
+        return (MosaicoWallAtlas){0};
+    }
+    const wall_header_t *header = (const wall_header_t *)asset.data;
+    size_t frame_bytes = (size_t)header->frame_count * sizeof(atlas_frame_t);
+    size_t lut_entries = (size_t)header->light_levels * header->palette_entries;
+    size_t lut_bytes = lut_entries * sizeof(uint16_t);
+    uint64_t expected = (uint64_t)sizeof(*header) + frame_bytes +
+                        lut_bytes + header->index_bytes;
+    if ((header->magic != M2D_WALL_MAGIC_COLUMN &&
+         header->magic != M2D_WALL_MAGIC_ROW) ||
+            !header->width || !header->height || header->light_levels != 16 ||
+            header->palette_entries != 256 ||
+            header->index_bytes != (uint32_t)header->width * header->height ||
+            expected > asset.size) {
+        mosaico_game_asset_release(&asset);
+        return (MosaicoWallAtlas){0};
+    }
+    const void *descriptor = wall_lease_take(asset);
+    if (!descriptor) {
+        mosaico_game_asset_release(&asset);
+        return (MosaicoWallAtlas){0};
+    }
+    const uint8_t *base = asset.data + sizeof(*header);
+    return (MosaicoWallAtlas) {
+        .descriptor = descriptor,
+        .frames = base,
+        .light_lut = (const uint16_t *)(base + frame_bytes),
+        .indices = base + frame_bytes + lut_bytes,
+        .width = header->width,
+        .height = header->height,
+        .frame_count = header->frame_count,
+        .light_levels = header->light_levels,
+        .row_major = header->magic == M2D_WALL_MAGIC_ROW,
+    };
 }
-void UnloadMosaicoWallAtlas(MosaicoWallAtlas atlas){(void)atlas;}
-void Mosaico2DUnloadTexture(Texture2D texture){texture_slot_t*s=texture_slot(texture);if(s){free(s->light_cache);memset(s,0,sizeof(*s));}}
-static inline uint16_t tint565(uint16_t p,Color t){if(t.r==255&&t.g==255&&t.b==255)return p;return(uint16_t)((((p>>11)&31U)*t.r/255U)<<11|(((p>>5)&63U)*t.g/255U)<<5|((p&31U)*t.b/255U));}
+
+void UnloadMosaicoWallAtlas(MosaicoWallAtlas atlas)
+{
+    wall_lease_release(atlas.descriptor);
+}
+
+void mosaico_renderer_unload_texture(mosaico_renderer_texture_t texture)
+{
+    texture_slot_t *slot = texture_slot(texture);
+    if (slot) texture_slot_release(slot);
+}
+
+static inline uint16_t tint565(uint16_t p,mosaico_renderer_color_t t){if(t.r==255&&t.g==255&&t.b==255)return p;return(uint16_t)((((p>>11)&31U)*t.r/255U)<<11|(((p>>5)&63U)*t.g/255U)<<5|((p&31U)*t.b/255U));}
 static inline unsigned quantize_light(unsigned light256)
 {
  unsigned light=light256>256U?256U:light256;
  if(light>=248U)return 256U;
  return(light+8U)&~15U;
 }
-bool Mosaico2DCacheTextureLight(Texture2D texture,unsigned light256)
+bool mosaico_renderer_cache_texture_light(mosaico_renderer_texture_t texture,unsigned light256)
 {
  texture_slot_t *s=texture_slot(texture);
  if(!s)return false;
@@ -168,7 +279,7 @@ static inline int sample_next(sample_step_t*step){
  if(step->error>=step->denominator){++step->value;step->error-=step->denominator;}
  return value;
 }
-void Mosaico2DDrawTexturePro(Texture2D texture,Rectangle source,Rectangle dest,Vector2 origin,float rotation,Color tint){
+void mosaico_renderer_draw_texture_pro(mosaico_renderer_texture_t texture,mosaico_renderer_rect_t source,mosaico_renderer_rect_t dest,mosaico_renderer_vec2_t origin,float rotation,mosaico_renderer_color_t tint){
  texture_slot_t*s=texture_slot(texture);if(!s||!s_target||source.width==0||source.height==0||dest.width==0||dest.height==0){++s_rejected_draw_calls;return;}
  if(!tint.a)return;
  bool fx=source.width<0,fy=source.height<0;float sw=fabsf(source.width),sh=fabsf(source.height),rad=rotation*0.01745329252f,cs=cosf(rad),sn=sinf(rad);int dw=(int)fabsf(dest.width),dh=(int)fabsf(dest.height),extent=dw>dh?dw:dh;bool identity=fabsf(rotation)<.001f;
@@ -668,7 +779,7 @@ static void draw_textured_triangle_prepared(texture_slot_t *s,
  PROFILE_ADD(triangle_raster_us,raster_started);
 }
 
-void Mosaico2DDrawTexturedTriangle(Texture2D texture,
+void mosaico_renderer_draw_textured_triangle(mosaico_renderer_texture_t texture,
  mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
  mosaico_textured_vertex_t c,unsigned light256)
 {
@@ -680,7 +791,7 @@ static void draw_rgb_quad_direct(texture_slot_t *s,
  mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
  mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light);
 
-void Mosaico2DDrawTexturedQuad(Texture2D texture,
+void mosaico_renderer_draw_textured_quad(mosaico_renderer_texture_t texture,
  mosaico_textured_vertex_t a,mosaico_textured_vertex_t b,
  mosaico_textured_vertex_t c,mosaico_textured_vertex_t d,unsigned light256)
 {
@@ -1337,14 +1448,14 @@ void Mosaico2DDrawIndexedTexturedQuad(MosaicoWallAtlas atlas,
  draw_indexed_triangle_prepared(&atlas,a,c,b,level,inside);
  draw_indexed_triangle_prepared(&atlas,b,c,d,level,inside);
 }
-void Mosaico2DDrawTileRow(Texture2D texture,const uint16_t*ids,size_t count,
+void mosaico_renderer_draw_tile_row(mosaico_renderer_texture_t texture,const uint16_t*ids,size_t count,
  int tw,int th,int dx,int dy){
  texture_slot_t*s=texture_slot(texture);if(!count)return;
  if(!s||!ids||tw<=0||th<=0||!s_target){++s_rejected_draw_calls;return;}
- if(s->alpha){for(size_t i=0;i<count;++i)if(ids[i])Mosaico2DDrawTexturePro(texture,
-   (Rectangle){(float)((ids[i]-1U)*tw),0,(float)tw,(float)th},
-   (Rectangle){(float)(dx+(int)i*tw),(float)dy,(float)tw,(float)th},
-   (Vector2){0,0},0,WHITE);return;}
+ if(s->alpha){for(size_t i=0;i<count;++i)if(ids[i])mosaico_renderer_draw_texture_pro(texture,
+   (mosaico_renderer_rect_t){(float)((ids[i]-1U)*tw),0,(float)tw,(float)th},
+   (mosaico_renderer_rect_t){(float)(dx+(int)i*tw),(float)dy,(float)tw,(float)th},
+   (mosaico_renderer_vec2_t){0,0},0,(mosaico_renderer_color_t){255,255,255,255});return;}
  int y0=dy>s_clip_y0?dy:s_clip_y0,y1=dy+th<s_clip_y1?dy+th:s_clip_y1;
  if(y0>=y1)return;
  uint32_t pixels=0;
@@ -1367,7 +1478,7 @@ static int wrap_coord(int value,int size)
  int wrapped=value%size;
  return wrapped<0?wrapped+size:wrapped;
 }
-void Mosaico2DDrawColumn(Texture2D texture,Rectangle source,int dest_x,int dest_y,
+void mosaico_renderer_draw_column(mosaico_renderer_texture_t texture,mosaico_renderer_rect_t source,int dest_x,int dest_y,
  int dest_width,int dest_height,unsigned light256)
 {
  texture_slot_t *s=texture_slot(texture);
@@ -1394,7 +1505,7 @@ void Mosaico2DDrawColumn(Texture2D texture,Rectangle source,int dest_x,int dest_
  }
  ++s_raster_stats.column_calls;s_raster_stats.column_pixels+=drawn;
 }
-void Mosaico2DDrawSpan(Texture2D texture,Rectangle source,int dest_y,int dest_x0,
+void mosaico_renderer_draw_span(mosaico_renderer_texture_t texture,mosaico_renderer_rect_t source,int dest_y,int dest_x0,
  int dest_x1,int u_16,int v_16,int du_16,int dv_16,unsigned light256)
 {
  texture_slot_t *s=texture_slot(texture);
@@ -1430,7 +1541,7 @@ void Mosaico2DDrawSpan(Texture2D texture,Rectangle source,int dest_y,int dest_x0
  }
  ++s_raster_stats.span_calls;s_raster_stats.span_pixels+=drawn;
 }
-void Mosaico2DDrawFloorRows(Texture2D texture,Rectangle source,int dest_y,int dest_x,
+void mosaico_renderer_draw_floor_rows(mosaico_renderer_texture_t texture,mosaico_renderer_rect_t source,int dest_y,int dest_x,
  int column_width,int columns,const uint16_t *wall_bottom,int u_16,int v_16,
  int du_16,int dv_16,unsigned light256,int row_repeat)
 {
@@ -1477,11 +1588,11 @@ void Mosaico2DDrawFloorRows(Texture2D texture,Rectangle source,int dest_y,int de
  }
  ++s_raster_stats.span_calls;s_raster_stats.span_pixels+=drawn;
 }
-void Mosaico2DDrawFloorRow(Texture2D texture,Rectangle source,int dest_y,int dest_x,
+void mosaico_renderer_draw_floor_row(mosaico_renderer_texture_t texture,mosaico_renderer_rect_t source,int dest_y,int dest_x,
  int column_width,int columns,const uint16_t *wall_bottom,int u_16,int v_16,
  int du_16,int dv_16,unsigned light256)
 {
- Mosaico2DDrawFloorRows(texture,source,dest_y,dest_x,column_width,columns,wall_bottom,
+ mosaico_renderer_draw_floor_rows(texture,source,dest_y,dest_x,column_width,columns,wall_bottom,
   u_16,v_16,du_16,dv_16,light256,1);
 }
 void Mosaico2DCopyScanline(int src_y,int dst_y)
@@ -1505,7 +1616,7 @@ typedef struct {
  sample_step_t sample;
  int32_t phase,step;
 } prepared_wall_t;
-void Mosaico2DDrawRaycastWalls(Texture2D texture,const mosaico_raycast_wall_t *columns,
+void mosaico_renderer_draw_raycast_walls(mosaico_renderer_texture_t texture,const mosaico_raycast_wall_t *columns,
  int column_count)
 {
  texture_slot_t *s=texture_slot(texture);
@@ -1685,7 +1796,7 @@ void Mosaico2DDrawSolidRaycastWalls(const mosaico_solid_wall_t *columns,
  if(any)++s_raster_stats.column_calls;
  s_raster_stats.column_pixels+=drawn;
 }
-MosaicoAtlas LoadMosaicoAtlas(const char*path){Texture2D t=Mosaico2DLoadTexture(path);texture_slot_t*s=texture_slot(t);return(MosaicoAtlas){.texture=t,.descriptor=s?s->header:NULL,.frame_count=s?s->header->frame_count:0};}
+mosaico_renderer_atlas_t mosaico_renderer_load_atlas(const char*path){mosaico_renderer_texture_t t=mosaico_renderer_load_texture(path);texture_slot_t*s=texture_slot(t);return(mosaico_renderer_atlas_t){.texture=t,.descriptor=s?s->header:NULL,.frame_count=s?s->header->frame_count:0};}
 static const atlas_frame_t*find_frame(texture_slot_t*s,mosaico_asset_id_t id){
  if(!s)return NULL;
  frame_cache_entry_t*cached=&s->frame_cache[(id^(id>>16))&(M2D_FRAME_CACHE_SIZE-1U)];
@@ -1696,21 +1807,21 @@ static const atlas_frame_t*find_frame(texture_slot_t*s,mosaico_asset_id_t id){
   *cached=(frame_cache_entry_t){.id=id,.index_plus_one=(uint16_t)(i+1U)};return&s->frames[i];}
  return NULL;
 }
-const MosaicoSpriteFrame*MosaicoAtlasGetFrame(MosaicoAtlas a,mosaico_asset_id_t id){texture_slot_t*s=texture_slot(a.texture);const atlas_frame_t*f=find_frame(s,id);if(!f)return NULL;s_frame_result=(MosaicoSpriteFrame){.id=id,.source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},.pivot={(float)f->pivot_x,(float)f->pivot_y}};return&s_frame_result;}
-esp_err_t mosaico_game_2d_atlas_get_frame(MosaicoAtlas a,mosaico_asset_id_t id,MosaicoSpriteFrame*out){
+const mosaico_renderer_sprite_frame_t*mosaico_renderer_atlas_get_frame(mosaico_renderer_atlas_t a,mosaico_asset_id_t id){texture_slot_t*s=texture_slot(a.texture);const atlas_frame_t*f=find_frame(s,id);if(!f)return NULL;s_frame_result=(mosaico_renderer_sprite_frame_t){.id=id,.source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},.pivot={(float)f->pivot_x,(float)f->pivot_y}};return&s_frame_result;}
+esp_err_t mosaico_renderer_atlas_get_frame_copy(mosaico_renderer_atlas_t a,mosaico_asset_id_t id,mosaico_renderer_sprite_frame_t*out){
  if(!out)return ESP_ERR_INVALID_ARG;
  texture_slot_t*s=texture_slot(a.texture);
  if(!s)return ESP_ERR_INVALID_STATE;
  const atlas_frame_t*f=find_frame(s,id);if(!f)return ESP_ERR_NOT_FOUND;
- *out=(MosaicoSpriteFrame){.id=id,.source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},.pivot={(float)f->pivot_x,(float)f->pivot_y}};return ESP_OK;}
-esp_err_t mosaico_game_2d_wall_atlas_get_frame(MosaicoWallAtlas atlas,
- mosaico_asset_id_t id,MosaicoSpriteFrame*out)
+ *out=(mosaico_renderer_sprite_frame_t){.id=id,.source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},.pivot={(float)f->pivot_x,(float)f->pivot_y}};return ESP_OK;}
+esp_err_t mosaico_renderer_wall_atlas_get_frame(MosaicoWallAtlas atlas,
+ mosaico_asset_id_t id,mosaico_renderer_sprite_frame_t*out)
 {
  if(!out||!atlas.descriptor||!atlas.frames)return ESP_ERR_INVALID_ARG;
  const atlas_frame_t *frames=(const atlas_frame_t*)atlas.frames;
  for(uint16_t i=0;i<atlas.frame_count;++i)if(frames[i].id==id){
   const atlas_frame_t *f=&frames[i];
-  *out=(MosaicoSpriteFrame){.id=id,
+  *out=(mosaico_renderer_sprite_frame_t){.id=id,
    .source={(float)f->x,(float)f->y,(float)f->width,(float)f->height},
    .pivot={(float)f->pivot_x,(float)f->pivot_y}};
   return ESP_OK;
@@ -1718,4 +1829,4 @@ esp_err_t mosaico_game_2d_wall_atlas_get_frame(MosaicoWallAtlas atlas,
  return ESP_ERR_NOT_FOUND;
 }
 mosaico_asset_id_t MosaicoAnimationFrameAt(const mosaico_asset_id_t*frames,size_t count,uint32_t frame_ticks,uint32_t elapsed,bool loop){if(!frames||!count||!frame_ticks)return 0;size_t frame=elapsed/frame_ticks;if(loop)frame%=count;else if(frame>=count)frame=count-1;return frames[frame];}
-void UnloadMosaicoAtlas(MosaicoAtlas a){Mosaico2DUnloadTexture(a.texture);}
+void mosaico_renderer_unload_atlas(mosaico_renderer_atlas_t a){mosaico_renderer_unload_texture(a.texture);}

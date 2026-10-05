@@ -3,6 +3,7 @@ set(BENCH_SOURCES
     "${CMAKE_CURRENT_LIST_DIR}/benchmark_main.c"
     "${CMAKE_CURRENT_LIST_DIR}/benchmark_assets.c"
     "${ENGINE_ROOT}/components/mosaico_game_2d/mosaico_game_2d.c"
+    "${ENGINE_ROOT}/components/mosaico_game_2d/mosaico_game_2d_raylib.c"
     "${ENGINE_ROOT}/components/mosaico_game_2d/mosaico_rgb565.c")
 set(BENCH_INCLUDES
     "${CMAKE_CURRENT_LIST_DIR}/../include"
@@ -38,7 +39,7 @@ if(RENDER_BENCH_PIE)
     if(RENDER_BENCH_HOST OR NOT IDF_TARGET STREQUAL "esp32s31")
         message(FATAL_ERROR "PIE requires ESP32-S31; host must stay scalar")
     endif()
-    list(APPEND BENCH_SOURCES "${ENGINE_ROOT}/components/mosaico_game_2d/mosaico_rgb565_pie.S")
+    list(APPEND BENCH_SOURCES "${ENGINE_ROOT}/components/mosaico_game_2d/arch/esp32s31/mosaico_rgb565_pie.S")
     list(APPEND BENCH_DEFINITIONS MOSAICO_RGB565_PIE=1)
 endif()
 

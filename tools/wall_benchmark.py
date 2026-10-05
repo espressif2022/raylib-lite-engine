@@ -148,7 +148,7 @@ def main():
     previous = json.loads(args.baseline.read_text()) if args.baseline else None
     out = args.output.resolve(); out.mkdir(parents=True, exist_ok=False)
     sources = [ROOT/'components/mosaico_game_2d'/name for name in
-               ('mosaico_wall_bench.c', 'mosaico_game_2d.c', 'mosaico_rgb565.c')]
+               ('mosaico_wall_bench.c', 'mosaico_game_2d.c', 'mosaico_game_2d_raylib.c', 'mosaico_rgb565.c')]
     sources += [ROOT/'host/host_asset_runtime.c']
     flags = ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-DWALL_BENCH_HOST=1']
     for folder in ('host/include', 'host', 'components/mosaico_game_assets/include',

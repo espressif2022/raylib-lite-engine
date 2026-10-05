@@ -34,8 +34,10 @@ def main():
              for path in [*overrides.keys(),*overrides.values()]}
     (args.output/"source-sha256.json").write_text(json.dumps(sources,indent=2)+"\n")
     original_run=subprocess.run
+    adapter_source=str(ROOT / "components/mosaico_game_2d/mosaico_game_2d_raylib.c")
     def baseline_compile(command, *values, **kwargs):
-        return original_run([overrides.get(str(value),value) for value in command], *values, **kwargs)
+        mapped=[overrides.get(str(value),value) for value in command if str(value)!=adapter_source]
+        return original_run(mapped, *values, **kwargs)
     reports=[]
     original_layout=os.environ.get("LAST_ZONE_SIM_LAYOUT")
     try:

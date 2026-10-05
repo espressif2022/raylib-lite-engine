@@ -15,6 +15,7 @@ class FixedRasterTests(unittest.TestCase):
     def test_rounding_boundaries(self):
         source = r'''#include <assert.h>
 #include "mosaico_game_2d.c"
+#include "mosaico_game_2d_raylib.c"
 int main(void) {
     const unsigned fractions[] = {0,1,32766,32767,32768,32769,32770,65534,65535};
     for (int integer = -32768; integer <= 32767; ++integer)
@@ -61,9 +62,9 @@ int main(void) {
         assert(!memcmp(before,after,sizeof before));
     }
     assert(Mosaico2DCacheTextureLight(tex,232));
-    assert(texture_slot(tex)->cached_light==240);
+    assert(texture_slot((mosaico_renderer_texture_t){.id=tex.id,.width=tex.width,.height=tex.height})->cached_light==240);
     assert(Mosaico2DCacheTextureLight(tex,256));
-    assert(!texture_slot(tex)->light_cache);
+    assert(!texture_slot((mosaico_renderer_texture_t){.id=tex.id,.width=tex.width,.height=tex.height})->light_cache);
     assert(!Mosaico2DCacheTextureLight((Texture2D){0},160));
     Mosaico2DUnloadTexture(tex);
     mosaico_game_2d_set_target(NULL,0,0,0);

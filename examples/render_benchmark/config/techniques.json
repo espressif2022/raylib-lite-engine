@@ -127,7 +127,7 @@
         "RENDER_BENCH_PIE=OFF",
         "RENDER_BENCH_PIE=ON"
       ],
-      "source": "components/mosaico_game_2d/mosaico_rgb565_pie.S",
+      "source": "components/mosaico_game_2d/arch/esp32s31/mosaico_rgb565_pie.S",
       "gate": "copy/fill 输出相同，固定同一硬件环境"
     },
     {

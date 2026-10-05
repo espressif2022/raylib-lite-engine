@@ -268,6 +268,32 @@ int main(void) {{ return M2D_WALL_MODE; }}
             source = (ENGINE / relative).read_text(encoding="utf-8")
             self.assertNotIn('#include "raylib_lite_raylib.h"', source)
 
+    def test_renderer_core_is_raylib_type_neutral(self) -> None:
+        renderer = ENGINE / "components/mosaico_game_2d"
+        core = (renderer / "mosaico_game_2d.c").read_text(encoding="utf-8")
+        neutral = (renderer / "include/mosaico_renderer.h").read_text(encoding="utf-8")
+        legacy = (renderer / "include/mosaico_game_2d.h").read_text(encoding="utf-8")
+        adapter = (renderer / "mosaico_game_2d_raylib.c").read_text(encoding="utf-8")
+        cmake = (renderer / "CMakeLists.txt").read_text(encoding="utf-8")
+
+        for source in (core, neutral):
+            for token in ("raylib.h", "Texture2D", "Rectangle", "Vector2",
+                          "Color", "PIXELFORMAT_"):
+                self.assertNotIn(token, source)
+        self.assertIn('#include "mosaico_renderer.h"', core)
+        self.assertIn('#include "raylib.h"', legacy)
+        self.assertIn("Texture2D", legacy)
+        self.assertIn("to_renderer_texture", adapter)
+        self.assertIn("mosaico_game_2d_raylib.c", cmake)
+        legacy_header = (renderer / "include/mosaico_game_2d.h").read_text(
+            encoding="utf-8")
+        for hot in ("Mosaico2DDrawTexturePro", "Mosaico2DDrawTexturedTriangle",
+                    "Mosaico2DDrawTexturedQuad", "Mosaico2DDrawColumn",
+                    "Mosaico2DDrawSpan", "Mosaico2DDrawFloorRow",
+                    "Mosaico2DDrawFloorRows", "Mosaico2DDrawRaycastWalls"):
+            self.assertIn(f"static inline void {hot}", legacy_header)
+            self.assertNotIn(f"void {hot}(", adapter)
+
     def test_s31_rgb565_acceleration_is_arch_scoped(self) -> None:
         renderer = ENGINE / "components/mosaico_game_2d"
         cmake = (renderer / "CMakeLists.txt").read_text(encoding="utf-8")

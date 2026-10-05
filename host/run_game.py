@@ -184,6 +184,7 @@ class GenericHostRuntime:
             ENGINE_ROOT / "components/mosaico_raylib_port/mosaico_raylib_port.c",
             ENGINE_ROOT / "host/host_asset_runtime.c",
             ENGINE_ROOT / "components/mosaico_game_2d/mosaico_game_2d.c",
+            ENGINE_ROOT / "components/mosaico_game_2d/mosaico_game_2d_raylib.c",
             ENGINE_ROOT / "components/mosaico_game_2d/mosaico_rgb565.c",
             ENGINE_ROOT / "components/mosaico_raylib_fast/mosaico_raylib_fast.c",
             ENGINE_ROOT / "components/mosaico_game_fx/mosaico_game_fx.c",

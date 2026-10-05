@@ -20,6 +20,7 @@ class PrimitiveTests(unittest.TestCase):
             command += [str(ROOT / path) for path in ["tests/test_primitives.c", "host/host_video_backend.c",
                         "components/mosaico_raylib_port/mosaico_raylib_port.c",
                         "host/host_asset_runtime.c", "components/mosaico_game_2d/mosaico_game_2d.c",
+                        "components/mosaico_game_2d/mosaico_game_2d_raylib.c",
                         "components/mosaico_game_2d/mosaico_rgb565.c"]]
             command += [source]
             for path in ["host/include", "host", "components/mosaico_game_assets/include",

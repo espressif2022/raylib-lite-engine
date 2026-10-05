@@ -170,7 +170,8 @@ assert.equal(plays,2);
                             "components/mosaico_game_2d/include",
                             "components/mosaico_game_assets/include",
                             "components/raylib_lite_platform/include",
-                            "components/mosaico_raylib_fast/include"]:
+                            "components/mosaico_raylib_fast/include",
+                            "compat/raylib/include"]:
                 command += ["-I", str(ENGINE / include)]
             linker_gc = "-Wl,-dead_strip" if sys.platform == "darwin" else "-Wl,--gc-sections"
             command += [str(ENGINE / "tests/test_sewer_model.c"), linker_gc,

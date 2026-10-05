@@ -62,6 +62,13 @@ esp_err_t mosaico_game_asset_open(const char *name, mosaico_asset_view_t *out)
     return ESP_ERR_NO_MEM;
 }
 
+void mosaico_game_asset_release(mosaico_asset_view_t *view)
+{
+    if (!view) return;
+    view->data = NULL;
+    view->size = 0;
+}
+
 esp_err_t mosaico_game_asset_open_id(mosaico_asset_id_t id,
                                      mosaico_asset_view_t *out)
 {

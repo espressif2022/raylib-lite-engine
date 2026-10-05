@@ -10,8 +10,8 @@ option(M2D_WALL_AUDIT "Audit wall UV (never use audit timings for acceptance)" O
 if(M2D_WALL_AUDIT AND NOT M2D_WALL_BENCHMARK)
     message(FATAL_ERROR "M2D_WALL_AUDIT requires M2D_WALL_BENCHMARK")
 endif()
-set(srcs "mosaico_game_2d_esp.c" "mosaico_rgb565.c" "mosaico_mtx2.c"
-    "mosaico_raster_bench.c")
+set(srcs "mosaico_game_2d_esp.c" "mosaico_game_2d_raylib.c"
+    "mosaico_rgb565.c" "mosaico_mtx2.c" "mosaico_raster_bench.c")
 if(IDF_TARGET STREQUAL "esp32s31")
     list(APPEND srcs "arch/esp32s31/mosaico_rgb565_pie.S")
 endif()
