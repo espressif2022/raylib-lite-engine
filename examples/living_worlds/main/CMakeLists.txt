@@ -5,7 +5,7 @@ idf_component_register(
          "living_worlds_aurora.c" "living_worlds_ocean.c"
          "living_worlds_volume.c" "living_worlds_view.c"
     INCLUDE_DIRS "." "${RAYLIB_LITE_ENGINE_ROOT}/examples/common"
-    REQUIRES raylib_lite_engine esp_driver_jpeg)
+    REQUIRES raylib-lite-engine esp_driver_jpeg)
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE MOSAICO_GAME_NATIVE=1)
 

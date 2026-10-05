@@ -131,22 +131,11 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
         self.assertTrue((ENGINE / "idf_component.yml").is_file())
         self.assertTrue((ENGINE / "Kconfig").is_file())
 
-        shim = ENGINE / "components/raylib_lite_engine"
-        self.assertTrue((shim / "CMakeLists.txt").is_file())
-        self.assertEqual((shim / "idf_component.yml").read_text(),
-                         (ENGINE / "idf_component.yml").read_text())
-        self.assertEqual((shim / "Kconfig").read_text(),
-                         (ENGINE / "Kconfig").read_text())
-
-        component_dirs = {
-            path.name for path in (ENGINE / "components").iterdir()
-            if path.is_dir()
-        }
-        self.assertEqual(component_dirs, {"raylib_lite_engine"})
+        self.assertFalse((ENGINE / "components").exists())
 
         helper = (ENGINE / "cmake/raylib_lite_esp.cmake").read_text(
             encoding="utf-8")
-        self.assertIn("components/raylib_lite_engine", helper)
+        self.assertIn('"${RAYLIB_LITE_ENGINE_ROOT}"', helper)
         for old in ("mosaico_game_app", "mosaico_game_assets",
                     "mosaico_game_2d", "mosaico_raylib_fast",
                     "raylib_lite_platform", "raylib_lite_runner"):
@@ -160,7 +149,7 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                 match = re.search(r"REQUIRES\s+([^)]*)", source, re.S)
                 self.assertIsNotNone(match)
                 requirements = match.group(1).split()
-                self.assertIn("raylib_lite_engine", requirements)
+                self.assertIn("raylib-lite-engine", requirements)
                 for old in ("mosaico_game", "mosaico_game_app",
                             "mosaico_game_assets", "mosaico_game_audio",
                             "mosaico_game_2d", "mosaico_raylib_fast",
@@ -394,7 +383,7 @@ int main(void) {{ return M2D_WALL_MODE; }}
         self.assertIn("src/audio/raylib_lite_audio_mixer.c", cmake)
 
         board_cmake = (ENGINE / "examples/boards/esp-mosaico/CMakeLists.txt").read_text()
-        self.assertIn("raylib_lite_engine", board_cmake)
+        self.assertIn("raylib-lite-engine", board_cmake)
         board_requires = re.search(r"REQUIRES\s+([^)]*)", board_cmake, re.S)
         self.assertIsNotNone(board_requires)
         self.assertNotIn("mosaico_game_audio", board_requires.group(1).split())
@@ -410,7 +399,7 @@ int main(void) {{ return M2D_WALL_MODE; }}
         for main in users:
             with self.subTest(path=main.relative_to(ENGINE)):
                 cmake = (main / "CMakeLists.txt").read_text()
-                self.assertIn("raylib_lite_engine", cmake)
+                self.assertIn("raylib-lite-engine", cmake)
                 self.assertNotIn("mosaico_game_audio", cmake)
 
     def test_game_manifests_do_not_own_board_dependencies(self) -> None:

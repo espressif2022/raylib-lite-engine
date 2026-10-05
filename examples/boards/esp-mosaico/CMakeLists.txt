@@ -11,7 +11,7 @@ idf_component_register(
         "."
         "${RAYLIB_LITE_ENGINE_ROOT}/examples/common"
     REQUIRES
-        raylib_lite_engine
+        raylib-lite-engine
         esp_display_present
         esp-mosaico-bsp
         nvs_flash

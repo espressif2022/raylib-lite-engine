@@ -16,6 +16,6 @@ Read the [game development guide](../../game-development.EN.md), [build paths](.
 3. For device work, name the tested path: **native firmware** or **ELF game**. A Host result does not prove display, audio, haptics, or board input.
 4. For a lobby ELF game, use the external `esp-mosaico-elf-game-sdk` package and a compatible lobby firmware; for native firmware, pass board/BSP paths explicitly. Follow Vibe documentation for Iris/Recovery and device operations. Preserve separate build directories and record firmware identity, configuration, and device logs.
 
-The engine does not own production board or flash-partition policy. Refer to [components](../../../components/README.md) for component ownership.
+The engine does not own production board or flash-partition policy. Refer to [components](../../engine-capabilities.EN.md) for component ownership.
 
 [简体中文](SKILL.CN.md)
