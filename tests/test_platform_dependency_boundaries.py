@@ -245,6 +245,16 @@ int main(void) {{ return M2D_WALL_MODE; }}
                             "-x", "c", "-c", "-o", output, "-"],
                            input=source, text=True, check=True)
 
+    def test_s31_rgb565_acceleration_is_arch_scoped(self) -> None:
+        renderer = ENGINE / "components/mosaico_game_2d"
+        cmake = (renderer / "CMakeLists.txt").read_text(encoding="utf-8")
+        arch = renderer / "arch/esp32s31/mosaico_rgb565_pie.S"
+        self.assertTrue(arch.is_file())
+        self.assertFalse((renderer / "mosaico_rgb565_pie.S").exists())
+        self.assertIn('"mosaico_rgb565.c"', cmake)
+        self.assertIn('"arch/esp32s31/mosaico_rgb565_pie.S"', cmake)
+        self.assertIn('IDF_TARGET STREQUAL "esp32s31"', cmake)
+
     def test_product_app_integrations_are_external(self) -> None:
         examples = (("raylib_shooter", "shooter"),
                     ("tower_defense", "tower"), ("sky_hop", "sky_hop"))

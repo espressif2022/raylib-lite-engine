@@ -13,7 +13,7 @@ endif()
 set(srcs "mosaico_game_2d_esp.c" "mosaico_rgb565.c" "mosaico_mtx2.c"
     "mosaico_raster_bench.c")
 if(IDF_TARGET STREQUAL "esp32s31")
-    list(APPEND srcs "mosaico_rgb565_pie.S")
+    list(APPEND srcs "arch/esp32s31/mosaico_rgb565_pie.S")
 endif()
 if(M2D_WALL_BENCHMARK)
     list(APPEND srcs "mosaico_wall_bench.c")
