@@ -30,47 +30,12 @@ typedef struct __attribute__((packed)){uint32_t magic;uint16_t width,height,fram
 typedef struct{uint32_t id;uint16_t index_plus_one;} frame_cache_entry_t;
 typedef struct{bool used;mosaico_asset_view_t asset;atlas_header_t inline_header;const atlas_header_t *header;const atlas_frame_t *frames;const uint16_t *rgb;uint16_t *light_cache;unsigned cached_light;const uint8_t *alpha;frame_cache_entry_t frame_cache[M2D_FRAME_CACHE_SIZE];} texture_slot_t;
 static texture_slot_t s_textures[M2D_MAX_TEXTURES];
-typedef struct wall_lease {
-    struct wall_lease *next;
-    mosaico_asset_view_t asset;
-} wall_lease_t;
-static wall_lease_t *s_wall_leases;
-
 static void texture_slot_release(texture_slot_t *slot)
 {
     if (!slot) return;
     free(slot->light_cache);
     mosaico_game_asset_release(&slot->asset);
     memset(slot, 0, sizeof(*slot));
-}
-
-static const void *wall_lease_take(mosaico_asset_view_t asset)
-{
-    wall_lease_t *lease = malloc(sizeof(*lease));
-    if (!lease) return NULL;
-    *lease = (wall_lease_t) {
-        .next = s_wall_leases,
-        .asset = asset,
-    };
-    s_wall_leases = lease;
-    return lease;
-}
-
-static void wall_lease_release(const void *descriptor)
-{
-    if (!descriptor) return;
-    wall_lease_t **link = &s_wall_leases;
-    while (*link) {
-        wall_lease_t *lease = *link;
-        if (lease != descriptor) {
-            link = &lease->next;
-            continue;
-        }
-        *link = lease->next;
-        mosaico_game_asset_release(&lease->asset);
-        free(lease);
-        return;
-    }
 }
 static uint16_t *s_target;static size_t s_stride;static int s_target_width,s_target_height;
 static int s_clip_x0,s_clip_y0,s_clip_x1,s_clip_y1;
@@ -187,14 +152,9 @@ MosaicoWallAtlas LoadMosaicoWallAtlas(const char *path)
         mosaico_game_asset_release(&asset);
         return (MosaicoWallAtlas){0};
     }
-    const void *descriptor = wall_lease_take(asset);
-    if (!descriptor) {
-        mosaico_game_asset_release(&asset);
-        return (MosaicoWallAtlas){0};
-    }
     const uint8_t *base = asset.data + sizeof(*header);
     return (MosaicoWallAtlas) {
-        .descriptor = descriptor,
+        .descriptor = header,
         .frames = base,
         .light_lut = (const uint16_t *)(base + frame_bytes),
         .indices = base + frame_bytes + lut_bytes,
@@ -208,7 +168,10 @@ MosaicoWallAtlas LoadMosaicoWallAtlas(const char *path)
 
 void UnloadMosaicoWallAtlas(MosaicoWallAtlas atlas)
 {
-    wall_lease_release(atlas.descriptor);
+    mosaico_asset_view_t asset = {
+        .data = (const uint8_t *)atlas.descriptor,
+    };
+    mosaico_game_asset_release(&asset);
 }
 
 void mosaico_renderer_unload_texture(mosaico_renderer_texture_t texture)

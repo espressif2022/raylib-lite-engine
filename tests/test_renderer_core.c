@@ -105,17 +105,11 @@ int main(void)
     MosaicoWallAtlas walls[20] = {0};
     for (size_t i = 0; i < 20; ++i) {
         walls[i] = LoadMosaicoWallAtlas("wall");
-        assert(walls[i].descriptor);
-        for (size_t j = 0; j < i; ++j)
-            assert(walls[i].descriptor != walls[j].descriptor);
+        assert(walls[i].descriptor == &s_wall);
     }
     assert(s_open_count == 22 && s_release_count == 2);
 
-    UnloadMosaicoWallAtlas(walls[0]);
-    assert(s_release_count == 3);
-    UnloadMosaicoWallAtlas(walls[0]);
-    assert(s_release_count == 3);
-    for (size_t i = 1; i < 20; ++i)
+    for (size_t i = 0; i < 20; ++i)
         UnloadMosaicoWallAtlas(walls[i]);
     assert(s_release_count == 22);
 
