@@ -8,7 +8,8 @@ set(BENCH_SOURCES
 set(BENCH_INCLUDES
     "${CMAKE_CURRENT_LIST_DIR}/../include"
     "${ENGINE_ROOT}/components/mosaico_game_2d/include"
-    "${ENGINE_ROOT}/components/mosaico_game_assets/include")
+    "${ENGINE_ROOT}/components/mosaico_game_assets/include"
+    "${ENGINE_ROOT}/components/raylib_lite_platform/include")
 set(BENCH_DEFINITIONS
     M2D_WALL_MODE=${M2D_WALL_MODE}
     M2D_WALL_FIXED_PIXELS=${M2D_WALL_FIXED_PIXELS}

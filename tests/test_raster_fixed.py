@@ -85,6 +85,7 @@ int main(void) {
                        str(ROOT / "host/host_asset_runtime.c"), str(ROOT / "components/mosaico_game_2d/mosaico_rgb565.c")]
             command += shlex.split(os.environ.get("CFLAGS", ""))
             for include in ["host", "host/include", "components/mosaico_game_assets/include",
+                            "components/raylib_lite_platform/include",
                             "components/mosaico_game_2d", "components/mosaico_game_2d/include"]:
                 command += ["-I", str(ROOT / include)]
             subprocess.run(command + ["-lm", "-o", str(p / "test")], check=True)

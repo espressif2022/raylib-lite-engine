@@ -37,7 +37,9 @@ class ColumnTests(unittest.TestCase):
             rgb565 = ROOT / 'components/mosaico_game_2d/mosaico_rgb565.c'
             if Path(source).resolve() != rgb565.resolve():
                 command.append(str(rgb565))
-            for include in ['host/include', 'host', 'components/mosaico_game_assets/include', 'components/mosaico_game_2d/include']:
+            for include in ['host/include', 'host', 'components/mosaico_game_assets/include',
+                            'components/raylib_lite_platform/include',
+                            'components/mosaico_game_2d/include']:
                 command += ['-I', str(ROOT / include)]
             command += ['-lm', '-o', str(temp / 'columns')]
             subprocess.run(command, check=True)
