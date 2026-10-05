@@ -12,7 +12,7 @@
 
 ## 原生固件接入
 
-示例顶层 CMake 包含 [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake)。它先通过 [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake) 注册 board-neutral 的引擎组件，再根据 `RAYLIB_LITE_BOARD` 加载 `examples/boards/<board>/board.cmake`。游戏 `main/CMakeLists.txt` 只依赖所选 Board component 并注册自身源码；内嵌资源可由 [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) 准备。Gateway、烧录和产品策略仍位于引擎之外。
+示例顶层 CMake 包含 [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake)。它先通过 [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake) 注册 board-neutral 的引擎组件，再根据 `RAYLIB_LITE_BOARD` 加载 `examples/boards/<board>/board.cmake`。Application 构建通过 `EXTRA_COMPONENT_DIRS` 加入具体 Board Adapter；游戏 `main/CMakeLists.txt` 只依赖 Engine component，并通过共享 example-board contract 编译。内嵌资源可由 [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) 准备。Gateway、烧录和产品策略仍位于引擎之外。
 
 ESP-Mosaico 是当前参考 Board Adapter，位于 [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/)。它接受 `MOSAICO_BSP_ROOT` 或 `MOSAICO_BSP_COMPONENT_DIR` 配置 BSP。在已加载 ESP-IDF 环境后，以 Sky Hop 为例构建：
 

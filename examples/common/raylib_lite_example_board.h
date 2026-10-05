@@ -37,6 +37,10 @@ esp_err_t raylib_lite_example_board_destroy(
 esp_err_t raylib_lite_example_board_retry_cleanup(
     raylib_lite_example_board_t *board, uint32_t timeout_ms);
 
+/* Optional singleton haptic capability for native example glue. Strength is 0..100; zero stops the motor. */
+esp_err_t raylib_lite_example_board_haptic_init(void);
+esp_err_t raylib_lite_example_board_haptic_set(uint8_t strength);
+
 #ifdef __cplusplus
 }
 #endif

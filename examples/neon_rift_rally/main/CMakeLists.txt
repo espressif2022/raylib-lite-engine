@@ -5,7 +5,7 @@ idf_component_register(
          "${RAYLIB_LITE_ENGINE_ROOT}/examples/common/native_module_main.c"
          "${RAYLIB_LITE_ENGINE_ROOT}/examples/common/native_feedback.c"
     INCLUDE_DIRS "." "${RAYLIB_LITE_ENGINE_ROOT}/examples/common"
-    REQUIRES ${RAYLIB_LITE_BOARD_COMPONENT} mosaico_game_app mosaico_game_assets
+    REQUIRES mosaico_game_app mosaico_game_assets mosaico_game_audio
              mosaico_game_save
              mosaico_game_2d mosaico_raylib_fast mosaico_raylib_port raylib
              esp_timer)

@@ -59,6 +59,20 @@ static esp_err_t to_esp(raylib_lite_result_t result)
     }
 }
 
+esp_err_t raylib_lite_example_board_haptic_init(void)
+{
+    esp_err_t error = bsp_motor_init();
+    if (error != ESP_OK) return error;
+    return bsp_motor_set(false);
+}
+
+esp_err_t raylib_lite_example_board_haptic_set(uint8_t strength)
+{
+    if (strength > 100) return ESP_ERR_INVALID_ARG;
+    if (strength == 0) return bsp_motor_set(false);
+    return bsp_motor_set_strength(strength);
+}
+
 static void lock_queue(void *ctx)
 {
     (void)xSemaphoreTake(ctx, portMAX_DELAY);

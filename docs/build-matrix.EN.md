@@ -12,7 +12,7 @@ The engine maintains integration boundaries for three artifacts: PC Host, generi
 
 ## Native firmware integration
 
-The example top-level CMake includes [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake). It registers the board-neutral engine components through [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake), then loads `examples/boards/<board>/board.cmake` according to `RAYLIB_LITE_BOARD`. The game's `main/CMakeLists.txt` depends only on the selected board component and registers its own sources; [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) can embed assets. Gateway, flashing, and product policy remain outside the engine.
+The example top-level CMake includes [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake). It registers the board-neutral engine components through [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake), then loads `examples/boards/<board>/board.cmake` according to `RAYLIB_LITE_BOARD`. The application build adds that concrete adapter through `EXTRA_COMPONENT_DIRS`; each game `main/CMakeLists.txt` depends only on Engine components and compiles against the shared example-board contract. [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) can embed assets. Gateway, flashing, and product policy remain outside the engine.
 
 ESP-Mosaico is the current reference board adapter at [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/). Its board selector accepts `MOSAICO_BSP_ROOT` or `MOSAICO_BSP_COMPONENT_DIR`. After loading ESP-IDF, build Sky Hop as an example artifact:
 
