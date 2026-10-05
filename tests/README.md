@@ -16,6 +16,7 @@ dependency set.
 Runtime-boundary coverage also includes `tests.test_game_action` for Action Mapper press/release/contact semantics and `tests.test_runtime_stats` for portable logic/display timing, counters, and 32-bit microsecond-clock wrap handling.
 `tests.test_game_save` compiles the save core without ESP-IDF and exercises a fake storage backend, defaults, debounce/force flush, CRC rejection, migration, and write failures.
 `tests.test_game_assets` compiles the asset core without ESP-IDF and checks image aliases, bounded read backing, lazy materialization/refcounts, release, streaming, counters, checksum/bounds failures, embedded fallback, and the partition-backend seam.
+`tests.test_renderer_core` compiles `mosaico_game_2d.c` without any Raylib include path, verifies neutral renderer types and texture/wall-asset lease release, and checks repeated unload behavior. `tests.test_platform_dependency_boundaries` additionally requires the Raylib-shaped hot draw wrappers to remain inline and the S31 assembly fast path to stay under `arch/esp32s31/`.
 
 # RGB565 raster regression
 
@@ -66,11 +67,10 @@ Run from the engine repository:
 
 ```sh
 python3 tests/test_columns.py
-CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' python3 tests/test_columns.py
+CFLAGS='-fsanitize=undefined -fno-omit-frame-pointer' python3 tests/test_columns.py
 ```
 
-Host builds of these suites must also compile `mosaico_rgb565.c`; the Python
-harnesses add it next to `mosaico_game_2d.c`.
+Host builds of Raylib-shaped raster suites compile `mosaico_game_2d_raylib.c` next to the neutral `mosaico_game_2d.c` core and `mosaico_rgb565.c`. The dedicated renderer-core test omits the adapter and any Raylib include path.
 
 The test compares both textured column APIs and the solid wall batch against
 independent oracles using deterministic randomized batches. It covers negative origins,

@@ -51,6 +51,8 @@ Optional top-level fields include `wall_atlases` (`config`, `source`, `.wall` ou
 
 The game view owns view-space clipping, projection, occlusion, and submission order. The rasterizer owns screen clipping, texture sampling, blending, and pixel output. The platform owns display submission.
 
+The raster core is deliberately Raylib-neutral: `mosaico_renderer.h` owns renderer texture/rectangle/vector/color contracts, while the existing `Mosaico2D*` API is a compatibility adapter. Supported upstream Raylib names are exposed separately through `compat/raylib/raylib_lite_raylib.h`. SoC-specific RGB565 acceleration is isolated under `components/mosaico_game_2d/arch/<soc>/`; the generic C implementation remains available on every target.
+
 | Scene | Rendering path | Reference example | Validate |
 | --- | --- | --- | --- |
 | Orthogonal grid and horizontal rays | DDA wall columns and floor rows | [Last Zone](../examples/last_zone_extraction/README.md) | Cell and side boundaries, per-column depth, sprite occlusion |

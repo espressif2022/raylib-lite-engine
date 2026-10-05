@@ -1,8 +1,8 @@
 # Raster-kernel contract
 
-[简体中文](raster-kernels.CN.md) · [Design principles](reference-designs.EN.md) · [Public header](../components/mosaico_game_2d/include/mosaico_game_2d.h)
+[简体中文](raster-kernels.CN.md) · [Design principles](reference-designs.EN.md) · [Neutral renderer](../components/mosaico_game_2d/include/mosaico_renderer.h) · [Legacy 2D facade](../components/mosaico_game_2d/include/mosaico_game_2d.h)
 
-This page describes the current `Mosaico2DDraw*` call boundary. Set an RGB565 target, pixel stride, width, and height with `mosaico_game_2d_set_target()`, then a half-open clip rectangle with `mosaico_game_2d_set_clip()`. Drawing is also limited by the target extent. Later pixels overwrite earlier ones; there is no general Z buffer. Host independent oracles define exact pixel-center and fixed-point rounding acceptance.
+This page describes the current raster contract. The implementation core uses the Raylib-neutral types and functions in `mosaico_renderer.h`; `mosaico_game_2d.h` preserves the existing Raylib-shaped `Mosaico2D*` source API and converts its types at the boundary. Hot draw wrappers are `static inline`, so the compatibility boundary does not add a second draw call in the column/span/triangle hot paths. Set an RGB565 target, pixel stride, width, and height with `mosaico_game_2d_set_target()`, then a half-open clip rectangle with `mosaico_game_2d_set_clip()`. Drawing is also limited by the target extent. Later pixels overwrite earlier ones; there is no general Z buffer. Host independent oracles define exact pixel-center and fixed-point rounding acceptance.
 
 `Texture2D` must be a valid handle from `Mosaico2DLoadTexture()` or `Mosaico2DRegisterRGB565()`. Its dimensions are fixed by registration or the asset and need not be powers of two. A `MosaicoWallAtlas` needs valid INDEX8 data, an RGB565 LUT with 256 entries per light level, nonzero dimensions, and exactly 16 light levels. Column-major data suits wall columns; row-major data suits horizontal spans. Callers keep borrowed textures, indices, LUTs, and column arrays alive during draws. The API cannot validate their actual allocation length.
 

@@ -6,7 +6,7 @@
 
 ## 1. 选择示例并组织代码
 
-在[示例支持矩阵（English）](../examples/README.md)中选择与新游戏最接近的相机、资源和输入方式；可复制目录，或运行 `python3 tools/game_cli.py create <name>`。只传名称时默认复制 `raylib_shooter` 模板到 `examples/<name>/`；`--template` 可改选其他内置模板。玩法模型保持可由主机 C 编译器编译；共享视图只调用设备支持的 [Raylib 兼容接口](../components/mosaico_raylib_fast/include/mosaico_raylib_fast.h)与引擎绘制接口。输入先映射成游戏语义，资源使用逻辑名称；`assets_src/game_assets.json` 的最小格式见[资源清单说明](reference-designs.CN.md#资源清单的最小格式)。
+在[示例支持矩阵（English）](../examples/README.md)中选择与新游戏最接近的相机、资源和输入方式；可复制目录，或运行 `python3 tools/game_cli.py create <name>`。只传名称时默认复制 `raylib_shooter` 模板到 `examples/<name>/`；`--template` 可改选其他内置模板。玩法模型保持可由主机 C 编译器编译；共享视图只调用设备支持的 [Raylib 兼容接口](../compat/raylib/include/raylib_lite_raylib.h)与引擎绘制接口；不需要上游 Raylib 名称的 Engine 实现代码应直接使用显式引擎 API，不依赖兼容宏。输入先映射成游戏语义，资源使用逻辑名称；`assets_src/game_assets.json` 的最小格式见[资源清单说明](reference-designs.CN.md#资源清单的最小格式)。
 
 Host 入口用项目根目录的 `game.sim.json` 列出要编译的源码：
 

@@ -1,8 +1,8 @@
 # 光栅内核契约
 
-[English](raster-kernels.EN.md) · [设计方法](reference-designs.CN.md) · [公开头文件](../components/mosaico_game_2d/include/mosaico_game_2d.h)
+[English](raster-kernels.EN.md) · [设计方法](reference-designs.CN.md) · [中性 Renderer](../components/mosaico_game_2d/include/mosaico_renderer.h) · [Legacy 2D Facade](../components/mosaico_game_2d/include/mosaico_game_2d.h)
 
-本页说明当前 `Mosaico2DDraw*` 实现的调用边界。先用 `mosaico_game_2d_set_target()` 设置 RGB565 目标、像素 stride、宽和高；再用 `mosaico_game_2d_set_clip()` 设置半开矩形裁剪区。下表的绘制还受目标范围约束。后提交的像素覆盖先提交的像素，没有通用 Z 缓冲。像素中心与固定点舍入的精确结果以 Host 独立 oracle 为验收依据。
+本页说明当前光栅契约。实现核心使用 `mosaico_renderer.h` 中与 Raylib 无关的类型和函数；`mosaico_game_2d.h` 保留既有 Raylib-shaped `Mosaico2D*` 源码接口，并只在边界做类型转换。高频 draw wrapper 使用 `static inline`，因此 column/span/triangle 热路径不会因为兼容层多一次函数调用。先用 `mosaico_game_2d_set_target()` 设置 RGB565 目标、像素 stride、宽和高；再用 `mosaico_game_2d_set_clip()` 设置半开矩形裁剪区。下表的绘制还受目标范围约束。后提交的像素覆盖先提交的像素，没有通用 Z 缓冲。像素中心与固定点舍入的精确结果以 Host 独立 oracle 为验收依据。
 
 `Texture2D` 是通过 `Mosaico2DLoadTexture()` 或 `Mosaico2DRegisterRGB565()` 得到的有效句柄；其真实宽高由注册/资产决定，不要求是 2 的幂。`MosaicoWallAtlas` 需要有效的 INDEX8 数据、256 项每级的 RGB565 LUT、非零宽高和恰好 16 个光照级别。列主序适合墙柱；行主序适合水平行段。调用者必须保证借用的纹理、索引、LUT 和列数组在绘制期间有效；接口无法验证其实际分配长度。
 

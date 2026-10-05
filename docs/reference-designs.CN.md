@@ -51,6 +51,8 @@ RGB565 帧缓冲的借出、提交、释放必须明确所有权；繁忙、失�
 
 项目视图负责视空间裁剪、投影、遮挡和提交顺序；光栅器负责屏幕裁剪、纹理采样、混合和像素输出；平台负责送屏。
 
+光栅核心刻意保持 Raylib-neutral：`mosaico_renderer.h` 定义 renderer 的纹理、矩形、向量和颜色 contract，既有 `Mosaico2D*` API 仅作为兼容 adapter；支持的上游 Raylib 名称则独立由 `compat/raylib/raylib_lite_raylib.h` 提供。SoC-specific RGB565 加速统一隔离在 `components/mosaico_game_2d/arch/<soc>/`，所有目标始终保留 generic C 实现。
+
 | 场景条件 | 路径 | 参考示例 | 必须验证 |
 |---|---|---|---|
 | 正交格子、水平射线 | DDA 墙柱与地板行 | [Last Zone](../examples/last_zone_extraction/README.md) | 命中格子/侧面的边界、列深度与精灵遮挡 |

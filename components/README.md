@@ -16,8 +16,8 @@ Use these public APIs before adding a game-local helper. If a helper is needed b
 | Fixed-step game loop and event queue | `raylib_lite_game_app_run`, runner input | [`raylib_lite_game_app.h`](mosaico_game_app/include/raylib_lite_game_app.h), [`raylib_lite_input.h`](raylib_lite_runner/include/raylib_lite_input.h) |
 | Runtime timing and display/input counters | `raylib_lite_runtime_stats_*` | [`raylib_lite_runtime_stats.h`](raylib_lite_runner/include/raylib_lite_runtime_stats.h) |
 | Touch or button to game action | `mosaico_action_*` | [`mosaico_game_action.h`](mosaico_game_input/include/mosaico_game_action.h) |
-| RGB565 shapes and compatible Raylib calls | fast drawing surface | [`mosaico_raylib_fast.h`](mosaico_raylib_fast/include/mosaico_raylib_fast.h) |
-| Texture, atlas, wall column, floor span, triangle or quad | `Mosaico2D*` | [`mosaico_game_2d.h`](mosaico_game_2d/include/mosaico_game_2d.h), [raster contract](../docs/raster-kernels.EN.md) |
+| RGB565 shapes and Raylib-compatible names | explicit fast implementation plus compatibility facade | [`mosaico_raylib_fast.h`](mosaico_raylib_fast/include/mosaico_raylib_fast.h), [`raylib_lite_raylib.h`](../compat/raylib/include/raylib_lite_raylib.h) |
+| Texture, atlas, wall column, floor span, triangle or quad | neutral renderer core with legacy `Mosaico2D*` facade | [`mosaico_renderer.h`](mosaico_game_2d/include/mosaico_renderer.h), [`mosaico_game_2d.h`](mosaico_game_2d/include/mosaico_game_2d.h), [raster contract](../docs/raster-kernels.EN.md) |
 | Tile map lookup and drawing | `mosaico_game_tilemap_*` | [`mosaico_game_tilemap.h`](mosaico_game_tilemap/include/mosaico_game_tilemap.h) |
 | Asset packing, backing providers, streaming, and logical-name lookup | packer, `mosaico_game_assets_mount_backing`, `mosaico_game_asset_open` | [`mosaico_game_assets.h`](mosaico_game_assets/include/mosaico_game_assets.h), [`pack_game_assets.py`](../tools/pack_game_assets.py) |
 | Sound/music playback and PCM device service | `MosaicoAudio*`, platform audio | [`mosaico_game_audio.h`](mosaico_game_audio/include/mosaico_game_audio.h), [`raylib_lite_audio.h`](raylib_lite_platform/include/raylib_lite_audio.h) |
@@ -33,9 +33,9 @@ Use these public APIs before adding a game-local helper. If a helper is needed b
 | `raylib_lite_runner` | Deterministic update/render scheduling, the bounded input queue, and board-neutral runtime statistics | Task creation or board input |
 | `mosaico_game_app` | Portable Raylib game lifecycle over a supplied platform and one runner input queue | Device boot, BSP, legacy event queues, or task placement |
 | `mosaico_raylib_port` | consume a platform-neutral video backend | display construction or game content |
-| `mosaico_raylib_fast` | RGB565 drawing implementation | board startup |
+| `mosaico_raylib_fast` | Explicit `MosaicoFast*` RGB565 drawing implementation | Raylib-name macro compatibility or board startup |
 | `mosaico_game_assets` | Asset registration/backing/stream/lifetime core plus the optional IDF mmap backend | Board-specific storage policy or `esp_mmap_assets` calls in the core |
-| `mosaico_game_2d` | textures, atlases, animation helpers, raycast columns/spans/walls, textured triangles | map rules, camera math, or audio |
+| `mosaico_game_2d` | Raylib-neutral raster core, texture/atlas lifetime, raycast columns/spans/walls, textured triangles, and the legacy Raylib-shaped adapter | Map rules, camera math, board/display policy, or Raylib types inside the core |
 | `mosaico_game_tilemap` | packed tile-map access and drawing | game-specific collision behavior |
 | `mosaico_game_audio` | clip loading, decoding, mixing, backend contract | codec device and worker policy |
 | `mosaico_game_input` | Action Mapper over `raylib_lite_input_event_t` | Device event queues or board driver ownership |
