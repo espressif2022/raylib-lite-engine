@@ -1,6 +1,6 @@
 # Raster-kernel contract
 
-[简体中文](raster-kernels.CN.md) · [Design principles](reference-designs.EN.md) · [Neutral renderer](../components/mosaico_game_2d/include/mosaico_renderer.h) · [Legacy 2D facade](../components/mosaico_game_2d/include/mosaico_game_2d.h)
+[简体中文](raster-kernels.CN.md) · [Design principles](reference-designs.EN.md) · [Neutral renderer](../include/raylib_lite/mosaico_renderer.h) · [Legacy 2D facade](../include/raylib_lite/mosaico_game_2d.h)
 
 This page describes the current raster contract. The implementation core uses the Raylib-neutral types and functions in `mosaico_renderer.h`; `mosaico_game_2d.h` preserves the existing Raylib-shaped `Mosaico2D*` source API and converts its types at the boundary. Hot draw wrappers are `static inline`, so the compatibility boundary does not add a second draw call in the column/span/triangle hot paths. Set an RGB565 target, pixel stride, width, and height with `mosaico_game_2d_set_target()`, then a half-open clip rectangle with `mosaico_game_2d_set_clip()`. Drawing is also limited by the target extent. Later pixels overwrite earlier ones; there is no general Z buffer. Host independent oracles define exact pixel-center and fixed-point rounding acceptance.
 

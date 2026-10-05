@@ -18,7 +18,7 @@ First use: follow the [quickstart](quickstart.EN.md) to create a game and see it
 | --- | --- |
 | [Examples](../examples/README.md) | Example and build-support matrix |
 | [Host simulator (简体中文)](../host/README.md) | Host ABI, rebuild-on-change, and replay |
-| [Components](engine-capabilities.EN.md) | Component ownership and lifecycle |
+| [Engine capabilities](engine-capabilities.EN.md) | Single-component API catalog and internal module ownership |
 | [Audio and feedback design](audio-design.EN.md) | Events, assets, backends, and device listening |
 | [New-board porting contract](board-porting.EN.md) | Video, clock, input, audio, and device acceptance |
 | [Agent CLI](agent-cli.EN.md) | JSON output, exit codes, and operation scopes for finite commands |

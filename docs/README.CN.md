@@ -18,7 +18,7 @@
 | --- | --- |
 | [示例索引（English）](../examples/README.md) | 示例与构建支持矩阵 |
 | [Host 仿真参考](../host/README.md) | Host ABI、修改后重编与回放 |
-| [组件参考（English）](engine-capabilities.EN.md) | 组件职责与生命周期 |
+| [Engine 能力参考（English）](engine-capabilities.EN.md) | 单一 component 的 API 目录与内部模块职责 |
 | [音频与反馈设计](audio-design.CN.md) | 事件、资源、后端和设备试听契约 |
 | [新板卡移植契约](board-porting.CN.md) | 视频、时钟、输入、音频与真实设备验收 |
 | [Agent 命令接口](agent-cli.CN.md) | 有限命令的 JSON 输出、退出码与授权边界 |

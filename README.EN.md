@@ -69,7 +69,7 @@ Standalone example firmware composes the same game source with a board adapter s
 
 ## Repository layout
 
-- `components/`: reusable game modules and ESP-IDF service implementations.
+- `src/`: internal engine modules and IDF backends; `include/raylib_lite/` contains the public headers.
 - `cmake/`: board-neutral ESP-IDF engine registration and native-example board selection helpers.
 - `examples/boards/`: concrete example/application-side board adapters; `esp-mosaico/` is the reference implementation.
 - `examples/`: reference games, a dedicated render benchmark, shared native-example glue, and board adapters.

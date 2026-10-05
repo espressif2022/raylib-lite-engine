@@ -8,10 +8,10 @@ A concrete native-example board adapter is an application-side IDF component und
 
 | Service | Contract to implement | Critical checks |
 | --- | --- | --- |
-| [Video](../components/raylib_lite_platform/include/raylib_lite_video.h) | Native-endian RGB565 frame with width, height, stride; `acquire` lends it, `present`/`discard` consume it, `flush` waits for release | No reuse before DMA release; transfer byte order, rotation, failures, double buffering |
-| [Monotonic clock](../components/raylib_lite_platform/include/raylib_lite_clock.h) | Microsecond timeline and waits that may wake early | Wrap, task blocking, stable logic ticks |
-| [Input](../components/raylib_lite_runner/include/raylib_lite_input.h) | Preserve contact identity and press/release edges before game-action mapping | Rotated coordinates, multitouch, queue overflow, disconnect recovery |
-| [PCM output](../components/raylib_lite_platform/include/raylib_lite_audio.h) | 24 kHz mono native-endian S16; partial writes and retryable stop | Codec startup, short writes, stop timeout, volume, listening on device |
+| [Video](../include/raylib_lite/raylib_lite_video.h) | Native-endian RGB565 frame with width, height, stride; `acquire` lends it, `present`/`discard` consume it, `flush` waits for release | No reuse before DMA release; transfer byte order, rotation, failures, double buffering |
+| [Monotonic clock](../include/raylib_lite/raylib_lite_clock.h) | Microsecond timeline and waits that may wake early | Wrap, task blocking, stable logic ticks |
+| [Input](../include/raylib_lite/raylib_lite_input.h) | Preserve contact identity and press/release edges before game-action mapping | Rotated coordinates, multitouch, queue overflow, disconnect recovery |
+| [PCM output](../include/raylib_lite/raylib_lite_audio.h) | 24 kHz mono native-endian S16; partial writes and retryable stop | Codec startup, short writes, stop timeout, volume, listening on device |
 | Assets and power | Product selects partition/embedding, backlight, and sleep policy | Names, capacity, startup/shutdown cleanup |
 
 Accept in order: lifecycle tests with a fake backend or Host, isolated panel/touch/audio checks, then one reference game covering startup, input, actual display, sound, shutdown, and error recovery. Report render time, buffer wait, DMA completion, and full-frame rate separately; a successful `present` return is not proof of visibility. If a second board requires changing shared raster code, first provide a board-independent contract or reproducible measurements before moving the boundary.

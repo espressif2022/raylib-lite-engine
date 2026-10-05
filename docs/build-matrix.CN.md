@@ -12,7 +12,7 @@
 
 ## 原生固件接入
 
-示例顶层 CMake 包含 [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake)。它先通过 [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake) 注册 board-neutral 的引擎组件，再根据 `RAYLIB_LITE_BOARD` 加载 `examples/boards/<board>/board.cmake`。Application 构建通过 `EXTRA_COMPONENT_DIRS` 加入具体 Board Adapter；游戏 `main/CMakeLists.txt` 只依赖 Engine component，并通过共享 example-board contract 编译。内嵌资源可由 [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) 准备。Gateway、烧录和产品策略仍位于引擎之外。
+示例顶层 CMake 包含 [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake)。它先通过 [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake) 加入仓库根部的单一 `raylib-lite-engine` component，再根据 `RAYLIB_LITE_BOARD` 加载 `examples/boards/<board>/board.cmake`。Application 构建通过 `EXTRA_COMPONENT_DIRS` 加入具体 Board Adapter；游戏 `main/CMakeLists.txt` 只依赖单一 `raylib-lite-engine` component，并通过共享 example-board contract 编译。内嵌资源可由 [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) 准备。Gateway、烧录和产品策略仍位于引擎之外。
 
 ESP-Mosaico 是当前参考 Board Adapter，位于 [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/)。它接受 `MOSAICO_BSP_ROOT` 或 `MOSAICO_BSP_COMPONENT_DIR` 配置 BSP。在已加载 ESP-IDF 环境后，以 Sky Hop 为例构建：
 
@@ -22,7 +22,7 @@ idf.py -C examples/sky_hop -D RAYLIB_LITE_BOARD=esp-mosaico \
     -B /tmp/sky-hop-native build
 ```
 
-产品固件复用游戏时，在包含 `raylib_lite_native_project.cmake` 后把 `examples/<game>/main` 加入 `EXTRA_COMPONENT_DIRS`。原生入口调用 [`raylib_lite_native_hooks.h`](../components/mosaico_game_app/include/raylib_lite_native_hooks.h)：创建板级平台前调用 `raylib_lite_native_boot()`，首帧上屏后调用 `raylib_lite_native_first_present()`。引擎提供 weak 空实现，产品在自己以 `WHOLE_ARCHIVE` 注册的组件中覆盖。产品读取的游戏列表来自 `python3 tools/game_cli.py list --json --target native`。
+产品固件复用游戏时，在包含 `raylib_lite_native_project.cmake` 后把 `examples/<game>/main` 加入 `EXTRA_COMPONENT_DIRS`。原生入口调用 [`raylib_lite_native_hooks.h`](../include/raylib_lite/raylib_lite_native_hooks.h)：创建板级平台前调用 `raylib_lite_native_boot()`，首帧上屏后调用 `raylib_lite_native_first_present()`。引擎提供 weak 空实现，产品在自己以 `WHOLE_ARCHIVE` 注册的组件中覆盖。产品读取的游戏列表来自 `python3 tools/game_cli.py list --json --target native`。
 
 Iris 适配由 Vibe 的 `mosaico-tools` 维护（`mosaico.py game build --target iris <game>`）；设备选择、烧录和恢复由 Vibe 产品 CLI 负责。不同目标使用独立构建目录，不共享 `sdkconfig` 与 CMake 缓存。
 

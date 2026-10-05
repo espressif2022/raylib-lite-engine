@@ -23,7 +23,7 @@ python3 tools/game_cli.py sim examples/sky_hop
 
 ## 仓库目录
 
-- `components/`：通用游戏组件和 ESP-IDF 服务实现。
+- `src/`：引擎内部模块与 IDF backend；`include/raylib_lite/` 保存公共头文件。
 - `cmake/`：board-neutral 的 ESP-IDF 引擎接入与原生示例 Board 选择辅助文件。
 - `examples/boards/`：具体开发板的示例/应用侧 Adapter；`esp-mosaico/` 是参考实现。
 - `examples/`：参考游戏、专用渲染测试、共享原生示例代码和 Board Adapter。

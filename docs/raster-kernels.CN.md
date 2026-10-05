@@ -1,6 +1,6 @@
 # 光栅内核契约
 
-[English](raster-kernels.EN.md) · [设计方法](reference-designs.CN.md) · [中性 Renderer](../components/mosaico_game_2d/include/mosaico_renderer.h) · [Legacy 2D Facade](../components/mosaico_game_2d/include/mosaico_game_2d.h)
+[English](raster-kernels.EN.md) · [设计方法](reference-designs.CN.md) · [中性 Renderer](../include/raylib_lite/mosaico_renderer.h) · [Legacy 2D Facade](../include/raylib_lite/mosaico_game_2d.h)
 
 本页说明当前光栅契约。实现核心使用 `mosaico_renderer.h` 中与 Raylib 无关的类型和函数；`mosaico_game_2d.h` 保留既有 Raylib-shaped `Mosaico2D*` 源码接口，并只在边界做类型转换。高频 draw wrapper 使用 `static inline`，因此 column/span/triangle 热路径不会因为兼容层多一次函数调用。先用 `mosaico_game_2d_set_target()` 设置 RGB565 目标、像素 stride、宽和高；再用 `mosaico_game_2d_set_clip()` 设置半开矩形裁剪区。下表的绘制还受目标范围约束。后提交的像素覆盖先提交的像素，没有通用 Z 缓冲。像素中心与固定点舍入的精确结果以 Host 独立 oracle 为验收依据。
 

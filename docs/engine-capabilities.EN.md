@@ -16,7 +16,7 @@ Use these public APIs before adding a game-local helper. If a helper is needed b
 | Tile map lookup and drawing | `mosaico_game_tilemap_*` | [`mosaico_game_tilemap.h`](../include/raylib_lite/mosaico_game_tilemap.h) |
 | Asset packing, backing providers, streaming, and logical-name lookup | packer, `mosaico_game_assets_mount_backing`, `mosaico_game_asset_open` | [`mosaico_game_assets.h`](../include/raylib_lite/mosaico_game_assets.h), [`pack_game_assets.py`](../tools/pack_game_assets.py) |
 | Sound/music playback and PCM device service | `MosaicoAudio*`, platform audio | [`mosaico_game_audio.h`](../include/raylib_lite/mosaico_game_audio.h), [`raylib_lite_audio.h`](../include/raylib_lite/raylib_lite_audio.h) |
-| Scene stack, UI controls, or effects | component-specific APIs | [`scene`](../include/raylib_lite/), [`ui`](../include/raylib_lite/), [`fx`](../include/raylib_lite/) |
+| Scene stack, UI controls, or effects | module-specific APIs | [`scene`](../include/raylib_lite/), [`ui`](../include/raylib_lite/), [`fx`](../include/raylib_lite/) |
 | Host replay or target build | `game_cli.py sim/build` | [`game_cli.py`](../tools/game_cli.py), [build paths](build-matrix.EN.md) |
 
 ## Internal module responsibilities

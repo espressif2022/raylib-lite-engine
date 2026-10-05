@@ -12,7 +12,7 @@ The engine maintains integration boundaries for three artifacts: PC Host, generi
 
 ## Native firmware integration
 
-The example top-level CMake includes [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake). It registers the board-neutral engine components through [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake), then loads `examples/boards/<board>/board.cmake` according to `RAYLIB_LITE_BOARD`. The application build adds that concrete adapter through `EXTRA_COMPONENT_DIRS`; each game `main/CMakeLists.txt` depends only on Engine components and compiles against the shared example-board contract. [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) can embed assets. Gateway, flashing, and product policy remain outside the engine.
+The example top-level CMake includes [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake). It adds the repository-root `raylib-lite-engine` component through [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake), then loads `examples/boards/<board>/board.cmake` according to `RAYLIB_LITE_BOARD`. The application build adds that concrete adapter through `EXTRA_COMPONENT_DIRS`; each game `main/CMakeLists.txt` depends on the single `raylib-lite-engine` component and compiles against the shared example-board contract. [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) can embed assets. Gateway, flashing, and product policy remain outside the engine.
 
 ESP-Mosaico is the current reference board adapter at [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/). Its board selector accepts `MOSAICO_BSP_ROOT` or `MOSAICO_BSP_COMPONENT_DIR`. After loading ESP-IDF, build Sky Hop as an example artifact:
 
@@ -22,7 +22,7 @@ idf.py -C examples/sky_hop -D RAYLIB_LITE_BOARD=esp-mosaico \
     -B /tmp/sky-hop-native build
 ```
 
-Product firmware reuses a game by adding `examples/<game>/main` to `EXTRA_COMPONENT_DIRS` after including `raylib_lite_native_project.cmake`. Native entries call [`raylib_lite_native_hooks.h`](../components/mosaico_game_app/include/raylib_lite_native_hooks.h): `raylib_lite_native_boot()` before the board is created and `raylib_lite_native_first_present()` after the first presented frame. The engine provides weak no-op defaults; a product overrides both from its own component registered with `WHOLE_ARCHIVE`. `python3 tools/game_cli.py list --json --target native` is the game list products consume.
+Product firmware reuses a game by adding `examples/<game>/main` to `EXTRA_COMPONENT_DIRS` after including `raylib_lite_native_project.cmake`. Native entries call [`raylib_lite_native_hooks.h`](../include/raylib_lite/raylib_lite_native_hooks.h): `raylib_lite_native_boot()` before the board is created and `raylib_lite_native_first_present()` after the first presented frame. The engine provides weak no-op defaults; a product overrides both from its own component registered with `WHOLE_ARCHIVE`. `python3 tools/game_cli.py list --json --target native` is the game list products consume.
 
 Vibe's `mosaico-tools` owns the Iris adapter (`mosaico.py game build --target iris <game>`); its product CLI owns device selection, flashing, and recovery. Use separate build directories; do not share `sdkconfig` or CMake caches across targets.
 
