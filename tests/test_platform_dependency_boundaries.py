@@ -175,13 +175,52 @@ int main(void) {{ return M2D_WALL_MODE; }}
                 self.assertTrue((root / "main/idf_component.yml").is_file())
                 self.assertTrue((root / "game.sim.json").is_file())
 
-    def test_native_examples_need_only_the_bsp(self) -> None:
-        for component in ("mosaico_board_platform", "mosaico_game_audio", "platform_esp_audio"):
-            with self.subTest(component=component):
-                self.assertTrue((ENGINE / "ports/esp_mosaico" / component / "CMakeLists.txt").is_file())
+    def test_native_examples_select_board_adapter(self) -> None:
+        board = ENGINE / "examples/boards/esp-mosaico"
+        self.assertFalse((ENGINE / "ports/esp_mosaico").exists())
+        for name in ("CMakeLists.txt", "board.cmake", "board.c",
+                     "sdkconfig.defaults"):
+            with self.subTest(path=name):
+                self.assertTrue((board / name).is_file())
+
         resolver = (ENGINE / "cmake/raylib_lite_native_project.cmake").read_text()
-        self.assertNotIn("MOSAICO_PRODUCT_ROOT", resolver)
-        self.assertIn("raylib_lite_esp_add_port()", resolver)
+        self.assertIn("RAYLIB_LITE_BOARD", resolver)
+        self.assertIn("examples/boards/${RAYLIB_LITE_BOARD}", resolver)
+        for board_token in ("esp-mosaico", "MOSAICO_BSP_ROOT",
+                            "mosaico_board_platform", "raylib_lite_esp_add_port"):
+            self.assertNotIn(board_token, resolver)
+
+        engine_helper = (ENGINE / "cmake/raylib_lite_esp.cmake").read_text()
+        self.assertNotIn("raylib_lite_esp_add_port", engine_helper)
+        self.assertNotIn("esp_mosaico", engine_helper)
+
+        for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
+            if cmake.parent.parent.name == "render_benchmark":
+                continue
+            with self.subTest(path=cmake.relative_to(ENGINE)):
+                self.assertIn("${RAYLIB_LITE_BOARD_COMPONENT}", cmake.read_text())
+
+    def test_game_manifests_do_not_own_board_dependencies(self) -> None:
+        forbidden = ("esp_display_present", "lvgl/lvgl", "esp-mosaico")
+        for manifest in (ENGINE / "examples").glob("*/main/idf_component.yml"):
+            source = manifest.read_text(encoding="utf-8")
+            with self.subTest(path=manifest.relative_to(ENGINE)):
+                for token in forbidden:
+                    self.assertNotIn(token, source)
+
+    def test_game_sources_do_not_depend_on_concrete_boards(self) -> None:
+        forbidden = ("mosaico_board_platform", "bsp/esp_mosaico",
+                     "esp-mosaico-bsp")
+        for main in (ENGINE / "examples").glob("*/main"):
+            if main.parent.name == "render_benchmark":
+                continue
+            for path in main.iterdir():
+                if path.suffix not in {".c", ".h"}:
+                    continue
+                source = path.read_text(encoding="utf-8")
+                with self.subTest(path=path.relative_to(ENGINE)):
+                    for token in forbidden:
+                        self.assertNotIn(token, source)
 
     def test_native_games_expose_only_the_neutral_lifecycle_hooks(self) -> None:
         product = re.compile(r"iris|MOSAICO_NATIVE_PRODUCT|esp_mosaico_app", re.IGNORECASE)

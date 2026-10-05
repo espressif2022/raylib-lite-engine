@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "mosaico_board_platform.h"
+#include "raylib_lite_example_board.h"
 
 #include <stdatomic.h>
 #include <string.h>
@@ -17,8 +17,8 @@
 
 #define INPUT_CAPACITY 32U
 
-struct mosaico_board_platform {
-    mosaico_board_platform_config_t config;
+struct raylib_lite_example_board {
+    raylib_lite_example_board_config_t config;
     raylib_lite_platform_t services;
     raylib_lite_input_queue_t input;
     raylib_lite_input_event_t events[INPUT_CAPACITY];
@@ -34,7 +34,7 @@ struct mosaico_board_platform {
     bool cleanup_pending;
 };
 
-static struct mosaico_board_platform s_board;
+static struct raylib_lite_example_board s_board;
 static bool s_consumed;
 
 static esp_err_t to_esp(raylib_lite_result_t result)
@@ -85,7 +85,7 @@ static void sleep_us(void *ctx, uint64_t us)
     vTaskDelay(ticks ? ticks : 1);
 }
 
-static void push(struct mosaico_board_platform *p,
+static void push(struct raylib_lite_example_board *p,
                  const raylib_lite_input_event_t *event)
 {
     (void)raylib_lite_input_push(&p->input, event);
@@ -93,7 +93,7 @@ static void push(struct mosaico_board_platform *p,
 
 static void touch_worker(void *ctx)
 {
-    struct mosaico_board_platform *p = ctx;
+    struct raylib_lite_example_board *p = ctx;
     uint8_t max = p->config.touch_points ? p->config.touch_points : 1;
     if (max > MOSAICO_CONTACT_CAPACITY) {
         max = MOSAICO_CONTACT_CAPACITY;
@@ -185,7 +185,7 @@ static void touch_worker(void *ctx)
 
 static void imu_worker(void *ctx)
 {
-    struct mosaico_board_platform *p = ctx;
+    struct raylib_lite_example_board *p = ctx;
     TickType_t period = pdMS_TO_TICKS(
         p->config.imu_sample_ms ? p->config.imu_sample_ms : 20);
     if (!period) {
@@ -213,8 +213,8 @@ static void imu_worker(void *ctx)
     vTaskDelete(NULL);
 }
 
-esp_err_t mosaico_board_platform_create(const mosaico_board_platform_config_t *c,
-                                        mosaico_board_platform_t **out)
+esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_config_t *c,
+                                        raylib_lite_example_board_t **out)
 {
     if (!c || !out) {
         return ESP_ERR_INVALID_ARG;
@@ -225,7 +225,7 @@ esp_err_t mosaico_board_platform_create(const mosaico_board_platform_config_t *c
     }
     s_consumed = true;
 
-    struct mosaico_board_platform *p = &s_board;
+    struct raylib_lite_example_board *p = &s_board;
     memset(p, 0, sizeof(*p));
     p->config = *c;
     atomic_init(&p->sampling, false);
@@ -325,7 +325,7 @@ failed:
     /* BSP panel/touch/IMU/power have no symmetric teardown. Preserve the
      * handle when presenter work prevents cleanup so callers can retry. */
     {
-        esp_err_t cleanup = mosaico_board_platform_retry_cleanup(p, 3000);
+        esp_err_t cleanup = raylib_lite_example_board_retry_cleanup(p, 3000);
         if (cleanup == ESP_ERR_TIMEOUT) {
             return cleanup;
         }
@@ -334,18 +334,18 @@ failed:
     }
 }
 
-const raylib_lite_platform_t *mosaico_board_platform_services(
-    mosaico_board_platform_t *p)
+const raylib_lite_platform_t *raylib_lite_example_board_services(
+    raylib_lite_example_board_t *p)
 {
     return p ? &p->services : NULL;
 }
 
-raylib_lite_input_queue_t *mosaico_board_platform_input(mosaico_board_platform_t *p)
+raylib_lite_input_queue_t *raylib_lite_example_board_input(raylib_lite_example_board_t *p)
 {
     return p ? &p->input : NULL;
 }
 
-esp_err_t mosaico_board_platform_start_input(mosaico_board_platform_t *p)
+esp_err_t raylib_lite_example_board_start_input(raylib_lite_example_board_t *p)
 {
     if (!p || atomic_load(&p->sampling)) {
         return ESP_ERR_INVALID_STATE;
@@ -367,7 +367,7 @@ fail:
     return ESP_ERR_NO_MEM;
 }
 
-esp_err_t mosaico_board_platform_stop(mosaico_board_platform_t *p,
+esp_err_t raylib_lite_example_board_stop(raylib_lite_example_board_t *p,
                                       uint32_t timeout_ms)
 {
     if (!p) {
@@ -390,10 +390,10 @@ esp_err_t mosaico_board_platform_stop(mosaico_board_platform_t *p,
     return ESP_OK;
 }
 
-esp_err_t mosaico_board_platform_retry_cleanup(mosaico_board_platform_t *p,
+esp_err_t raylib_lite_example_board_retry_cleanup(raylib_lite_example_board_t *p,
                                                uint32_t timeout_ms)
 {
-    esp_err_t err = mosaico_board_platform_stop(p, timeout_ms);
+    esp_err_t err = raylib_lite_example_board_stop(p, timeout_ms);
     if (err != ESP_OK) {
         return err;
     }
@@ -428,11 +428,11 @@ esp_err_t mosaico_board_platform_retry_cleanup(mosaico_board_platform_t *p,
     return ESP_OK;
 }
 
-esp_err_t mosaico_board_platform_destroy(mosaico_board_platform_t *p,
+esp_err_t raylib_lite_example_board_destroy(raylib_lite_example_board_t *p,
                                          uint32_t timeout_ms)
 {
     if (!p || p != &s_board) {
         return ESP_ERR_INVALID_ARG;
     }
-    return mosaico_board_platform_retry_cleanup(p, timeout_ms);
+    return raylib_lite_example_board_retry_cleanup(p, timeout_ms);
 }

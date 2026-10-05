@@ -12,13 +12,14 @@ The engine maintains integration boundaries for three artifacts: PC Host, generi
 
 ## Native firmware integration
 
-The example top-level CMake includes [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake), which calls [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake) to register engine components. The game's `main/CMakeLists.txt` registers sources, and [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) can embed assets. Engine helpers do not select a board or manage Gateway or device writes. Vibe owns Recovery dependency wiring and product policy.
+The example top-level CMake includes [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake). It registers the board-neutral engine components through [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake), then loads `examples/boards/<board>/board.cmake` according to `RAYLIB_LITE_BOARD`. The game's `main/CMakeLists.txt` depends only on the selected board component and registers its own sources; [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) can embed assets. Gateway, flashing, and product policy remain outside the engine.
 
-A native example needs only `MOSAICO_BSP_ROOT`; the ESP-Mosaico board platform and audio output come from [`ports/esp_mosaico`](../ports/esp_mosaico) through `raylib_lite_esp_add_port()`. Another board passes `MOSAICO_BOARD_PLATFORM_DIR` (and optionally `MOSAICO_AUDIO_COMPONENT_DIR`/`MOSAICO_AUDIO_PLATFORM_DIR`) instead. After loading ESP-IDF, build Sky Hop as an example artifact:
+ESP-Mosaico is the current reference board adapter at [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/). Its board selector accepts `MOSAICO_BSP_ROOT` or `MOSAICO_BSP_COMPONENT_DIR`. After loading ESP-IDF, build Sky Hop as an example artifact:
 
 ```sh
-export MOSAICO_BSP_ROOT=/path/to/bsp
-idf.py -C examples/sky_hop -B /tmp/sky-hop-native build
+export MOSAICO_BSP_ROOT=/path/to/esp-mosaico-bsp
+idf.py -C examples/sky_hop -D RAYLIB_LITE_BOARD=esp-mosaico \
+    -B /tmp/sky-hop-native build
 ```
 
 Product firmware reuses a game by adding `examples/<game>/main` to `EXTRA_COMPONENT_DIRS` after including `raylib_lite_native_project.cmake`. Native entries call [`raylib_lite_native_hooks.h`](../components/mosaico_game_app/include/raylib_lite_native_hooks.h): `raylib_lite_native_boot()` before the board is created and `raylib_lite_native_first_present()` after the first presented frame. The engine provides weak no-op defaults; a product overrides both from its own component registered with `WHOLE_ARCHIVE`. `python3 tools/game_cli.py list --json --target native` is the game list products consume.

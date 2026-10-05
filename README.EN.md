@@ -65,22 +65,14 @@ python3 tools/game_cli.py sim examples/tomb_raycast --headless --frames 8
 python3 tools/game_cli.py sim examples/vertical_dock
 ```
 
-Standalone example firmware can be built from supported example directories;
-production board policy belongs to the product repository. Documentation index:
-[docs/README.EN.md](docs/README.EN.md). Host ABI:
-[host/README.md](host/README.md).
-The Mosaico device examples depend only on the BSP (`MOSAICO_BSP_ROOT`); the
-ESP-Mosaico board port lives in `ports/esp_mosaico/`. Iris product integration
-is documented in Vibe. Host simulation needs neither.
+Standalone example firmware composes the same game source with a board adapter selected at build time. The ESP-Mosaico reference adapter lives in [`examples/boards/esp-mosaico`](examples/boards/esp-mosaico/) and is selected with `-DRAYLIB_LITE_BOARD=esp-mosaico`; its BSP path is configured by that adapter. Production board policy belongs to the product repository. Documentation index: [docs/README.EN.md](docs/README.EN.md). Host ABI: [host/README.md](host/README.md). Iris product integration is documented in Vibe. Host simulation needs no board adapter.
 
 ## Repository layout
 
 - `components/`: reusable game modules and ESP-IDF service implementations.
-- `ports/esp_mosaico/`: ESP-Mosaico board platform and audio output on top of
-  the BSP.
-- `cmake/`: ESP-IDF component registration for device firmware.
-- `examples/`: eight reference games, including Vertical Dock, plus a
-  dedicated render benchmark and shared native-example glue.
+- `cmake/`: board-neutral ESP-IDF engine registration and native-example board selection helpers.
+- `examples/boards/`: concrete example/application-side board adapters; `esp-mosaico/` is the reference implementation.
+- `examples/`: reference games, a dedicated render benchmark, shared native-example glue, and board adapters.
 - `host/`: native Host ABI, RGB565 renderer bridge and browser simulator.
 - `tools/`: game CLI, asset compiler, and performance analysis tools.
 - `docs/`: game development guides and the mosaico-game-development skill.

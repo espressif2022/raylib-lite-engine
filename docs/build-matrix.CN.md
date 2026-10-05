@@ -12,13 +12,14 @@
 
 ## 原生固件接入
 
-示例顶层 CMake 包含 [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake)，它调用 [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake) 注册引擎组件。游戏 `main/CMakeLists.txt` 注册源码，内嵌资源可由 [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) 准备。引擎辅助文件不选择板卡，也不管理 Gateway 或设备写入；Recovery 依赖接线和产品规则由 Vibe 维护。
+示例顶层 CMake 包含 [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake)。它先通过 [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake) 注册 board-neutral 的引擎组件，再根据 `RAYLIB_LITE_BOARD` 加载 `examples/boards/<board>/board.cmake`。游戏 `main/CMakeLists.txt` 只依赖所选 Board component 并注册自身源码；内嵌资源可由 [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) 准备。Gateway、烧录和产品策略仍位于引擎之外。
 
-原生示例只需要 `MOSAICO_BSP_ROOT`；ESP-Mosaico 板级平台和音频输出由 [`ports/esp_mosaico`](../ports/esp_mosaico) 经 `raylib_lite_esp_add_port()` 提供。其他板卡改传 `MOSAICO_BOARD_PLATFORM_DIR`（音频可选 `MOSAICO_AUDIO_COMPONENT_DIR`/`MOSAICO_AUDIO_PLATFORM_DIR`）。在已加载 ESP-IDF 环境后，以 Sky Hop 为例只构建产物：
+ESP-Mosaico 是当前参考 Board Adapter，位于 [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/)。它接受 `MOSAICO_BSP_ROOT` 或 `MOSAICO_BSP_COMPONENT_DIR` 配置 BSP。在已加载 ESP-IDF 环境后，以 Sky Hop 为例构建：
 
 ```sh
-export MOSAICO_BSP_ROOT=/path/to/bsp
-idf.py -C examples/sky_hop -B /tmp/sky-hop-native build
+export MOSAICO_BSP_ROOT=/path/to/esp-mosaico-bsp
+idf.py -C examples/sky_hop -D RAYLIB_LITE_BOARD=esp-mosaico \
+    -B /tmp/sky-hop-native build
 ```
 
 产品固件复用游戏时，在包含 `raylib_lite_native_project.cmake` 后把 `examples/<game>/main` 加入 `EXTRA_COMPONENT_DIRS`。原生入口调用 [`raylib_lite_native_hooks.h`](../components/mosaico_game_app/include/raylib_lite_native_hooks.h)：创建板级平台前调用 `raylib_lite_native_boot()`，首帧上屏后调用 `raylib_lite_native_first_present()`。引擎提供 weak 空实现，产品在自己以 `WHOLE_ARCHIVE` 注册的组件中覆盖。产品读取的游戏列表来自 `python3 tools/game_cli.py list --json --target native`。

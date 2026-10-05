@@ -9,7 +9,7 @@
 #include "esp_err.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
-#include "mosaico_board_platform.h"
+#include "raylib_lite_example_board.h"
 #include "mosaico_game_assets.h"
 #include "mosaico_game_module.h"
 #include "raylib_lite_game_app.h"
@@ -27,7 +27,7 @@ extern void raylib_lite_register_native_assets(void);
 typedef struct {
     const mosaico_game_module_v1_t *module;
     void *state;
-    mosaico_board_platform_t *board;
+    raylib_lite_example_board_t *board;
     uint32_t last_render_error_log;
 } native_game_t;
 
@@ -81,7 +81,7 @@ static raylib_lite_result_t game_start(void *user)
 static raylib_lite_result_t first_present(void *user)
 {
     native_game_t *game = user;
-    esp_err_t error = mosaico_board_platform_start_input(game->board);
+    esp_err_t error = raylib_lite_example_board_start_input(game->board);
     if (error != ESP_OK) {
         ESP_LOGE(TAG, "start board input: %s", esp_err_to_name(error));
         return to_runner_result(error);
@@ -157,16 +157,16 @@ static void game_stop(void *user)
     mosaico_game_assets_unmount();
 }
 
-static esp_err_t cleanup_board(mosaico_board_platform_t *board)
+static esp_err_t cleanup_board(raylib_lite_example_board_t *board)
 {
     if (!board) return ESP_OK;
-    esp_err_t error = mosaico_board_platform_stop(board, 3000);
+    esp_err_t error = raylib_lite_example_board_stop(board, 3000);
     if (error != ESP_OK && error != ESP_ERR_INVALID_STATE)
         ESP_LOGW(TAG, "stop board input: %s", esp_err_to_name(error));
-    error = mosaico_board_platform_destroy(board, 3000);
+    error = raylib_lite_example_board_destroy(board, 3000);
     if (error == ESP_OK) return ESP_OK;
     ESP_LOGW(TAG, "destroy board: %s; retrying cleanup", esp_err_to_name(error));
-    return mosaico_board_platform_retry_cleanup(board, 3000);
+    return raylib_lite_example_board_retry_cleanup(board, 3000);
 }
 
 void app_main(void)
@@ -176,19 +176,19 @@ void app_main(void)
         return;
     }
 
-    const mosaico_board_platform_config_t board_config = {
+    const raylib_lite_example_board_config_t board_config = {
         .touch_points = 2,
         .enable_imu = true,
         .imu_sample_ms = 20,
         .drawbuf_lines = 34,
         .drawbuf_count = 2,
     };
-    mosaico_board_platform_t *board = NULL;
-    esp_err_t error = mosaico_board_platform_create(&board_config, &board);
+    raylib_lite_example_board_t *board = NULL;
+    esp_err_t error = raylib_lite_example_board_create(&board_config, &board);
     if (error != ESP_OK) {
         ESP_LOGE(TAG, "create board platform: %s", esp_err_to_name(error));
         if (board)
-            (void)mosaico_board_platform_retry_cleanup(board, 3000);
+            (void)raylib_lite_example_board_retry_cleanup(board, 3000);
         return;
     }
 
@@ -206,7 +206,7 @@ void app_main(void)
     const uint32_t target_fps = MOSAICO_NATIVE_TARGET_FPS
         ? MOSAICO_NATIVE_TARGET_FPS : logic_hz;
     const raylib_lite_platform_t *services =
-        mosaico_board_platform_services(board);
+        raylib_lite_example_board_services(board);
     if (!services) {
         ESP_LOGE(TAG, "board platform has no services");
         (void)cleanup_board(board);
@@ -219,7 +219,7 @@ void app_main(void)
         .target_fps = target_fps,
         .stats_interval = logic_hz * 10,
         .platform = *services,
-        .input = mosaico_board_platform_input(board),
+        .input = raylib_lite_example_board_input(board),
         .user = &game,
         .on_start = game_start,
         .on_first_present = first_present,

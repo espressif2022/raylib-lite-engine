@@ -6,7 +6,7 @@
 
 #include "driver/jpeg_decode.h"
 #include "esp_log.h"
-#include "mosaico_board_platform.h"
+#include "raylib_lite_example_board.h"
 #include "mosaico_game_2d.h"
 #include "mosaico_game_assets.h"
 #include "raylib_lite_game_app.h"
@@ -44,7 +44,7 @@ extern const uint8_t _binary_sunrise_jpg_start[], _binary_sunrise_jpg_end[];
 extern const uint8_t _binary_rainforest_jpg_start[], _binary_rainforest_jpg_end[];
 
 typedef struct {
-    mosaico_board_platform_t *board;
+    raylib_lite_example_board_t *board;
     living_worlds_session_t session;
     jpeg_decoder_handle_t jpeg;
     void *background_pixels;
@@ -259,7 +259,7 @@ static raylib_lite_result_t app_first_present(void *user)
 {
     living_worlds_native_t *state = user;
     if (!state->board ||
-            mosaico_board_platform_start_input(state->board) != ESP_OK)
+            raylib_lite_example_board_start_input(state->board) != ESP_OK)
         return RAYLIB_LITE_PLATFORM_ERROR;
     raylib_lite_native_first_present();
     return RAYLIB_LITE_OK;
@@ -310,11 +310,11 @@ static void app_stop(void *user)
     mosaico_game_assets_unmount();
 }
 
-esp_err_t living_worlds_native_run(mosaico_board_platform_t *board)
+esp_err_t living_worlds_native_run(raylib_lite_example_board_t *board)
 {
     if (!board) return ESP_ERR_INVALID_ARG;
     const raylib_lite_platform_t *services =
-        mosaico_board_platform_services(board);
+        raylib_lite_example_board_services(board);
     if (!services) return ESP_ERR_INVALID_STATE;
 
     living_worlds_native_t state = {.board = board};
@@ -326,7 +326,7 @@ esp_err_t living_worlds_native_run(mosaico_board_platform_t *board)
         /* Keep the shared timing logger dormant in release builds. */
         .stats_interval = UINT32_MAX,
         .platform = *services,
-        .input = mosaico_board_platform_input(board),
+        .input = raylib_lite_example_board_input(board),
         .user = &state,
         .on_start = app_start,
         .on_first_present = app_first_present,

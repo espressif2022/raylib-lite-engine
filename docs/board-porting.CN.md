@@ -4,6 +4,8 @@
 
 当前仓库没有第二块板的验收数据；“游戏与通用光栅器无需改动”是移植目标，还不是跨板实证。先在独立构建目录接入新 BSP 与产品组件；Iris/Recovery 产品集成由 `esp-mosaico-vibe` 维护；不要修改共享游戏模型来适配面板或触摸驱动。
 
+具体原生示例 Board Adapter 是应用侧 IDF component，统一放在 `examples/boards/<board>/`，组件源码直接位于这一层。每块 Board 提供 `board.cmake` 设置 `RAYLIB_LITE_BOARD_COMPONENT` 和必要的 board sdkconfig defaults，并实现共享的 `examples/common/raylib_lite_example_board.h` contract。Game 目录只依赖所选 Board component，不能直接 include 具体 BSP 或 Board API。当前参考实现是 [`esp-mosaico`](../examples/boards/esp-mosaico/)。
+
 | 服务 | 应实现的契约 | 必查边界 |
 | --- | --- | --- |
 | [视频](../components/raylib_lite_platform/include/raylib_lite_video.h) | native-endian RGB565 帧、宽高与 stride；`acquire` 借出，`present`/`discard` 消费，`flush` 等待释放点 | DMA 未完成前不能复用缓冲；送屏字节序、旋转、失败清理与双缓冲 |

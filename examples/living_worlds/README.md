@@ -34,13 +34,11 @@ python3 tools/game_cli.py sim examples/living_worlds
 python3 tools/game_cli.py sim examples/living_worlds --headless --frames 300
 ```
 
-本目录也是独立 ESP-IDF native 工程。设备构建只需要 BSP，配置时传入
-`MOSAICO_BSP_ROOT`；板级平台来自引擎 `ports/esp_mosaico/`。Iris 原生构建（`mosaico.py game build --target iris living_worlds`）与设备操作由 `esp-mosaico-vibe` 维护。Host 仿真不需要板级依赖。
+本目录也是独立 ESP-IDF native 工程。设备构建在 application 层选择 Board Adapter；ESP-Mosaico 参考实现位于 `examples/boards/esp-mosaico/`，其 BSP 可通过 `MOSAICO_BSP_ROOT` 指定。Iris 原生构建（`mosaico.py game build --target iris living_worlds`）与设备操作由 `esp-mosaico-vibe` 维护。Host 仿真不需要板级依赖。
 
 ```bash
-export MOSAICO_BSP_ROOT=/path/to/bsp
-cd examples/living_worlds
-idf.py build
+export MOSAICO_BSP_ROOT=/path/to/esp-mosaico-bsp
+idf.py -C examples/living_worlds -D RAYLIB_LITE_BOARD=esp-mosaico build
 ```
 
 直接烧录会替换当前启动器固件；大厅 ELF 版本仍由外部 `esp-mosaico-elf-game-sdk` 打包安装。

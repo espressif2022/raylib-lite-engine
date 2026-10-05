@@ -17,6 +17,7 @@ fill count, and solid and anti-aliased pixel counts.
 
 ```sh
 python3 tools/game_cli.py sim examples/vector_puppet
-export MOSAICO_BSP_ROOT=/path/to/bsp
-idf.py -C examples/vector_puppet -B /tmp/vector-puppet-native build
+export MOSAICO_BSP_ROOT=/path/to/esp-mosaico-bsp
+idf.py -C examples/vector_puppet -D RAYLIB_LITE_BOARD=esp-mosaico \
+    -B /tmp/vector-puppet-native build
 ```

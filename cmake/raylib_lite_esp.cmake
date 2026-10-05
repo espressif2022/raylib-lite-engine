@@ -42,16 +42,3 @@ function(mosaico_game_sdk_add_components)
     list(REMOVE_DUPLICATES EXTRA_COMPONENT_DIRS)
     set(EXTRA_COMPONENT_DIRS "${EXTRA_COMPONENT_DIRS}" PARENT_SCOPE)
 endfunction()
-
-# Board port for ESP-Mosaico: mosaico_board_platform plus ESP audio output.
-# The caller also adds the esp-mosaico-bsp component. Another board supplies
-# its own directories instead of calling this.
-function(raylib_lite_esp_add_port)
-    set(_port "${RAYLIB_LITE_ENGINE_ROOT}/ports/esp_mosaico")
-    list(APPEND EXTRA_COMPONENT_DIRS
-        "${_port}/mosaico_board_platform"
-        "${_port}/mosaico_game_audio"
-        "${_port}/platform_esp_audio")
-    list(REMOVE_DUPLICATES EXTRA_COMPONENT_DIRS)
-    set(EXTRA_COMPONENT_DIRS "${EXTRA_COMPONENT_DIRS}" PARENT_SCOPE)
-endfunction()

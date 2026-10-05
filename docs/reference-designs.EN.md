@@ -4,17 +4,18 @@
 
 When designing a game or backend, decide who owns each resource and capability, choose the rendering path, then validate correctness and device cost with the same inputs. This page records rules shared across games. Build commands and individual measurements belong to their respective projects.
 
-## 1. Separate game, engine, and platform ownership
+## 1. Separate game, engine, board, and product ownership
 
 | Layer | Owns | Boundary |
 | --- | --- | --- |
-| Game model and view | State, game actions, logical asset names, audiovisual events, projection, and layer order | Portable C; no BSP or display-driver handles |
-| Engine | Fixed-step scheduling, input queue, RGB565 rasterizer, asset and audio services | Uses platform capabilities through video, clock, input, and audio contracts |
-| Platform and product | BSP, panel, touch, codec, power, tasks, and firmware entry point | Creates backends, supplies device resources, and cleans up |
+| Game model and view | State, game actions, logical asset names, audiovisual events, projection, and layer order | Shared C; no concrete BSP or board-driver handles |
+| Engine | Fixed-step scheduling, input queue, RGB565 rasterizer, asset and audio services, platform contracts | Does not depend on a concrete board |
+| Board adapter | BSP, panel, touch, codec, IMU, board resources, and backend construction | Example/application-side IDF component under `examples/boards/<board>/`; depends on the engine |
+| Product runtime | Product tasks, loader/session policy, install/update/recovery, and device ownership | Composes engine and board capabilities without becoming part of either |
 
-Translate raw input into game actions before gameplay updates. The model emits numbered audio and haptic events; consumers handle each event once. Refer to assets by logical name and let the platform provide their storage. A monotonic clock drives logic. Display backpressure may drop an old frame, but must not change logic speed.
+Translate raw input into game actions before gameplay updates. The model emits numbered audio and haptic events; consumers handle each event once. Refer to assets by logical name and let the selected integration provide their storage. A monotonic clock drives logic. Display backpressure may drop an old frame, but must not change logic speed.
 
-Define who borrows, submits, and releases each RGB565 framebuffer. Return it exactly once on busy, failure, and exit paths. Acceptance by `present`, buffer reuse, and actual screen completion are different timestamps; label each measurement. Adding a board should require adapting the platform entry point and services, not the game loop or generic rasterizer.
+Define who borrows, submits, and releases each RGB565 framebuffer. Return it exactly once on busy, failure, and exit paths. Acceptance by `present`, buffer reuse, and actual screen completion are different timestamps; label each measurement. Adding a board means adding a board adapter and selecting it at build time; it must not require changes to the game loop, generic rasterizer, or game source.
 
 ## 2. Design input, feedback, and assets around game meaning
 

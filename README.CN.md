@@ -19,13 +19,14 @@ python3 -m pip install Pillow
 python3 tools/game_cli.py sim examples/sky_hop
 ```
 
-浏览器预览地址为 `http://127.0.0.1:8460/`。独立原生示例只依赖 BSP（`MOSAICO_BSP_ROOT`），ESP-Mosaico 板级端口在 `ports/esp_mosaico/`；生产固件的产品策略由产品仓库负责。设备 ELF 游戏由外部 SDK 构建、打包和安装。
+浏览器预览地址为 `http://127.0.0.1:8460/`。原生示例在构建时选择 Board Adapter；ESP-Mosaico 参考实现位于 [`examples/boards/esp-mosaico`](examples/boards/esp-mosaico/)，使用 `-DRAYLIB_LITE_BOARD=esp-mosaico` 选择，BSP 路径由该 Board Adapter 配置。生产固件的产品策略由产品仓库负责；设备 ELF 游戏由外部 SDK 构建、打包和安装。
 
 ## 仓库目录
 
 - `components/`：通用游戏组件和 ESP-IDF 服务实现。
-- `cmake/`：ESP-IDF 组件接入与示例构建辅助文件。
-- `examples/`：八个参考游戏、专用渲染测试和原生示例共享代码。
+- `cmake/`：board-neutral 的 ESP-IDF 引擎接入与原生示例 Board 选择辅助文件。
+- `examples/boards/`：具体开发板的示例/应用侧 Adapter；`esp-mosaico/` 是参考实现。
+- `examples/`：参考游戏、专用渲染测试、共享原生示例代码和 Board Adapter。
 - `host/`：Host ABI、RGB565 浏览器预览与固定输入回放。
 - `tools/`：游戏 CLI、资源打包与性能分析工具。
 - `docs/`：中英文开发、构建和可复用设计指南。

@@ -4,6 +4,8 @@
 
 There is no second-board acceptance result in this repository. Keeping game models and the generic rasterizer unchanged is a porting goal, not yet cross-board evidence. Connect the new BSP and product components in a separate build directory. `esp-mosaico-vibe` owns Iris/Recovery product integration. Keep panel/touch adaptation out of shared gameplay.
 
+A concrete native-example board adapter is an application-side IDF component under `examples/boards/<board>/`. Put its component sources directly in that directory, provide `board.cmake` to set `RAYLIB_LITE_BOARD_COMPONENT` and any board sdkconfig defaults, and implement the shared `examples/common/raylib_lite_example_board.h` contract. Game directories depend only on the selected board component; they must not include the concrete BSP or board API. The current reference implementation is [`esp-mosaico`](../examples/boards/esp-mosaico/).
+
 | Service | Contract to implement | Critical checks |
 | --- | --- | --- |
 | [Video](../components/raylib_lite_platform/include/raylib_lite_video.h) | Native-endian RGB565 frame with width, height, stride; `acquire` lends it, `present`/`discard` consume it, `flush` waits for release | No reuse before DMA release; transfer byte order, rotation, failures, double buffering |

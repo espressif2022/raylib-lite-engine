@@ -4,9 +4,8 @@ idf_component_register(
          "living_worlds_world.c"
          "living_worlds_aurora.c" "living_worlds_ocean.c"
          "living_worlds_volume.c" "living_worlds_view.c"
-    INCLUDE_DIRS "."
-    REQUIRES mosaico_board_platform mosaico_game_app mosaico_game_assets
-             mosaico_game_audio
+    INCLUDE_DIRS "." "${RAYLIB_LITE_ENGINE_ROOT}/examples/common"
+    REQUIRES ${RAYLIB_LITE_BOARD_COMPONENT} mosaico_game_app mosaico_game_assets
              mosaico_game_2d esp_driver_jpeg mosaico_raylib_fast
              mosaico_raylib_port raylib)
 

@@ -2,6 +2,8 @@
 
 Reference games for Raylib Lite Engine. Start with `python3 tools/game_cli.py create <name>` or copy a nearby game. See the [build-path guide](../docs/build-matrix.EN.md) for target-specific requirements.
 
+Each top-level game directory is board-neutral. Native firmware combines the game with a build-time-selected adapter under [`boards/`](boards/); the current reference board is [`boards/esp-mosaico`](boards/esp-mosaico/). For example: `idf.py -C examples/raylib_shooter -D RAYLIB_LITE_BOARD=esp-mosaico build`.
+
 | Example | Use it for | Host game sim | Native | Lobby ELF SDK |
 | --- | --- | :---: | :---: | :---: |
 | [raylib_shooter](raylib_shooter/README.md) | Small shooter and shared RGB565 drawing | ✓ | ✓ | ✓ |
@@ -25,4 +27,4 @@ python3 tools/game_cli.py sim examples/<name>
 python3 tools/game_cli.py sim examples/<name> --headless --frames 300
 ```
 
-The browser preview is `http://127.0.0.1:8460/`; use `--listen 0.0.0.0` for LAN. Native builds require explicit product/BSP paths. Product firmware owns production board policy and Iris workflows. See the [English documentation index](../docs/README.EN.md) and [Host simulator reference (简体中文)](../host/README.md).
+The browser preview is `http://127.0.0.1:8460/`; use `--listen 0.0.0.0` for LAN. Native builds require an explicit `RAYLIB_LITE_BOARD` and whatever external dependencies that board adapter documents. Product firmware owns production board policy and Iris workflows. See the [English documentation index](../docs/README.EN.md) and [Host simulator reference (简体中文)](../host/README.md).

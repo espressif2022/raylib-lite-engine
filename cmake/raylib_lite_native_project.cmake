@@ -1,47 +1,40 @@
-# Mosaico device examples use this dependency resolver. The only external
-# input is the BSP; the engine does not discover repositories by sibling names.
-# The ESP-Mosaico board port in ports/esp_mosaico is used unless the caller
-# passes MOSAICO_BOARD_PLATFORM_DIR (and optionally the audio directories) for
-# another board.
-# Product firmware reuses a game by adding examples/<game>/main to
-# EXTRA_COMPONENT_DIRS after including this file, and overrides the lifecycle
-# hooks in raylib_lite_native_hooks.h from its own component.
+# Native examples compose the board-neutral engine with one example-side board
+# adapter selected by the application. The engine helper never knows a concrete
+# BSP or board implementation.
 get_filename_component(RAYLIB_LITE_ENGINE_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 
-foreach(name MOSAICO_BSP_ROOT MOSAICO_BSP_COMPONENT_DIR MOSAICO_BOARD_PLATFORM_DIR
-        MOSAICO_AUDIO_COMPONENT_DIR MOSAICO_AUDIO_PLATFORM_DIR)
-    if(NOT ${name} AND DEFINED ENV{${name}})
-        set(${name} "$ENV{${name}}")
-    endif()
-endforeach()
-if(NOT MOSAICO_BSP_COMPONENT_DIR AND MOSAICO_BSP_ROOT)
-    set(MOSAICO_BSP_COMPONENT_DIR "${MOSAICO_BSP_ROOT}/components/esp-mosaico-bsp")
+if(NOT RAYLIB_LITE_BOARD AND DEFINED ENV{RAYLIB_LITE_BOARD})
+    set(RAYLIB_LITE_BOARD "$ENV{RAYLIB_LITE_BOARD}")
 endif()
-if(NOT EXISTS "${MOSAICO_BSP_COMPONENT_DIR}/CMakeLists.txt")
+if(NOT RAYLIB_LITE_BOARD)
     message(FATAL_ERROR
-        "Set MOSAICO_BSP_ROOT to an esp-mosaico-bsp checkout (or "
-        "MOSAICO_BSP_COMPONENT_DIR to its components/esp-mosaico-bsp): "
-        "'${MOSAICO_BSP_COMPONENT_DIR}'")
+        "Set -DRAYLIB_LITE_BOARD=<board>; available adapters live under "
+        "examples/boards/<board>")
 endif()
-get_filename_component(MOSAICO_BSP_COMPONENT_DIR "${MOSAICO_BSP_COMPONENT_DIR}" ABSOLUTE)
-set(MOSAICO_BSP_COMPONENT_DIR "${MOSAICO_BSP_COMPONENT_DIR}" CACHE PATH "esp-mosaico-bsp component")
+set(RAYLIB_LITE_BOARD "${RAYLIB_LITE_BOARD}" CACHE STRING
+    "Raylib Lite example board adapter")
+
+set(_raylib_lite_board_dir
+    "${RAYLIB_LITE_ENGINE_ROOT}/examples/boards/${RAYLIB_LITE_BOARD}")
+if(NOT EXISTS "${_raylib_lite_board_dir}/board.cmake")
+    message(FATAL_ERROR
+        "Unknown RAYLIB_LITE_BOARD='${RAYLIB_LITE_BOARD}': missing "
+        "${_raylib_lite_board_dir}/board.cmake")
+endif()
 
 include("${RAYLIB_LITE_ENGINE_ROOT}/cmake/raylib_lite_esp.cmake")
 mosaico_game_sdk_add_components(RAYLIB TILEMAP FX SAVE)
-list(APPEND EXTRA_COMPONENT_DIRS "${MOSAICO_BSP_COMPONENT_DIR}")
+include("${_raylib_lite_board_dir}/board.cmake")
 
-if(NOT MOSAICO_BOARD_PLATFORM_DIR)
-    raylib_lite_esp_add_port()
-    return()
-endif()
-foreach(name MOSAICO_BOARD_PLATFORM_DIR MOSAICO_AUDIO_COMPONENT_DIR MOSAICO_AUDIO_PLATFORM_DIR)
-    if(${name} AND NOT EXISTS "${${name}}/CMakeLists.txt")
-        message(FATAL_ERROR "Missing ${name}/CMakeLists.txt: '${${name}}'")
-    endif()
-endforeach()
-if(MOSAICO_AUDIO_COMPONENT_DIR AND NOT MOSAICO_AUDIO_PLATFORM_DIR)
+if(NOT RAYLIB_LITE_BOARD_COMPONENT)
     message(FATAL_ERROR
-        "MOSAICO_AUDIO_COMPONENT_DIR requires MOSAICO_AUDIO_PLATFORM_DIR=/path/to/platform_esp_audio")
+        "Board '${RAYLIB_LITE_BOARD}' did not define RAYLIB_LITE_BOARD_COMPONENT")
 endif()
-list(APPEND EXTRA_COMPONENT_DIRS "${MOSAICO_BOARD_PLATFORM_DIR}"
-    ${MOSAICO_AUDIO_COMPONENT_DIR} ${MOSAICO_AUDIO_PLATFORM_DIR})
+if(RAYLIB_LITE_BOARD_SDKCONFIG_DEFAULTS)
+    list(PREPEND SDKCONFIG_DEFAULTS "${RAYLIB_LITE_BOARD_SDKCONFIG_DEFAULTS}")
+    list(REMOVE_DUPLICATES SDKCONFIG_DEFAULTS)
+endif()
+
+# Product firmware may reuse a game by adding examples/<game>/main to
+# EXTRA_COMPONENT_DIRS after including this file. Product lifecycle hooks remain
+# external to the engine and board adapter.
