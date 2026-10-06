@@ -32,7 +32,7 @@ def main():
                 for frame in range(checkpoints[name]["end"]):
                     for event in by_frame.get(frame, []):
                         runtime.action(event["code"], event["pressed"])
-                    runtime.api.mosaico_host_game_update_v1(runtime.context)
+                    runtime.api.raylib_lite_host_game_update_v1(runtime.context)
                     runtime.frames += 1
                     if frame + 1 in captures:
                         image = runtime.frame()
@@ -56,7 +56,7 @@ def main():
                 if name == "service-duct.json":
                     runtime.action(6, True)
                     runtime.action(6, False)
-                    runtime.api.mosaico_host_game_update_v1(runtime.context)
+                    runtime.api.raylib_lite_host_game_update_v1(runtime.context)
                     (PROJECT / "docs/outing-board.png").write_bytes(runtime.frame())
             finally:
                 runtime.close()

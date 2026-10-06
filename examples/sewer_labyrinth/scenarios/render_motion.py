@@ -36,7 +36,7 @@ def main():
             for frame in range(checkpoints["west"] + 2):
                 for event in by_frame.get(frame, []):
                     runtime.action(event["code"], event["pressed"])
-                runtime.api.mosaico_host_game_update_v1(runtime.context)
+                runtime.api.raylib_lite_host_game_update_v1(runtime.context)
                 runtime.frames += 1
                 if frame==2:
                     (PROJECT / "docs/entrance.png").write_bytes(runtime.frame())
