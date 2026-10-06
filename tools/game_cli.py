@@ -288,9 +288,12 @@ def _test(arguments: argparse.Namespace, project: Path, command_name: str) -> in
                                   json_mode=arguments.json)
     if arguments.json:
         if code or payload is None:
-            _emit_json("failed", command=command_name, error="host_failed",
-                       exit_code=1, tool_exit_code=code)
-            return 1
+            protocol_error = code == 4
+            public_code = 4 if protocol_error else 1
+            _emit_json("failed", command=command_name,
+                       error="invalid_host_result" if protocol_error else "host_failed",
+                       exit_code=public_code, tool_exit_code=code)
+            return public_code
         _emit_json("succeeded", command=command_name, result=payload)
         return 0
     return code

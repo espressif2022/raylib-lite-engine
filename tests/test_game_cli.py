@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import json
+import importlib.util
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 import subprocess
 import sys
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
 
 ENGINE = Path(__file__).resolve().parents[1]
@@ -101,6 +106,24 @@ class GameCliTests(unittest.TestCase):
         ], cwd=ENGINE))
         self.assertEqual(replayed["command"], "replay")
         self.assertEqual(replayed["result"]["frames"], 3)
+
+    def test_test_command_preserves_invalid_host_protocol_exit(self) -> None:
+        spec = importlib.util.spec_from_file_location("raylib_lite_game_cli", CLI)
+        self.assertIsNotNone(spec and spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        assert spec and spec.loader
+        spec.loader.exec_module(module)
+        arguments = SimpleNamespace(
+            frames=3, replay=None, replay_file=None, state_output=None, json=True)
+        output = StringIO()
+        with mock.patch.object(module, "_host_command", return_value=(4, None)):
+            with redirect_stdout(output):
+                code = module._test(arguments, ENGINE / "examples/raylib_shooter", "test")
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 4)
+        self.assertEqual(payload["exit_code"], 4)
+        self.assertEqual(payload["error"], "invalid_host_result")
+        self.assertEqual(payload["tool_exit_code"], 4)
 
     def test_assets_and_benchmark_are_engine_tool_wrappers(self) -> None:
         assets = json.loads(subprocess.check_output([
