@@ -63,7 +63,7 @@ python3 tools/game_cli.py sim examples/tomb_raycast --headless --frames 8
 python3 tools/game_cli.py sim examples/vertical_dock
 ```
 
-Standalone example firmware composes the same game source with a board adapter selected at build time. The ESP-Mosaico reference adapter lives in [`examples/boards/esp-mosaico`](examples/boards/esp-mosaico/) and is selected with `-DRAYLIB_LITE_BOARD=esp-mosaico`; its BSP path is configured by that adapter. Production board policy belongs to the product repository. Documentation index: [docs/README.EN.md](docs/README.EN.md). Host ABI: [host/README.md](host/README.md). Iris product integration is documented in Vibe. Host simulation needs no board adapter.
+Standalone example firmware composes the same game source with a board adapter selected at build time. The ESP-Mosaico reference adapter lives in [`examples/boards/esp-mosaico`](examples/boards/esp-mosaico/) and is selected with `-DRAYLIB_LITE_BOARD=esp-mosaico`; its BSP and ESP-Iris paths are configured by that adapter. ESP-Mosaico native examples expose the Iris USB management plane plus screenshot/pointer services, but application updates are Recovery-first: the retained factory Recovery owns the USB OTA writer and installs the normal Game into `ota_0`. Recovery/Gateway tooling remains in `esp-mosaico-utils` rather than the engine. Documentation index: [docs/README.EN.md](docs/README.EN.md). Host ABI: [host/README.md](host/README.md). Host simulation needs no board adapter.
 
 ## Repository layout
 

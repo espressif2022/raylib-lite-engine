@@ -19,7 +19,7 @@ python3 -m pip install Pillow
 python3 tools/game_cli.py sim examples/sky_hop
 ```
 
-浏览器预览地址为 `http://127.0.0.1:8460/`。原生示例在构建时选择 Board Adapter；ESP-Mosaico 参考实现位于 [`examples/boards/esp-mosaico`](examples/boards/esp-mosaico/)，使用 `-DRAYLIB_LITE_BOARD=esp-mosaico` 选择，BSP 路径由该 Board Adapter 配置。生产固件的产品策略由产品仓库负责；设备 ELF 游戏由外部 SDK 构建、打包和安装。
+浏览器预览地址为 `http://127.0.0.1:8460/`。原生示例在构建时选择 Board Adapter；ESP-Mosaico 参考实现位于 [`examples/boards/esp-mosaico`](examples/boards/esp-mosaico/)，使用 `-DRAYLIB_LITE_BOARD=esp-mosaico` 选择，BSP 与 ESP-Iris 路径由该 Board Adapter 配置。ESP-Mosaico normal Game 默认提供 Iris USB 管理、截图和远程 pointer，但固件更新采用 Recovery-first：保留的 factory Recovery 负责 USB OTA writer，并把 normal Game 安装到 `ota_0`。Recovery/Gateway 实现仍由 `esp-mosaico-utils` 维护；设备 ELF 游戏由外部 SDK 构建、打包和安装。
 
 ## 仓库目录
 

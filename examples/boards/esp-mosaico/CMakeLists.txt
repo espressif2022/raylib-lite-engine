@@ -3,6 +3,7 @@ get_filename_component(RAYLIB_LITE_ENGINE_ROOT
 idf_component_register(
     SRCS
         "board.c"
+        "esp_mosaico_iris.c"
         "mosaico_strip_present.c"
         "game_audio.c"
         "platform_esp_audio.c"
@@ -14,7 +15,15 @@ idf_component_register(
         raylib-lite-engine
         esp_display_present
         esp-mosaico-bsp
+        esp_iris
+        app_update
+        esp_app_format
+        esp_partition
+        esp_system
+        heap
+        mbedtls
         nvs_flash
+        spi_flash
         esp_timer
         esp_driver_dma
     PRIV_REQUIRES freertos)

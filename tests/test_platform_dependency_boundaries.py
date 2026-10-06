@@ -67,6 +67,7 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
             "mosaico_board_platform",
             "ports/esp_mosaico",
             "MOSAICO_BSP_ROOT",
+            "esp_iris",
         )
         roots = [ENGINE / name for name in ENGINE_SOURCE_ROOTS]
         roots.extend((ENGINE / "CMakeLists.txt", ENGINE / "Kconfig"))
@@ -447,7 +448,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         board = ENGINE / "examples/boards/esp-mosaico"
         self.assertFalse((ENGINE / "ports/esp_mosaico").exists())
         for name in ("CMakeLists.txt", "board.cmake", "board.c",
-                     "sdkconfig.defaults"):
+                     "esp_mosaico_iris.c", "partitions.csv", "sdkconfig.defaults"):
             with self.subTest(path=name):
                 self.assertTrue((board / name).is_file())
 
@@ -472,6 +473,42 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         board_selector = (board / "board.cmake").read_text()
         self.assertIn('"${CMAKE_CURRENT_LIST_DIR}"', board_selector)
         self.assertIn("EXTRA_COMPONENT_DIRS", board_selector)
+        self.assertIn("ESP_IRIS_COMPONENT_DIR", board_selector)
+        self.assertIn('ESP_IRIS_BUILD_PROFILE "usb"', board_selector)
+        self.assertIn('${CMAKE_BINARY_DIR}/sdkconfig', board_selector)
+
+        board_component = (board / "CMakeLists.txt").read_text()
+        self.assertIn('"esp_mosaico_iris.c"', board_component)
+        self.assertRegex(board_component, r"REQUIRES[\s\S]*\besp_iris\b")
+
+        defaults = (board / "sdkconfig.defaults").read_text()
+        self.assertIn("CONFIG_ESP_IRIS_TRANSPORT_USB=y", defaults)
+        self.assertIn("# CONFIG_ESP_IRIS_OTA is not set", defaults)
+        self.assertIn("CONFIG_ESP_IRIS_OTA_DEFAULT_VIA_RECOVERY=y", defaults)
+        self.assertIn("CONFIG_ESP_IRIS_SYSTEM_INVENTORY=y", defaults)
+        self.assertIn("CONFIG_ESP_IRIS_FIRMWARE_ROLE=1", defaults)
+        self.assertIn('CONFIG_ESP_IRIS_PRODUCT_CONTRACT="esp-mosaico/v1"', defaults)
+        self.assertIn('CONFIG_ESP_IRIS_LAYOUT_ID="mosaico-retained-recovery-2m-v1"', defaults)
+        self.assertIn("CONFIG_ESP_IRIS_RECOVERY_ABI=1", defaults)
+        self.assertIn('CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../boards/esp-mosaico/partitions.csv"', defaults)
+
+        partitions = (board / "partitions.csv").read_text()
+        for token in ("sysmeta", "factory", "coredump", "ota_0"):
+            self.assertIn(token, partitions)
+        self.assertNotIn("ota_1", partitions)
+
+        board_source = (board / "board.c").read_text()
+        self.assertIn("esp_mosaico_iris_boot_probe", board_source)
+        self.assertIn("esp_mosaico_iris_start", board_source)
+        self.assertIn("raylib_lite_native_boot", board_source)
+        self.assertIn("raylib_lite_native_first_present", board_source)
+
+        iris_source = (board / "esp_mosaico_iris.c").read_text()
+        self.assertIn("ESP_IRIS_OTA_DEFAULT_VIA_RECOVERY", iris_source)
+        self.assertIn("The ESP-Iris OTA writer belongs in retained Recovery", iris_source)
+        self.assertIn("ENTER_RECOVERY_METHOD", iris_source)
+        self.assertIn("esp_iris_system_inventory_register", iris_source)
+        self.assertNotIn("esp_iris_platform_prepare_ota", iris_source)
 
     def test_shared_example_glue_does_not_include_concrete_bsp(self) -> None:
         forbidden = re.compile(r'#\s*include\s*[<"](?:bsp/|esp_mosaico)')

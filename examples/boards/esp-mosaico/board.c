@@ -10,6 +10,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "esp_mosaico_iris.h"
 #include "mosaico_strip_present.h"
 #include "raylib_lite_action.h"
 #include "nvs_flash.h"
@@ -334,6 +335,12 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
         },
         .audio = NULL,
     };
+    err = esp_mosaico_iris_start(
+        p->services.video, &p->input,
+        ESP_MOSAICO_GAME_WIDTH, ESP_MOSAICO_GAME_HEIGHT);
+    if (err != ESP_OK) {
+        goto failed;
+    }
     return ESP_OK;
 
 failed:
@@ -412,6 +419,10 @@ esp_err_t raylib_lite_example_board_retry_cleanup(raylib_lite_example_board_t *p
     if (err != ESP_OK) {
         return err;
     }
+    err = esp_mosaico_iris_stop();
+    if (err != ESP_OK) {
+        return err;
+    }
     if (p->video) {
         raylib_lite_result_t rr = mosaico_strip_present_close(p->video, timeout_ms);
         if (rr != RAYLIB_LITE_OK) {
@@ -450,4 +461,28 @@ esp_err_t raylib_lite_example_board_destroy(raylib_lite_example_board_t *p,
         return ESP_ERR_INVALID_ARG;
     }
     return raylib_lite_example_board_retry_cleanup(p, timeout_ms);
+}
+
+/* Run crash/recovery attribution before any Board peripheral initialization. */
+bool raylib_lite_native_boot(void)
+{
+    esp_err_t err = esp_mosaico_iris_boot_probe();
+    if (err != ESP_OK) {
+        ESP_LOGE("esp_mosaico_board", "Iris boot probe: %s",
+                 esp_err_to_name(err));
+        return false;
+    }
+    return true;
+}
+
+/* The native launcher calls this only after the first frame was accepted and
+ * physical input started. Accept the Recovery-installed normal image only at
+ * that point so a broken Game/Board initialization can still roll back. */
+void raylib_lite_native_first_present(void)
+{
+    esp_err_t err = esp_mosaico_iris_mark_healthy();
+    if (err != ESP_OK) {
+        ESP_LOGW("esp_mosaico_board", "Iris healthy mark: %s",
+                 esp_err_to_name(err));
+    }
 }

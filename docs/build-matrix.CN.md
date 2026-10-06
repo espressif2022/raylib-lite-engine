@@ -35,15 +35,16 @@ W07 已在 Host 与 ESP-Mosaico 两条路径实际验证：
 
 ## 原生固件
 
-ESP-Mosaico 是当前参考 Board Adapter，位于 [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/)。外部 BSP 通过 `MOSAICO_BSP_ROOT` 或 `MOSAICO_BSP_COMPONENT_DIR` 指定。
+ESP-Mosaico 是当前参考 Board Adapter，位于 [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/)。外部 BSP 通过 `MOSAICO_BSP_ROOT` 或 `MOSAICO_BSP_COMPONENT_DIR` 指定；ESP-Iris 通过 `MOSAICO_UTILS_ROOT` 或 `ESP_IRIS_COMPONENT_DIR` 指定。该 Board 使用 retained-Recovery partition contract：normal Game 位于 `ota_0`，factory partition 保留给 Recovery。
 
 ```sh
 export MOSAICO_BSP_ROOT=/path/to/esp-mosaico-bsp
+export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
 idf.py -C examples/sky_hop -D RAYLIB_LITE_BOARD=esp-mosaico \
   -B /tmp/sky-hop-native build
 ```
 
-不同目标使用独立 build 目录。Engine 不提供 native build CLI wrapper，也不负责烧录、Recovery 或生产 Board policy。
+不同目标使用独立 build 目录。构建 normal Game 不等于设备 provisioning：ESP-Mosaico 设备应先通过 `esp-mosaico-recovery` 的 `mosaico.py recover` 建立 retained Recovery，再通过 `mosaico.py install --project <example>` 进入 Recovery 并经 USB 安装/更新 normal Game。不要用 normal Game 的 `idf.py flash` 覆盖 reviewed Recovery bootloader/partition contract。Engine 不提供 native build/install CLI wrapper，也不拥有 Recovery/Gateway 实现或生产 Board policy。
 
 ## ELF 接入
 

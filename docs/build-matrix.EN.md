@@ -35,15 +35,16 @@ The W07 reference matrix is validated on both Host and ESP-Mosaico for:
 
 ## Native firmware
 
-ESP-Mosaico is the current reference Board adapter at [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/). It accepts `MOSAICO_BSP_ROOT` or `MOSAICO_BSP_COMPONENT_DIR` for the external BSP.
+ESP-Mosaico is the current reference Board adapter at [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/). It accepts `MOSAICO_BSP_ROOT` or `MOSAICO_BSP_COMPONENT_DIR` for the external BSP and `MOSAICO_UTILS_ROOT` or `ESP_IRIS_COMPONENT_DIR` for ESP-Iris. The Board uses the retained-Recovery partition contract: the normal Game occupies `ota_0` while the factory partition is reserved for Recovery.
 
 ```sh
 export MOSAICO_BSP_ROOT=/path/to/esp-mosaico-bsp
+export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
 idf.py -C examples/sky_hop -D RAYLIB_LITE_BOARD=esp-mosaico \
   -B /tmp/sky-hop-native build
 ```
 
-Use separate build directories per target. The Engine does not expose a native-build CLI wrapper, and it does not own flashing, Recovery, or production board policy.
+Use separate build directories per target. Building a normal Game is not device provisioning: first establish retained Recovery with `esp-mosaico-recovery` (`mosaico.py recover`), then use `mosaico.py install --project <example>` to enter Recovery and install/update the normal Game over USB. Do not use the normal Game's `idf.py flash` to replace the reviewed Recovery bootloader/partition contract. The Engine exposes no native build/install wrapper and does not own the Recovery/Gateway implementation or production board policy.
 
 ## ELF integration
 
