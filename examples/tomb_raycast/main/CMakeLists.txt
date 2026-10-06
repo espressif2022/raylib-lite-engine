@@ -5,8 +5,8 @@ idf_component_register(
     INCLUDE_DIRS "." "${RAYLIB_LITE_ENGINE_ROOT}/examples/common"
     REQUIRES raylib-lite-engine esp_timer)
 target_include_directories(${COMPONENT_LIB} SYSTEM PRIVATE "${RAYLIB_LITE_ENGINE_ROOT}/host/include")
-target_compile_definitions(${COMPONENT_LIB} PRIVATE MOSAICO_GAME_NATIVE=1)
-target_compile_definitions(${COMPONENT_LIB} PRIVATE MOSAICO_NATIVE_TARGET_FPS=50)
+target_compile_definitions(${COMPONENT_LIB} PRIVATE RAYLIB_LITE_GAME_NATIVE=1)
+target_compile_definitions(${COMPONENT_LIB} PRIVATE RAYLIB_LITE_NATIVE_TARGET_FPS=50)
 include("${RAYLIB_LITE_ENGINE_ROOT}/cmake/raylib_lite_native_assets.cmake")
 raylib_lite_native_embed_assets("${CMAKE_CURRENT_LIST_DIR}/..")
 set_source_files_properties(tomb_view.c PROPERTIES COMPILE_OPTIONS "-O3;-funroll-loops")

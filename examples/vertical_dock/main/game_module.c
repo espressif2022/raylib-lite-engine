@@ -523,7 +523,7 @@ static int initialize(void *value
 #endif
     vd_module_t *s=value;reset_game(&s->game);s->game.camera_y=1.55f;
     s->pointer_id=s->look_id=-1;
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(480,480,"Vertical Dock");SetTargetFPS(30);
 #endif
     return 0;

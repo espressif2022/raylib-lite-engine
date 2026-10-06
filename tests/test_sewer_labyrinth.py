@@ -165,7 +165,7 @@ assert.equal(plays,2);
         with tempfile.TemporaryDirectory() as directory:
             executable = Path(directory) / "sewer_model"
             command = ["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
-                       "-DMOSAICO_GAME_NATIVE=1", "-ffunction-sections", "-fdata-sections"]
+                       "-DRAYLIB_LITE_GAME_NATIVE=1", "-ffunction-sections", "-fdata-sections"]
             for include in ["tests/fakes/sewer_audio", "host/include", "host",
                             "include/raylib_lite",
                             "include/raylib_lite",

@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import re
 import subprocess
 import tempfile
@@ -402,6 +403,32 @@ int main(void) {{ return M2D_WALL_MODE; }}
                 self.assertTrue((root / "main/CMakeLists.txt").is_file())
                 self.assertTrue((root / "main/idf_component.yml").is_file())
                 self.assertTrue((root / "game.sim.json").is_file())
+
+    def test_required_game_matrix_uses_same_module_source_for_host_and_board(self) -> None:
+        required = (
+            "raylib_shooter", "tower_defense", "sky_hop", "living_worlds",
+            "last_zone_extraction", "tomb_raycast", "vertical_dock",
+        )
+        for directory in required:
+            root = ENGINE / "examples" / directory
+            manifest = json.loads((root / "game.sim.json").read_text())
+            cmake = (root / "main/CMakeLists.txt").read_text()
+            top = (root / "CMakeLists.txt").read_text()
+            with self.subTest(game=directory):
+                self.assertEqual(manifest.get("schema"), "raylib-lite-game-sim/v1")
+                self.assertIn("main/game_module.c", manifest.get("sources", []))
+                self.assertTrue(
+                    '"game_module.c"' in cmake or
+                    ("file(GLOB example_sources" in cmake and
+                     "SRCS ${example_sources}" in cmake))
+                self.assertIn("examples/common/native_module_main.c", cmake)
+                self.assertIn("RAYLIB_LITE_GAME_NATIVE=1", cmake)
+                self.assertIn("raylib_lite_native_project.cmake", top)
+
+        living = ENGINE / "examples/living_worlds/main"
+        self.assertFalse((living / "main.c").exists())
+        self.assertFalse((living / "living_worlds_native.c").exists())
+        self.assertTrue((living / "living_worlds_native_assets.c").is_file())
 
     def test_native_examples_select_board_adapter(self) -> None:
         board = ENGINE / "examples/boards/esp-mosaico"

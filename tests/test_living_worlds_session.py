@@ -39,7 +39,7 @@ void raylib_lite_game_audio_set_music_volume(Music music, float volume);
             executable = temporary / "living_worlds_session_test"
             subprocess.run([
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
-                "-DMOSAICO_GAME_NATIVE=1", "-I", str(temporary), "-I", str(GAME),
+                "-DRAYLIB_LITE_GAME_NATIVE=1", "-I", str(temporary), "-I", str(GAME),
                 str(ROOT / "tests/test_living_worlds_session.c"),
                 str(GAME / "living_worlds_session.c"),
                 str(GAME / "living_worlds_scene_audio.c"),

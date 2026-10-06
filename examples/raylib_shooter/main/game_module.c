@@ -5,7 +5,7 @@
 #include <stdio.h>
 #if defined(MOSAICO_GAME_ELF)
 #else
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif
 #endif
@@ -34,13 +34,13 @@ static int initialize(void *value
 )
 {
     shooter_module_state_t *state=value;
-#if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
+#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_host_assets_set_root(asset_root);
 #endif
     state->atlas=raylib_lite_atlas_load("shooter.atlas");
     if(!state->atlas.texture.id)return -1;
     shooter_game_reset(&state->game,0x4d4f5341U);
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(480,480,"Mosaico Strike");
     SetTargetFPS(30);
 #endif

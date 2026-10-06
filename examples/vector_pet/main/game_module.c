@@ -36,7 +36,7 @@ typedef struct {
     vg_stats_t stats;
 } vector_pet_state_t;
 
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 /* No packed assets: the pet and room are drawn from code. */
 void raylib_lite_register_native_assets(void) {}
 #endif
@@ -62,7 +62,7 @@ static int initialize(void *value
     state->background = malloc((size_t)SCREEN * SCREEN * sizeof(uint16_t));
     if (!state->background) return -1;
     pet_draw_background(state->background, SCREEN, SCREEN, SCREEN);
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(SCREEN, SCREEN, "Vector Pet");
     SetTargetFPS(TICK_HZ);
 #endif

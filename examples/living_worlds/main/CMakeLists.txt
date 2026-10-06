@@ -1,13 +1,15 @@
 idf_component_register(
-    SRCS "main.c" "living_worlds_native.c" "living_worlds_session.c"
-         "living_worlds_scene_audio.c"
-         "living_worlds_world.c"
-         "living_worlds_aurora.c" "living_worlds_ocean.c"
+    SRCS "game_module.c" "living_worlds_native_assets.c"
+         "living_worlds_session.c" "living_worlds_scene_audio.c"
+         "living_worlds_world.c" "living_worlds_aurora.c" "living_worlds_ocean.c"
          "living_worlds_volume.c" "living_worlds_view.c"
+         "${RAYLIB_LITE_ENGINE_ROOT}/examples/common/native_module_main.c"
     INCLUDE_DIRS "." "${RAYLIB_LITE_ENGINE_ROOT}/examples/common"
     REQUIRES raylib-lite-engine esp_driver_jpeg)
 
-target_compile_definitions(${COMPONENT_LIB} PRIVATE MOSAICO_GAME_NATIVE=1)
+target_include_directories(${COMPONENT_LIB} SYSTEM PRIVATE
+    "${RAYLIB_LITE_ENGINE_ROOT}/host/include")
+target_compile_definitions(${COMPONENT_LIB} PRIVATE RAYLIB_LITE_GAME_NATIVE=1)
 
 set(asset_source "${CMAKE_CURRENT_LIST_DIR}/../assets_src")
 set(asset_output "${CMAKE_CURRENT_BINARY_DIR}/living_worlds_assets")

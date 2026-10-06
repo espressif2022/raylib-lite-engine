@@ -6,12 +6,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if !defined(MOSAICO_GAME_NATIVE) && !defined(MOSAICO_GAME_ELF)
+#if !defined(RAYLIB_LITE_GAME_NATIVE) && !defined(MOSAICO_GAME_ELF)
 #include "host_asset_runtime.h"
 #endif
 #include "raylib_lite_2d.h"
 #include "raylib_lite_raylib.h"
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
 #include "raylib_lite_raylib_audio.h"
 #endif
 #if defined(MOSAICO_GAME_ELF)
@@ -99,7 +99,7 @@ typedef struct {
     sl_run_record_t records[SL_MISSIONS][SL_SITES][6];
     uint8_t learned;
     uint32_t surveyed[SL_MAP];
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     Sound sounds[SL_CUES];
 #endif
     int pointer_id,look_id,sneak_id,start_x,start_y,last_x,last_y;
@@ -1709,7 +1709,7 @@ static void render_game(sl_game_t *g,raylib_lite_wall_atlas_t materials)
 
 static void stop_audio(sl_module_t *s)
 {
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     for(int i=1;i<SL_CUES;++i)if(s->sounds[i].frameCount)StopSound(s->sounds[i]);
 #endif
     s->consumed_sfx=s->game.sfx_seq;
@@ -1719,7 +1719,7 @@ static void consume_audio(sl_module_t *s)
 {
     if(s->consumed_sfx==s->game.sfx_seq)return;
     s->consumed_sfx=s->game.sfx_seq;
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     unsigned id=s->game.cue;
     if(id>0&&id<SL_CUES&&s->sounds[id].frameCount)PlaySound(s->sounds[id]);
 #endif
@@ -1770,16 +1770,16 @@ static int initialize(void *value
 #endif
 )
 {
-#if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
+#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_host_assets_set_root(asset_root);
-#elif defined(MOSAICO_GAME_NATIVE)
+#elif defined(RAYLIB_LITE_GAME_NATIVE)
     (void)asset_root;
 #endif
     sl_module_t *s=value;reset_dispatch(&s->game,0,0,0,true);restore_survey(s);
     s->materials=raylib_lite_wall_atlas_load("materials.wall");
     if(!s->materials.descriptor)return -1;
     clear_input(s);
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     InitAudioDevice();
     if(IsAudioDeviceReady())for(int i=1;i<SL_CUES;++i){
         char path[32];snprintf(path,sizeof(path),"%s.sound",s_cues[i]);
@@ -1787,7 +1787,7 @@ static int initialize(void *value
         if(s->sounds[i].frameCount)SetSoundVolume(s->sounds[i],i==SL_STEP?.25f:.55f);
     }
 #endif
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(480,480,"Below the Tide");SetTargetFPS(30);
 #endif
     return 0;
@@ -1797,7 +1797,7 @@ static void shutdown(void *value)
     sl_module_t *s=value;
     if(!s)return;
     stop_audio(s);
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     for(int i=1;i<SL_CUES;++i)if(s->sounds[i].frameCount){
         UnloadSound(s->sounds[i]);memset(&s->sounds[i],0,sizeof(s->sounds[i]));
     }

@@ -87,7 +87,7 @@ int living_worlds_session_start(living_worlds_session_t *session,
         living_worlds_session_close(session);
         return -1;
     }
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     living_worlds_scene_audio_init(&session->audio);
     session->audio_started = true;
 #endif
@@ -107,7 +107,7 @@ void living_worlds_session_pointer(living_worlds_session_t *session,
         (void)load_volumes(session, previous);
         return;
     }
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     living_worlds_scene_audio_select(&session->audio, session->world.scene);
 #endif
 }
@@ -125,7 +125,7 @@ void living_worlds_session_reset(living_worlds_session_t *session)
     living_world_reset(&session->world);
     (void)load_background(session, session->world.scene);
     (void)load_volumes(session, session->world.scene);
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     living_worlds_scene_audio_select(&session->audio, session->world.scene);
 #endif
 }
@@ -133,7 +133,7 @@ void living_worlds_session_reset(living_worlds_session_t *session)
 bool living_worlds_session_update(living_worlds_session_t *session)
 {
     if (!session->paused) living_world_update(&session->world);
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     return living_worlds_scene_audio_update(&session->audio,
                                             session->world.scene);
 #else
@@ -149,7 +149,7 @@ void living_worlds_session_render(living_worlds_session_t *session)
 void living_worlds_session_close(living_worlds_session_t *session)
 {
     if (!session || !session->assets) return;
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     if (session->audio_started) {
         living_worlds_scene_audio_close(&session->audio);
         session->audio_started = false;

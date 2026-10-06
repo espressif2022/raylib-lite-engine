@@ -5,12 +5,12 @@
 #include <stdio.h>
 #if defined(MOSAICO_GAME_ELF)
 #else
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif
 #endif
 #include "raylib_lite_raylib.h"
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 #include "native_feedback.h"
 #include "raylib_lite_runtime_stats.h"
 #endif
@@ -67,7 +67,7 @@ static int initialize(void *value
 )
 {
     tomb_module_t *state=value;
-#if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
+#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_host_assets_set_root(asset_root);
 #endif
     state->textures=raylib_lite_wall_atlas_load("textures.wall");
@@ -75,10 +75,10 @@ static int initialize(void *value
     if(!state->textures.descriptor||!state->controls.texture.id)return -1;
     tomb_reset(&state->game);
     clear_tracks(state);
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     mosaico_native_feedback_init();
 #endif
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(480,480,"Tomb Raycast");
     SetTargetFPS(30);
 #endif
@@ -89,7 +89,7 @@ static void shutdown(void *value)
 {
     tomb_module_t *state=value;
     if(!state)return;
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     mosaico_native_feedback_stop();
 #endif
     raylib_lite_wall_atlas_unload(state->textures);
@@ -166,12 +166,12 @@ static void update(void *value)
     if(state->left||state->right)
         tomb_set_look(&state->game,((state->right?1.0f:0.0f)-(state->left?1.0f:0.0f))*0.06f,0.0f);
     tomb_set_jump(&state->game,state->jump||state->jump_track>=0);
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     const bool was_grounded=state->game.grounded;
     const float fall_speed=state->game.vertical_speed;
 #endif
     tomb_update(&state->game);
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     if(was_grounded&&!state->game.grounded&&state->game.vertical_speed>0.0f)
         mosaico_native_feedback_pulse(34,34);
     else if(!was_grounded&&state->game.grounded){
@@ -189,7 +189,7 @@ static int render(void *value)
     float display_fps=MosaicoPerformanceGetStats(&stats)?stats.display_fps:0.0f;
 #else
     float display_fps=(float)GetFPS();
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_runtime_stats_t stats = {0};
     raylib_lite_runtime_stats_get(&stats);
     display_fps=stats.display_fps;

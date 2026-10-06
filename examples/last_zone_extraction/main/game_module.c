@@ -7,16 +7,16 @@
 #include <stdlib.h>
 #include "raylib_lite_clock.h"
 #include "raylib_lite_2d.h"
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
 #include "last_zone_feedback.h"
 #endif
-#if !defined(MOSAICO_GAME_NATIVE) && !defined(MOSAICO_GAME_ELF)
+#if !defined(RAYLIB_LITE_GAME_NATIVE) && !defined(MOSAICO_GAME_ELF)
 #include "host_asset_runtime.h"
 #endif
 #include "raylib_lite_raylib.h"
 #include "last_zone_game.h"
 #include "last_zone_view.h"
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 #include "native_feedback.h"
 #include "raylib_lite_runtime_stats.h"
 #endif
@@ -33,7 +33,7 @@ typedef struct {
     uint8_t warmup_frames;
     bool deploy_ready;
     bool block_until_up;
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     last_zone_feedback_t feedback;
 #endif
 #if !defined(MOSAICO_GAME_ELF)
@@ -77,7 +77,7 @@ static void clear_tracks(last_zone_module_t *state)
     last_zone_set_fire_held(&state->game, false);
 }
 
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
 #if defined(MOSAICO_GAME_ELF)
 static void report_missing_asset(const char *path)
 {
@@ -115,9 +115,9 @@ static int initialize(void *value
 )
 {
     last_zone_module_t *state = value;
-#if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
+#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_host_assets_set_root(asset_root);
-#elif defined(MOSAICO_GAME_NATIVE)
+#elif defined(RAYLIB_LITE_GAME_NATIVE)
     (void)asset_root;
 #endif
     state->enemies = raylib_lite_atlas_load("enemy.atlas");
@@ -134,7 +134,7 @@ static int initialize(void *value
         return -1;
     last_zone_reset(&state->game);
     clear_tracks(state);
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     state->contact_mask = 0;
     state->warmup_frames = 2;
     state->deploy_ready = false;
@@ -149,11 +149,11 @@ static int initialize(void *value
         }
     }
 #endif
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(480, 480, "Last Zone: Extraction");
     SetTargetFPS(30);
 #endif
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     last_zone_feedback_init(&state->feedback, &state->game, &s_feedback_backend);
 #endif
     return 0;
@@ -163,7 +163,7 @@ static void shutdown(void *value)
 {
     last_zone_module_t *state = value;
     if (!state) return;
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     last_zone_feedback_close(&state->feedback);
 #endif
     raylib_lite_atlas_unload(state->enemies);
@@ -175,7 +175,7 @@ static void shutdown(void *value)
     raylib_lite_atlas_unload(state->props);
 }
 
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
 static void note_contact(last_zone_module_t *state, const raylib_lite_host_input_v1_t *event)
 {
     if (event->type != RAYLIB_LITE_HOST_INPUT_POINTER) return;
@@ -203,14 +203,14 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
         else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESET) {
             last_zone_reset(&state->game);
             clear_tracks(state);
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
             state->block_until_up = false;
             last_zone_feedback_reset(&state->feedback, &state->game);
 #endif
         }
         return;
     }
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     note_contact(state, event);
     if (!state->deploy_ready) {
         clear_tracks(state);
@@ -259,7 +259,7 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
             /* A release can arrive on a different track id than the press.
              * Once nothing is touching, drop every capture so a mismatched
              * id cannot leave the stick deflected. */
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
             bool none = state->contact_mask == 0;
 #else
             bool none = false;
@@ -303,7 +303,7 @@ static void update(void *value)
 {
     last_zone_module_t *state = value;
     if (!state || state->paused) return;
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     if (state->warmup_frames) state->warmup_frames--;
     if (!state->deploy_ready && state->warmup_frames == 0 && state->contact_mask == 0)
         state->deploy_ready = true;
@@ -322,7 +322,7 @@ static void update(void *value)
         strafe = (state->strafe_right ? walk : 0.0f) - (state->strafe_left ? walk : 0.0f);
     /* Device yaw comes from look drag; Host also supports keyboard turning. */
     last_zone_set_motion(&state->game, forward, strafe,
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
                          0.0f);
 #else
                          (state->right ? 1.0f : 0.0f) -
@@ -332,7 +332,7 @@ static void update(void *value)
     last_zone_set_fire_held(&state->game, state->fire || state->fire_track >= 0);
     if (state->look_track < 0) last_zone_settle_look(&state->game);
     last_zone_update(&state->game);
-#if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
+#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     last_zone_feedback_events(&state->feedback, &state->game);
 #endif
 }
@@ -352,7 +352,7 @@ static int render(void *value)
         logic_fps = display_fps = 0.0f;
     }
 #else
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_runtime_stats_t stats = {0};
     raylib_lite_runtime_stats_get(&stats);
     logic_fps = stats.logic_fps;

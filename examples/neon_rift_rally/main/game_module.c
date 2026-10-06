@@ -12,12 +12,12 @@
 #include <string.h>
 
 #include "raylib_lite_raylib.h"
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif
 #include "rally_game.h"
 #include "rally_view.h"
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 #include "raylib_lite_raylib_audio.h"
 #include "raylib_lite_save.h"
 #include "native_feedback.h"
@@ -64,7 +64,7 @@ typedef struct {
     uint32_t best_lap_ticks;
     uint32_t best_race_ticks;
     uint8_t course_id;
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     Sound sounds[8];
     Music engine;
     raylib_lite_save_t save;
@@ -72,7 +72,7 @@ typedef struct {
 #endif
 } neon_rift_rally_module_t;
 
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 typedef struct {
     uint32_t best_lap_ticks[NEON_RIFT_COURSE_COUNT];
     uint32_t best_race_ticks[NEON_RIFT_COURSE_COUNT];
@@ -84,7 +84,7 @@ typedef struct {
 } neon_rift_rally_record_v1_t;
 #endif
 
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 static const char *const SFX_PATHS[8] = {
     "boost.sound", "drift.sound", "jump.sound", "land.sound",
     "checkpoint.sound", "lap.sound", "finish.sound", "offtrack.sound"
@@ -216,7 +216,7 @@ static void select_course(neon_rift_rally_module_t *state, int direction)
     state->course_id = (uint8_t)course;
     state->best_lap_ticks = 0;
     state->best_race_ticks = 0;
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     if (state->save_ready) {
         neon_rift_rally_record_t record = {0};
         if (raylib_lite_save_load(&state->save, &record, NULL) == RAYLIB_LITE_OK) {
@@ -253,7 +253,7 @@ static const char *start_hint(const rally_game_t *game)
             (game->countdown_ticks > 30U ? "hold_drift" : "nitro_go"));
 }
 
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 static esp_err_t migrate_record(uint16_t old_version, const void *old_data,
                                 size_t old_size, void *new_data, size_t new_size)
 {
@@ -327,11 +327,11 @@ static int initialize(void *value, const char *asset_root)
 {
     neon_rift_rally_module_t *state = value;
     reset_run(state);
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     load_record(state);
     feedback_init(state);
 #endif
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_host_assets_set_root(asset_root);
     InitWindow(480, 480, "Neon Rift Rally");
     SetTargetFPS(30);
@@ -348,7 +348,7 @@ static void shutdown(void *value)
         raylib_lite_atlas_unload(state->rally_art);
         raylib_lite_atlas_unload(state->track_background);
     }
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 #if NEON_RIFT_HAPTICS_ENABLED
     mosaico_native_feedback_stop();
 #endif
@@ -446,7 +446,7 @@ static void update(void *value)
         steer = (state->steer_right ? 1.0f : 0.0f) -
                 (state->steer_left ? 1.0f : 0.0f);
     bool drive_throttle = state->throttle || state->touch_throttle;
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     /* Touch-first kart controls: native play auto-accelerates so one finger
        steers and the second can boost. Host/replay controls remain explicit. */
     drive_throttle = true;
@@ -465,11 +465,11 @@ static void update(void *value)
         if ((state->game.event_flags & RALLY_EVENT_FINISH) &&
             (!state->best_race_ticks || state->game.tick < state->best_race_ticks))
             state->best_race_ticks = state->game.tick;
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
         save_record(state, (state->game.event_flags & RALLY_EVENT_FINISH) != 0);
 #endif
     }
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     feedback_events(state);
     UpdateMusicStream(state->engine);
 #endif
