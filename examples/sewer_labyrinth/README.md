@@ -284,15 +284,4 @@ python3 examples/sewer_labyrinth/scenarios/render_workshop.py
 
 ## Lobby ELF / 游戏大厅安装包
 
-Build this game's `elf/` wrapper in its own build directory, with the matching
-external SDK and launcher paths:
-
-```sh
-cmake -S examples/sewer_labyrinth/elf -B build/sewer_labyrinth_elf \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/../esp-mosaico-elf-game-sdk/cmake/mosaico-riscv32.cmake" \
-  -DMOSAICO_LAUNCHER_ROOT="$PWD/../esp-mosaico-game"
-cmake --build build/sewer_labyrinth_elf
-```
-
-The bundle is `build/sewer_labyrinth_elf/game/game.bin`. Building does not
-install it on a device.
+ELF 编译、打包与安装由外部 `esp-mosaico-elf-game-sdk` 和产品工具负责；本仓库只维护可复用的 Game source 与 Product ABI bridge，不再保留仓库内 ELF wrapper。先在 Host 验证玩法，再按外部 Module SDK 的构建流程消费同一份 `main/game_module.c`。

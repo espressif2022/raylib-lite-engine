@@ -16,7 +16,7 @@ dependency set.
 Runtime-boundary coverage also includes `tests.test_game_action` for Action Mapper press/release/contact semantics and `tests.test_runtime_stats` for portable logic/display timing, counters, and 32-bit microsecond-clock wrap handling.
 `tests.test_game_save` compiles the save core without ESP-IDF and exercises a fake storage backend, defaults, debounce/force flush, CRC rejection, migration, and write failures.
 `tests.test_game_assets` compiles the asset core without ESP-IDF and checks image aliases, bounded read backing, lazy materialization/refcounts, release, streaming, counters, checksum/bounds failures, embedded fallback, and the partition-backend seam.
-`tests.test_renderer_core` compiles `mosaico_game_2d.c` without any Raylib include path, verifies neutral renderer types and texture/wall-asset lease release, and checks repeated unload behavior. `tests.test_platform_dependency_boundaries` additionally requires the Raylib-shaped hot draw wrappers to remain inline and the S31 assembly fast path to stay under `arch/esp32s31/`.
+`tests.test_renderer_core` compiles `src/renderer/raylib_lite_renderer.c` without any Raylib include path, verifies neutral renderer types and texture/wall-asset lease release, and checks repeated unload behavior. `tests.test_platform_dependency_boundaries` additionally requires the Raylib-shaped hot draw wrappers to remain inline and the S31 assembly fast path to stay under `arch/esp32s31/`.
 
 # RGB565 raster regression
 
@@ -25,7 +25,7 @@ Runtime-boundary coverage also includes `tests.test_game_action` for Action Mapp
 ```sh
 python3 tests/test_primitives.py
 CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' python3 tests/test_primitives.py
-FAST_TEST_SOURCE=/path/to/previous/mosaico_raylib_fast.c python3 tests/test_primitives.py
+FAST_TEST_SOURCE=/path/to/previous/raylib_lite_raylib_impl.c python3 tests/test_primitives.py
 ```
 
 The standalone suite has no game dependency. It checks rectangles, filled
@@ -57,7 +57,7 @@ CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' python3 tests/test
 ```
 
 The suite has no atlas or game dependency. It checks fill, copy, null guards,
-16-level lookup-table construction, and `mosaico_shade565()` against an
+16-level lookup-table construction, and `raylib_lite_rgb565_shade_pixel()` against an
 independent multiply oracle for aligned LUT lights and unaligned multiply
 lights. Host and device share the same C.
 
@@ -70,7 +70,7 @@ python3 tests/test_columns.py
 CFLAGS='-fsanitize=undefined -fno-omit-frame-pointer' python3 tests/test_columns.py
 ```
 
-Host builds of Raylib-shaped raster suites compile `mosaico_game_2d_raylib.c` next to the neutral `mosaico_game_2d.c` core and `mosaico_rgb565.c`. The dedicated renderer-core test omits the adapter and any Raylib include path.
+Host builds of Raylib-shaped raster suites compile `raylib_lite_renderer_raylib.c` next to the neutral `raylib_lite_renderer.c` core and `raylib_lite_rgb565.c`. The dedicated renderer-core test omits the adapter and any Raylib include path.
 
 The test compares both textured column APIs and the solid wall batch against
 independent oracles using deterministic randomized batches. It covers negative origins,
@@ -80,7 +80,7 @@ framebuffer stride padding. The reference does not share the optimized sampler.
 
 The wall benchmark renders 240 two-pixel columns, 500 times. Its printed Host
 CPU time is informational, not a test threshold or an estimate of device FPS.
-For before/after comparisons, `M2D_TEST_SOURCE=/path/to/old/mosaico_game_2d.c`
+For before/after comparisons, `M2D_TEST_SOURCE=/path/to/old/raylib_lite_renderer.c`
 selects the previous implementation with identical compiler flags and workload.
 
 The RGB565 and compatibility MSW2 paths prepare bounded 64-column blocks and
@@ -137,7 +137,7 @@ fast path are covered. Every texel is compared against an independent Python
 decoder at an unlit and a lit level, degenerate blocks with identical endpoints
 are included, and transparent texels must leave the destination untouched
 rather than store black. The varying-V entry point is asserted to agree with
-the constant-V fast path, and `mosaico_mtx2_blit` with the span path it
+the constant-V fast path, and `raylib_lite_mtx2_blit` with the span path it
 replaces.
 
 Palette channels are interpolated in 5/6/5 space with integer division, not in
@@ -150,7 +150,7 @@ therefore cannot store equal endpoints.
 The benchmark reports two access patterns at three working-set sizes. Per
 scanline the sampler costs about 2.3x a raw RGB565 sampler of the same loop
 shape, because a block spans four scanlines and its palette is rebuilt for each
-one. `mosaico_mtx2_blit` decodes each block row once and reaches roughly 1.1x
+one. `raylib_lite_mtx2_blit` decodes each block row once and reaches roughly 1.1x
 when cache-resident, and beats the raw sampler once the working set no longer
 fits, where the 4x smaller footprint dominates. The overhead is palette
 construction rather than lighting: unshaded MTX2 still costs about 1.7 ns/px

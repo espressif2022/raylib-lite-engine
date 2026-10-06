@@ -33,13 +33,13 @@ modules, and the PC Host simulator. Iris/Gateway product workflows are maintaine
 in `esp-mosaico-vibe`. Their boundaries and example commands are
 in [the build matrix](docs/build-matrix.EN.md).
 
-For ESP-IDF firmware, include the engine integration helper before IDF's
-`project()` call and select the component paths there:
+For ESP-IDF firmware, add the repository root as an extra component directory
+before IDF's `project()` call. Raylib Lite Engine is one component; there is no
+per-feature component-selection wrapper:
 
 ```cmake
 set(RAYLIB_LITE_ENGINE_ROOT "/path/to/raylib-lite-engine")
-include("${RAYLIB_LITE_ENGINE_ROOT}/cmake/raylib_lite_esp.cmake")
-mosaico_game_sdk_add_components(RAYLIB AUDIO TILEMAP SCENE UI FX SAVE)
+list(APPEND EXTRA_COMPONENT_DIRS "${RAYLIB_LITE_ENGINE_ROOT}")
 ```
 
 The engine supplies portable game services and RGB565 software rendering; the

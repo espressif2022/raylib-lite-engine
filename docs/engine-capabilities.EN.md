@@ -18,7 +18,7 @@ Raylib Lite Engine is one ESP-IDF component: `raylib-lite-engine`. Public neutra
 | Raylib-style Sound/Music facade | `raylib_lite_game_audio_*` or Raylib audio names | [game audio](../compat/raylib/include/raylib_lite_game_audio.h), [audio-name compatibility](../compat/raylib/include/raylib_lite_raylib_audio.h) |
 | Save/version/migration/storage | `raylib_lite_save_*` | [save](../include/raylib_lite/raylib_lite_save.h) |
 | Scene/UI/effects | `raylib_lite_scene_*`, `raylib_lite_ui_*`, `raylib_lite_*tween/particle*` | [scene](../include/raylib_lite/raylib_lite_scene.h), [UI](../include/raylib_lite/raylib_lite_ui.h), [FX](../include/raylib_lite/raylib_lite_fx.h) |
-| Host replay/build | `game_cli.py sim/build` | [game CLI](../tools/game_cli.py), [build paths](build-matrix.EN.md) |
+| Host simulation/test/replay | `game_cli.py sim/test/replay` | [game CLI](../tools/game_cli.py), [build paths](build-matrix.EN.md) |
 
 ## Internal module responsibilities
 
