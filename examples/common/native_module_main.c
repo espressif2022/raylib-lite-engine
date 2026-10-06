@@ -11,7 +11,7 @@
 #include "esp_log.h"
 #include "raylib_lite_example_board.h"
 #include "raylib_lite_assets.h"
-#include "mosaico_game_module.h"
+#include "raylib_lite_game_module.h"
 #include "raylib_lite_game_app.h"
 #include "raylib_lite_native_hooks.h"
 
@@ -25,7 +25,7 @@ static const char *TAG = "native_game";
 extern void raylib_lite_register_native_assets(void);
 
 typedef struct {
-    const mosaico_game_module_v1_t *module;
+    const raylib_lite_game_module_v1_t *module;
     void *state;
     raylib_lite_example_board_t *board;
     uint32_t last_render_error_log;
@@ -95,11 +95,11 @@ static void game_event(void *user, const raylib_lite_input_event_t *event)
     native_game_t *game = user;
     if (!event || !game->module->input) return;
 
-    mosaico_host_input_v1_t input = {0};
+    raylib_lite_host_input_v1_t input = {0};
     switch (event->type) {
     case RAYLIB_LITE_INPUT_POINTER:
     case RAYLIB_LITE_INPUT_TOUCH:
-        input.type = MOSAICO_HOST_INPUT_POINTER;
+        input.type = RAYLIB_LITE_HOST_INPUT_POINTER;
         input.x = event->x;
         input.y = event->y;
         input.track_id = event->type == RAYLIB_LITE_INPUT_TOUCH
@@ -107,12 +107,12 @@ static void game_event(void *user, const raylib_lite_input_event_t *event)
         input.pressed = event->pressed;
         break;
     case RAYLIB_LITE_INPUT_BUTTON:
-        input.type = MOSAICO_HOST_INPUT_ACTION;
+        input.type = RAYLIB_LITE_HOST_INPUT_ACTION;
         input.code = event->value;
         input.pressed = event->pressed;
         break;
     case RAYLIB_LITE_INPUT_IMU:
-        input.type = MOSAICO_HOST_INPUT_IMU;
+        input.type = RAYLIB_LITE_HOST_INPUT_IMU;
         input.value_x = event->x / 1000.0f;
         input.value_y = event->y / 1000.0f;
         input.value_z = event->value / 1000.0f;
@@ -192,7 +192,7 @@ void app_main(void)
         return;
     }
 
-    const mosaico_game_module_v1_t *module = mosaico_game_module_v1();
+    const raylib_lite_game_module_v1_t *module = raylib_lite_game_module_v1();
     if (!module || !module->descriptor.game_id || !module->state_size ||
             !module->initialize || !module->render) {
         ESP_LOGE(TAG, "game module descriptor is incomplete");

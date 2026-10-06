@@ -10,7 +10,7 @@ typedef struct { char name[64]; uint8_t *data; size_t size; } host_file_t;
 static char s_root[512];
 static host_file_t s_files[HOST_FILE_COUNT];
 
-void mosaico_host_assets_set_root(const char *root)
+void raylib_lite_host_assets_set_root(const char *root)
 {
     snprintf(s_root, sizeof(s_root), "%s", root ? root : "");
 }

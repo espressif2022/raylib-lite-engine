@@ -51,7 +51,7 @@ def main():
                     try:
                         for case in range(12 if game=="living_worlds" else 4):
                             for runtime in (old,new):
-                                runtime.control(3)  # MOSAICO_HOST_CONTROL_RESET
+                                runtime.control(3)  # RAYLIB_LITE_HOST_CONTROL_RESET
                                 if game=="living_worlds" and case<4:
                                     runtime.pointer(1,[190,80,300,410][case],440,True)
                                     runtime.pointer(1,[190,80,300,410][case],440,False)

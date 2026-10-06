@@ -43,7 +43,7 @@ static void indexed_reference(const raylib_lite_raycast_wall_t *c,int lo,int hi)
  }
 }
 int main(int argc,char **argv){
- assert(argc>=2);mosaico_host_assets_set_root(argv[1]);
+ assert(argc>=2);raylib_lite_host_assets_set_root(argv[1]);
  Texture2D texture=raylib_lite_2d_load_texture("test.atlas");assert(texture.id);
  raylib_lite_wall_atlas_t wall=raylib_lite_wall_atlas_load("test.wall");assert(wall.descriptor);
  raylib_lite_wall_atlas_t row_wall=raylib_lite_wall_atlas_load("test_row.wall");assert(row_wall.descriptor);

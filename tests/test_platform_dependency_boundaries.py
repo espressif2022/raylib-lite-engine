@@ -353,6 +353,44 @@ int main(void) {{ return M2D_WALL_MODE; }}
                     with self.subTest(path=path.relative_to(ENGINE)):
                         self.assertIsNone(forbidden.search(path.read_text()))
 
+    def test_host_contract_namespace_and_v1_values_are_stable(self) -> None:
+        host = ENGINE / "host"
+        self.assertFalse((host / "include/mosaico_host_game.h").exists())
+        self.assertFalse((host / "include/mosaico_game_module.h").exists())
+        self.assertFalse((host / "include/mosaico_game.h").exists())
+        header = (host / "include/raylib_lite_host_game.h").read_text()
+        for token in ("mosaico_host_", "MOSAICO_HOST_"):
+            self.assertNotIn(token, header)
+        self.assertIn("RAYLIB_LITE_HOST_GAME_ABI_V1 1U", header)
+        self.assertIn("RAYLIB_LITE_HOST_INPUT_ACTION = 1", header)
+        self.assertIn("RAYLIB_LITE_HOST_INPUT_POINTER = 2", header)
+        self.assertIn("RAYLIB_LITE_HOST_INPUT_CONTROL = 3", header)
+        self.assertIn("RAYLIB_LITE_HOST_INPUT_IMU = 4", header)
+        self.assertIn("RAYLIB_LITE_HOST_CONTROL_PAUSE = 1", header)
+
+        for path in host.rglob("*"):
+            if not path.is_file() or path.suffix not in {".c", ".h", ".py"}:
+                continue
+            source = path.read_text(encoding="utf-8")
+            with self.subTest(path=path.relative_to(ENGINE)):
+                self.assertNotIn("mosaico_host_", source)
+                self.assertNotIn("MOSAICO_HOST_", source)
+
+    def test_product_runtime_abi_mapping_is_isolated_to_example_bridge(self) -> None:
+        bridge = ENGINE / "examples/common/raylib_lite_game_module_contract.h"
+        source = bridge.read_text(encoding="utf-8")
+        self.assertIn("#if defined(MOSAICO_GAME_ELF)", source)
+        self.assertIn('#include "mosaico_runtime_v1.h"', source)
+        self.assertIn("raylib_lite_game_module_v1_t", source)
+        for module in (ENGINE / "examples").glob("*/main/game_module.c"):
+            text = module.read_text(encoding="utf-8")
+            with self.subTest(path=module.relative_to(ENGINE)):
+                self.assertNotIn("mosaico_host_", text)
+                self.assertNotIn("MOSAICO_HOST_", text)
+                self.assertNotIn("mosaico_game_module_v1_t", text)
+                self.assertNotIn("mosaico_runtime_v1_t", text)
+                self.assertIn("raylib_lite_game_module_v1_t", text)
+
     def test_reference_examples_have_host_and_direct_entries(self) -> None:
         for directory in (
             "raylib_shooter", "tower_defense", "sky_hop", "living_worlds",

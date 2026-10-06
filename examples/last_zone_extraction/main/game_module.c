@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "../../common/raylib_lite_game_module_contract.h"
 /* One module entry for Host, direct native, and lobby ELF builds. */
 #include <stdbool.h>
 #include <math.h>
@@ -9,7 +10,6 @@
 #if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
 #include "last_zone_feedback.h"
 #endif
-#include "mosaico_game_module.h"
 #if !defined(MOSAICO_GAME_NATIVE) && !defined(MOSAICO_GAME_ELF)
 #include "host_asset_runtime.h"
 #endif
@@ -81,10 +81,10 @@ static void clear_tracks(last_zone_module_t *state)
 #if defined(MOSAICO_GAME_ELF)
 static void report_missing_asset(const char *path)
 {
-    if (!g_mosaico_rt || !g_mosaico_rt->log || !g_mosaico_rt->log->message) return;
+    if (!raylib_lite_product_runtime || !raylib_lite_product_runtime->log || !raylib_lite_product_runtime->log->message) return;
     char message[96];
     snprintf(message, sizeof(message), "missing asset: %s", path);
-    g_mosaico_rt->log->message(2, "last_zone_audio", message);
+    raylib_lite_product_runtime->log->message(2, "last_zone_audio", message);
 }
 static const last_zone_feedback_backend_t s_feedback_backend = {
     .init = MosaicoHapticInit,
@@ -116,7 +116,7 @@ static int initialize(void *value
 {
     last_zone_module_t *state = value;
 #if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
-    mosaico_host_assets_set_root(asset_root);
+    raylib_lite_host_assets_set_root(asset_root);
 #elif defined(MOSAICO_GAME_NATIVE)
     (void)asset_root;
 #endif
@@ -176,9 +176,9 @@ static void shutdown(void *value)
 }
 
 #if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
-static void note_contact(last_zone_module_t *state, const mosaico_host_input_v1_t *event)
+static void note_contact(last_zone_module_t *state, const raylib_lite_host_input_v1_t *event)
 {
-    if (event->type != MOSAICO_HOST_INPUT_POINTER) return;
+    if (event->type != RAYLIB_LITE_HOST_INPUT_POINTER) return;
     int track = event->track_id;
     if (track < 0 || track > 7) track = 0;
     uint8_t bit = (uint8_t)(1u << track);
@@ -186,21 +186,21 @@ static void note_contact(last_zone_module_t *state, const mosaico_host_input_v1_
     else state->contact_mask = (uint8_t)(state->contact_mask & (uint8_t)~bit);
 }
 
-static bool tap_event(const mosaico_host_input_v1_t *event)
+static bool tap_event(const raylib_lite_host_input_v1_t *event)
 {
-    return event->pressed && (event->type == MOSAICO_HOST_INPUT_ACTION ||
-                              event->type == MOSAICO_HOST_INPUT_POINTER);
+    return event->pressed && (event->type == RAYLIB_LITE_HOST_INPUT_ACTION ||
+                              event->type == RAYLIB_LITE_HOST_INPUT_POINTER);
 }
 #endif
 
-static void input(void *value, const mosaico_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_host_input_v1_t *event)
 {
     last_zone_module_t *state = value;
     if (!state || !event) return;
-    if (event->type == MOSAICO_HOST_INPUT_CONTROL) {
-        if (event->code == MOSAICO_HOST_CONTROL_PAUSE) state->paused = true;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESUME) state->paused = false;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESET) {
+    if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_HOST_CONTROL_PAUSE) state->paused = true;
+        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESUME) state->paused = false;
+        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESET) {
             last_zone_reset(&state->game);
             clear_tracks(state);
 #if defined(MOSAICO_GAME_ELF) || defined(MOSAICO_GAME_NATIVE)
@@ -226,7 +226,7 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
         return;
     }
     if (state->block_until_up) {
-        bool action_down = event->type == MOSAICO_HOST_INPUT_ACTION && event->pressed;
+        bool action_down = event->type == RAYLIB_LITE_HOST_INPUT_ACTION && event->pressed;
         if (state->contact_mask == 0 && !action_down) state->block_until_up = false;
         if (state->block_until_up) {
             clear_tracks(state);
@@ -235,8 +235,8 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
     }
 #else
     if (state->game.phase != LAST_ZONE_PHASE_PLAYING) {
-        if (event->pressed && (event->type == MOSAICO_HOST_INPUT_ACTION ||
-                               event->type == MOSAICO_HOST_INPUT_POINTER))
+        if (event->pressed && (event->type == RAYLIB_LITE_HOST_INPUT_ACTION ||
+                               event->type == RAYLIB_LITE_HOST_INPUT_POINTER))
             last_zone_confirm(&state->game);
         if (state->game.phase != LAST_ZONE_PHASE_PLAYING || !event->pressed) {
             clear_tracks(state);
@@ -244,7 +244,7 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
         }
     }
 #endif
-    if (event->type == MOSAICO_HOST_INPUT_ACTION) {
+    if (event->type == RAYLIB_LITE_HOST_INPUT_ACTION) {
         if (event->code == 0) state->left = event->pressed;
         else if (event->code == 1) state->right = event->pressed;
         else if (event->code == 2) state->forward = event->pressed;
@@ -253,7 +253,7 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
         else if (event->code == 7) state->sprint = event->pressed;
         else if (event->code == 8) state->strafe_left = event->pressed;
         else if (event->code == 9) state->strafe_right = event->pressed;
-    } else if (event->type == MOSAICO_HOST_INPUT_POINTER) {
+    } else if (event->type == RAYLIB_LITE_HOST_INPUT_POINTER) {
         int track = event->track_id;
         if (!event->pressed) {
             /* A release can arrive on a different track id than the press.
@@ -451,12 +451,12 @@ static int state_json(const void *value, char *output, size_t capacity)
 #endif
 }
 
-static const mosaico_game_module_v1_t s_module = {
+static const raylib_lite_game_module_v1_t s_module = {
     .descriptor = {
 #if defined(MOSAICO_GAME_ELF)
-                   MOSAICO_HOST_GAME_ABI,
+                   RAYLIB_LITE_GAME_MODULE_ABI,
 #else
-                   MOSAICO_HOST_GAME_ABI_V1,
+                   RAYLIB_LITE_GAME_MODULE_ABI,
 #endif
                    "last_zone_extraction",
                    "Last Zone: Extraction", 480, 480, 30, 2},
@@ -467,14 +467,14 @@ static const mosaico_game_module_v1_t s_module = {
 };
 
 #if defined(MOSAICO_GAME_ELF)
-MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
-mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
+raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
 {
-    if (runtime) g_mosaico_rt = runtime;
+    if (runtime) raylib_lite_product_runtime = runtime;
     return &s_module;
 }
 #else
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {
     return &s_module;
 }

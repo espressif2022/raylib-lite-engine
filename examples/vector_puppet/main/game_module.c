@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "../../common/raylib_lite_game_module_contract.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #if defined(MOSAICO_GAME_ELF)
-#include "mosaico_game_module.h"
-#include "mosaico_runtime_v1.h"
 #else
-#include "mosaico_game_module.h"
 #endif
 #include "raylib_lite_raylib.h"
 #include "raylib_lite_rgb565.h"
@@ -16,9 +14,9 @@
 #include "vg_raster.h"
 
 #if defined(MOSAICO_GAME_ELF)
-#define VECTOR_PUPPET_ABI MOSAICO_HOST_GAME_ABI
+#define VECTOR_PUPPET_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #else
-#define VECTOR_PUPPET_ABI MOSAICO_HOST_GAME_ABI_V1
+#define VECTOR_PUPPET_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #endif
 
 #define SCREEN 480
@@ -136,11 +134,11 @@ static void look_at(vector_puppet_state_t *state, int x, int y, bool active)
                         (y - (NECK_Y - 100)) / 180.0f, active);
 }
 
-static void input(void *value, const mosaico_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_host_input_v1_t *event)
 {
     vector_puppet_state_t *state = value;
     if (!state || !event) return;
-    if (event->type == MOSAICO_HOST_INPUT_POINTER &&
+    if (event->type == RAYLIB_LITE_HOST_INPUT_POINTER &&
             event->track_id >= 0 && event->track_id < 2) {
         int track = event->track_id;
         state->idle_ticks = 0;
@@ -210,7 +208,7 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
             else if (!state->pointer_moved)
                 play_next(state);
         }
-    } else if (event->type == MOSAICO_HOST_INPUT_ACTION &&
+    } else if (event->type == RAYLIB_LITE_HOST_INPUT_ACTION &&
                event->code >= 0 && event->code < PUPPET_ACTION_COUNT - 1) {
         /* Hosts repeat held actions every tick; only the press edge plays. */
         uint32_t bit = 1u << event->code;
@@ -220,12 +218,12 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
         if (!event->pressed || was_held) return;
         state->idle_ticks = 0;
         puppet_rig_play(&state->rig, event->code + 1);
-    } else if (event->type == MOSAICO_HOST_INPUT_IMU) {
+    } else if (event->type == RAYLIB_LITE_HOST_INPUT_IMU) {
         puppet_rig_set_tilt(&state->rig, event->value_x * 1.5f);
-    } else if (event->type == MOSAICO_HOST_INPUT_CONTROL) {
-        if (event->code == MOSAICO_HOST_CONTROL_RESET) reset(state);
-        else if (event->code == MOSAICO_HOST_CONTROL_PAUSE) state->paused = true;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESUME) state->paused = false;
+    } else if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_HOST_CONTROL_RESET) reset(state);
+        else if (event->code == RAYLIB_LITE_HOST_CONTROL_PAUSE) state->paused = true;
+        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESUME) state->paused = false;
     }
 }
 
@@ -329,7 +327,7 @@ static int state_json(const void *value, char *output, size_t capacity)
         state->rig.limbs[PUPPET_LIMB_LEG_L].x, state->rig.limbs[PUPPET_LIMB_LEG_L].y,
         (unsigned long)state_hash(state));
 }
-static const mosaico_game_module_v1_t s_module = {
+static const raylib_lite_game_module_v1_t s_module = {
     .descriptor = {VECTOR_PUPPET_ABI, "vector_puppet", "Vector Puppet", SCREEN, SCREEN,
                    TICK_HZ, 2},
     .state_size = sizeof(vector_puppet_state_t),
@@ -339,14 +337,14 @@ static const mosaico_game_module_v1_t s_module = {
 };
 
 #if defined(MOSAICO_GAME_ELF)
-MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
-mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
+raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
 {
-    g_mosaico_rt = runtime;
+    raylib_lite_product_runtime = runtime;
     return &s_module;
 }
 #else
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {
     return &s_module;
 }

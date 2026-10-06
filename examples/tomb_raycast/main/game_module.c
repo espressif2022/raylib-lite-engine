@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "../../common/raylib_lite_game_module_contract.h"
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>
 #if defined(MOSAICO_GAME_ELF)
-#include "mosaico_game_module.h"
-#include "mosaico_runtime_v1.h"
 #else
-#include "mosaico_game_module.h"
 #if !defined(MOSAICO_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif
@@ -20,9 +18,9 @@
 #include "tomb_view.h"
 
 #if defined(MOSAICO_GAME_ELF)
-#define TOMB_RAYCAST_ABI MOSAICO_HOST_GAME_ABI
+#define TOMB_RAYCAST_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #else
-#define TOMB_RAYCAST_ABI MOSAICO_HOST_GAME_ABI_V1
+#define TOMB_RAYCAST_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #endif
 
 typedef struct {
@@ -70,7 +68,7 @@ static int initialize(void *value
 {
     tomb_module_t *state=value;
 #if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
-    mosaico_host_assets_set_root(asset_root);
+    raylib_lite_host_assets_set_root(asset_root);
 #endif
     state->textures=raylib_lite_wall_atlas_load("textures.wall");
     state->controls=raylib_lite_atlas_load("controls.atlas");
@@ -98,22 +96,22 @@ static void shutdown(void *value)
     raylib_lite_atlas_unload(state->controls);
 }
 
-static void input(void *value, const mosaico_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_host_input_v1_t *event)
 {
     tomb_module_t *state=value;
     if(!state||!event)return;
 #if defined(TOMB_RAYCAST_BENCHMARK)
     return;
 #endif
-    if(event->type==MOSAICO_HOST_INPUT_CONTROL){
-        if(event->code==MOSAICO_HOST_CONTROL_PAUSE)state->paused=true;
-        else if(event->code==MOSAICO_HOST_CONTROL_RESUME)state->paused=false;
-        else if(event->code==MOSAICO_HOST_CONTROL_RESET){
+    if(event->type==RAYLIB_LITE_HOST_INPUT_CONTROL){
+        if(event->code==RAYLIB_LITE_HOST_CONTROL_PAUSE)state->paused=true;
+        else if(event->code==RAYLIB_LITE_HOST_CONTROL_RESUME)state->paused=false;
+        else if(event->code==RAYLIB_LITE_HOST_CONTROL_RESET){
             tomb_reset(&state->game);clear_tracks(state);
         }
         return;
     }
-    if(event->type==MOSAICO_HOST_INPUT_ACTION){
+    if(event->type==RAYLIB_LITE_HOST_INPUT_ACTION){
         if(event->code==0)state->left=event->pressed;
         else if(event->code==1)state->right=event->pressed;
         else if(event->code==2)state->forward=event->pressed;
@@ -123,7 +121,7 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
         else if(event->code==9)state->strafe_right=event->pressed;
         return;
     }
-    if(event->type!=MOSAICO_HOST_INPUT_POINTER)return;
+    if(event->type!=RAYLIB_LITE_HOST_INPUT_POINTER)return;
     int track=event->track_id;
     if(!event->pressed){
         if(track==state->joystick_track){state->joystick_track=-1;state->move_forward=state->move_strafe=0;}
@@ -237,18 +235,18 @@ static int state_json(const void *value, char *output, size_t capacity)
 #endif
 }
 
-static const mosaico_game_module_v1_t s_module={
+static const raylib_lite_game_module_v1_t s_module={
     .descriptor={TOMB_RAYCAST_ABI,"tomb_raycast","Tomb Raycast",480,480,30,2},
     .state_size=sizeof(tomb_module_t),.initialize=initialize,.shutdown=shutdown,
     .input=input,.update=update,.render=render,.state_hash=state_hash,.state_json=state_json};
 
 #if defined(MOSAICO_GAME_ELF)
-MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
-mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
+raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
 {
-    g_mosaico_rt=runtime;
+    raylib_lite_product_runtime=runtime;
     return &s_module;
 }
 #else
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void){return &s_module;}
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void){return &s_module;}
 #endif

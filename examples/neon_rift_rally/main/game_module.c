@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "../../common/raylib_lite_game_module_contract.h"
 //
 // Host/native lifecycle and input adapter for Neon Rift Rally. The gameplay
 // model and renderer intentionally live in rally_game.[ch] and rally_view.[ch]
@@ -10,7 +11,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "mosaico_game_module.h"
 #include "raylib_lite_raylib.h"
 #if !defined(MOSAICO_GAME_NATIVE)
 #include "host_asset_runtime.h"
@@ -332,7 +332,7 @@ static int initialize(void *value, const char *asset_root)
     feedback_init(state);
 #endif
 #if !defined(MOSAICO_GAME_NATIVE)
-    mosaico_host_assets_set_root(asset_root);
+    raylib_lite_host_assets_set_root(asset_root);
     InitWindow(480, 480, "Neon Rift Rally");
     SetTargetFPS(30);
 #endif
@@ -365,21 +365,21 @@ static void shutdown(void *value)
 #endif
 }
 
-static void input(void *value, const mosaico_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_host_input_v1_t *event)
 {
     neon_rift_rally_module_t *state = value;
     if (!state || !event) return;
 
-    if (event->type == MOSAICO_HOST_INPUT_CONTROL) {
-        if (event->code == MOSAICO_HOST_CONTROL_PAUSE) state->paused = true;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESUME) state->paused = false;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESET) {
+    if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_HOST_CONTROL_PAUSE) state->paused = true;
+        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESUME) state->paused = false;
+        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESET) {
             reset_run(state);
         }
         return;
     }
 
-    if (event->type == MOSAICO_HOST_INPUT_ACTION) {
+    if (event->type == RAYLIB_LITE_HOST_INPUT_ACTION) {
         /* Stable action map shared with browser replays:
            0 left, 1 right, 2 throttle, 3 pause, 4 restart,
            5 brake, 6 nitro, 7 drift. */
@@ -400,7 +400,7 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
         return;
     }
 
-    if (event->type != MOSAICO_HOST_INPUT_POINTER) return;
+    if (event->type != RAYLIB_LITE_HOST_INPUT_POINTER) return;
     if (event->pressed && state->game.phase == RALLY_PHASE_COUNTDOWN &&
         event->y < 100) {
         if (event->x < 160) select_course(state, -1);
@@ -523,9 +523,9 @@ static int state_json(const void *value, char *output, size_t capacity)
         (unsigned long)rally_state_hash(game));
 }
 
-static const mosaico_game_module_v1_t s_module = {
+static const raylib_lite_game_module_v1_t s_module = {
     .descriptor = {
-        MOSAICO_HOST_GAME_ABI_V1, "neon_rift_rally", "Neon Rift Rally",
+        RAYLIB_LITE_GAME_MODULE_ABI, "neon_rift_rally", "Neon Rift Rally",
         480, 480, 30, 2
     },
     .state_size = sizeof(neon_rift_rally_module_t),
@@ -538,7 +538,7 @@ static const mosaico_game_module_v1_t s_module = {
     .state_json = state_json,
 };
 
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {
     return &s_module;
 }

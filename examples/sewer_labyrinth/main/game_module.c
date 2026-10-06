@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "../../common/raylib_lite_game_module_contract.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -9,13 +10,11 @@
 #include "host_asset_runtime.h"
 #endif
 #include "raylib_lite_2d.h"
-#include "mosaico_game_module.h"
 #include "raylib_lite_raylib.h"
 #if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
 #include "raylib_lite_raylib_audio.h"
 #endif
 #if defined(MOSAICO_GAME_ELF)
-#include "mosaico_runtime_v1.h"
 #endif
 
 #define SL_W 480
@@ -37,9 +36,9 @@
 #define SL_CAMERA_DIST 2.55f
 #include "sewer_contracts.h"
 #if defined(MOSAICO_GAME_ELF)
-#define SL_ABI MOSAICO_HOST_GAME_ABI
+#define SL_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #else
-#define SL_ABI MOSAICO_HOST_GAME_ABI_V1
+#define SL_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #endif
 
 typedef struct { float x,y,z; } sl_vec3_t;
@@ -1772,7 +1771,7 @@ static int initialize(void *value
 )
 {
 #if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
-    mosaico_host_assets_set_root(asset_root);
+    raylib_lite_host_assets_set_root(asset_root);
 #elif defined(MOSAICO_GAME_NATIVE)
     (void)asset_root;
 #endif
@@ -1833,21 +1832,21 @@ static void toggle_journal(sl_module_t *s)
     if(s->game.briefing||s->game.paused||s->game.failed||s->game.escaped||s->game.action)return;
     stop_audio(s);s->game.journal=!s->game.journal;clear_input(s);
 }
-static void input(void *value,const mosaico_host_input_v1_t *e)
+static void input(void *value,const raylib_lite_host_input_v1_t *e)
 {
     sl_module_t *s=value;if(!s||!e)return;
-    if(e->type==MOSAICO_HOST_INPUT_CONTROL){
-        if(e->code==MOSAICO_HOST_CONTROL_RESET){
+    if(e->type==RAYLIB_LITE_HOST_INPUT_CONTROL){
+        if(e->code==RAYLIB_LITE_HOST_CONTROL_RESET){
             stop_audio(s);reset_dispatch(&s->game,s->game.mission,s->game.dispatch,s->game.kit,true);clear_input(s);
             restore_survey(s);
             s->run_ticks=0;
             s->has_checkpoint=false;s->consumed_sfx=0;
         }
-        else if(e->code==MOSAICO_HOST_CONTROL_PAUSE){s->game.paused=true;stop_audio(s);clear_input(s);}
-        else if(e->code==MOSAICO_HOST_CONTROL_RESUME)s->game.paused=false;
+        else if(e->code==RAYLIB_LITE_HOST_CONTROL_PAUSE){s->game.paused=true;stop_audio(s);clear_input(s);}
+        else if(e->code==RAYLIB_LITE_HOST_CONTROL_RESUME)s->game.paused=false;
         return;
     }
-    if(e->type==MOSAICO_HOST_INPUT_ACTION){
+    if(e->type==RAYLIB_LITE_HOST_INPUT_ACTION){
         if(e->code==4){
             if(e->pressed&&!(s->menu_down&16))toggle_journal(s);
             if(e->pressed)s->menu_down|=16;else s->menu_down&=~16;
@@ -1872,7 +1871,7 @@ static void input(void *value,const mosaico_host_input_v1_t *e)
         else if(e->code==8)s->strafe_left=e->pressed;else if(e->code==9)s->strafe_right=e->pressed;
         else if(e->code==7)s->sneak=e->pressed;
         else if(e->code==6){if(e->pressed&&!s->fire)s->fire_edge=true;s->fire=e->pressed;}
-    }else if(e->type==MOSAICO_HOST_INPUT_POINTER){
+    }else if(e->type==RAYLIB_LITE_HOST_INPUT_POINTER){
         if(!e->pressed){
             if(e->track_id==s->pointer_id)s->pointer_id=-1;
             if(e->track_id==s->look_id)s->look_id=-1;
@@ -2011,7 +2010,7 @@ static int state_json(const void *value,char *out,size_t cap)
         s_face_count,s_faces_dropped,(unsigned long)state_hash(value));
 }
 #endif
-static const mosaico_game_module_v1_t s_module={
+static const raylib_lite_game_module_v1_t s_module={
     .descriptor={SL_ABI,"sewer_labyrinth","Below the Tide",480,480,30,2},
     .state_size=sizeof(sl_module_t),.initialize=initialize,.shutdown=shutdown,
     .input=input,.update=update,.render=render,.state_hash=state_hash,
@@ -2020,11 +2019,11 @@ static const mosaico_game_module_v1_t s_module={
 #endif
 };
 #if defined(MOSAICO_GAME_ELF)
-MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
-mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
+raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
 {
-    g_mosaico_rt=runtime;return &s_module;
+    raylib_lite_product_runtime=runtime;return &s_module;
 }
 #else
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void){return &s_module;}
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void){return &s_module;}
 #endif

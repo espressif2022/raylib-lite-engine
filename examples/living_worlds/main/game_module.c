@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "../../common/raylib_lite_game_module_contract.h"
 /* Host and ELF adapters for the shared Living Worlds session. */
 #include <stdbool.h>
 #include <stdint.h>
@@ -6,7 +7,6 @@
 #if !defined(MOSAICO_GAME_ELF)
 #include "host_asset_runtime.h"
 #endif
-#include "mosaico_game_module.h"
 #include "raylib_lite_raylib.h"
 #include "living_worlds_session.h"
 
@@ -95,7 +95,7 @@ static int initialize(void *value
 {
     module_state_t *s = value;
 #if !defined(MOSAICO_GAME_ELF)
-    mosaico_host_assets_set_root(asset_root);
+    raylib_lite_host_assets_set_root(asset_root);
     if (load_atlas(&s->atlases.aurora, "aurora.atlas") ||
         load_atlas(&s->atlases.ocean, "ocean.atlas") ||
         load_atlas(&s->atlases.sunrise, "sunrise.atlas") ||
@@ -116,19 +116,19 @@ static void shutdown(void *value)
     living_worlds_session_close(value);
 }
 
-static void input(void *value, const mosaico_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_host_input_v1_t *event)
 {
     module_state_t *s = value;
     if (!s || !event) return;
-    if (event->type == MOSAICO_HOST_INPUT_POINTER)
+    if (event->type == RAYLIB_LITE_HOST_INPUT_POINTER)
         living_worlds_session_pointer(s, (float)event->x, (float)event->y,
                                       event->pressed);
-    else if (event->type == MOSAICO_HOST_INPUT_ACTION)
+    else if (event->type == RAYLIB_LITE_HOST_INPUT_ACTION)
         living_worlds_session_action(s, event->code, event->pressed);
-    else if (event->type == MOSAICO_HOST_INPUT_CONTROL) {
-        if (event->code == MOSAICO_HOST_CONTROL_PAUSE) s->paused = true;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESUME) s->paused = false;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESET)
+    else if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_HOST_CONTROL_PAUSE) s->paused = true;
+        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESUME) s->paused = false;
+        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESET)
             living_worlds_session_reset(s);
     }
 }
@@ -168,12 +168,12 @@ static int state_json(const void *value, char *output, size_t capacity)
 #endif
 }
 
-static const mosaico_game_module_v1_t s_module = {
+static const raylib_lite_game_module_v1_t s_module = {
     .descriptor = {
 #if defined(MOSAICO_GAME_ELF)
-                   MOSAICO_HOST_GAME_ABI,
+                   RAYLIB_LITE_GAME_MODULE_ABI,
 #else
-                   MOSAICO_HOST_GAME_ABI_V1,
+                   RAYLIB_LITE_GAME_MODULE_ABI,
 #endif
                    "living_worlds", "Living Worlds",
                    480, 480, 30, 1},
@@ -184,14 +184,14 @@ static const mosaico_game_module_v1_t s_module = {
 };
 
 #if defined(MOSAICO_GAME_ELF)
-MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
-mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
+raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
 {
-    if (runtime) g_mosaico_rt = runtime;
+    if (runtime) raylib_lite_product_runtime = runtime;
     return &s_module;
 }
 #else
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {
     return &s_module;
 }
