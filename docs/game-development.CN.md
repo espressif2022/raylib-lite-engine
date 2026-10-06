@@ -17,7 +17,7 @@ Host 入口用项目根目录的 `game.sim.json` 列出要编译的源码：
 }
 ```
 
-`game_module.c` 可同时包含 Host、原生固件或 ELF 的条件入口；可移植的模型和视图不依赖 ESP-IDF、BSP 或 FreeRTOS。Host 构建会自动运行 `assets_src/prepare_*.py`、`generate_*.py`，并在存在 `assets_src/game_assets.json` 时打包资源。清单只写 `schema` 和 `sources`；节拍由模块的 Host ABI 配置提供。
+`game_module.c` 是 Host 与 Board build 共用的 Game source；它通过 include path 引用 `raylib_lite_game_module_contract.h`，不依赖仓库相对路径。外部 ELF 产品 ABI 只在该 application-layer bridge 的 `MOSAICO_GAME_ELF` 分支中映射，Host header 不导入产品 Runtime ABI。可移植的模型和视图不依赖 ESP-IDF、BSP 或 FreeRTOS；设备专用优化 provider 放在 selected Board/application extension，而不是 Game `main/`。Host 构建会自动运行 `assets_src/prepare_*.py`、`generate_*.py`，并在存在 `assets_src/game_assets.json` 时打包资源。清单只写 `schema` 和 `sources`；节拍由模块的 Host ABI 配置提供。
 
 ## 2. 在 Host 验证
 

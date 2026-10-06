@@ -43,4 +43,4 @@ idf.py -C examples/raylib_shooter \
   -D RAYLIB_LITE_BOARD=esp-mosaico build
 ```
 
-ELF module building belongs to the external Module SDK. Device selection, flashing, installation, Gateway sessions, Recovery, and updates belong to the product tooling. A Host or build result is not device acceptance.
+ELF module building belongs to the external Module SDK. Device selection, flashing, installation, Gateway sessions, Recovery, and updates belong to the product tooling. A Host or build result is not device acceptance. The seven W07 reference games validated on both Host and ESP-Mosaico are listed in [build-matrix.EN.md](build-matrix.EN.md); `list` reports declared support for additional examples without fabricating device acceptance.

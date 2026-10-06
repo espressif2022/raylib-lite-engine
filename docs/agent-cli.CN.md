@@ -43,4 +43,4 @@ idf.py -C examples/raylib_shooter \
   -D RAYLIB_LITE_BOARD=esp-mosaico build
 ```
 
-ELF 模块构建由外部 Module SDK 负责。设备选择、烧录、安装、Gateway、Recovery 和更新属于产品工具。Host 或 build 成功都不代表设备验收完成。
+ELF 模块构建由外部 Module SDK 负责。设备选择、烧录、安装、Gateway、Recovery 和更新属于产品工具。Host 或 build 成功都不代表设备验收完成。 W07 已在 Host 与 ESP-Mosaico 两条路径实际验证的 7 个参考 Game 见 [build-matrix.CN.md](build-matrix.CN.md)；`list` 可报告其他示例的声明支持，但不会把它伪装成设备验收。
