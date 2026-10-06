@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Commands for creating, simulating, and building Raylib Lite games."""
+"""Engine-only commands for Raylib Lite game development."""
 from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -12,6 +11,8 @@ import sys
 from typing import Optional, Sequence
 
 
+CLI_SCHEMA = "raylib-lite-game-cli/v1"
+SIM_SCHEMA = "raylib-lite-game-sim/v1"
 TEMPLATES = {
     "shooter": "raylib_shooter",
     "sky-hop": "sky_hop",
@@ -20,8 +21,15 @@ TEMPLATES = {
     "last-zone": "last_zone_extraction",
     "tomb-raycast": "tomb_raycast",
 }
-
 ENGINE_ROOT = Path(__file__).resolve().parents[1]
+
+
+def available_boards() -> list[str]:
+    root = ENGINE_ROOT / "examples/boards"
+    if not root.is_dir():
+        return []
+    return [path.name for path in sorted(root.iterdir())
+            if path.is_dir() and (path / "board.cmake").is_file()]
 
 
 def _inside_any(value: str, *roots: Path) -> Path:
@@ -48,28 +56,43 @@ def _inside_any(value: str, *roots: Path) -> Path:
     raise ValueError("game project must be inside this repository or Raylib Lite Engine")
 
 
+def _add_project_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("project", nargs="?")
+    parser.add_argument("--project", dest="project_option")
+
+
+def _add_finite_host_arguments(parser: argparse.ArgumentParser) -> None:
+    _add_project_argument(parser)
+    parser.add_argument("--json", action="store_true", help="Emit one machine-readable result")
+    parser.add_argument("--frames", type=int, default=300)
+    parser.add_argument("--replay")
+    parser.add_argument("--state-output")
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="game_cli.py",
-        description="Create, simulate, or build a Raylib Lite Engine game",
+        description="Create, simulate, test, pack, and benchmark Raylib Lite games",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     commands = parser.add_subparsers(dest="command", required=True)
-    listing = commands.add_parser("list", help="List engine games and their build targets")
+
+    listing = commands.add_parser("list", help="List games and their Host/Board support")
     listing.add_argument("--json", action="store_true", help="Emit one machine-readable result")
-    listing.add_argument("--target", choices=("host", "native"),
-                         help="Only list games that support this target")
+    listing.add_argument("--target", choices=("host", *available_boards()),
+                         help="Only list games supported by this Host/Board target")
+
     for name in ("create", "new"):
         create = commands.add_parser(name, help="Create a game from a project template")
         create.add_argument("destination")
         create.add_argument("--json", action="store_true", help="Emit one machine-readable result")
         create.add_argument("--template", default="shooter",
-                            help="Alias (" + ", ".join(TEMPLATES) + ") or a game from `list --target host`")
+                            help="Alias (" + ", ".join(TEMPLATES) + ") or a Host game from `list`")
         create.add_argument("--dry-run", action="store_true", help="Validate without copying")
+
     for name in ("sim", "run"):
         sim = commands.add_parser(name, help="Run the shared-source RGB565 simulator")
-        sim.add_argument("project", nargs="?")
-        sim.add_argument("--project", dest="project_option")
+        _add_project_argument(sim)
         sim.add_argument("--headless", action="store_true")
         sim.add_argument("--json", action="store_true", help="Emit one JSON result; requires --headless")
         sim.add_argument("--frames", type=int, default=300)
@@ -77,16 +100,29 @@ def _parser() -> argparse.ArgumentParser:
         sim.add_argument("--port", type=int, default=8460)
         sim.add_argument("--scenario", "--replay", dest="replay")
         sim.add_argument("--state-output")
-    build = commands.add_parser("build", help="Build an external native firmware or ELF project")
-    build.add_argument("project", nargs="?")
-    build.add_argument("--project", dest="project_option")
-    build.add_argument("--target", choices=("native", "elf"), default="native")
-    build.add_argument("--build-dir", help="Build output directory (default: PROJECT/build)")
-    build.add_argument("--toolchain", help="CMake toolchain file for an ELF module")
-    build.add_argument("--json", action="store_true", help="Emit one machine-readable result")
-    build.add_argument("--clean", action="store_true",
-                       help="Discard the matching generated CMake build directory first")
-    build.add_argument("--idf-path", help="ESP-IDF checkout to use for this build")
+
+    test = commands.add_parser("test", help="Run a finite deterministic Host test/replay")
+    _add_finite_host_arguments(test)
+
+    replay = commands.add_parser("replay", help="Replay an input trace in the finite Host runner")
+    _add_project_argument(replay)
+    replay.add_argument("replay_file")
+    replay.add_argument("--json", action="store_true", help="Emit one machine-readable result")
+    replay.add_argument("--frames", type=int, default=300)
+    replay.add_argument("--state-output")
+
+    assets = commands.add_parser("assets", help="Pack deterministic game assets")
+    _add_project_argument(assets)
+    assets.add_argument("--source", default="assets_src")
+    assets.add_argument("--output", default="assets/generated")
+    assets.add_argument("--manifest")
+    assets.add_argument("--limit")
+    assets.add_argument("--dry-run", action="store_true")
+    assets.add_argument("--json", action="store_true", help="Emit one machine-readable result")
+
+    benchmark = commands.add_parser("benchmark", help="Run the dedicated render benchmark tool")
+    benchmark.add_argument("benchmark_args", nargs=argparse.REMAINDER,
+                           help="Arguments forwarded to tools/render_benchmark.py")
     return parser
 
 
@@ -95,42 +131,60 @@ def _selected_project(parser: argparse.ArgumentParser, arguments: argparse.Names
     value = arguments.project_option or arguments.project
     if not value:
         parser.error("a project path is required")
-    # Projects belong to the caller, including standalone product and module
-    # repositories. Only template creation is restricted to workspace roots.
     candidate = Path(value).expanduser()
     project = candidate.resolve() if candidate.is_absolute() else (repository / candidate).resolve()
-    required = "game.sim.json" if arguments.command in {"sim", "run"} else "CMakeLists.txt"
-    if not (project / required).is_file():
-        parser.error(f"game project is missing {required}: {project}")
+    manifest = project / "game.sim.json"
+    if not manifest.is_file():
+        parser.error(f"game project is missing game.sim.json: {project}")
+    try:
+        schema = json.loads(manifest.read_text(encoding="utf-8")).get("schema")
+    except (json.JSONDecodeError, AttributeError) as error:
+        parser.error(f"invalid simulator manifest: {manifest}: {error}")
+    if schema != SIM_SCHEMA:
+        parser.error(f"unsupported simulator manifest schema {schema!r}: {manifest}")
     return project
 
 
 def _emit_json(status: str, **fields: object) -> None:
-    print(json.dumps({"schema": "mosaico-game-cli/v1", "status": status, **fields}))
+    print(json.dumps({"schema": CLI_SCHEMA, "status": status, **fields}))
 
 
 def engine_games() -> list[dict[str, object]]:
-    """Games under examples/ with the targets their project files declare."""
+    """Games under examples/ and the Host/Board combinations they declare."""
+    boards = available_boards()
     games = []
     for project in sorted((ENGINE_ROOT / "examples").iterdir()):
+        manifest_path = project / "game.sim.json"
+        host = False
+        if manifest_path.is_file():
+            try:
+                host = json.loads(manifest_path.read_text(encoding="utf-8")).get("schema") == SIM_SCHEMA
+            except json.JSONDecodeError:
+                host = False
         top = project / "CMakeLists.txt"
-        host = (project / "game.sim.json").is_file()
         native = ((project / "main/CMakeLists.txt").is_file() and top.is_file() and
                   "raylib_lite_native_project.cmake" in top.read_text(encoding="utf-8"))
-        if host or native:
-            targets = [name for name, ok in (("host", host), ("native", native)) if ok]
-            games.append({"name": project.name, "path": str(project), "targets": targets})
+        game_boards = boards.copy() if native else []
+        if host or game_boards:
+            games.append({"name": project.name, "path": str(project),
+                          "host": host, "boards": game_boards})
     return games
+
+
+def _supports(game: dict[str, object], target: str) -> bool:
+    return bool(game["host"]) if target == "host" else target in game["boards"]
 
 
 def _list(arguments: argparse.Namespace) -> int:
     games = [game for game in engine_games()
-             if not arguments.target or arguments.target in game["targets"]]
+             if not arguments.target or _supports(game, arguments.target)]
     if arguments.json:
-        _emit_json("succeeded", command="list", games=games)
+        _emit_json("succeeded", command="list", games=games,
+                   boards=available_boards())
     else:
         for game in games:
-            print(f"{game['name']}\t{','.join(game['targets'])}")
+            targets = (["host"] if game["host"] else []) + list(game["boards"])
+            print(f"{game['name']}\t{','.join(targets)}")
     return 0
 
 
@@ -151,8 +205,7 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
     if destination.exists():
         parser.error(f"project already exists: {destination}")
     source_name = TEMPLATES.get(arguments.template, arguments.template)
-    if not any(game["name"] == source_name and "host" in game["targets"]
-               for game in engine_games()):
+    if not any(game["name"] == source_name and game["host"] for game in engine_games()):
         parser.error(f"unknown template: {arguments.template}")
     source = ENGINE_ROOT / "examples" / source_name
     if arguments.dry_run:
@@ -182,105 +235,104 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
     return 0
 
 
-def _simulate(arguments: argparse.Namespace, project: Path, repository: Path) -> int:
+def _host_command(project: Path, *, frames: int, replay: Optional[str],
+                  state_output: Optional[str], json_mode: bool,
+                  interactive: bool = False, listen: str = "127.0.0.1",
+                  port: int = 8460) -> tuple[int, Optional[dict[str, object]]]:
     command = [sys.executable, str(ENGINE_ROOT / "host/run_game.py"),
-               "--project", str(project), "--listen", arguments.listen,
-               "--port", str(arguments.port)]
-    if arguments.headless:
-        command.extend(("--headless", "--frames", str(arguments.frames)))
-    if arguments.replay:
-        command.extend(("--replay", arguments.replay))
-    if arguments.state_output:
-        command.extend(("--state-output", arguments.state_output))
-    if arguments.json:
-        if not arguments.headless:
-            raise ValueError("sim --json requires --headless")
-        result = subprocess.run(command, cwd=ENGINE_ROOT, text=True,
-                                capture_output=True)
-        if result.stderr:
-            print(result.stderr, file=sys.stderr, end="")
-        if result.returncode:
-            _emit_json("failed", command="sim", exit_code=1,
-                       tool_exit_code=result.returncode)
-            return 1
+               "--project", str(project), "--listen", listen, "--port", str(port)]
+    if not interactive:
+        command.extend(("--headless", "--frames", str(frames)))
+    if replay:
+        command.extend(("--replay", replay))
+    if state_output:
+        command.extend(("--state-output", state_output))
+    if not json_mode:
         try:
-            payload = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            payload = None
-        if not isinstance(payload, dict):
-            print("game_cli: Host result was not one JSON object", file=sys.stderr)
-            _emit_json("failed", command="sim", error="invalid_host_result", exit_code=4)
-            return 4
-        _emit_json("succeeded", command="sim", result=payload)
-        return 0
-    try:
-        return subprocess.call(command, cwd=ENGINE_ROOT)
-    except KeyboardInterrupt:
-        return 130
-
-
-def _invoke(command: list[str], *, env: dict[str, str], machine: bool) -> int:
-    if not machine:
-        return subprocess.call(command, env=env)
-    result = subprocess.run(command, env=env, text=True, capture_output=True)
-    if result.stdout:
-        print(result.stdout, file=sys.stderr, end="")
+            return subprocess.call(command, cwd=ENGINE_ROOT), None
+        except KeyboardInterrupt:
+            return 130, None
+    result = subprocess.run(command, cwd=ENGINE_ROOT, text=True, capture_output=True)
     if result.stderr:
         print(result.stderr, file=sys.stderr, end="")
+    if result.returncode:
+        return result.returncode, None
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return 4, None
+    return 0, payload if isinstance(payload, dict) else None
+
+
+def _simulate(arguments: argparse.Namespace, project: Path) -> int:
+    if arguments.json and not arguments.headless:
+        raise ValueError("sim --json requires --headless")
+    code, payload = _host_command(
+        project, frames=arguments.frames, replay=arguments.replay,
+        state_output=arguments.state_output, json_mode=arguments.json,
+        interactive=not arguments.headless, listen=arguments.listen, port=arguments.port)
+    if arguments.json:
+        if code or payload is None:
+            _emit_json("failed", command="sim", error="host_failed" if code != 4 else "invalid_host_result",
+                       exit_code=1 if code != 4 else 4, tool_exit_code=code)
+            return 1 if code != 4 else 4
+        _emit_json("succeeded", command="sim", result=payload)
+        return 0
+    return code
+
+
+def _test(arguments: argparse.Namespace, project: Path, command_name: str) -> int:
+    replay = arguments.replay if command_name == "test" else arguments.replay_file
+    code, payload = _host_command(project, frames=arguments.frames, replay=replay,
+                                  state_output=arguments.state_output,
+                                  json_mode=arguments.json)
+    if arguments.json:
+        if code or payload is None:
+            _emit_json("failed", command=command_name, error="host_failed",
+                       exit_code=1, tool_exit_code=code)
+            return 1
+        _emit_json("succeeded", command=command_name, result=payload)
+        return 0
+    return code
+
+
+def _assets(arguments: argparse.Namespace, project: Path) -> int:
+    source = (project / arguments.source).resolve()
+    output = (project / arguments.output).resolve()
+    if not source.is_dir():
+        raise ValueError(f"asset source directory is missing: {source}")
+    if arguments.dry_run:
+        if arguments.json:
+            _emit_json("dry_run", command="assets", project=str(project),
+                       source=str(source), output=str(output))
+        else:
+            print(f"source={source}\noutput={output}")
+        return 0
+    command = [sys.executable, str(ENGINE_ROOT / "tools/pack_game_assets.py"),
+               "--source", str(source), "--output", str(output)]
+    if arguments.manifest:
+        command.extend(("--manifest", arguments.manifest))
+    if arguments.limit:
+        command.extend(("--limit", arguments.limit))
+    result = subprocess.run(command, cwd=ENGINE_ROOT, text=True,
+                            capture_output=arguments.json)
+    if arguments.json:
+        if result.stdout:
+            print(result.stdout, file=sys.stderr, end="")
+        if result.stderr:
+            print(result.stderr, file=sys.stderr, end="")
+        _emit_json("succeeded" if result.returncode == 0 else "failed",
+                   command="assets", project=str(project), output=str(output),
+                   exit_code=0 if result.returncode == 0 else 1,
+                   tool_exit_code=result.returncode)
+        return 0 if result.returncode == 0 else 1
     return result.returncode
 
 
-def _build(project: Path, clean: bool = False, idf_path: Optional[str] = None,
-           target: str = "native", build_dir: Optional[str] = None,
-           toolchain: Optional[str] = None, machine: bool = False) -> int:
-    env = os.environ.copy()
-    output = Path(build_dir).expanduser().resolve() if build_dir else project / "build"
-    if output == project or output in project.parents:
-        raise ValueError("build output must not be the project or its parent")
-    cache = output / "CMakeCache.txt"
-    cache_lines = cache.read_text().splitlines() if cache.is_file() else []
-    if clean and output.exists():
-        expected = f"CMAKE_HOME_DIRECTORY:INTERNAL={project}"
-        if expected not in cache_lines:
-            raise ValueError("--clean requires a CMake build directory for this project")
-    if target != "elf" and toolchain:
-        raise ValueError("--toolchain is only supported with --target elf")
-    toolchain_path = None
-    if target == "elf":
-        cached_toolchain = next((line.split("=", 1)[1] for line in cache_lines
-                                 if line.startswith("CMAKE_TOOLCHAIN_FILE:") and "=" in line), None)
-        selected_toolchain = toolchain or cached_toolchain
-        if selected_toolchain:
-            toolchain_path = Path(selected_toolchain).expanduser().resolve()
-            if not toolchain_path.is_file():
-                raise ValueError(f"toolchain file not found: {toolchain_path}")
-        elif clean or not cache_lines:
-            raise ValueError("an initial ELF build requires --toolchain from its module SDK")
-    if clean and output.exists():
-        shutil.rmtree(output)
-    if target == "elf":
-        env.pop("IDF_PATH", None)
-        command = ["cmake", "-S", str(project), "-B", str(output)]
-        if toolchain_path:
-            command.append(f"-DCMAKE_TOOLCHAIN_FILE={toolchain_path}")
-        result = _invoke(command, env=env, machine=machine)
-        return result or _invoke(["cmake", "--build", str(output)], env=env, machine=machine)
-    env.setdefault("RAYLIB_LITE_ENGINE_ROOT", str(ENGINE_ROOT))
-    if idf_path:
-        env["IDF_PATH"] = str(Path(idf_path).expanduser().resolve())
-    idf_py = None if idf_path else shutil.which("idf.py", path=env.get("PATH"))
-    if idf_py:
-        command = [idf_py, "-C", str(project), "-B", str(output), "build"]
-    else:
-        idf_root = env.get("IDF_PATH")
-        if not idf_root:
-            raise OSError("set IDF_PATH or pass --idf-path, or source export.sh")
-        idf_script = Path(idf_root) / "tools" / "idf.py"
-        if not idf_script.is_file():
-            raise OSError(f"idf.py not found: {idf_script}")
-        command = [sys.executable, str(idf_script), "-C", str(project),
-                   "-B", str(output), "build"]
-    return _invoke(command, env=env, machine=machine)
+def _benchmark(arguments: argparse.Namespace) -> int:
+    command = [sys.executable, str(ENGINE_ROOT / "tools/render_benchmark.py"),
+               *arguments.benchmark_args]
+    return subprocess.call(command, cwd=ENGINE_ROOT)
 
 
 def main(argv: Optional[Sequence[str]] = None, *, repository: Path) -> int:
@@ -298,18 +350,16 @@ def main(argv: Optional[Sequence[str]] = None, *, repository: Path) -> int:
             return _list(arguments)
         if arguments.command in {"create", "new"}:
             return _create(parser, arguments, repository)
+        if arguments.command == "benchmark":
+            return _benchmark(arguments)
         project = _selected_project(parser, arguments, repository)
         if arguments.command in {"sim", "run"}:
-            return _simulate(arguments, project, repository)
-        result = _build(project, arguments.clean, arguments.idf_path,
-                        arguments.target, arguments.build_dir, arguments.toolchain,
-                        machine=arguments.json)
-        if arguments.json:
-            _emit_json("succeeded" if result == 0 else "failed", command="build",
-                       target=arguments.target, project=str(project),
-                       exit_code=0 if result == 0 else 1, tool_exit_code=result)
-            return 0 if result == 0 else 1
-        return result
+            return _simulate(arguments, project)
+        if arguments.command in {"test", "replay"}:
+            return _test(arguments, project, arguments.command)
+        if arguments.command == "assets":
+            return _assets(arguments, project)
+        parser.error(f"unsupported command: {arguments.command}")
     except SystemExit as error:
         if machine and error.code:
             _emit_json("failed", error="usage", exit_code=2)
@@ -327,6 +377,7 @@ def main(argv: Optional[Sequence[str]] = None, *, repository: Path) -> int:
         print(f"game_cli: internal error: {error}", file=sys.stderr)
         _emit_json("failed", error="internal", exit_code=4)
         return 4
+    return 0
 
 
 if __name__ == "__main__":
