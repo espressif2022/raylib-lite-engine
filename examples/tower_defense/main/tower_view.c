@@ -202,7 +202,7 @@ static void draw_overlay(const char *title, const char *line, const char *action
 bool tower_view_apply_map(tower_game_t *game, raylib_lite_tilemap_t map)
 {
     (void)game;
-    const Vector2 *points = NULL;
+    const raylib_lite_renderer_vec2_t *points = NULL;
     size_t count = raylib_lite_tilemap_path_points(map, &points);
     tower_level_t level = {.path_count = (uint8_t)count};
     for (size_t i = 0; i < count && i < TOWER_MAX_PATH_POINTS; ++i) {
@@ -247,7 +247,8 @@ void tower_view_render(const tower_view_t *view)
         return;
     }
     ClearBackground(C_GRASS);
-    raylib_lite_tilemap_draw_layer(view->map, 0, (Rectangle){0, 0, 480, 320});
+    raylib_lite_tilemap_draw_layer(view->map, 0,
+        (raylib_lite_renderer_rect_t){0, 0, 480, 320});
     draw_core(view);
     for (size_t i = 0; i < TOWER_PAD_COUNT; ++i) draw_pad(view, &game->towers[i]);
     for (size_t i = 0; i < TOWER_MAX_ENEMIES; ++i)

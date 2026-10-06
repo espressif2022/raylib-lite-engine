@@ -38,8 +38,7 @@ class ColumnTests(unittest.TestCase):
             if Path(source).resolve() != rgb565.resolve():
                 command.append(str(rgb565))
             for include in ['host/include', 'host', 'include/raylib_lite',
-                            'include/raylib_lite',
-                            'include/raylib_lite']:
+                            'compat/raylib/include']:
                 command += ['-I', str(ROOT / include)]
             command += ['-lm', '-o', str(temp / 'columns')]
             subprocess.run(command, check=True)

@@ -8,8 +8,7 @@ set(BENCH_SOURCES
 set(BENCH_INCLUDES
     "${CMAKE_CURRENT_LIST_DIR}/../include"
     "${ENGINE_ROOT}/include/raylib_lite"
-    "${ENGINE_ROOT}/include/raylib_lite"
-    "${ENGINE_ROOT}/include/raylib_lite")
+    "${ENGINE_ROOT}/compat/raylib/include")
 set(BENCH_DEFINITIONS
     M2D_WALL_MODE=${M2D_WALL_MODE}
     M2D_WALL_FIXED_PIXELS=${M2D_WALL_FIXED_PIXELS}

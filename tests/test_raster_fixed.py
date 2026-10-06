@@ -85,7 +85,7 @@ int main(void) {
                        str(ROOT / "host/host_asset_runtime.c"), str(ROOT / "src/renderer/raylib_lite_rgb565.c")]
             command += shlex.split(os.environ.get("CFLAGS", ""))
             for include in ["host", "host/include", "include/raylib_lite",
-                            "include/raylib_lite",
+                            "compat/raylib/include",
                             "src/renderer", "include/raylib_lite"]:
                 command += ["-I", str(ROOT / include)]
             subprocess.run(command + ["-lm", "-o", str(p / "test")], check=True)
