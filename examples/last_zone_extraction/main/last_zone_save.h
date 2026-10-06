@@ -17,9 +17,9 @@ typedef struct {
     uint8_t reserved;
 } last_zone_campaign_t;
 
-esp_err_t last_zone_save_load(last_zone_campaign_t *campaign);
-esp_err_t last_zone_save_campaign(const last_zone_campaign_t *campaign);
-esp_err_t last_zone_save_flush(void);
+raylib_lite_result_t last_zone_save_load(last_zone_campaign_t *campaign);
+raylib_lite_result_t last_zone_save_campaign(const last_zone_campaign_t *campaign);
+raylib_lite_result_t last_zone_save_flush(void);
 void last_zone_campaign_from_game(const last_zone_game_t *game,
                                  last_zone_campaign_t *campaign);
 void last_zone_campaign_apply(last_zone_game_t *game,
