@@ -12,12 +12,12 @@ List Host sources in `game.sim.json` at the game project root:
 
 ```json
 {
-  "schema": "mosaico-game-sim/v1",
+  "schema": "raylib-lite-game-sim/v1",
   "sources": ["main/game_module.c", "main/game.c", "main/game_view.c"]
 }
 ```
 
-`game_module.c` may contain conditional Host, native, and ELF entry points. Portable models and views do not depend on ESP-IDF, BSP, or FreeRTOS. Before compiling, the Host runner executes `assets_src/prepare_*.py` and `generate_*.py`, then packs assets if `assets_src/game_assets.json` exists. The Host manifest needs only `schema` and `sources`; the module's Host ABI descriptor supplies its tick rate.
+`game_module.c` is the shared Game source for Host and Board builds. It includes `raylib_lite_game_module_contract.h` by include path rather than repository-relative path. The external ELF product ABI is translated only by that application-layer bridge under `MOSAICO_GAME_ELF`; Host headers do not import the product Runtime ABI. Portable models and views do not depend on ESP-IDF, BSP, or FreeRTOS. Before compiling, the Host runner executes `assets_src/prepare_*.py` and `generate_*.py`, then packs assets if `assets_src/game_assets.json` exists. The Host manifest needs only `schema` and `sources`; the module's Host ABI descriptor supplies its tick rate.
 
 ## 2. Validate on Host
 
@@ -27,13 +27,14 @@ With a C compiler and Pillow available, run from the engine root:
 python3 -m pip install Pillow
 python3 tools/game_cli.py sim examples/<name>
 python3 tools/game_cli.py sim examples/<name> --headless --frames 300
+python3 tools/game_cli.py test examples/<name> --frames 300 --json
 ```
 
 The browser preview supports input, pause, single stepping, screenshots, and recording. Use `--scenario <json>` for deterministic input replay and `--state-output <path>` to save state. Replay `frame` numbers must be nonnegative and nondecreasing. Native C rendering writes RGB565 pixels; the browser displays them. See the [Host simulator reference](../host/README.md) for more options.
 
 ## 3. Validate on device
 
-Use [build paths](build-matrix.EN.md) to choose generic native or ELF integration and build the artifact. Follow `esp-mosaico-vibe` documentation for Iris/Gateway installation and acceptance. On device, verify startup, assets, input, audio and haptics, actual display output, and shutdown cleanup. For performance comparisons, hold the input, scene, board, clocks, and build settings constant; save firmware identity and raw logs. Passing Host tests does not establish device acceptance.
+Use [build paths](build-matrix.EN.md) for device integration. Native examples build directly with ESP-IDF and an explicit `RAYLIB_LITE_BOARD`; ELF compilation belongs to the external Module SDK. Board-specific optimized providers belong under the selected Board/application extension, not under the Game `main/` source. Follow `esp-mosaico-vibe` documentation for Iris/Gateway installation and acceptance. On device, verify startup, assets, input, audio and haptics, actual display output, and shutdown cleanup. For performance comparisons, hold the input, scene, board, clocks, and build settings constant; save firmware identity and raw logs. Passing Host tests does not establish device acceptance.
 
 ## 4. Before submitting
 

@@ -12,7 +12,7 @@ Host 入口用项目根目录的 `game.sim.json` 列出要编译的源码：
 
 ```json
 {
-  "schema": "mosaico-game-sim/v1",
+  "schema": "raylib-lite-game-sim/v1",
   "sources": ["main/game_module.c", "main/game.c", "main/game_view.c"]
 }
 ```
@@ -27,6 +27,7 @@ Host 入口用项目根目录的 `game.sim.json` 列出要编译的源码：
 python3 -m pip install Pillow
 python3 tools/game_cli.py sim examples/<name>
 python3 tools/game_cli.py sim examples/<name> --headless --frames 300
+python3 tools/game_cli.py test examples/<name> --frames 300 --json
 ```
 
 浏览器预览支持输入、暂停、单步、截图和录制；`--scenario <json>` 可回放固定输入，`--state-output <path>` 可保存状态。回放事件的 `frame` 序号必须非负且不递减。Host 写入 RGB565 像素，浏览器只展示结果。更多选项见 [Host 仿真说明](../host/README.md)。

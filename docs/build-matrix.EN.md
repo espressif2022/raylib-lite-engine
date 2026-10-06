@@ -2,32 +2,53 @@
 
 [Documentation index](README.EN.md) · [简体中文](build-matrix.CN.md) · [Game development](game-development.EN.md)
 
-The engine maintains integration boundaries for three artifacts: PC Host, generic native firmware, and device ELF games. Choose the artifact, then consult the [example support matrix](../examples/README.md). Iris/Recovery, Gateway sessions, device ownership, flashing, and updates are product workflows maintained in `esp-mosaico-vibe/docs/project-gateway.md`, `docs/game-development.md`, and its CLI guide.
+Raylib Lite Engine keeps three integration paths separate: PC Host, ESP-IDF Board builds, and external ELF module builds. The Engine CLI owns Host/development workflows only; product Runtime/installation workflows stay outside this repository.
 
-| Artifact | Engine entry | External requirements | Validate here |
+| Artifact | Entry | External requirements | Validate here |
 | --- | --- | --- | --- |
-| PC Host | `python3 tools/game_cli.py sim examples/<game>` | C compiler, Pillow | Gameplay, deterministic replay, RGB565 pixels |
-| Native firmware | `examples/<game>/CMakeLists.txt` | ESP-IDF and the BSP supplied by the caller | Shared-source integration; the product accepts device behavior |
-| ELF game | External `esp-mosaico-elf-game-sdk` project produces `game.bin` | Module SDK and compatible runtime ABI | ABI, shared sources, assets; the product accepts installation |
+| PC Host | `python3 tools/game_cli.py test examples/<game>` | C compiler, Pillow | Gameplay, deterministic replay, RGB565 output |
+| ESP-IDF Board firmware | `idf.py -C examples/<game> -D RAYLIB_LITE_BOARD=<board> build` | ESP-IDF plus selected Board/BSP | Shared Game source + Board application integration |
+| ELF game | External `esp-mosaico-elf-game-sdk` project | Module SDK and compatible product Runtime ABI | Shared Game source/ABI/assets; product owns installation |
 
-## Native firmware integration
+## Game × Board model
 
-The example top-level CMake includes [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake). It adds the repository-root `raylib-lite-engine` component through [`raylib_lite_esp.cmake`](../cmake/raylib_lite_esp.cmake), then loads `examples/boards/<board>/board.cmake` according to `RAYLIB_LITE_BOARD`. The application build adds that concrete adapter through `EXTRA_COMPONENT_DIRS`; each game `main/CMakeLists.txt` depends on the single `raylib-lite-engine` component and compiles against the shared example-board contract. [`raylib_lite_native_assets.cmake`](../cmake/raylib_lite_native_assets.cmake) can embed assets. Gateway, flashing, and product policy remain outside the engine.
+A game owns portable model/view/module source. The application selects a Board at build time through [`raylib_lite_native_project.cmake`](../cmake/raylib_lite_native_project.cmake). The selected `examples/boards/<board>/board.cmake` adds the concrete Board adapter; Game code does not include concrete BSP/device SDK headers.
 
-ESP-Mosaico is the current reference board adapter at [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/). Its board selector accepts `MOSAICO_BSP_ROOT` or `MOSAICO_BSP_COMPONENT_DIR`. After loading ESP-IDF, build Sky Hop as an example artifact:
+`game.sim.json` and the Board build compile the same `main/game_module.c`. `examples/common/native_module_main.c` supplies the generic native launcher. Board-specific application extensions may provide optimized device assets or policy without taking over the launcher. Living Worlds, for example, keeps JPEG decode/embedding in the ESP-Mosaico Board extension while Host and native both use the same `game_module.c`.
+
+Discover support with:
+
+```sh
+python3 tools/game_cli.py list --json
+python3 tools/game_cli.py list --json --target esp-mosaico
+```
+
+The W07 reference matrix is validated on both Host and ESP-Mosaico for:
+
+- `raylib_shooter`
+- `tower_defense`
+- `sky_hop`
+- `living_worlds`
+- `last_zone_extraction`
+- `tomb_raycast`
+- `vertical_dock`
+
+## Native firmware
+
+ESP-Mosaico is the current reference Board adapter at [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/). It accepts `MOSAICO_BSP_ROOT` or `MOSAICO_BSP_COMPONENT_DIR` for the external BSP.
 
 ```sh
 export MOSAICO_BSP_ROOT=/path/to/esp-mosaico-bsp
 idf.py -C examples/sky_hop -D RAYLIB_LITE_BOARD=esp-mosaico \
-    -B /tmp/sky-hop-native build
+  -B /tmp/sky-hop-native build
 ```
 
-Product firmware reuses a game by adding `examples/<game>/main` to `EXTRA_COMPONENT_DIRS` after including `raylib_lite_native_project.cmake`. Native entries call [`raylib_lite_native_hooks.h`](../include/raylib_lite/raylib_lite_native_hooks.h): `raylib_lite_native_boot()` before the board is created and `raylib_lite_native_first_present()` after the first presented frame. The engine provides weak no-op defaults; a product overrides both from its own component registered with `WHOLE_ARCHIVE`. `python3 tools/game_cli.py list --json --target native` is the game list products consume.
+Use separate build directories per target. The Engine does not expose a native-build CLI wrapper, and it does not own flashing, Recovery, or production board policy.
 
-Vibe's `mosaico-tools` owns the Iris adapter (`mosaico.py game build --target iris <game>`); its product CLI owns device selection, flashing, and recovery. Use separate build directories; do not share `sdkconfig` or CMake caches across targets.
+## ELF integration
 
-## ELF game integration
+Validate portable gameplay on Host first, then build the matching external Module SDK project. The application bridge [`examples/common/raylib_lite_game_module_contract.h`](../examples/common/raylib_lite_game_module_contract.h) maps the external product module/runtime ABI only under `MOSAICO_GAME_ELF`; Host headers do not import that product Runtime contract.
 
-Validate shared gameplay with engine Host first, then select the wrapper project in `esp-mosaico-elf-game-sdk`. Engine `tools/game_cli.py build --target elf` only dispatches CMake for an external SDK project and needs the SDK `--toolchain` initially; it does not turn a native project into ELF. The SDK documents module packaging and ABI. `esp-mosaico-vibe` owns installation, updates, device identity, and Gateway operations.
+The external Module SDK owns ELF compilation/packaging. `esp-mosaico-vibe` owns installation, updates, device identity, Gateway operations, and Iris/Recovery workflows. Engine `game_cli.py` deliberately has no ELF build command.
 
-The dedicated [render_benchmark example](../examples/render_benchmark/README.md) has its own minimal device project. Display preview and offscreen scoring use separate configurations and do not use the game native helper.
+The dedicated [render_benchmark example](../examples/render_benchmark/README.md) keeps its own minimal Host/device acceptance path.
