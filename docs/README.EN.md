@@ -22,11 +22,11 @@ First use: follow the [quickstart](quickstart.EN.md) to create a game and see it
 | [Audio and feedback design](audio-design.EN.md) | Events, assets, backends, and device listening |
 | [New-board porting contract](board-porting.EN.md) | Video, clock, input, audio, and device acceptance |
 | [Agent CLI](agent-cli.EN.md) | JSON output, exit codes, and operation scopes for finite commands |
-| [Raster-kernel contract](raster-kernels.EN.md) | Texture, light, coverage, and error behavior for each `Mosaico2DDraw*` API |
+| [Raster-kernel contract](raster-kernels.EN.md) | Texture, light, coverage, and error behavior for each `raylib_lite_2d_draw_*` API |
 | [render_benchmark](../examples/render_benchmark/README.md) | Raster benchmark and optional display preview |
 | [Tests](../tests/README.md) | Host unit tests |
 | [Mosaico game development skill](skills/mosaico-game-development/SKILL.EN.md) | Agent-specific workflow |
 
 Bilingual content uses `.EN.md` and `.CN.md` suffixes. `README.md` is a language selector, while `SKILL.md` remains the tool-compatible entry point.
 
-The public API retains the `mosaico_*` prefix for source compatibility; see [versioning](../README.EN.md#versioning). One-off measurements and migration notes belong outside the maintained `docs/` guides; local `docs/debug/` is ignored by Git.
+Public Engine APIs use the `raylib_lite_*` namespace; Raylib-shaped compatibility lives under `compat/raylib/`. See [versioning](../README.EN.md#versioning). One-off measurements and migration notes belong outside the maintained `docs/` guides; local `docs/debug/` is ignored by Git.

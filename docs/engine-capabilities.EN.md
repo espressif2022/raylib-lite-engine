@@ -1,78 +1,51 @@
 # Raylib Lite Engine capabilities and internal modules
 
-Raylib Lite Engine is one ESP-IDF component: `raylib-lite-engine`. Its implementation is organized as internal modules under `src/`, while public headers are exported from `include/raylib_lite/`. Host builds compile the portable sources they need directly; ESP-IDF products add the repository root through `cmake/raylib_lite_esp.cmake`. See [build-matrix.EN.md](build-matrix.EN.md) for the supported build paths.
+Raylib Lite Engine is one ESP-IDF component: `raylib-lite-engine`. Public neutral headers live under `include/raylib_lite/`; Raylib-shaped source compatibility lives under `compat/raylib/`; implementation modules live under `src/`.
 
 ## Find a capability
 
-Use these public APIs before adding a game-local helper. If a helper is needed by a second game, compare its data and ownership contract before moving the reusable part into a component; camera and product policy remain with their owners.
-
-| Need | Start with | Public header or tool |
+| Need | Start with | Header or tool |
 | --- | --- | --- |
-| Fixed-step game loop and event queue | `raylib_lite_game_app_run`, runner input | [`raylib_lite_game_app.h`](../include/raylib_lite/raylib_lite_game_app.h), [`raylib_lite_input.h`](../include/raylib_lite/raylib_lite_input.h) |
-| Runtime timing and display/input counters | `raylib_lite_runtime_stats_*` | [`raylib_lite_runtime_stats.h`](../include/raylib_lite/raylib_lite_runtime_stats.h) |
-| Touch or button to game action | `mosaico_action_*` | [`mosaico_game_action.h`](../include/raylib_lite/mosaico_game_action.h) |
-| RGB565 shapes and Raylib-compatible names | explicit fast implementation plus compatibility facade | [`mosaico_raylib_fast.h`](../include/raylib_lite/mosaico_raylib_fast.h), [`raylib_lite_raylib.h`](../compat/raylib/include/raylib_lite_raylib.h) |
-| Texture, atlas, wall column, floor span, triangle or quad | neutral renderer core with legacy `Mosaico2D*` facade | [`mosaico_renderer.h`](../include/raylib_lite/mosaico_renderer.h), [`mosaico_game_2d.h`](../include/raylib_lite/mosaico_game_2d.h), [raster contract](raster-kernels.EN.md) |
-| Tile map lookup and drawing | `mosaico_game_tilemap_*` | [`mosaico_game_tilemap.h`](../include/raylib_lite/mosaico_game_tilemap.h) |
-| Asset packing, backing providers, streaming, and logical-name lookup | packer, `mosaico_game_assets_mount_backing`, `mosaico_game_asset_open` | [`mosaico_game_assets.h`](../include/raylib_lite/mosaico_game_assets.h), [`pack_game_assets.py`](../tools/pack_game_assets.py) |
-| Sound/music playback and PCM device service | `MosaicoAudio*`, platform audio | [`mosaico_game_audio.h`](../include/raylib_lite/mosaico_game_audio.h), [`raylib_lite_audio.h`](../include/raylib_lite/raylib_lite_audio.h) |
-| Scene stack, UI controls, or effects | module-specific APIs | [`scene`](../include/raylib_lite/), [`ui`](../include/raylib_lite/), [`fx`](../include/raylib_lite/) |
-| Host replay or target build | `game_cli.py sim/build` | [`game_cli.py`](../tools/game_cli.py), [build paths](build-matrix.EN.md) |
+| Fixed-step game lifecycle | `raylib_lite_game_app_run` | [game app](../include/raylib_lite/raylib_lite_game_app.h) |
+| Runner input and runtime counters | `raylib_lite_input_*`, `raylib_lite_runtime_stats_*` | [input](../include/raylib_lite/raylib_lite_input.h), [stats](../include/raylib_lite/raylib_lite_runtime_stats.h) |
+| Touch/button action mapping | `raylib_lite_action_*` | [action](../include/raylib_lite/raylib_lite_action.h) |
+| Neutral raster/rendering | `raylib_lite_renderer_*` | [renderer](../include/raylib_lite/raylib_lite_renderer.h), [raster contract](raster-kernels.EN.md) |
+| Raylib-shaped graphics/input names | `InitWindow`, `Draw*`, etc. | [Raylib compatibility](../compat/raylib/include/raylib_lite_raylib.h) |
+| Raylib-shaped 2D texture helpers | `raylib_lite_2d_*` | [2D compatibility](../compat/raylib/include/raylib_lite_2d.h) |
+| Tile map lookup/drawing | `raylib_lite_tilemap_*` | [tilemap](../include/raylib_lite/raylib_lite_tilemap.h) |
+| Asset backing/stream/lifetime | `raylib_lite_asset_*`, `raylib_lite_assets_*` | [assets](../include/raylib_lite/raylib_lite_assets.h), [packer](../tools/pack_game_assets.py) |
+| PCM mixer/backend contract | `raylib_lite_audio_*` | [audio backend](../include/raylib_lite/raylib_lite_audio.h) |
+| Raylib-style Sound/Music facade | `raylib_lite_game_audio_*` or Raylib audio names | [game audio](../compat/raylib/include/raylib_lite_game_audio.h), [audio-name compatibility](../compat/raylib/include/raylib_lite_raylib_audio.h) |
+| Save/version/migration/storage | `raylib_lite_save_*` | [save](../include/raylib_lite/raylib_lite_save.h) |
+| Scene/UI/effects | `raylib_lite_scene_*`, `raylib_lite_ui_*`, `raylib_lite_*tween/particle*` | [scene](../include/raylib_lite/raylib_lite_scene.h), [UI](../include/raylib_lite/raylib_lite_ui.h), [FX](../include/raylib_lite/raylib_lite_fx.h) |
+| Host replay/build | `game_cli.py sim/build` | [game CLI](../tools/game_cli.py), [build paths](build-matrix.EN.md) |
 
 ## Internal module responsibilities
 
 | Module | Owns | Must not own |
 | --- | --- | --- |
-| `mosaico_game` | Legacy compatibility wrappers for the old event/config/statistics API | Default runtime scheduling, board ownership, or new APIs |
-| `raylib_lite_platform` | video/audio/clock contracts and ESP clock implementation | BSP or product policy |
-| `raylib_lite_runner` | Deterministic update/render scheduling, the bounded input queue, and board-neutral runtime statistics | Task creation or board input |
-| `mosaico_game_app` | Portable Raylib game lifecycle over a supplied platform and one runner input queue | Device boot, BSP, legacy event queues, or task placement |
-| `mosaico_raylib_port` | consume a platform-neutral video backend | display construction or game content |
-| `mosaico_raylib_fast` | Explicit `MosaicoFast*` RGB565 drawing implementation | Raylib-name macro compatibility or board startup |
-| `mosaico_game_assets` | Asset registration/backing/stream/lifetime core plus the optional IDF mmap backend | Board-specific storage policy or `esp_mmap_assets` calls in the core |
-| `mosaico_game_2d` | Raylib-neutral raster core, texture/atlas lifetime, raycast columns/spans/walls, textured triangles, and the legacy Raylib-shaped adapter | Map rules, camera math, board/display policy, or Raylib types inside the core |
-| `mosaico_game_tilemap` | packed tile-map access and drawing | game-specific collision behavior |
-| `mosaico_game_audio` | clip loading, decoding, mixing, backend contract | codec device and worker policy |
-| `mosaico_game_input` | Action Mapper over `raylib_lite_input_event_t` | Device event queues or board driver ownership |
-| `mosaico_game_debug` | IDF logging of board-neutral runtime statistics plus heap/PSRAM diagnostics | Runtime ownership or product telemetry transport |
-| `mosaico_game_scene` | fixed-capacity scene stack and lifecycle dispatch | game-specific scene policy |
-| `mosaico_game_ui` | fixed retained panel/label/button tree and two tracked pointers | menus, layout engines, or board input |
-| `mosaico_game_fx` | fixed-capacity tweens, easing, and particle pools | heap allocation or rendering policy |
-| `mosaico_game_save` | Version/CRC/migration/debounce core over a storage callback contract, plus the optional ESP NVS backend | Game migration policy or storage-specific rules in the core |
+| `src/runtime` | portable game lifecycle, video port, debug integration | BSP startup or product policy |
+| `src/runner` | fixed-step scheduling, bounded input queue, runtime statistics | RTOS task placement or Board ownership |
+| `src/input` | Action Mapper over `raylib_lite_input_event_t` | device driver queues |
+| `src/renderer` | neutral raster core, texture/atlas lifetime, tilemaps, Raylib implementation backend | BSP/display construction or game rules |
+| `src/assets` | backing/stream/lifetime core | ESP mmap calls |
+| `src/audio` | decoding, mixing, PCM backend contract | codec/I2S device policy |
+| `src/save` | version/CRC/migration/debounce core | NVS calls |
+| `src/scene`, `src/ui`, `src/fx` | reusable scene stack, retained UI, tweens/particles | game-specific policy |
+| `src/idf` | ESP clock, mmap-assets and NVS adapters | portable Engine policy |
+| `src/arch/esp32s31` | S31-specific RGB565 acceleration | Board/BSP behavior |
 
 ## Public API rules
 
-- Public headers live in `include/`, use `#pragma once`, C++ guards, fixed-width
-  types, and an SPDX license marker.
-- New platform contracts use the `raylib_lite_*` prefix and
-  `raylib_lite_result_t`. Existing game APIs retain `mosaico_game_*` names and
-  frozen `esp_err_t` values through the SDK-independent compatibility header.
-- Handles returned by a component are owned by that component. A matching
-  unload/close function must run before the owning module shuts down.
-- A pointer returned by a legacy lookup is borrowed and can be invalidated by
-  unloading its owner. Prefer copy-out lookup APIs such as
-  `mosaico_game_2d_atlas_get_frame()` in new code.
-- Calls are task-context APIs unless documented otherwise; none of these APIs
-  are ISR-safe. Audio mixer state and display presentation are serialized by
-  their owning modules.
+- Neutral Engine headers are under `include/raylib_lite/` and use the `raylib_lite_*` namespace.
+- Public fallible Engine APIs use `raylib_lite_result_t`; neutral headers do not expose `esp_err_t`, `ESP_ERR_*`, or Raylib types.
+- Raylib-shaped types and name mappings are isolated under `compat/raylib/`.
+- Asset views are borrowed/leased according to the asset API. Call `raylib_lite_asset_release()` when the view may own a materialized backing buffer.
+- Handles returned by an owning module must be closed/unloaded before the owner shuts down.
+- Calls are task-context APIs unless explicitly documented otherwise; they are not ISR-safe by default.
 
 ## Configuration and lifecycle
 
-Portable sources provide ordinary C configuration defaults. ESP-specific
-configuration lives in the repository-root `Kconfig`;
-game-specific tuning belongs in the product's `sdkconfig.defaults`. Platform
-registration maps those choices to the shared source configuration.
-The engine provides generic `raylib_lite_game_app_t` and
-`raylib_lite_game_app_run()` lifecycle/runner types. A standalone example
-can use `examples/common/native_module_main.c`; a product can compose its own
-entry point and platform services. The runner does not select a board or
-create an RTOS task. See [reusable design principles](reference-designs.EN.md)
-for the ownership boundary.
+The repository-root `Kconfig` uses `RAYLIB_LITE_*` Engine configuration names. Board-specific ESP-Mosaico options use the `ESP_MOSAICO_*` namespace. A standalone native example can use `examples/common/native_module_main.c`; products can compose their own entry point and platform services.
 
-Asset source conversion is a build-time concern owned by
-`tools/pack_game_assets.py`. Runtime asset services consume packed files from a read-only asset partition,
-an in-memory module image, or `mosaico_game_asset_register_memory()` (currently
-32 slots). Lookup prefers a mounted partition, then a mounted image, then
-registered memory when names overlap. Whether a complete pack is embedded or
-stored in a partition depends on the product's partition table and capacity
-budget. Host simulation reads generated files and does not mount device flash.
+Runtime asset services consume a read-only mmap partition, a resident image alias, a bounded read backing, or explicitly registered memory. Host simulation reads generated assets and does not mount device flash.

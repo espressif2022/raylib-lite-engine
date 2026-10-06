@@ -9,9 +9,7 @@ simulator. It is not affiliated with or endorsed by the raylib project.
 
 The engine contains shared game code, a PC Host backend, and ESP-IDF
 integration. Board startup and device services belong to product or example
-firmware. Public APIs retain their `mosaico_*` names so existing games remain
-source compatible; neutral `raylite_*` APIs will be introduced through versioned
-compatibility aliases rather than a flag-day rename.
+firmware. Public Engine APIs use the `raylib_lite_*` namespace. Raylib-shaped source compatibility is isolated under `compat/raylib/`; neutral Engine headers do not expose ESP-IDF or Raylib types.
 
 ## Capabilities
 
@@ -79,9 +77,7 @@ Standalone example firmware composes the same game source with a board adapter s
 
 ## Versioning
 
-The initial `0.x` series preserves the existing Mosaico API while platform
-boundaries are separated. Host ABI and binary asset formats are independently
-versioned and reject incompatible inputs.
+The initial `0.x` series keeps Host ABI and binary asset formats independently versioned while the Engine API uses the neutral `raylib_lite_*` namespace. Incompatible Host ABI and asset-format inputs are rejected.
 
 ## License
 

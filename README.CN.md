@@ -4,7 +4,7 @@
 
 Raylib Lite Engine 是面向嵌入式 RGB565 显示的轻量 Raylib 兼容游戏运行时，提供固定步长更新、软件光栅、资源打包和 PC Host 仿真。它不是 raylib 官方项目，也不代表 raylib 官方背书。
 
-引擎维护共享游戏代码、Host 后端和 ESP-IDF 集成；示例或产品固件负责选择板卡并提供设备服务。公共 API 暂保留 `mosaico_*` 前缀，以兼容已有游戏；未来中性命名通过版本化别名过渡，不要求一次性改名。
+引擎维护共享游戏代码、Host 后端和 ESP-IDF 集成；示例或产品固件负责选择板卡并提供设备服务。Engine 公共 API 已统一为 `raylib_lite_*` 命名；Raylib-shaped 源码兼容层只位于 `compat/raylib/`，neutral Engine header 不再暴露 ESP-IDF 或 Raylib 类型。
 
 ## 从哪里开始
 
@@ -33,4 +33,4 @@ python3 tools/game_cli.py sim examples/sky_hop
 
 ## 版本与许可
 
-初期 `0.x` 版本保留现有 `mosaico_*` 源码兼容接口。Host ABI 与二进制资源格式分别带版本号，并拒绝不兼容输入。源码除另有标注外采用 Apache-2.0 许可，见 [LICENSE](LICENSE)；外部依赖见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。参与开发见[贡献指南](CONTRIBUTING.CN.md)。
+初期 `0.x` 版本使用 neutral `raylib_lite_*` Engine API；Host ABI 与二进制资源格式分别带版本号，并拒绝不兼容输入。源码除另有标注外采用 Apache-2.0 许可，见 [LICENSE](LICENSE)；外部依赖见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。参与开发见[贡献指南](CONTRIBUTING.CN.md)。

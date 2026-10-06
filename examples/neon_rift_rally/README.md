@@ -88,7 +88,7 @@ void rally_set_controls(rally_game_t *game, float throttle, float brake,
                         float steer, bool drift, bool nitro);
 void rally_update(rally_game_t *game);
 uint32_t rally_state_hash(const rally_game_t *game);
-int rally_view_render(const rally_game_t *game, MosaicoAtlas rally_art);
+int rally_view_render(const rally_game_t *game, raylib_lite_atlas_t rally_art);
 ```
 
 The deterministic model owns track-local motion, jumping, checkpoints, laps,

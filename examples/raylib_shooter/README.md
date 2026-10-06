@@ -1,7 +1,7 @@
 # Mosaico Raylib Shooter
 
 Reference application for Raylib Lite Engine. Its embedded build keeps the
-familiar Raylib 2D call surface through `mosaico_raylib_fast.h`, but maps common
+familiar Raylib 2D call surface through `raylib_lite_raylib.h`, but maps common
 drawing calls directly to a 480x480 RGB565 framebuffer instead of Raylib's
 generic software-OpenGL rasterizer. The platform backend owns buffer retention and display submission.
 

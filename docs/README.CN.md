@@ -22,11 +22,11 @@
 | [音频与反馈设计](audio-design.CN.md) | 事件、资源、后端和设备试听契约 |
 | [新板卡移植契约](board-porting.CN.md) | 视频、时钟、输入、音频与真实设备验收 |
 | [Agent 命令接口](agent-cli.CN.md) | 有限命令的 JSON 输出、退出码与授权边界 |
-| [光栅内核契约](raster-kernels.CN.md) | 各 `Mosaico2DDraw*` 接口的纹理、光照、覆盖和错误行为 |
+| [光栅内核契约](raster-kernels.CN.md) | 各 `raylib_lite_2d_draw_*` 接口的纹理、光照、覆盖和错误行为 |
 | [render_benchmark 参考](../examples/render_benchmark/README.md) | 光栅基准测试与可选上屏预览 |
 | [测试参考（English）](../tests/README.md) | Host 单元测试 |
 | [Mosaico 游戏开发 Skill 中文说明](skills/mosaico-game-development/SKILL.CN.md) | Agent 专用工作流 |
 
 双语正文统一使用 `.EN.md` 与 `.CN.md` 后缀；`README.md` 是语言选择入口，`SKILL.md` 是工具兼容入口。
 
-公共 API 为兼容现有游戏暂保留 `mosaico_*` 前缀，原因见[根 README 的版本说明](../README.CN.md#版本与许可)。单轮测量与迁移记录不放进正式指南；本地 `docs/debug/` 已被 Git 忽略。
+Engine 公共 API 已统一为 `raylib_lite_*` 命名；Raylib-shaped compatibility 位于 `compat/raylib/`。见[根 README 的版本说明](../README.CN.md#版本与许可)。单轮测量与迁移记录不放进正式指南；本地 `docs/debug/` 已被 Git 忽略。
