@@ -212,6 +212,31 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
             with self.subTest(path=game_manifest.relative_to(ENGINE)):
                 self.assertNotIn("esp_mmap_assets", game_manifest.read_text())
 
+    def test_result_numeric_abi_is_stable(self) -> None:
+        header = ENGINE / "include/raylib_lite/raylib_lite_result.h"
+        source = f'''#include "{header}"
+_Static_assert(RAYLIB_LITE_OK == 0, "result ABI");
+_Static_assert(RAYLIB_LITE_INVALID_ARGUMENT == 1, "result ABI");
+_Static_assert(RAYLIB_LITE_INVALID_STATE == 2, "result ABI");
+_Static_assert(RAYLIB_LITE_NOT_SUPPORTED == 3, "result ABI");
+_Static_assert(RAYLIB_LITE_NO_MEMORY == 4, "result ABI");
+_Static_assert(RAYLIB_LITE_NOT_READY == 5, "result ABI");
+_Static_assert(RAYLIB_LITE_BUSY == 6, "result ABI");
+_Static_assert(RAYLIB_LITE_TIMEOUT == 7, "result ABI");
+_Static_assert(RAYLIB_LITE_IO_ERROR == 8, "result ABI");
+_Static_assert(RAYLIB_LITE_PLATFORM_ERROR == 9, "result ABI");
+_Static_assert(RAYLIB_LITE_NOT_FOUND == 10, "result ABI extension");
+_Static_assert(RAYLIB_LITE_INVALID_SIZE == 11, "result ABI extension");
+_Static_assert(RAYLIB_LITE_INVALID_CRC == 12, "result ABI extension");
+_Static_assert(RAYLIB_LITE_INVALID_VERSION == 13, "result ABI extension");
+int main(void) {{ return 0; }}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            output = str(Path(directory) / "result-abi.o")
+            subprocess.run(["cc", "-std=c11", "-Wall", "-Werror", "-pedantic",
+                            "-x", "c", "-c", "-o", output, "-"],
+                           input=source, text=True, check=True)
+
     def test_neutral_public_headers_do_not_expose_esp_or_raylib_types(self) -> None:
         self.assertFalse((ENGINE / "include/raylib_lite/raylib_lite_compat.h").exists())
         forbidden = ("esp_err_t", "ESP_ERR_", '#include "raylib.h"',
