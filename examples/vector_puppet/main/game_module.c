@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "../../common/raylib_lite_game_module_contract.h"
+#include "raylib_lite_game_module_contract.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "../../common/raylib_lite_game_module_contract.h"
+#include "raylib_lite_game_module_contract.h"
 #include <stdio.h>
 #if defined(MOSAICO_GAME_ELF)
 #else

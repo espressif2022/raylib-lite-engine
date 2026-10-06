@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "../../common/raylib_lite_game_module_contract.h"
+#include "raylib_lite_game_module_contract.h"
 //
 // Host/native lifecycle and input adapter for Neon Rift Rally. The gameplay
 // model and renderer intentionally live in rally_game.[ch] and rally_view.[ch]
