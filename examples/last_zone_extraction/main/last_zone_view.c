@@ -954,10 +954,10 @@ static void load_material_frames(raylib_lite_atlas_t floor,raylib_lite_wall_atla
         RAYLIB_LITE_ASSET_ID_WALL_BRICK, RAYLIB_LITE_ASSET_ID_WALL_CONTAINER,
         RAYLIB_LITE_ASSET_ID_FLOOR_DIRT};
     for (int i = 0; i < 4; ++i) {
-        esp_err_t err=i==3?
-            raylib_lite_renderer_atlas_get_frame(floor,material_ids[i],&s_material_copies[i]):
-            raylib_lite_renderer_wall_atlas_get_frame(walls,material_ids[i],&s_material_copies[i]);
-        if (err == ESP_OK)
+        raylib_lite_result_t result=i==3?
+            raylib_lite_atlas_get_frame_copy(floor,material_ids[i],&s_material_copies[i]):
+            raylib_lite_wall_atlas_get_frame(walls,material_ids[i],&s_material_copies[i]);
+        if (result == RAYLIB_LITE_OK)
             s_material_frames[i] = &s_material_copies[i];
         else
             s_material_frames[i] = NULL;
