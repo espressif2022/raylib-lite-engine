@@ -67,7 +67,7 @@ static int default_load_background(void *context, living_worlds_atlases_t *atlas
 {
     (void)context;
 #if defined(MOSAICO_GAME_ELF)
-    raylib_lite_atlas_t photo = MosaicoJpegLoad(background_path(scene));
+    raylib_lite_atlas_t photo = raylib_lite_product_jpeg_load(background_path(scene));
     if (!photo.texture.id) return -1;
     clear_backgrounds(atlases);
     if (scene == LIVING_SCENE_AURORA) atlases->aurora = photo;
@@ -88,7 +88,7 @@ static void default_release_background(void *context, living_worlds_atlases_t *a
 {
     (void)context;
 #if defined(MOSAICO_GAME_ELF)
-    MosaicoJpegRelease();
+    raylib_lite_product_jpeg_release();
 #endif
     clear_backgrounds(atlases);
 }

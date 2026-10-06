@@ -26,7 +26,7 @@ static void motor_second(void *arg)
     (void)esp_timer_start_once(s_off_timer,(uint64_t)s_second_ms*1000ULL);
 }
 
-void mosaico_native_feedback_init(void)
+void raylib_lite_native_feedback_init(void)
 {
     if(raylib_lite_example_board_haptic_init()!=ESP_OK)return;
     (void)raylib_lite_example_board_haptic_set(0);
@@ -39,7 +39,7 @@ void mosaico_native_feedback_init(void)
     s_ready=true;
 }
 
-void mosaico_native_feedback_pulse(uint8_t strength,uint16_t duration_ms)
+void raylib_lite_native_feedback_pulse(uint8_t strength,uint16_t duration_ms)
 {
     if(!s_ready||!duration_ms||strength>100)return;
     if(s_second_timer)(void)esp_timer_stop(s_second_timer);
@@ -49,18 +49,18 @@ void mosaico_native_feedback_pulse(uint8_t strength,uint16_t duration_ms)
     (void)esp_timer_start_once(s_off_timer,(uint64_t)duration_ms*1000ULL);
 }
 
-void mosaico_native_feedback_pattern(uint8_t first_strength,uint16_t first_ms,
+void raylib_lite_native_feedback_pattern(uint8_t first_strength,uint16_t first_ms,
                                      uint8_t second_strength,uint16_t gap_ms,
                                      uint16_t second_ms)
 {
-    mosaico_native_feedback_pulse(first_strength,first_ms);
+    raylib_lite_native_feedback_pulse(first_strength,first_ms);
     if(!s_ready||!s_second_timer||!second_ms)return;
     s_second_strength=second_strength;s_second_ms=second_ms;
     (void)esp_timer_stop(s_second_timer);
     (void)esp_timer_start_once(s_second_timer,(uint64_t)(first_ms+gap_ms)*1000ULL);
 }
 
-void mosaico_native_feedback_stop(void)
+void raylib_lite_native_feedback_stop(void)
 {
     if(s_off_timer)(void)esp_timer_stop(s_off_timer);
     if(s_second_timer)(void)esp_timer_stop(s_second_timer);

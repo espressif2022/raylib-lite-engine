@@ -22,8 +22,8 @@ if(NOT EXISTS "${_raylib_lite_board_dir}/board.cmake")
         "${_raylib_lite_board_dir}/board.cmake")
 endif()
 
-include("${RAYLIB_LITE_ENGINE_ROOT}/cmake/raylib_lite_esp.cmake")
-mosaico_game_sdk_add_components(RAYLIB TILEMAP FX SAVE)
+list(APPEND EXTRA_COMPONENT_DIRS "${RAYLIB_LITE_ENGINE_ROOT}")
+list(REMOVE_DUPLICATES EXTRA_COMPONENT_DIRS)
 include("${_raylib_lite_board_dir}/board.cmake")
 
 if(NOT RAYLIB_LITE_BOARD_COMPONENT)

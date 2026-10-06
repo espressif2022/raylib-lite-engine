@@ -76,7 +76,7 @@ static int initialize(void *value
     tomb_reset(&state->game);
     clear_tracks(state);
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-    mosaico_native_feedback_init();
+    raylib_lite_native_feedback_init();
 #endif
 #if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(480,480,"Tomb Raycast");
@@ -90,7 +90,7 @@ static void shutdown(void *value)
     tomb_module_t *state=value;
     if(!state)return;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-    mosaico_native_feedback_stop();
+    raylib_lite_native_feedback_stop();
 #endif
     raylib_lite_wall_atlas_unload(state->textures);
     raylib_lite_atlas_unload(state->controls);
@@ -173,10 +173,10 @@ static void update(void *value)
     tomb_update(&state->game);
 #if defined(RAYLIB_LITE_GAME_NATIVE)
     if(was_grounded&&!state->game.grounded&&state->game.vertical_speed>0.0f)
-        mosaico_native_feedback_pulse(34,34);
+        raylib_lite_native_feedback_pulse(34,34);
     else if(!was_grounded&&state->game.grounded){
         const uint8_t strength=fall_speed<-3.0f?72:45;
-        mosaico_native_feedback_pattern(strength,42,(uint8_t)(strength/2),18,28);
+        raylib_lite_native_feedback_pattern(strength,42,(uint8_t)(strength/2),18,28);
     }
 #endif
 }
@@ -184,16 +184,11 @@ static void update(void *value)
 static int render(void *value)
 {
     tomb_module_t *state=value;
-#if defined(MOSAICO_GAME_ELF)
-    mosaico_runtime_performance_stats_v1_t stats={0};
-    float display_fps=MosaicoPerformanceGetStats(&stats)?stats.display_fps:0.0f;
-#else
     float display_fps=(float)GetFPS();
 #if defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_runtime_stats_t stats = {0};
     raylib_lite_runtime_stats_get(&stats);
     display_fps=stats.display_fps;
-#endif
 #endif
     tomb_hud_input_t input={
         .stick_active=state->joystick_track>=0,

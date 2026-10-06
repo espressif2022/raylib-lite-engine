@@ -36,10 +36,8 @@ typedef struct {
 #if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
     last_zone_feedback_t feedback;
 #endif
-#if !defined(MOSAICO_GAME_ELF)
     uint64_t fps_window_us;
     uint32_t fps_window_frames;
-#endif
 } last_zone_module_t;
 
 #define JOYSTICK_RADIUS 64
@@ -87,10 +85,10 @@ static void report_missing_asset(const char *path)
     raylib_lite_product_runtime->log->message(2, "last_zone_audio", message);
 }
 static const last_zone_feedback_backend_t s_feedback_backend = {
-    .init = MosaicoHapticInit,
-    .pulse = MosaicoHapticPulse,
-    .pattern = MosaicoHapticPattern,
-    .stop = MosaicoHapticStop,
+    .init = raylib_lite_product_haptic_init,
+    .pulse = raylib_lite_product_haptic_pulse,
+    .pattern = raylib_lite_product_haptic_pattern,
+    .stop = raylib_lite_product_haptic_stop,
     .missing_asset = report_missing_asset,
 };
 #else
@@ -99,10 +97,10 @@ static void report_missing_asset(const char *path)
     fprintf(stderr, "last_zone_audio: failed to load %s\n", path);
 }
 static const last_zone_feedback_backend_t s_feedback_backend = {
-    .init = mosaico_native_feedback_init,
-    .pulse = mosaico_native_feedback_pulse,
-    .pattern = mosaico_native_feedback_pattern,
-    .stop = mosaico_native_feedback_stop,
+    .init = raylib_lite_native_feedback_init,
+    .pulse = raylib_lite_native_feedback_pulse,
+    .pattern = raylib_lite_native_feedback_pattern,
+    .stop = raylib_lite_native_feedback_stop,
     .missing_asset = report_missing_asset,
 };
 #endif
@@ -343,33 +341,22 @@ static int render(void *value)
     uint64_t now = raylib_lite_time_us();
     float logic_fps = state->game.perf_logic_fps;
     float display_fps = state->game.perf_display_fps;
-#if defined(MOSAICO_GAME_ELF)
-    mosaico_runtime_performance_stats_v1_t stats = {0};
-    if (MosaicoPerformanceGetStats(&stats)) {
-        logic_fps = stats.logic_fps;
-        display_fps = stats.display_fps;
-    } else {
-        logic_fps = display_fps = 0.0f;
-    }
-#else
 #if defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_runtime_stats_t stats = {0};
     raylib_lite_runtime_stats_get(&stats);
     logic_fps = stats.logic_fps;
     display_fps = stats.display_fps;
 #else
-    uint64_t now_us = now;
-    if (!state->fps_window_us) state->fps_window_us = now_us;
+    if (!state->fps_window_us) state->fps_window_us = now;
     ++state->fps_window_frames;
-    uint64_t window_us = now_us - state->fps_window_us;
+    uint64_t window_us = now - state->fps_window_us;
     if (window_us >= 1000000ULL) {
         float fps = (float)state->fps_window_frames * 1000000.0f /
                     (float)window_us;
         logic_fps = display_fps = fps;
-        state->fps_window_us = now_us;
+        state->fps_window_us = now;
         state->fps_window_frames = 0;
     }
-#endif
 #endif
     last_zone_set_performance(&state->game, logic_fps, display_fps,
                               state->game.perf_render_ms);

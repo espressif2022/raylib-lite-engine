@@ -93,7 +93,7 @@ static const char *const SFX_PATHS[8] = {
 static void feedback_pulse(int strength, int duration_ms)
 {
 #if NEON_RIFT_HAPTICS_ENABLED
-    mosaico_native_feedback_pulse(strength, duration_ms);
+    raylib_lite_native_feedback_pulse(strength, duration_ms);
 #else
     (void)strength;
     (void)duration_ms;
@@ -105,7 +105,7 @@ static void feedback_pattern(int first_strength, int first_duration_ms,
                              int gap_ms)
 {
 #if NEON_RIFT_HAPTICS_ENABLED
-    mosaico_native_feedback_pattern(first_strength, first_duration_ms,
+    raylib_lite_native_feedback_pattern(first_strength, first_duration_ms,
                                     second_strength, second_duration_ms,
                                     gap_ms);
 #else
@@ -127,7 +127,7 @@ static void feedback_init(neon_rift_rally_module_t *state)
         PlayMusicStream(state->engine);
     }
 #if NEON_RIFT_HAPTICS_ENABLED
-    mosaico_native_feedback_init();
+    raylib_lite_native_feedback_init();
 #endif
 }
 
@@ -350,7 +350,7 @@ static void shutdown(void *value)
     }
 #if defined(RAYLIB_LITE_GAME_NATIVE)
 #if NEON_RIFT_HAPTICS_ENABLED
-    mosaico_native_feedback_stop();
+    raylib_lite_native_feedback_stop();
 #endif
     if (state && IsAudioDeviceReady()) {
         StopMusicStream(state->engine);
