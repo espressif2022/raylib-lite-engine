@@ -128,7 +128,7 @@ int raylib_lite_wall_benchmark(void){
   printf("WALLBENCH {\"case\":\"%s\",\"mode\":%d,\"fixed\":%d,\"bound\":%.6f,"
    "\"coverage_errors\":%llu,\"texel_errors\":%llu,\"max_texel_error\":%u,\"pixels\":%llu,"
    "\"uv_max\":%.9f,\"uv_sum\":%.9f,\"uv_samples\":%llu,\"segments\":%llu,\"uv_reciprocals\":%llu,\"hash\":%u,\"times_us\":[",
-   current->name,M2D_WALL_MODE,M2D_WALL_FIXED_PIXELS,(double)M2D_WALL_ERROR_TEXELS,
+   current->name,RAYLIB_LITE_WALL_MODE,RAYLIB_LITE_WALL_FIXED_PIXELS,(double)RAYLIB_LITE_WALL_ERROR_TEXELS,
    coverage,mismatch,max_texel,pixels,max_uv,sum_uv,uv_samples,segments,divides,(unsigned)hash);
   for(int w=0;w<2;++w)for(int f=0;f<FRAMES;++f)draw(atlas,f);
   for(int r=0;r<SAMPLES;++r){

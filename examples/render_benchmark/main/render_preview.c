@@ -119,12 +119,12 @@ void render_preview_draw(uint16_t *pixels,size_t stride,const render_preview_sta
  box(0,0,480,64,0x1126);text(16,12,state->scene<RENDER_PREVIEW_WALL_SCENES?"WALL PREVIEW":"CORE PREVIEW",3,0xffff);
  char line[80];
  const char *mode[]={"LEGACY","EXACT","FIXED","ADAPT"};
- snprintf(line,sizeof(line),"%s %.3f  %s",mode[M2D_WALL_MODE],(double)M2D_WALL_ERROR_TEXELS,render_preview_scene_name(state->scene));
+ snprintf(line,sizeof(line),"%s %.3f  %s",mode[RAYLIB_LITE_WALL_MODE],(double)RAYLIB_LITE_WALL_ERROR_TEXELS,render_preview_scene_name(state->scene));
  if(state->scene>=RENDER_PREVIEW_WALL_SCENES){
   snprintf(line,sizeof(line),"CASE %u  %s",state->scene-RENDER_PREVIEW_WALL_SCENES+1,render_preview_scene_name(state->scene));
   for(char *p=line;*p;++p){if(*p>='a'&&*p<='z')*p-=32;else if(*p=='_')*p=' ';}
  }
- if(state->scene<RENDER_PREVIEW_WALL_SCENES&&M2D_WALL_MODE==M2D_WALL_FIXED)snprintf(line,sizeof(line),"FIXED %d  %s",M2D_WALL_FIXED_PIXELS,render_preview_scene_name(state->scene));
+ if(state->scene<RENDER_PREVIEW_WALL_SCENES&&RAYLIB_LITE_WALL_MODE==RAYLIB_LITE_WALL_FIXED)snprintf(line,sizeof(line),"FIXED %d  %s",RAYLIB_LITE_WALL_FIXED_PIXELS,render_preview_scene_name(state->scene));
  text(16,40,line,2,0x9e7f);
  if(state->scene>=RENDER_PREVIEW_WALL_SCENES){core_page(state->scene,state->split);raylib_lite_renderer_set_target(pixels,stride,480,480);}
  else{

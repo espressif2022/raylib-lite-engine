@@ -87,7 +87,6 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
         self.assertFalse((ENGINE / "cmake/mosaico_game_example.cmake").exists())
 
     def test_esp_implementations_are_scoped_to_explicit_backends(self) -> None:
-        self.assertTrue((ENGINE / "cmake/raylib_lite_esp.cmake").is_file())
         forbidden_include = re.compile(
             r'#\s*include\s*[<"](?:esp_|freertos/|nvs|bsp/|driver/|sdkconfig)')
         for path in (ENGINE / "src").rglob("*"):
@@ -133,13 +132,11 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
 
         self.assertFalse((ENGINE / "components").exists())
 
-        helper = (ENGINE / "cmake/raylib_lite_esp.cmake").read_text(
+        self.assertFalse((ENGINE / "cmake/raylib_lite_esp.cmake").exists())
+        resolver = (ENGINE / "cmake/raylib_lite_native_project.cmake").read_text(
             encoding="utf-8")
-        self.assertIn('"${RAYLIB_LITE_ENGINE_ROOT}"', helper)
-        for old in ("mosaico_game_app", "mosaico_game_assets",
-                    "raylib_lite_renderer", "mosaico_raylib_fast",
-                    "raylib_lite_platform", "raylib_lite_runner"):
-            self.assertNotIn(f"components/${{{old}}}", helper)
+        self.assertIn('list(APPEND EXTRA_COMPONENT_DIRS "${RAYLIB_LITE_ENGINE_ROOT}")', resolver)
+        self.assertNotIn("mosaico_game_sdk_add_components", resolver)
 
         for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
             if cmake.parent.parent.name == "render_benchmark":
@@ -260,8 +257,9 @@ int main(void) {{ return 0; }}
 
     def test_wall_config_header_compiles_with_strict_c11(self) -> None:
         header = ENGINE / "include/raylib_lite/raylib_lite_wall_config.h"
-        source = f'''#include "{header}"
-int main(void) {{ return M2D_WALL_MODE; }}
+        source = f'''#define RAYLIB_LITE_WALL_FIXED_PIXELS 1024
+#include "{header}"
+int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
 '''
         with tempfile.TemporaryDirectory() as directory:
             output = str(Path(directory) / "wall-config.o")
@@ -339,8 +337,13 @@ int main(void) {{ return M2D_WALL_MODE; }}
                     self.assertFalse((main / f"{stem}_app{suffix}").exists())
                     self.assertFalse((main / f"{stem}_mosaico_app{suffix}").exists())
                 self.assertTrue((main / "game_module.c").is_file())
+        for directory in ("sewer_labyrinth", "vertical_dock"):
+            self.assertFalse((ENGINE / "examples" / directory / "elf").exists())
 
     def test_example_sources_do_not_include_device_sdks(self) -> None:
+        common_feedback = (ENGINE / "examples/common/native_feedback.h").read_text()
+        self.assertNotIn("mosaico_native_feedback_", common_feedback)
+
         forbidden = re.compile(
             r'#\s*include\s*[<"](?:esp_|freertos/|nvs|bsp/|driver/|sdkconfig|mmap_generate)')
         for main in (ENGINE / "examples").glob("*/main"):
@@ -389,6 +392,8 @@ int main(void) {{ return M2D_WALL_MODE; }}
                 self.assertNotIn("MOSAICO_HOST_", text)
                 self.assertNotIn("mosaico_game_module_v1_t", text)
                 self.assertNotIn("mosaico_runtime_v1_t", text)
+                for token in ("mosaico_runtime_", "MosaicoHaptic", "MosaicoPerformance", "MosaicoJpeg"):
+                    self.assertNotIn(token, text)
                 self.assertIn("raylib_lite_game_module_v1_t", text)
 
     def test_reference_examples_have_host_and_direct_entries(self) -> None:
@@ -453,9 +458,8 @@ int main(void) {{ return M2D_WALL_MODE; }}
                             "mosaico_board_platform", "raylib_lite_esp_add_port"):
             self.assertNotIn(board_token, resolver)
 
-        engine_helper = (ENGINE / "cmake/raylib_lite_esp.cmake").read_text()
-        self.assertNotIn("raylib_lite_esp_add_port", engine_helper)
-        self.assertNotIn("esp_mosaico", engine_helper)
+        self.assertFalse((ENGINE / "cmake/raylib_lite_esp.cmake").exists())
+        self.assertNotIn("mosaico_", resolver)
 
         for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
             if cmake.parent.parent.name == "render_benchmark":

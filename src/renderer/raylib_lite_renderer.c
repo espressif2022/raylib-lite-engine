@@ -20,8 +20,8 @@
 #endif
 #define M2D_MAX_TEXTURES CONFIG_RAYLIB_LITE_MAX_TEXTURES
 #define M2D_MAGIC 0x3141534dU
-#define M2D_WALL_MAGIC_COLUMN 0x3157534dU
-#define M2D_WALL_MAGIC_ROW 0x3257534dU
+#define RAYLIB_LITE_WALL_MAGIC_COLUMN 0x3157534dU
+#define RAYLIB_LITE_WALL_MAGIC_ROW 0x3257534dU
 #define M2D_ATLAS_BINARY_ALPHA (1U<<0)
 #define M2D_FRAME_CACHE_SIZE 16U
 typedef struct __attribute__((packed)){uint32_t magic;uint16_t width,height,frame_count,flags;uint32_t rgb_bytes,alpha_bytes;} atlas_header_t;
@@ -143,8 +143,8 @@ raylib_lite_wall_atlas_t raylib_lite_wall_atlas_load(const char *path)
     size_t lut_bytes = lut_entries * sizeof(uint16_t);
     uint64_t expected = (uint64_t)sizeof(*header) + frame_bytes +
                         lut_bytes + header->index_bytes;
-    if ((header->magic != M2D_WALL_MAGIC_COLUMN &&
-         header->magic != M2D_WALL_MAGIC_ROW) ||
+    if ((header->magic != RAYLIB_LITE_WALL_MAGIC_COLUMN &&
+         header->magic != RAYLIB_LITE_WALL_MAGIC_ROW) ||
             !header->width || !header->height || header->light_levels != 16 ||
             header->palette_entries != 256 ||
             header->index_bytes != (uint32_t)header->width * header->height ||
@@ -162,7 +162,7 @@ raylib_lite_wall_atlas_t raylib_lite_wall_atlas_load(const char *path)
         .height = header->height,
         .frame_count = header->frame_count,
         .light_levels = header->light_levels,
-        .row_major = header->magic == M2D_WALL_MAGIC_ROW,
+        .row_major = header->magic == RAYLIB_LITE_WALL_MAGIC_ROW,
     };
 }
 
@@ -915,7 +915,7 @@ static float persp_q_ratio(float a,float b)
 static bool persp_span_needed(float a,float b,float c,float d,int corners)
 {
  if(!(a>0.0f&&b>0.0f&&c>0.0f)||(corners==4&&!(d>0.0f)))return false;
- if(M2D_WALL_MODE!=M2D_WALL_LEGACY)return true;
+ if(RAYLIB_LITE_WALL_MODE!=RAYLIB_LITE_WALL_LEGACY)return true;
  float hi=a,lo=a;
  if(b>hi)hi=b;else if(b<lo)lo=b;
  if(c>hi)hi=c;else if(c<lo)lo=c;
@@ -992,12 +992,12 @@ static void fill_indexed_persp_span(const raylib_lite_wall_atlas_t *atlas,
   if(x==x0){us=u0;vs=v0;qs=q0;}
   else persp_uv_at(left,right,x,&us,&vs,&qs);
   int n;
-  if(M2D_WALL_MODE==M2D_WALL_EXACT)n=1;
-  else if(M2D_WALL_MODE==M2D_WALL_FIXED)
-   n=remain<M2D_WALL_FIXED_PIXELS?remain:M2D_WALL_FIXED_PIXELS;
-  else if(M2D_WALL_MODE==M2D_WALL_ERROR_BOUNDED)n=remain;
+  if(RAYLIB_LITE_WALL_MODE==RAYLIB_LITE_WALL_EXACT)n=1;
+  else if(RAYLIB_LITE_WALL_MODE==RAYLIB_LITE_WALL_FIXED)
+   n=remain<RAYLIB_LITE_WALL_FIXED_PIXELS?remain:RAYLIB_LITE_WALL_FIXED_PIXELS;
+  else if(RAYLIB_LITE_WALL_MODE==RAYLIB_LITE_WALL_ERROR_BOUNDED)n=remain;
   else n=persp_piece_length(qs,q1,remain);
-  if(M2D_WALL_MODE==M2D_WALL_ERROR_BOUNDED&&n>2){
+  if(RAYLIB_LITE_WALL_MODE==RAYLIB_LITE_WALL_ERROR_BOUNDED&&n>2){
    /* Rational chord error <= |delta_uv|*|delta_q|/(4*min(q)).
     * For a prefix t of the remaining span, delta_uv =
     * (uv1-uvs)*q1*t/q(t). Compare the cross-multiplied bound:
@@ -1008,7 +1008,7 @@ static void fill_indexed_persp_span(const raylib_lite_wall_atlas_t *atlas,
    while(n>2){
     float t=(float)(n-1)*inverse_length;
     float qn=qs+(q1-qs)*t;
-    float budget=M2D_WALL_ERROR_TEXELS-(float)n/65536.0f-0.0001f;
+    float budget=RAYLIB_LITE_WALL_ERROR_TEXELS-(float)n/65536.0f-0.0001f;
     if(delta*q1*t*fabsf(qn-qs)<=budget*4.0f*fminf(qs,qn)*qn)break;
     n=(n+1)/2;
    }
@@ -1205,9 +1205,9 @@ static void draw_indexed_quad_persp(const raylib_lite_wall_atlas_t *atlas,
  raylib_lite_textured_vertex_t p[4]={a,b,d,c};
  int top=0;
  float min_y=p[0].y,max_y=p[0].y,min_x=p[0].x,max_x=p[0].x;
- /* Screen-space coordinates are clipped to a 480x480 target. Float has ample
-  * precision for the degeneracy test and avoids software double arithmetic
-  * in every quad setup on embedded RISC-V targets. */
+ /* Screen-space coordinates are clipped to the active target bounds. Float
+  * has ample precision for the degeneracy test and avoids software double
+  * arithmetic in every quad setup on embedded RISC-V targets. */
  float area=0.0f;
  for(int i=0;i<4;++i){
   int j=(i+1)&3;
@@ -1581,7 +1581,7 @@ void raylib_lite_2d_copy_scanline(int src_y,int dst_y)
 /* Bounded stack workspace, no frame-time allocation. Process columns in input
  * order so overlapping batches retain painter ordering. Each block writes rows
  * horizontally and prepares clipping, light and exact rational sampling once. */
-#define M2D_WALL_BLOCK 64
+#define RAYLIB_LITE_WALL_BLOCK 64
 typedef struct {
  int x0,width,y0,y1,sx,source_y;
  unsigned light;
@@ -1594,13 +1594,13 @@ void raylib_lite_renderer_draw_raycast_walls(raylib_lite_renderer_texture_t text
  texture_slot_t *s=texture_slot(texture);
  if(column_count<=0)return;
  if(!s||!s_target||s->alpha||!columns){++s_rejected_draw_calls;return;}
- prepared_wall_t prepared[M2D_WALL_BLOCK];
+ prepared_wall_t prepared[RAYLIB_LITE_WALL_BLOCK];
  uint32_t drawn=0;
  bool any_rows=false;
  int atlas_w=s->header->width,atlas_h=s->header->height;
  for(int first=0;first<column_count;){
   int count=column_count-first;
-  if(count>M2D_WALL_BLOCK)count=M2D_WALL_BLOCK;
+  if(count>RAYLIB_LITE_WALL_BLOCK)count=RAYLIB_LITE_WALL_BLOCK;
   int used=0,y_min=s_clip_y1,y_max=s_clip_y0;
   for(int i=0;i<count;++i){
    const raylib_lite_raycast_wall_t *c=&columns[first+i];
@@ -1700,10 +1700,10 @@ void raylib_lite_2d_draw_indexed_raycast_walls(raylib_lite_wall_atlas_t atlas,
   s_raster_stats.column_pixels+=drawn;
   return;
  }
- prepared_wall_t prepared[M2D_WALL_BLOCK];
+ prepared_wall_t prepared[RAYLIB_LITE_WALL_BLOCK];
  for(int first=0;first<column_count;){
   int count=column_count-first;
-  if(count>M2D_WALL_BLOCK)count=M2D_WALL_BLOCK;
+  if(count>RAYLIB_LITE_WALL_BLOCK)count=RAYLIB_LITE_WALL_BLOCK;
   int used=0,y_min=s_clip_y1,y_max=s_clip_y0;
   for(int i=0;i<count;++i){
    const raylib_lite_raycast_wall_t *c=&columns[first+i];

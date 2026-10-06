@@ -3,16 +3,16 @@
 # consumers depend on the root component as `raylib-lite-engine`.
 get_filename_component(RAYLIB_LITE_ENGINE_ROOT "${CMAKE_CURRENT_LIST_DIR}" ABSOLUTE)
 
-set(M2D_WALL_MODE "0" CACHE STRING "0 legacy, 1 exact, 2 fixed, 3 error bounded")
-set(M2D_WALL_FIXED_PIXELS "16" CACHE STRING "Fixed perspective segment length")
-set(M2D_WALL_ERROR_TEXELS "0.25" CACHE STRING "Adaptive UV error budget")
-if(M2D_WALL_ERROR_TEXELS LESS_EQUAL 0 OR M2D_WALL_ERROR_TEXELS GREATER 1)
-    message(FATAL_ERROR "M2D_WALL_ERROR_TEXELS must be in (0,1]")
+set(RAYLIB_LITE_WALL_MODE "0" CACHE STRING "0 legacy, 1 exact, 2 fixed, 3 error bounded")
+set(RAYLIB_LITE_WALL_FIXED_PIXELS "16" CACHE STRING "Fixed perspective segment length")
+set(RAYLIB_LITE_WALL_ERROR_TEXELS "0.25" CACHE STRING "Adaptive UV error budget")
+if(RAYLIB_LITE_WALL_ERROR_TEXELS LESS_EQUAL 0 OR RAYLIB_LITE_WALL_ERROR_TEXELS GREATER 1)
+    message(FATAL_ERROR "RAYLIB_LITE_WALL_ERROR_TEXELS must be in (0,1]")
 endif()
-option(M2D_WALL_BENCHMARK "Run deterministic wall microbenchmark at raster benchmark entry" OFF)
-option(M2D_WALL_AUDIT "Audit wall UV (never use audit timings for acceptance)" OFF)
-if(M2D_WALL_AUDIT AND NOT M2D_WALL_BENCHMARK)
-    message(FATAL_ERROR "M2D_WALL_AUDIT requires M2D_WALL_BENCHMARK")
+option(RAYLIB_LITE_WALL_BENCHMARK "Run deterministic wall microbenchmark at raster benchmark entry" OFF)
+option(RAYLIB_LITE_WALL_AUDIT "Audit wall UV (never use audit timings for acceptance)" OFF)
+if(RAYLIB_LITE_WALL_AUDIT AND NOT RAYLIB_LITE_WALL_BENCHMARK)
+    message(FATAL_ERROR "RAYLIB_LITE_WALL_AUDIT requires RAYLIB_LITE_WALL_BENCHMARK")
 endif()
 
 set(_platform_sources "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/clock_esp.c")
@@ -42,7 +42,7 @@ if(IDF_TARGET STREQUAL "esp32s31")
     list(APPEND _renderer_sources
         "${RAYLIB_LITE_ENGINE_ROOT}/src/arch/esp32s31/raylib_lite_rgb565_pie.S")
 endif()
-if(M2D_WALL_BENCHMARK)
+if(RAYLIB_LITE_WALL_BENCHMARK)
     list(APPEND _renderer_sources
         "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_wall_bench.c")
 endif()
@@ -82,7 +82,7 @@ set(_renderer_c_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_rgb565.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_mtx2.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_raster_bench.c")
-if(M2D_WALL_BENCHMARK)
+if(RAYLIB_LITE_WALL_BENCHMARK)
     list(APPEND _renderer_c_sources
         "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_wall_bench.c")
 endif()
@@ -91,24 +91,24 @@ foreach(_source IN LISTS _renderer_c_sources)
         -O3 -funroll-loops
         "-include${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raster_esp_config.h")
     set_property(SOURCE "${_source}" APPEND PROPERTY COMPILE_DEFINITIONS
-        M2D_WALL_MODE=${M2D_WALL_MODE}
-        M2D_WALL_FIXED_PIXELS=${M2D_WALL_FIXED_PIXELS}
-        M2D_WALL_ERROR_TEXELS=${M2D_WALL_ERROR_TEXELS}f)
+        RAYLIB_LITE_WALL_MODE=${RAYLIB_LITE_WALL_MODE}
+        RAYLIB_LITE_WALL_FIXED_PIXELS=${RAYLIB_LITE_WALL_FIXED_PIXELS}
+        RAYLIB_LITE_WALL_ERROR_TEXELS=${RAYLIB_LITE_WALL_ERROR_TEXELS}f)
 endforeach()
 if(IDF_TARGET STREQUAL "esp32s31")
     set_property(SOURCE
         "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_rgb565.c"
         APPEND PROPERTY COMPILE_DEFINITIONS RAYLIB_LITE_RGB565_PIE=1)
 endif()
-if(M2D_WALL_BENCHMARK)
+if(RAYLIB_LITE_WALL_BENCHMARK)
     foreach(_source IN LISTS _renderer_c_sources)
         set_property(SOURCE "${_source}" APPEND PROPERTY COMPILE_DEFINITIONS
-            M2D_WALL_BENCHMARK=1)
+            RAYLIB_LITE_WALL_BENCHMARK=1)
     endforeach()
 endif()
-if(M2D_WALL_AUDIT)
+if(RAYLIB_LITE_WALL_AUDIT)
     foreach(_source IN LISTS _renderer_c_sources)
         set_property(SOURCE "${_source}" APPEND PROPERTY COMPILE_DEFINITIONS
-            M2D_WALL_AUDIT=1)
+            RAYLIB_LITE_WALL_AUDIT=1)
     endforeach()
 endif()

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "raylib_lite_2d.h"
-#if defined(M2D_WALL_BENCHMARK)
+#if defined(RAYLIB_LITE_WALL_BENCHMARK)
 #include "esp_log.h"
 int raylib_lite_wall_benchmark(void);
 void raylib_lite_renderer_run_benchmark(void)

@@ -189,12 +189,12 @@ def main():
         check_comparable(previous, probe)
     audits, timings = {}, {}
     for label, (mode, fixed, error) in VARIANTS.items():
-        defs = [f'-DM2D_WALL_MODE={mode}', f'-DM2D_WALL_FIXED_PIXELS={fixed}',
-                f'-DM2D_WALL_ERROR_TEXELS={error}f']
+        defs = [f'-DRAYLIB_LITE_WALL_MODE={mode}', f'-DRAYLIB_LITE_WALL_FIXED_PIXELS={fixed}',
+                f'-DRAYLIB_LITE_WALL_ERROR_TEXELS={error}f']
         timings[label] = {case: [] for case in CASES}
         for audit in (True, False):
             binary = out/(label+('-audit' if audit else '-timing'))
-            command = [compiler, *flags, *defs, *(['-DM2D_WALL_AUDIT=1'] if audit else []),
+            command = [compiler, *flags, *defs, *(['-DRAYLIB_LITE_WALL_AUDIT=1'] if audit else []),
                        *map(str, sources), '-lm', '-o', str(binary)]
             report['commands'].append(command);subprocess.run(command, check=True)
             report['binaries'][binary.name] = digest(binary.read_bytes())

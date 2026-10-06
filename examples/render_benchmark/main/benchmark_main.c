@@ -31,7 +31,7 @@ int render_core_benchmark(void);
 #define RUN_BENCHMARK render_core_benchmark
 #define SUITE "core"
 #endif
-#ifdef M2D_WALL_AUDIT
+#ifdef RAYLIB_LITE_WALL_AUDIT
 #define AUDIT 1
 #else
 #define AUDIT 0
@@ -52,7 +52,7 @@ static int run(void){
  printf("RENDERBENCH_BEGIN {\"schema\":\"render-example/v1\",\"suite\":\"%s\","
         "\"audit\":%d,\"mode\":%d,\"fixed\":%d,\"bound\":%.6f,\"pie\":%d,"
         "\"lut_storage\":\"%s\",\"workload_sha256\":\"%s\",\"display_active\":false}\n",
-        SUITE,AUDIT,M2D_WALL_MODE,M2D_WALL_FIXED_PIXELS,(double)M2D_WALL_ERROR_TEXELS,PIE,LUT,RENDER_BENCH_WORKLOAD_SHA256);
+        SUITE,AUDIT,RAYLIB_LITE_WALL_MODE,RAYLIB_LITE_WALL_FIXED_PIXELS,(double)RAYLIB_LITE_WALL_ERROR_TEXELS,PIE,LUT,RENDER_BENCH_WORKLOAD_SHA256);
 #ifdef ESP_PLATFORM
  esp_chip_info_t info;esp_chip_info(&info);
  const esp_app_desc_t *app=esp_app_get_description();
