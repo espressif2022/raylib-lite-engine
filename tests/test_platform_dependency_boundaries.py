@@ -346,8 +346,7 @@ int main(void) {{ return M2D_WALL_MODE; }}
         for main in (ENGINE / "examples").glob("*/main"):
             for path in main.iterdir():
                 if path.suffix in {".c", ".h"}:
-                    if path.name in {"main.c", "living_worlds_native.c",
-                                     "living_worlds_native.h"} or (
+                    if path.name == "main.c" or (
                             main.parent.name == "render_benchmark" and
                             path.name in ESP_BENCHMARK_SOURCES):
                         continue  # ESP-only entry and adapter, separate from gameplay.
@@ -425,10 +424,19 @@ int main(void) {{ return M2D_WALL_MODE; }}
                 self.assertIn("RAYLIB_LITE_GAME_NATIVE=1", cmake)
                 self.assertIn("raylib_lite_native_project.cmake", top)
 
-        living = ENGINE / "examples/living_worlds/main"
+        living_root = ENGINE / "examples/living_worlds"
+        living = living_root / "main"
         self.assertFalse((living / "main.c").exists())
         self.assertFalse((living / "living_worlds_native.c").exists())
-        self.assertTrue((living / "living_worlds_native_assets.c").is_file())
+        self.assertFalse((living / "living_worlds_native_assets.c").exists())
+        self.assertTrue((living / "living_worlds_native_assets.h").is_file())
+        self.assertIn('RAYLIB_LITE_BOARD_GAME_EXTENSION "living_worlds"',
+                      (living_root / "CMakeLists.txt").read_text())
+        self.assertIn("${RAYLIB_LITE_BOARD_GAME_COMPONENTS}",
+                      (living / "CMakeLists.txt").read_text())
+        extension = ENGINE / "examples/boards/esp-mosaico/extensions/living_worlds"
+        self.assertTrue((extension / "living_worlds_native_assets.c").is_file())
+        self.assertTrue((extension / "CMakeLists.txt").is_file())
 
     def test_native_examples_select_board_adapter(self) -> None:
         board = ENGINE / "examples/boards/esp-mosaico"
@@ -526,18 +534,21 @@ int main(void) {{ return M2D_WALL_MODE; }}
         for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
             with self.subTest(path=cmake.relative_to(ENGINE)):
                 self.assertIsNone(product.search(cmake.read_text()))
-        entries = {
-            "examples/common/native_module_main.c": ("raylib_lite_native_boot()",
-                                                     "raylib_lite_native_first_present()"),
-            "examples/living_worlds/main/main.c": ("raylib_lite_native_boot()",),
-            "examples/living_worlds/main/living_worlds_native.c": (
-                "raylib_lite_native_first_present()",),
-        }
-        for relative, calls in entries.items():
-            text = (ENGINE / relative).read_text()
-            for call in calls:
-                with self.subTest(path=relative, call=call):
-                    self.assertIn(call, text)
+        common = ENGINE / "examples/common/native_module_main.c"
+        text = common.read_text()
+        for call in ("raylib_lite_native_boot()", "raylib_lite_native_first_present()"):
+            with self.subTest(path=common.relative_to(ENGINE), call=call):
+                self.assertIn(call, text)
+
+        # Per-game Board extensions may provide assets/configuration, but must
+        # not own a second launcher or product lifecycle.
+        for root in (ENGINE / "examples/boards").glob("*/extensions/*"):
+            for path in root.glob("*.c"):
+                source = path.read_text(encoding="utf-8")
+                with self.subTest(path=path.relative_to(ENGINE)):
+                    for token in ("app_main(", "raylib_lite_native_boot()",
+                                  "raylib_lite_native_first_present()"):
+                        self.assertNotIn(token, source)
 
 
 if __name__ == "__main__":

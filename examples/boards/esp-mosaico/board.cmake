@@ -29,4 +29,21 @@ set(MOSAICO_BSP_COMPONENT_DIR "${MOSAICO_BSP_COMPONENT_DIR}" CACHE PATH
 list(APPEND EXTRA_COMPONENT_DIRS
     "${CMAKE_CURRENT_LIST_DIR}"
     "${MOSAICO_BSP_COMPONENT_DIR}")
+
+if(RAYLIB_LITE_BOARD_GAME_EXTENSION)
+    set(_raylib_lite_board_extension_dir
+        "${CMAKE_CURRENT_LIST_DIR}/extensions/${RAYLIB_LITE_BOARD_GAME_EXTENSION}")
+    if(NOT EXISTS "${_raylib_lite_board_extension_dir}/CMakeLists.txt")
+        message(FATAL_ERROR
+            "ESP-Mosaico has no Board extension for "
+            "RAYLIB_LITE_BOARD_GAME_EXTENSION='${RAYLIB_LITE_BOARD_GAME_EXTENSION}'")
+    endif()
+    list(APPEND EXTRA_COMPONENT_DIRS "${_raylib_lite_board_extension_dir}")
+    set(RAYLIB_LITE_BOARD_GAME_COMPONENTS
+        "${RAYLIB_LITE_BOARD_GAME_EXTENSION}" CACHE INTERNAL
+        "Selected Board-specific game extension components" FORCE)
+else()
+    set(RAYLIB_LITE_BOARD_GAME_COMPONENTS "" CACHE INTERNAL
+        "Selected Board-specific game extension components" FORCE)
+endif()
 list(REMOVE_DUPLICATES EXTRA_COMPONENT_DIRS)
