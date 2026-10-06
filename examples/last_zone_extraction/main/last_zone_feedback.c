@@ -37,36 +37,36 @@ static void pattern(const last_zone_feedback_t *feedback,
 static void play(const last_zone_feedback_t *feedback, unsigned sound)
 {
     if (feedback->sounds[sound].frameCount)
-        MosaicoAudioPlaySound(feedback->sounds[sound]);
+        raylib_lite_game_audio_play_sound(feedback->sounds[sound]);
 }
 
 static bool playing(const last_zone_feedback_t *feedback, unsigned sound)
 {
     return feedback->sounds[sound].frameCount &&
-           MosaicoAudioIsSoundPlaying(feedback->sounds[sound]);
+           raylib_lite_game_audio_is_sound_playing(feedback->sounds[sound]);
 }
 
 static void set_volume(const last_zone_feedback_t *feedback, unsigned sound,
                        float volume)
 {
     if (feedback->sounds[sound].frameCount)
-        MosaicoAudioSetSoundVolume(feedback->sounds[sound], volume);
+        raylib_lite_game_audio_set_sound_volume(feedback->sounds[sound], volume);
 }
 
 static void load_audio(last_zone_feedback_t *feedback)
 {
-    if (feedback->load_attempted || !MosaicoAudioReady()) return;
+    if (feedback->load_attempted || !raylib_lite_game_audio_ready()) return;
     feedback->load_attempted = true;
     for (unsigned i = 0; i < LAST_ZONE_SOUND_COUNT; ++i) {
-        feedback->sounds[i] = MosaicoAudioLoadSound(SOUND_PATHS[i]);
+        feedback->sounds[i] = raylib_lite_game_audio_load_sound(SOUND_PATHS[i]);
         if (!feedback->sounds[i].frameCount && feedback->backend &&
             feedback->backend->missing_asset)
             feedback->backend->missing_asset(SOUND_PATHS[i]);
     }
-    feedback->music = MosaicoAudioLoadMusic("music.sound");
+    feedback->music = raylib_lite_game_audio_load_music("music.sound");
     if (feedback->music.frameCount) {
-        MosaicoAudioSetMusicVolume(feedback->music, .10f);
-        MosaicoAudioPlayMusic(feedback->music);
+        raylib_lite_game_audio_set_music_volume(feedback->music, .10f);
+        raylib_lite_game_audio_play_music(feedback->music);
     } else if (feedback->backend && feedback->backend->missing_asset)
         feedback->backend->missing_asset("music.sound");
 }
@@ -87,7 +87,7 @@ void last_zone_feedback_init(last_zone_feedback_t *feedback,
 {
     *feedback = (last_zone_feedback_t){.backend = backend};
     last_zone_feedback_reset(feedback, game);
-    MosaicoAudioInit();
+    raylib_lite_game_audio_init();
     feedback->audio_initialized = true;
     if (backend && backend->init) backend->init();
     load_audio(feedback);
@@ -98,9 +98,9 @@ void last_zone_feedback_music(last_zone_feedback_t *feedback,
 {
     load_audio(feedback);
     if (!feedback->music.frameCount) return;
-    MosaicoAudioSetMusicVolume(feedback->music,
+    raylib_lite_game_audio_set_music_volume(feedback->music,
                                phase == LAST_ZONE_PHASE_PLAYING ? .14f : .10f);
-    MosaicoAudioUpdateMusic(feedback->music);
+    raylib_lite_game_audio_update_music(feedback->music);
 }
 
 static void combat_feedback(last_zone_feedback_t *feedback,
@@ -244,15 +244,15 @@ void last_zone_feedback_close(last_zone_feedback_t *feedback)
         feedback->backend->stop();
     if (!feedback->audio_initialized) return;
     if (feedback->music.frameCount) {
-        MosaicoAudioStopMusic(feedback->music);
-        MosaicoAudioUnloadMusic(feedback->music);
+        raylib_lite_game_audio_stop_music(feedback->music);
+        raylib_lite_game_audio_unload_music(feedback->music);
         feedback->music = (Music){0};
     }
     for (unsigned i = 0; i < LAST_ZONE_SOUND_COUNT; ++i) {
         if (!feedback->sounds[i].frameCount) continue;
-        MosaicoAudioUnloadSound(feedback->sounds[i]);
+        raylib_lite_game_audio_unload_sound(feedback->sounds[i]);
         feedback->sounds[i] = (Sound){0};
     }
-    MosaicoAudioClose();
+    raylib_lite_game_audio_close();
     feedback->audio_initialized = false;
 }

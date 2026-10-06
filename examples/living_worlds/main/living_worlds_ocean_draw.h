@@ -9,7 +9,7 @@ void living_ocean_draw(const living_ocean_t *ocean,float yaw,float pitch,
                            raylib_lite_atlas_t right_side,raylib_lite_atlas_t right_rear);
 
 /* Residual emit costs exclude raster loops, water mesh setup and jelly drawing.
- * Valid only with CONFIG_MOSAICO_GAME_RASTER_PROFILE; otherwise zero. */
+ * Valid only with CONFIG_RAYLIB_LITE_RASTER_PROFILE; otherwise zero. */
 typedef struct {
     uint32_t water_emit_us, reefs_emit_us, jelly_us;
 } living_ocean_draw_profile_t;

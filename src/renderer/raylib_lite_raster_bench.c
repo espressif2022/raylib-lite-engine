@@ -7,7 +7,7 @@ void raylib_lite_renderer_run_benchmark(void)
 {
     if(raylib_lite_wall_benchmark()!=0)ESP_LOGE("wall_bench","allocation failed; run invalid");
 }
-#elif CONFIG_MOSAICO_GAME_RASTER_BENCHMARK
+#elif CONFIG_RAYLIB_LITE_RASTER_BENCHMARK
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"

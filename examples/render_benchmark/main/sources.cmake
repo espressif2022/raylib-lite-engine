@@ -41,7 +41,7 @@ if(RENDER_BENCH_PIE)
         message(FATAL_ERROR "PIE requires ESP32-S31; host must stay scalar")
     endif()
     list(APPEND BENCH_SOURCES "${ENGINE_ROOT}/src/arch/esp32s31/raylib_lite_rgb565_pie.S")
-    list(APPEND BENCH_DEFINITIONS MOSAICO_RGB565_PIE=1)
+    list(APPEND BENCH_DEFINITIONS RAYLIB_LITE_RGB565_PIE=1)
 endif()
 
 if(RENDER_BENCH_DISPLAY)

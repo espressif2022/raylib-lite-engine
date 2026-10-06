@@ -4,7 +4,7 @@
 #include "esp_heap_caps.h"
 #include "raylib_lite_runtime_stats.h"
 
-/* mosaico_game_2d defines the strong version and logs the store shape of the
+/* raylib_lite_renderer defines the strong version and logs the store shape of the
    frame that just finished. Games built without RAYLIB or TILEMAP never link
    the rasteriser, and this weak stub keeps the debug line available to them
    without making the whole component depend on it. */

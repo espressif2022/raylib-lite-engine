@@ -36,7 +36,7 @@ int render_core_benchmark(void);
 #else
 #define AUDIT 0
 #endif
-#ifdef MOSAICO_RGB565_PIE
+#ifdef RAYLIB_LITE_RGB565_PIE
 #define PIE 1
 #else
 #define PIE 0

@@ -22,8 +22,8 @@
 typedef struct {
     platform_game_t game;
     raylib_lite_atlas_t atlas;
-    mosaico_particle_t particles[SKY_HOP_PARTICLE_COUNT];
-    mosaico_particle_pool_t pool;
+    raylib_lite_particle_t particles[SKY_HOP_PARTICLE_COUNT];
+    raylib_lite_particle_pool_t pool;
     sky_hop_overlay_t overlay;
     uint16_t best_score;
     bool paused;
@@ -58,7 +58,7 @@ static int initialize(void *value
     SetTargetFPS(30);
 #endif
     platform_game_reset(&state->game);
-    mosaico_particle_pool_init(&state->pool, state->particles, SKY_HOP_PARTICLE_COUNT);
+    raylib_lite_particle_pool_init(&state->pool, state->particles, SKY_HOP_PARTICLE_COUNT);
     sky_hop_overlay_sync(&state->overlay, state->game.phase);
     return 0;
 }
@@ -111,7 +111,7 @@ static void update(void *value)
         sky_hop_view_spawn_particles(&state->pool, state->game.player_x + 14,
             state->game.player_y + 12, (Color){255, 95, 80, 255}, 12);
     if (state->game.score > state->best_score) state->best_score = state->game.score;
-    mosaico_particle_pool_update(&state->pool);
+    raylib_lite_particle_pool_update(&state->pool);
     sky_hop_overlay_sync(&state->overlay, state->game.phase);
 }
 

@@ -27,7 +27,7 @@ static void raylib_lite_rgb565_shade_lut_ctor(void) __attribute__((constructor))
 static void raylib_lite_rgb565_shade_lut_ctor(void) { raylib_lite_rgb565_shade_lut_init(); }
 #endif
 
-#if defined(MOSAICO_RGB565_PIE)
+#if defined(RAYLIB_LITE_RGB565_PIE)
 void raylib_lite_rgb565_copy_pie(uint16_t *dst, const uint16_t *src, size_t count);
 void raylib_lite_rgb565_fill_pie(uint16_t *dst, uint16_t color, size_t count);
 #endif
@@ -37,7 +37,7 @@ void raylib_lite_rgb565_copy(uint16_t *dst, const uint16_t *src, size_t count)
     if (!dst || !src || count == 0) {
         return;
     }
-#if defined(MOSAICO_RGB565_PIE)
+#if defined(RAYLIB_LITE_RGB565_PIE)
     /* PIE is worth it from 16 pixels; 8-wide walls stay scalar. */
     if (count >= 16U) {
         size_t n = count & ~(size_t)7U;
@@ -57,7 +57,7 @@ void raylib_lite_rgb565_fill(uint16_t *dst, uint16_t color, size_t count)
     if (!dst || count == 0) {
         return;
     }
-#if defined(MOSAICO_RGB565_PIE)
+#if defined(RAYLIB_LITE_RGB565_PIE)
     if (count >= 16U) {
         size_t n = count & ~(size_t)7U;
         raylib_lite_rgb565_fill_pie(dst, color, n);

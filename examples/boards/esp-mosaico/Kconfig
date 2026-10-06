@@ -1,11 +1,11 @@
-menu "Mosaico Game Audio"
+menu "ESP-Mosaico Game Audio"
 
-config MOSAICO_GAME_AUDIO_CLIPS
+config ESP_MOSAICO_AUDIO_CLIPS
     int "Maximum loaded audio clips"
     range 4 64
     default 20
 
-config MOSAICO_GAME_AUDIO_VOICES
+config ESP_MOSAICO_AUDIO_VOICES
     int "Simultaneous sound-effect voices"
     range 1 16
     default 8

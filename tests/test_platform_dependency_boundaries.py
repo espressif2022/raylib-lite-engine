@@ -212,19 +212,25 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
             with self.subTest(path=game_manifest.relative_to(ENGINE)):
                 self.assertNotIn("esp_mmap_assets", game_manifest.read_text())
 
-    def test_error_compatibility_header_compiles_without_sdk(self) -> None:
-        header = ENGINE / "include/raylib_lite/raylib_lite_compat.h"
-        source = f'''#include "{header}"
-_Static_assert(sizeof(esp_err_t) == sizeof(int), "legacy ABI");
-_Static_assert(ESP_OK == 0 && ESP_ERR_INVALID_ARG == 0x102, "error ABI");
-_Static_assert(ESP_ERR_INVALID_CRC == 0x109, "save ABI");
-int main(void) {{ return ESP_OK; }}
-'''
-        with tempfile.TemporaryDirectory() as directory:
-            output = str(Path(directory) / "compat.o")
-            subprocess.run(["cc", "-std=c11", "-Wall", "-Werror", "-x", "c",
-                            "-c", "-o", output, "-"], input=source,
-                           text=True, check=True)
+    def test_neutral_public_headers_do_not_expose_esp_or_raylib_types(self) -> None:
+        self.assertFalse((ENGINE / "include/raylib_lite/raylib_lite_compat.h").exists())
+        forbidden = ("esp_err_t", "ESP_ERR_", '#include "raylib.h"',
+                     "Texture2D", "Rectangle", "Vector2", "Color")
+        for header in (ENGINE / "include/raylib_lite").glob("*.h"):
+            source = header.read_text(encoding="utf-8")
+            with self.subTest(path=header.relative_to(ENGINE)):
+                for token in forbidden:
+                    self.assertNotIn(token, source)
+
+    def test_engine_namespace_is_neutral(self) -> None:
+        for root_name in ("include", "src", "compat"):
+            for path in (ENGINE / root_name).rglob("*"):
+                if not path.is_file() or path.suffix not in {".c", ".h", ".S"}:
+                    continue
+                source = path.read_text(encoding="utf-8")
+                with self.subTest(path=path.relative_to(ENGINE)):
+                    self.assertNotIn("mosaico_", source)
+                    self.assertNotIn("Mosaico", source)
 
     def test_wall_config_header_compiles_with_strict_c11(self) -> None:
         header = ENGINE / "include/raylib_lite/raylib_lite_wall_config.h"
@@ -238,7 +244,7 @@ int main(void) {{ return M2D_WALL_MODE; }}
                            input=source, text=True, check=True)
 
     def test_raylib_name_compatibility_is_explicit(self) -> None:
-        fast = (ENGINE / "include/raylib_lite/raylib_lite_raylib_impl.h").read_text()
+        fast = (ENGINE / "compat/raylib/include/raylib_lite_raylib_impl.h").read_text()
         compat = (ENGINE / "compat/raylib/include/raylib_lite_raylib.h").read_text()
         for macro in ("InitWindow", "BeginDrawing", "DrawRectangle",
                       "DrawTexture", "DrawText"):
@@ -256,7 +262,7 @@ int main(void) {{ return M2D_WALL_MODE; }}
                     self.assertNotIn('#include "raylib_lite_raylib_impl.h"', source)
 
         for relative in ("src/runtime/raylib_lite_game_app.c",
-                         "src/ui/mosaico_game_ui.c"):
+                         "src/ui/raylib_lite_ui.c"):
             source = (ENGINE / relative).read_text(encoding="utf-8")
             self.assertNotIn('#include "raylib_lite_raylib.h"', source)
 
@@ -264,7 +270,7 @@ int main(void) {{ return M2D_WALL_MODE; }}
         renderer = ENGINE / "src/renderer"
         core = (renderer / "raylib_lite_renderer.c").read_text(encoding="utf-8")
         neutral = (ENGINE / "include/raylib_lite/raylib_lite_renderer.h").read_text(encoding="utf-8")
-        legacy = (ENGINE / "include/raylib_lite/raylib_lite_2d.h").read_text(encoding="utf-8")
+        legacy = (ENGINE / "compat/raylib/include/raylib_lite_2d.h").read_text(encoding="utf-8")
         adapter = (renderer / "raylib_lite_renderer_raylib.c").read_text(encoding="utf-8")
         cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
 
@@ -278,7 +284,7 @@ int main(void) {{ return M2D_WALL_MODE; }}
         self.assertIn("to_renderer_texture", adapter)
         self.assertIn("raylib_lite_renderer_raylib.c", cmake)
         self.assertIn("REQUIRES raylib", cmake)
-        legacy_header = (ENGINE / "include/raylib_lite/raylib_lite_2d.h").read_text(
+        legacy_header = (ENGINE / "compat/raylib/include/raylib_lite_2d.h").read_text(
             encoding="utf-8")
         for hot in ("raylib_lite_2d_draw_texture_pro", "raylib_lite_2d_draw_textured_triangle",
                     "raylib_lite_2d_draw_textured_quad", "raylib_lite_2d_draw_column",
@@ -382,6 +388,8 @@ int main(void) {{ return M2D_WALL_MODE; }}
         self.assertIn("src/audio/raylib_lite_audio_mixer.c", cmake)
 
         board_cmake = (ENGINE / "examples/boards/esp-mosaico/CMakeLists.txt").read_text()
+        self.assertIn("game_audio.c", board_cmake)
+        self.assertNotIn("mosaico_game_audio.c", board_cmake)
         self.assertIn("raylib-lite-engine", board_cmake)
         board_requires = re.search(r"REQUIRES\s+([^)]*)", board_cmake, re.S)
         self.assertIsNotNone(board_requires)
@@ -392,7 +400,7 @@ int main(void) {{ return M2D_WALL_MODE; }}
         users = set()
         for path in (ENGINE / "examples").glob("*/main/*"):
             if path.is_file() and path.suffix in {".c", ".h"} and \
-                    '#include "mosaico_game_audio.h"' in path.read_text(errors="ignore"):
+                    '#include "raylib_lite_game_audio.h"' in path.read_text(errors="ignore"):
                 users.add(path.parent)
         self.assertTrue(users)
         for main in users:

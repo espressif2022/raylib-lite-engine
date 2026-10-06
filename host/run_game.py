@@ -187,7 +187,7 @@ class GenericHostRuntime:
             ENGINE_ROOT / "src/renderer/raylib_lite_renderer_raylib.c",
             ENGINE_ROOT / "src/renderer/raylib_lite_rgb565.c",
             ENGINE_ROOT / "src/renderer/raylib_lite_raylib_impl.c",
-            ENGINE_ROOT / "src/fx/mosaico_game_fx.c",
+            ENGINE_ROOT / "src/fx/raylib_lite_fx.c",
             ENGINE_ROOT / "src/renderer/raylib_lite_tilemap.c",
         ]
         includes = [ENGINE_ROOT / "host/include", ENGINE_ROOT / "host",

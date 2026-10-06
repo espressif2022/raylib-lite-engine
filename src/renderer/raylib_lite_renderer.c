@@ -6,8 +6,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
-#ifndef CONFIG_MOSAICO_GAME_MAX_TEXTURES
-#define CONFIG_MOSAICO_GAME_MAX_TEXTURES 12
+#ifndef CONFIG_RAYLIB_LITE_MAX_TEXTURES
+#define CONFIG_RAYLIB_LITE_MAX_TEXTURES 12
 #endif
 #include "raylib_lite_raster_config.h"
 #define M2D_HOT RAYLIB_LITE_RASTER_HOT
@@ -18,7 +18,7 @@
 #define PROFILE_START(name) ((void)0)
 #define PROFILE_ADD(field,name) ((void)0)
 #endif
-#define M2D_MAX_TEXTURES CONFIG_MOSAICO_GAME_MAX_TEXTURES
+#define M2D_MAX_TEXTURES CONFIG_RAYLIB_LITE_MAX_TEXTURES
 #define M2D_MAGIC 0x3141534dU
 #define M2D_WALL_MAGIC_COLUMN 0x3157534dU
 #define M2D_WALL_MAGIC_ROW 0x3257534dU

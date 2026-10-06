@@ -61,24 +61,24 @@ void sky_hop_overlay_sync(sky_hop_overlay_t *overlay, platform_phase_t phase)
     if (want && !overlay->shown) {
         overlay->shown = true;
         overlay->y = -190.0f;
-        mosaico_tween_start(&overlay->tween, -190.0f, 120.0f, 12, MOSAICO_EASE_OUT);
+        raylib_lite_tween_start(&overlay->tween, -190.0f, 120.0f, 12, RAYLIB_LITE_EASE_OUT);
     } else if (!want && overlay->shown) {
         overlay->shown = false;
         overlay->y = -190.0f;
         overlay->tween.active = false;
     }
     if (overlay->shown && overlay->tween.active)
-        overlay->y = mosaico_tween_tick(&overlay->tween);
+        overlay->y = raylib_lite_tween_tick(&overlay->tween);
 }
 
-void sky_hop_view_spawn_particles(mosaico_particle_pool_t *pool, float x, float y,
+void sky_hop_view_spawn_particles(raylib_lite_particle_pool_t *pool, float x, float y,
                                   Color color, unsigned count)
 {
     static const float vx[] = {-2.4f, -1.6f, -.8f, .8f, 1.6f, 2.4f};
     for (unsigned i = 0; i < count; ++i) {
         uint32_t packed = (uint32_t)color.r | ((uint32_t)color.g << 8) |
             ((uint32_t)color.b << 16) | ((uint32_t)color.a << 24);
-        (void)mosaico_particle_spawn(pool, (mosaico_particle_t){
+        (void)raylib_lite_particle_spawn(pool, (raylib_lite_particle_t){
             x, y, vx[i % 6], -2.8f - (float)(i % 3), .22f, packed,
             (uint16_t)(18 + i % 8), true});
     }
@@ -174,7 +174,7 @@ bool sky_hop_view_render(const sky_hop_view_t *view)
         draw_sprite(view->atlas, RAYLIB_LITE_ASSET_ID_FINISH_FLAG_NATIVE, finish_x - 12, 292,
                     70, 98, false);
     for (size_t i = 0; i < view->particle_count; ++i) {
-        const mosaico_particle_t *particle = &view->particles[i];
+        const raylib_lite_particle_t *particle = &view->particles[i];
         if (!particle->active) continue;
         const uint32_t packed = particle->color;
         const Color color = {(uint8_t)packed, (uint8_t)(packed >> 8),

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "mosaico_game_audio.h"
+#include "raylib_lite_game_audio.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -109,13 +109,13 @@ static void tickets_destroy_all(void)
     }
 }
 
-void MosaicoAudioInit(void)
+void raylib_lite_game_audio_init(void)
 {
     if (s_service) return;
     if (platform_esp_audio_service_create(&s_service) != RAYLIB_LITE_OK) return;
     raylib_lite_audio_mixer_config_t config = {
-        .max_clips = CONFIG_MOSAICO_GAME_AUDIO_CLIPS,
-        .max_sfx_voices = CONFIG_MOSAICO_GAME_AUDIO_VOICES,
+        .max_clips = CONFIG_ESP_MOSAICO_AUDIO_CLIPS,
+        .max_sfx_voices = CONFIG_ESP_MOSAICO_AUDIO_VOICES,
         .assets = {.open = asset_open, .close = asset_close},
         .sync = {
             .context = s_service,
@@ -135,7 +135,7 @@ void MosaicoAudioInit(void)
     raylib_lite_audio_mixer_set_master_volume(s_mixer, s_master_volume);
 }
 
-void MosaicoAudioClose(void)
+void raylib_lite_game_audio_close(void)
 {
     if (!s_service) return;
     if (platform_esp_audio_service_stop(s_service, AUDIO_STOP_TIMEOUT_MS) !=
@@ -147,12 +147,12 @@ void MosaicoAudioClose(void)
     s_service = NULL;
 }
 
-bool MosaicoAudioReady(void)
+bool raylib_lite_game_audio_ready(void)
 {
     return platform_esp_audio_service_ready(s_service);
 }
 
-Sound MosaicoAudioLoadSound(const char *path)
+Sound raylib_lite_game_audio_load_sound(const char *path)
 {
     raylib_lite_audio_clip_t clip = RAYLIB_LITE_AUDIO_CLIP_INVALID;
     if (!s_mixer || raylib_lite_audio_mixer_load(s_mixer, path, &clip) !=
@@ -173,7 +173,7 @@ Sound MosaicoAudioLoadSound(const char *path)
     };
 }
 
-void MosaicoAudioUnloadSound(Sound sound)
+void raylib_lite_game_audio_unload_sound(Sound sound)
 {
     audio_ticket_t *ticket = sound_ticket(sound);
     if (!ticket) return;
@@ -181,33 +181,33 @@ void MosaicoAudioUnloadSound(Sound sound)
     ticket->active = false;
 }
 
-void MosaicoAudioPlaySound(Sound sound)
+void raylib_lite_game_audio_play_sound(Sound sound)
 {
     audio_ticket_t *ticket = sound_ticket(sound);
     if (ticket) (void)raylib_lite_audio_mixer_play_sound(s_mixer, ticket->clip);
 }
 
-void MosaicoAudioStopSound(Sound sound)
+void raylib_lite_game_audio_stop_sound(Sound sound)
 {
     audio_ticket_t *ticket = sound_ticket(sound);
     if (ticket) (void)raylib_lite_audio_mixer_stop_sound(s_mixer, ticket->clip);
 }
 
-bool MosaicoAudioIsSoundPlaying(Sound sound)
+bool raylib_lite_game_audio_is_sound_playing(Sound sound)
 {
     audio_ticket_t *ticket = sound_ticket(sound);
     return ticket && raylib_lite_audio_mixer_is_sound_playing(
                          s_mixer, ticket->clip);
 }
 
-void MosaicoAudioSetSoundVolume(Sound sound, float volume)
+void raylib_lite_game_audio_set_sound_volume(Sound sound, float volume)
 {
     audio_ticket_t *ticket = sound_ticket(sound);
     if (ticket) (void)raylib_lite_audio_mixer_set_sound_volume(
         s_mixer, ticket->clip, volume);
 }
 
-Music MosaicoAudioLoadMusic(const char *path)
+Music raylib_lite_game_audio_load_music(const char *path)
 {
     raylib_lite_audio_clip_t clip = RAYLIB_LITE_AUDIO_CLIP_INVALID;
     if (!s_mixer || raylib_lite_audio_mixer_load(s_mixer, path, &clip) !=
@@ -230,7 +230,7 @@ Music MosaicoAudioLoadMusic(const char *path)
     };
 }
 
-void MosaicoAudioUnloadMusic(Music music)
+void raylib_lite_game_audio_unload_music(Music music)
 {
     audio_ticket_t *ticket = music_ticket(music);
     if (!ticket) return;
@@ -238,30 +238,30 @@ void MosaicoAudioUnloadMusic(Music music)
     ticket->active = false;
 }
 
-void MosaicoAudioPlayMusic(Music music)
+void raylib_lite_game_audio_play_music(Music music)
 {
     audio_ticket_t *ticket = music_ticket(music);
     if (ticket) (void)raylib_lite_audio_mixer_play_music(s_mixer, ticket->clip);
 }
 
-void MosaicoAudioUpdateMusic(Music music)
+void raylib_lite_game_audio_update_music(Music music)
 {
     (void)music;
 }
 
-void MosaicoAudioStopMusic(Music music)
+void raylib_lite_game_audio_stop_music(Music music)
 {
     (void)music;
     raylib_lite_audio_mixer_stop_music(s_mixer);
 }
 
-void MosaicoAudioSetMusicVolume(Music music, float volume)
+void raylib_lite_game_audio_set_music_volume(Music music, float volume)
 {
     (void)music;
     raylib_lite_audio_mixer_set_music_volume(s_mixer, volume);
 }
 
-void MosaicoAudioSetMasterVolume(float volume)
+void raylib_lite_game_audio_set_master_volume(float volume)
 {
     if (volume < 0.0f) volume = 0.0f;
     if (volume > 1.0f) volume = 1.0f;
@@ -269,7 +269,7 @@ void MosaicoAudioSetMasterVolume(float volume)
     if (s_mixer) raylib_lite_audio_mixer_set_master_volume(s_mixer, volume);
 }
 
-void MosaicoAudioGetStats(mosaico_audio_stats_t *stats)
+void raylib_lite_game_audio_get_stats(raylib_lite_game_audio_stats_t *stats)
 {
     if (!stats) return;
     memset(stats, 0, sizeof(*stats));

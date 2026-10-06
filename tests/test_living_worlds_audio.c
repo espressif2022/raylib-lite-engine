@@ -7,10 +7,10 @@ static bool ready;
 static unsigned inits, closes, loads, unloads, plays, stops, updates, volumes;
 static unsigned last_play, last_stop, last_update;
 
-void MosaicoAudioInit(void) { ++inits; }
-void MosaicoAudioClose(void) { ++closes; }
-bool MosaicoAudioReady(void) { return ready; }
-Music MosaicoAudioLoadMusic(const char *path)
+void raylib_lite_game_audio_init(void) { ++inits; }
+void raylib_lite_game_audio_close(void) { ++closes; }
+bool raylib_lite_game_audio_ready(void) { return ready; }
+Music raylib_lite_game_audio_load_music(const char *path)
 {
     for (unsigned i = 0; i < SCENE_AUDIO_COUNT; ++i) {
         if (strcmp(path, SCENE_AUDIO_PATHS[i]) == 0) {
@@ -21,11 +21,11 @@ Music MosaicoAudioLoadMusic(const char *path)
     assert(false);
     return (Music){0};
 }
-void MosaicoAudioUnloadMusic(Music music) { assert(music.frameCount); ++unloads; }
-void MosaicoAudioPlayMusic(Music music) { ++plays; last_play = music.id; }
-void MosaicoAudioUpdateMusic(Music music) { ++updates; last_update = music.id; }
-void MosaicoAudioStopMusic(Music music) { ++stops; last_stop = music.id; }
-void MosaicoAudioSetMusicVolume(Music music, float volume)
+void raylib_lite_game_audio_unload_music(Music music) { assert(music.frameCount); ++unloads; }
+void raylib_lite_game_audio_play_music(Music music) { ++plays; last_play = music.id; }
+void raylib_lite_game_audio_update_music(Music music) { ++updates; last_update = music.id; }
+void raylib_lite_game_audio_stop_music(Music music) { ++stops; last_stop = music.id; }
+void raylib_lite_game_audio_set_music_volume(Music music, float volume)
 {
     assert(music.frameCount && volume > 0.64f && volume < 0.66f);
     ++volumes;

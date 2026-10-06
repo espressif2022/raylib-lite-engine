@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "raylib_lite_compat.h"
 #include "raylib_lite_assets.h"
 #include "raylib_lite_result.h"
 

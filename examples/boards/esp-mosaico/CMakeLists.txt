@@ -4,7 +4,7 @@ idf_component_register(
     SRCS
         "board.c"
         "mosaico_strip_present.c"
-        "mosaico_game_audio.c"
+        "game_audio.c"
         "platform_esp_audio.c"
         "platform_audio_write_all.c"
     PRIV_INCLUDE_DIRS

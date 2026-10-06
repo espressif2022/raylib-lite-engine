@@ -12,7 +12,7 @@
 #include "mosaico_game_module.h"
 #include "raylib_lite_raylib.h"
 #if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
-#include "mosaico_game_audio.h"
+#include "raylib_lite_raylib_audio.h"
 #endif
 #if defined(MOSAICO_GAME_ELF)
 #include "mosaico_runtime_v1.h"

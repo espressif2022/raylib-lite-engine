@@ -18,7 +18,7 @@
 #include "rally_game.h"
 #include "rally_view.h"
 #if defined(MOSAICO_GAME_NATIVE)
-#include "mosaico_game_audio.h"
+#include "raylib_lite_raylib_audio.h"
 #include "raylib_lite_save.h"
 #include "native_feedback.h"
 #include "raylib_lite_clock.h"

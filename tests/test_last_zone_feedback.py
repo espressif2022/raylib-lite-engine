@@ -15,25 +15,25 @@ class LastZoneFeedbackTests(unittest.TestCase):
         self.assertIsNotNone(compiler)
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
-            (temporary / "mosaico_game_audio.h").write_text(
+            (temporary / "raylib_lite_game_audio.h").write_text(
                 """#pragma once
 #include <stdbool.h>
 typedef struct { unsigned frameCount; unsigned id; } Sound;
 typedef struct { unsigned frameCount; unsigned id; } Music;
-void MosaicoAudioInit(void);
-void MosaicoAudioClose(void);
-bool MosaicoAudioReady(void);
-Sound MosaicoAudioLoadSound(const char *path);
-void MosaicoAudioUnloadSound(Sound sound);
-void MosaicoAudioPlaySound(Sound sound);
-bool MosaicoAudioIsSoundPlaying(Sound sound);
-void MosaicoAudioSetSoundVolume(Sound sound, float volume);
-Music MosaicoAudioLoadMusic(const char *path);
-void MosaicoAudioUnloadMusic(Music music);
-void MosaicoAudioPlayMusic(Music music);
-void MosaicoAudioUpdateMusic(Music music);
-void MosaicoAudioStopMusic(Music music);
-void MosaicoAudioSetMusicVolume(Music music, float volume);
+void raylib_lite_game_audio_init(void);
+void raylib_lite_game_audio_close(void);
+bool raylib_lite_game_audio_ready(void);
+Sound raylib_lite_game_audio_load_sound(const char *path);
+void raylib_lite_game_audio_unload_sound(Sound sound);
+void raylib_lite_game_audio_play_sound(Sound sound);
+bool raylib_lite_game_audio_is_sound_playing(Sound sound);
+void raylib_lite_game_audio_set_sound_volume(Sound sound, float volume);
+Music raylib_lite_game_audio_load_music(const char *path);
+void raylib_lite_game_audio_unload_music(Music music);
+void raylib_lite_game_audio_play_music(Music music);
+void raylib_lite_game_audio_update_music(Music music);
+void raylib_lite_game_audio_stop_music(Music music);
+void raylib_lite_game_audio_set_music_volume(Music music, float volume);
 """, encoding="utf-8")
             executable = temporary / "last_zone_feedback_test"
             subprocess.run([

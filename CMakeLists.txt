@@ -51,9 +51,9 @@ set(_raylib_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_raylib_impl.c")
 set(_feature_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_tilemap.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/scene/mosaico_game_scene.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/ui/mosaico_game_ui.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/fx/mosaico_game_fx.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/scene/raylib_lite_scene.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/ui/raylib_lite_ui.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/fx/raylib_lite_fx.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/save/raylib_lite_save.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/raylib_lite_save_nvs.c")
 
@@ -73,7 +73,7 @@ idf_component_register(
                   nvs_flash log)
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC
-    MOSAICO_GAME_DEFAULT_FPS=${CONFIG_MOSAICO_GAME_DEFAULT_FPS})
+    RAYLIB_LITE_DEFAULT_FPS=${CONFIG_RAYLIB_LITE_DEFAULT_FPS})
 
 set(_renderer_c_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer.c"
@@ -98,7 +98,7 @@ endforeach()
 if(IDF_TARGET STREQUAL "esp32s31")
     set_property(SOURCE
         "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_rgb565.c"
-        APPEND PROPERTY COMPILE_DEFINITIONS MOSAICO_RGB565_PIE=1)
+        APPEND PROPERTY COMPILE_DEFINITIONS RAYLIB_LITE_RGB565_PIE=1)
 endif()
 if(M2D_WALL_BENCHMARK)
     foreach(_source IN LISTS _renderer_c_sources)

@@ -26,16 +26,16 @@ static raylib_lite_result_t s_last_acquire = RAYLIB_LITE_NOT_READY;
 static raylib_lite_result_t s_last_present = RAYLIB_LITE_NOT_READY;
 static bool s_scissor_active;
 static int s_scissor_x0, s_scissor_y0, s_scissor_x1, s_scissor_y1;
-#define MOSAICO_FAST_KEY_COUNT 512
-#define MOSAICO_FAST_POINTER_COUNT 2
+#define RAYLIB_LITE_RAYLIB_KEY_COUNT 512
+#define RAYLIB_LITE_RAYLIB_POINTER_COUNT 2
 typedef struct {
     int track_id, x, y;
     bool active, pressed, released;
 } fast_pointer_t;
-static bool s_key_down[MOSAICO_FAST_KEY_COUNT];
-static bool s_key_pressed[MOSAICO_FAST_KEY_COUNT];
-static bool s_key_released[MOSAICO_FAST_KEY_COUNT];
-static fast_pointer_t s_pointers[MOSAICO_FAST_POINTER_COUNT];
+static bool s_key_down[RAYLIB_LITE_RAYLIB_KEY_COUNT];
+static bool s_key_pressed[RAYLIB_LITE_RAYLIB_KEY_COUNT];
+static bool s_key_released[RAYLIB_LITE_RAYLIB_KEY_COUNT];
+static fast_pointer_t s_pointers[RAYLIB_LITE_RAYLIB_POINTER_COUNT];
 static Vector2 s_imu_xy;
 static float s_imu_z;
 
@@ -194,7 +194,7 @@ double raylib_lite_raylib_get_time(void)
 int raylib_lite_raylib_get_fps(void) { return s_target_fps; }
 
 static bool valid_key(int key)
-{ return key >= 0 && key < MOSAICO_FAST_KEY_COUNT; }
+{ return key >= 0 && key < RAYLIB_LITE_RAYLIB_KEY_COUNT; }
 
 void raylib_lite_raylib_inject_key(int key, bool pressed)
 {
@@ -216,9 +216,9 @@ void raylib_lite_raylib_inject_action(int action, bool pressed)
 void raylib_lite_raylib_inject_pointer(int track_id, int x, int y, bool pressed)
 {
     fast_pointer_t *slot = NULL;
-    for (int i = 0; i < MOSAICO_FAST_POINTER_COUNT; ++i)
+    for (int i = 0; i < RAYLIB_LITE_RAYLIB_POINTER_COUNT; ++i)
         if (s_pointers[i].active && s_pointers[i].track_id == track_id) slot = &s_pointers[i];
-    if (!slot && pressed) for (int i = 0; i < MOSAICO_FAST_POINTER_COUNT; ++i)
+    if (!slot && pressed) for (int i = 0; i < RAYLIB_LITE_RAYLIB_POINTER_COUNT; ++i)
         if (!s_pointers[i].active) { slot = &s_pointers[i]; break; }
     if (!slot) return;
     slot->track_id = track_id; slot->x = x; slot->y = y;
@@ -249,12 +249,12 @@ Vector2 raylib_lite_raylib_get_mouse_position(void)
 int raylib_lite_raylib_get_touch_point_count(void)
 {
     int count = 0;
-    for (int i = 0; i < MOSAICO_FAST_POINTER_COUNT; ++i) count += s_pointers[i].active;
+    for (int i = 0; i < RAYLIB_LITE_RAYLIB_POINTER_COUNT; ++i) count += s_pointers[i].active;
     return count;
 }
 static fast_pointer_t *active_pointer(int index)
 {
-    for (int i = 0; i < MOSAICO_FAST_POINTER_COUNT; ++i)
+    for (int i = 0; i < RAYLIB_LITE_RAYLIB_POINTER_COUNT; ++i)
         if (s_pointers[i].active && index-- == 0) return &s_pointers[i];
     return NULL;
 }
@@ -310,7 +310,7 @@ void raylib_lite_raylib_consume_input_edges(void)
 {
     memset(s_key_pressed, 0, sizeof(s_key_pressed));
     memset(s_key_released, 0, sizeof(s_key_released));
-    for (int i = 0; i < MOSAICO_FAST_POINTER_COUNT; ++i) {
+    for (int i = 0; i < RAYLIB_LITE_RAYLIB_POINTER_COUNT; ++i) {
         s_pointers[i].pressed = false;
         s_pointers[i].released = false;
     }

@@ -429,11 +429,11 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
             if(jelly_band<0)jelly_band=0;
             if(jelly_band>7)jelly_band=7;
             if(jelly_band==band){
-#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+#if CONFIG_RAYLIB_LITE_RASTER_PROFILE
                 uint32_t jelly_start=ocean_now_us();
 #endif
                 draw_ocean_jelly(camera,&ocean->jellies[i],t);
-#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+#if CONFIG_RAYLIB_LITE_RASTER_PROFILE
                 draw_profile.jelly_us+=ocean_now_us()-jelly_start;
 #endif
             }
@@ -650,14 +650,14 @@ void living_ocean_draw(const living_ocean_t *ocean,float yaw,float pitch,
     int jellies=effects_level==0?3:ocean->jelly_count;
     uint32_t cover_us=ocean_now_us()-phase_start;
     memset(&draw_profile,0,sizeof draw_profile);
-#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+#if CONFIG_RAYLIB_LITE_RASTER_PROFILE
     raylib_lite_renderer_raster_stats_t before_water,after_water,after_reefs;
     raylib_lite_renderer_get_raster_stats(&before_water);
 #endif
     phase_start=ocean_now_us();
     draw_ocean_water(ocean,&camera,water,jellies,t);
     uint32_t water_us=ocean_now_us()-phase_start;
-#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+#if CONFIG_RAYLIB_LITE_RASTER_PROFILE
     raylib_lite_renderer_get_raster_stats(&after_water);
     uint32_t accounted=water_setup_us+draw_profile.jelly_us+
         after_water.triangle_raster_us-before_water.triangle_raster_us;
@@ -667,7 +667,7 @@ void living_ocean_draw(const living_ocean_t *ocean,float yaw,float pitch,
     /* The reefs frame the canyon as the closest foreground layer. */
     draw_ocean_reefs(&camera,yaw,left_front,left_side,left_rear,right_front,right_side,right_rear);
     uint32_t reefs_us=ocean_now_us()-phase_start;
-#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+#if CONFIG_RAYLIB_LITE_RASTER_PROFILE
     raylib_lite_renderer_get_raster_stats(&after_reefs);
     accounted=after_reefs.triangle_raster_us-after_water.triangle_raster_us;
     draw_profile.reefs_emit_us=reefs_us>accounted?reefs_us-accounted:0;

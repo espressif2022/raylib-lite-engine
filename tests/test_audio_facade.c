@@ -2,7 +2,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include "mosaico_game_audio.h"
+#include "raylib_lite_raylib_audio.h"
 #include "raylib_lite_assets.h"
 #include "platform_esp_audio.h"
 
@@ -83,7 +83,7 @@ int main(void)
     put32(sound_file + 16, 0);
     put16(sound_file + 20, 1000);
     put16(sound_file + 22, 2000);
-    MosaicoAudioInit();
+    raylib_lite_game_audio_init();
     assert(IsAudioDeviceReady());
     Sound old = LoadSound("one");
     Sound stale = old;
