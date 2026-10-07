@@ -20,7 +20,8 @@ typedef struct {
 
 raylib_lite_tilemap_t raylib_lite_tilemap_load(const char *asset_path);
 void raylib_lite_tilemap_draw_layer(raylib_lite_tilemap_t map,
-    uint32_t layer_id, raylib_lite_renderer_rect_t viewport);
+    uint32_t layer_id, raylib_lite_renderer_rect_t viewport,
+    raylib_lite_renderer_vec2_t origin);
 bool raylib_lite_tilemap_is_blocked(raylib_lite_tilemap_t map,
     int tile_x, int tile_y);
 bool raylib_lite_tilemap_find_object(raylib_lite_tilemap_t map,

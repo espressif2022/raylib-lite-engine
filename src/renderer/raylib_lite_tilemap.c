@@ -39,11 +39,20 @@ raylib_lite_tilemap_t raylib_lite_tilemap_load(const char *path)
         return NULL;
     }
     const map_header_t *header = (const map_header_t *)asset.data;
-    size_t need = sizeof(*header) + header->layer_bytes +
-                  header->collision_bytes +
-                  (size_t)header->objects * sizeof(map_object_t) +
-                  (size_t)header->points * 4U;
-    if (header->magic != MTM_MAGIC || need > asset.size || header->points > 32) {
+    uint64_t cells = (uint64_t)header->width * header->height;
+    uint64_t expected_layer_bytes =
+        cells * header->layers * sizeof(uint16_t);
+    uint64_t expected_collision_bytes = (cells + 7U) / 8U;
+    uint64_t need = sizeof(*header) + expected_layer_bytes +
+                    expected_collision_bytes +
+                    (uint64_t)header->objects * sizeof(map_object_t) +
+                    (uint64_t)header->points * 4U;
+    if (header->magic != MTM_MAGIC || !header->width || !header->height ||
+            !header->tile_width || !header->tile_height || !header->layers ||
+            header->points > 32 ||
+            header->layer_bytes != expected_layer_bytes ||
+            header->collision_bytes != expected_collision_bytes ||
+            need > asset.size) {
         raylib_lite_asset_release(&asset);
         return NULL;
     }
@@ -87,7 +96,8 @@ raylib_lite_tilemap_t raylib_lite_tilemap_load(const char *path)
 }
 
 void raylib_lite_tilemap_draw_layer(raylib_lite_tilemap_t map,
-    uint32_t layer, raylib_lite_renderer_rect_t viewport)
+    uint32_t layer, raylib_lite_renderer_rect_t viewport,
+    raylib_lite_renderer_vec2_t origin)
 {
     if (!map || !map->used || layer >= map->header->layers) return;
     int x0 = (int)viewport.x / map->header->tile_width;
@@ -106,8 +116,9 @@ void raylib_lite_tilemap_draw_layer(raylib_lite_tilemap_t map,
         raylib_lite_renderer_draw_tile_row(map->atlas.texture,
             &tiles[(size_t)y * map->header->width + x0],
             (size_t)(x1 - x0), map->header->tile_width,
-            map->header->tile_height, x0 * map->header->tile_width,
-            69 + y * map->header->tile_height);
+            map->header->tile_height,
+            (int)origin.x + x0 * map->header->tile_width,
+            (int)origin.y + y * map->header->tile_height);
     }
 }
 

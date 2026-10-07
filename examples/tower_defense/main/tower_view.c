@@ -248,7 +248,8 @@ void tower_view_render(const tower_view_t *view)
     }
     ClearBackground(C_GRASS);
     raylib_lite_tilemap_draw_layer(view->map, 0,
-        (raylib_lite_renderer_rect_t){0, 0, 480, 320});
+        (raylib_lite_renderer_rect_t){0, 0, 480, 320},
+        (raylib_lite_renderer_vec2_t){0, 69});
     draw_core(view);
     for (size_t i = 0; i < TOWER_PAD_COUNT; ++i) draw_pad(view, &game->towers[i]);
     for (size_t i = 0; i < TOWER_MAX_ENEMIES; ++i)
