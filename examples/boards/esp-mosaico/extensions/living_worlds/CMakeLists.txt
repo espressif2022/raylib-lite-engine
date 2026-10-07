@@ -1,7 +1,10 @@
-get_filename_component(RAYLIB_LITE_ENGINE_ROOT
-    "${CMAKE_CURRENT_LIST_DIR}/../../../../.." ABSOLUTE)
-set(_living_worlds_root "${RAYLIB_LITE_ENGINE_ROOT}/examples/living_worlds")
-set(_living_worlds_main "${_living_worlds_root}/main")
+idf_component_get_property(RAYLIB_LITE_ENGINE_ROOT
+    raylib-lite-engine COMPONENT_DIR)
+idf_component_get_property(_living_worlds_main main COMPONENT_DIR)
+if(NOT _living_worlds_main)
+    message(FATAL_ERROR "Living Worlds Board extension could not resolve the main component")
+endif()
+get_filename_component(_living_worlds_root "${_living_worlds_main}/.." ABSOLUTE)
 set(_asset_source "${_living_worlds_root}/assets_src")
 set(_asset_output "${CMAKE_CURRENT_BINARY_DIR}/living_worlds_assets")
 
@@ -9,8 +12,7 @@ idf_component_register(
     SRCS "living_worlds_native_assets.c"
     PRIV_INCLUDE_DIRS
         "${_living_worlds_main}"
-        "${RAYLIB_LITE_ENGINE_ROOT}/examples/common"
-    REQUIRES raylib-lite-engine esp_driver_jpeg log)
+    REQUIRES esp-mosaico esp_driver_jpeg log)
 
 set(_volume_atlases
     sunrise_cliff_front sunrise_cliff_side sunrise_cliff_rear

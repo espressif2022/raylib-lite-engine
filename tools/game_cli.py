@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -29,7 +30,8 @@ def available_boards() -> list[str]:
     if not root.is_dir():
         return []
     return [path.name for path in sorted(root.iterdir())
-            if path.is_dir() and (path / "board.cmake").is_file()]
+            if path.is_dir() and (path / "CMakeLists.txt").is_file()
+            and (path / "idf_component.yml").is_file()]
 
 
 def _inside_any(value: str, *roots: Path) -> Path:
@@ -162,9 +164,25 @@ def engine_games() -> list[dict[str, object]]:
             except json.JSONDecodeError:
                 host = False
         top = project / "CMakeLists.txt"
-        native = ((project / "main/CMakeLists.txt").is_file() and top.is_file() and
-                  "raylib_lite_native_project.cmake" in top.read_text(encoding="utf-8"))
-        game_boards = boards.copy() if native else []
+        main_cmake = project / "main/CMakeLists.txt"
+        component_manifest = project / "main/idf_component.yml"
+        component_source = (component_manifest.read_text(encoding="utf-8")
+                            if component_manifest.is_file() else "")
+        top_source = top.read_text(encoding="utf-8") if top.is_file() else ""
+        main_source = main_cmake.read_text(encoding="utf-8") if main_cmake.is_file() else ""
+        native = (main_cmake.is_file() and top.is_file() and
+                  "espressif2022/raylib-lite-engine" in component_source and
+                  "raylib_lite_example_project.cmake" in top_source and
+                  "${RAYLIB_LITE_BOARD}" in main_source)
+        game_boards: list[str] = []
+        if native:
+            extension_required = re.search(
+                rf"\bREQUIRES\b[^)]*\b{re.escape(project.name)}\b", main_source) is not None
+            for board in boards:
+                extension = (ENGINE_ROOT / "examples/boards" / board /
+                             "extensions" / project.name / "CMakeLists.txt")
+                if not extension_required or extension.is_file():
+                    game_boards.append(board)
         if host or game_boards:
             games.append({"name": project.name, "path": str(project),
                           "host": host, "boards": game_boards})

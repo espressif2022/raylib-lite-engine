@@ -134,11 +134,11 @@ static void look_at(vector_puppet_state_t *state, int x, int y, bool active)
                         (y - (NECK_Y - 100)) / 180.0f, active);
 }
 
-static void input(void *value, const raylib_lite_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     vector_puppet_state_t *state = value;
     if (!state || !event) return;
-    if (event->type == RAYLIB_LITE_HOST_INPUT_POINTER &&
+    if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER &&
             event->track_id >= 0 && event->track_id < 2) {
         int track = event->track_id;
         state->idle_ticks = 0;
@@ -208,7 +208,7 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
             else if (!state->pointer_moved)
                 play_next(state);
         }
-    } else if (event->type == RAYLIB_LITE_HOST_INPUT_ACTION &&
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION &&
                event->code >= 0 && event->code < PUPPET_ACTION_COUNT - 1) {
         /* Hosts repeat held actions every tick; only the press edge plays. */
         uint32_t bit = 1u << event->code;
@@ -218,12 +218,12 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
         if (!event->pressed || was_held) return;
         state->idle_ticks = 0;
         puppet_rig_play(&state->rig, event->code + 1);
-    } else if (event->type == RAYLIB_LITE_HOST_INPUT_IMU) {
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_IMU) {
         puppet_rig_set_tilt(&state->rig, event->value_x * 1.5f);
-    } else if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL) {
-        if (event->code == RAYLIB_LITE_HOST_CONTROL_RESET) reset(state);
-        else if (event->code == RAYLIB_LITE_HOST_CONTROL_PAUSE) state->paused = true;
-        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESUME) state->paused = false;
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_GAME_CONTROL_RESET) reset(state);
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) state->paused = true;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESUME) state->paused = false;
     }
 }
 

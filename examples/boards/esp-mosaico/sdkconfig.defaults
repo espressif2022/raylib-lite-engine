@@ -14,9 +14,10 @@ CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../boards/esp-mosaico/partitions.csv"
 CONFIG_BOOTLOADER_APP_ROLLBACK_CONFIRM_BY_APP=y
 
 # ESP-Mosaico normal applications always expose the Iris USB management plane.
-# Device provisioning and application updates are Recovery-first; the normal
-# application never owns the OTA writer. Its TinyUSB CDC endpoint stays
-# protocol-only while retained Recovery performs USB installation into ota_0.
+# Recovery/OTA/health/system-inventory behavior comes from the pinned upstream
+# esp_mosaico_app_recovery component. Health is accepted explicitly after the
+# first presented Game frame; this integration does not enable its optional
+# auto-accept Kconfig path. Retained Recovery performs USB installation into ota_0.
 CONFIG_ESP_CONSOLE_UART_DEFAULT=y
 # CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG is not set
 CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

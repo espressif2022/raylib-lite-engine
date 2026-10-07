@@ -1,29 +1,24 @@
-get_filename_component(RAYLIB_LITE_ENGINE_ROOT
-    "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 idf_component_register(
     SRCS
         "board.c"
-        "esp_mosaico_iris.c"
+        "iris_display_input.c"
         "mosaico_strip_present.c"
         "game_audio.c"
         "platform_esp_audio.c"
         "platform_audio_write_all.c"
+    INCLUDE_DIRS
+        "../../common"
     PRIV_INCLUDE_DIRS
         "."
-        "${RAYLIB_LITE_ENGINE_ROOT}/examples/common"
     REQUIRES
         raylib-lite-engine
         esp_display_present
         esp-mosaico-bsp
         esp_iris
-        app_update
-        esp_app_format
-        esp_partition
+        esp_mosaico_app_recovery
         esp_system
         heap
-        mbedtls
         nvs_flash
-        spi_flash
         esp_timer
         esp_driver_dma
     PRIV_REQUIRES freertos)

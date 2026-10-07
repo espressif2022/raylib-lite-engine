@@ -66,22 +66,22 @@ static void shutdown(void *value)
     raylib_lite_atlas_unload(state->atlas);
 }
 
-static void input(void *value, const raylib_lite_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     tower_module_state_t *state = value;
     if (!state || !event) return;
-    if (event->type == RAYLIB_LITE_HOST_INPUT_POINTER)
+    if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER)
         tower_game_set_pointer(&state->game, (float)event->x, (float)event->y, event->pressed);
-    else if (event->type == RAYLIB_LITE_HOST_INPUT_ACTION)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION)
         tower_game_set_pointer(&state->game, 240, 220, event->pressed);
-    else if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL &&
-             event->code == RAYLIB_LITE_HOST_CONTROL_RESET)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_RESET)
         tower_game_reset(&state->game, 0x544f5745U);
-    else if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL &&
-             event->code == RAYLIB_LITE_HOST_CONTROL_PAUSE)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE)
         state->paused = true;
-    else if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL &&
-             event->code == RAYLIB_LITE_HOST_CONTROL_RESUME)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_RESUME)
         state->paused = false;
 }
 

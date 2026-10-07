@@ -127,33 +127,54 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
 
     def test_single_engine_component_registration(self) -> None:
         root_cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
+        root_manifest = (ENGINE / "idf_component.yml").read_text(encoding="utf-8")
         self.assertEqual(root_cmake.count("idf_component_register("), 1)
-        self.assertTrue((ENGINE / "idf_component.yml").is_file())
         self.assertTrue((ENGINE / "Kconfig").is_file())
-
         self.assertFalse((ENGINE / "components").exists())
+        self.assertFalse((ENGINE / "cmake").exists())
+        self.assertTrue((ENGINE / "tools/cmake/raylib_lite_native_assets.cmake").is_file())
+        self.assertFalse((ENGINE / "support/native").exists())
+        self.assertNotIn("support/native", root_manifest)
 
-        self.assertFalse((ENGINE / "cmake/raylib_lite_esp.cmake").exists())
-        resolver = (ENGINE / "cmake/raylib_lite_native_project.cmake").read_text(
-            encoding="utf-8")
-        self.assertIn('list(APPEND EXTRA_COMPONENT_DIRS "${RAYLIB_LITE_ENGINE_ROOT}")', resolver)
-        self.assertNotIn("mosaico_game_sdk_add_components", resolver)
+        for token in (
+            'version: "0.1.0"',
+            "description:",
+            "license: Apache-2.0",
+            "repository: https://github.com/espressif2022/raylib-lite-engine.git",
+        ):
+            self.assertIn(token, root_manifest)
 
         for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
             if cmake.parent.parent.name == "render_benchmark":
                 continue
             source = cmake.read_text(encoding="utf-8")
+            manifest = cmake.parent / "idf_component.yml"
+            top = cmake.parent.parent / "CMakeLists.txt"
             with self.subTest(path=cmake.relative_to(ENGINE)):
-                match = re.search(r"REQUIRES\s+([^)]*)", source, re.S)
-                self.assertIsNotNone(match)
-                requirements = match.group(1).split()
-                self.assertIn("raylib-lite-engine", requirements)
-                for old in ("mosaico_game", "mosaico_game_app",
-                            "mosaico_game_assets", "mosaico_game_audio",
-                            "raylib_lite_renderer", "mosaico_raylib_fast",
-                            "mosaico_raylib_port", "raylib_lite_platform",
-                            "raylib_lite_runner"):
-                    self.assertNotIn(old, requirements)
+                self.assertTrue(manifest.is_file())
+                manifest_source = manifest.read_text(encoding="utf-8")
+                self.assertIn("espressif2022/raylib-lite-engine:", manifest_source)
+                self.assertIn('version: "^0.1.0"', manifest_source)
+                self.assertIn("override_path: ../../..", manifest_source)
+                self.assertNotIn("esp-mosaico:", manifest_source)
+                self.assertNotIn("../../boards/", manifest_source)
+                self.assertNotIn("georgik/raylib", manifest_source)
+                if "raylib_lite_native_assets.cmake" in source:
+                    self.assertIn("idf_component_get_property(RAYLIB_LITE_ENGINE_ROOT", source)
+                    self.assertIn("raylib-lite-engine COMPONENT_DIR", source)
+                self.assertNotIn("support/native", source)
+                self.assertIn("RAYLIB_LITE_EXAMPLE_COMMON_DIR", source)
+                self.assertIn("../../common", source)
+                self.assertIn("native_module_main.c", source)
+                self.assertNotRegex(source, r"REQUIRES[^)]*raylib-lite-engine")
+                top_source = top.read_text(encoding="utf-8")
+                self.assertNotIn("raylib_lite_native_project.cmake", top_source)
+                self.assertIn("../common/raylib_lite_example_project.cmake", top_source)
+                self.assertNotIn("../../cmake/", top_source)
+                self.assertIn("${RAYLIB_LITE_BOARD}", source)
+                self.assertNotIn("${RAYLIB_LITE_ENGINE_ROOT}/cmake/raylib_lite_native_assets.cmake", source)
+                if "raylib_lite_native_assets.cmake" in source:
+                    self.assertIn("${RAYLIB_LITE_ENGINE_ROOT}/tools/cmake/raylib_lite_native_assets.cmake", source)
 
     def test_legacy_runtime_wrapper_has_been_removed(self) -> None:
         self.assertFalse((ENGINE / "src/runtime/mosaico_game.c").exists())
@@ -342,26 +363,31 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
             self.assertFalse((ENGINE / "examples" / directory / "elf").exists())
 
     def test_example_sources_do_not_include_device_sdks(self) -> None:
-        common_feedback = (ENGINE / "examples/common/native_feedback.h").read_text()
-        self.assertNotIn("mosaico_native_feedback_", common_feedback)
+        feedback = (ENGINE / "examples/common/native_feedback.h").read_text()
+        self.assertNotIn("mosaico_native_feedback_", feedback)
 
         forbidden = re.compile(
             r'#\s*include\s*[<"](?:esp_|freertos/|nvs|bsp/|driver/|sdkconfig|mmap_generate)')
         for main in (ENGINE / "examples").glob("*/main"):
-            for path in main.iterdir():
-                if path.suffix in {".c", ".h"}:
-                    if path.name == "main.c" or (
+            for source_path in main.iterdir():
+                if source_path.suffix in {".c", ".h"}:
+                    if source_path.name == "main.c" or (
                             main.parent.name == "render_benchmark" and
-                            path.name in ESP_BENCHMARK_SOURCES):
-                        continue  # ESP-only entry and adapter, separate from gameplay.
-                    with self.subTest(path=path.relative_to(ENGINE)):
-                        self.assertIsNone(forbidden.search(path.read_text()))
+                            source_path.name in ESP_BENCHMARK_SOURCES):
+                        continue
+                    with self.subTest(path=source_path.relative_to(ENGINE)):
+                        self.assertIsNone(forbidden.search(source_path.read_text()))
 
     def test_host_contract_namespace_and_v1_values_are_stable(self) -> None:
         host = ENGINE / "host"
         self.assertFalse((host / "include/mosaico_host_game.h").exists())
         self.assertFalse((host / "include/mosaico_game_module.h").exists())
         self.assertFalse((host / "include/mosaico_game.h").exists())
+        self.assertTrue((host / "include/raylib_lite_host_game.h").is_file())
+        self.assertFalse((host / "include/raylib_lite_game_module.h").exists())
+        self.assertFalse((ENGINE / "include/raylib_lite/raylib_lite_host_game.h").exists())
+        self.assertFalse((ENGINE / "include/raylib_lite/raylib_lite_game_module.h").exists())
+        self.assertTrue((ENGINE / "examples/common/raylib_lite_game_module.h").is_file())
         header = (host / "include/raylib_lite_host_game.h").read_text()
         for token in ("mosaico_host_", "MOSAICO_HOST_"):
             self.assertNotIn(token, header)
@@ -372,17 +398,22 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn("RAYLIB_LITE_HOST_INPUT_IMU = 4", header)
         self.assertIn("RAYLIB_LITE_HOST_CONTROL_PAUSE = 1", header)
 
-        for path in host.rglob("*"):
-            if not path.is_file() or path.suffix not in {".c", ".h", ".py"}:
+        for source_path in host.rglob("*"):
+            if not source_path.is_file() or source_path.suffix not in {".c", ".h", ".py"}:
                 continue
-            source = path.read_text(encoding="utf-8")
-            with self.subTest(path=path.relative_to(ENGINE)):
+            source = source_path.read_text(encoding="utf-8")
+            with self.subTest(path=source_path.relative_to(ENGINE)):
                 self.assertNotIn("mosaico_host_", source)
                 self.assertNotIn("MOSAICO_HOST_", source)
 
     def test_product_runtime_abi_mapping_is_isolated_to_example_bridge(self) -> None:
+        self.assertFalse((ENGINE / "support/native").exists())
         bridge = ENGINE / "examples/common/raylib_lite_game_module_contract.h"
+        module_header = ENGINE / "examples/common/raylib_lite_game_module.h"
         source = bridge.read_text(encoding="utf-8")
+        module_source = module_header.read_text(encoding="utf-8")
+        self.assertNotIn("raylib_lite_host_", module_source)
+        self.assertNotIn("RAYLIB_LITE_HOST_", module_source)
         self.assertIn("#if defined(MOSAICO_GAME_ELF)", source)
         self.assertIn('#include "mosaico_runtime_v1.h"', source)
         self.assertIn("raylib_lite_game_module_v1_t", source)
@@ -396,6 +427,9 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
                 for token in ("mosaico_runtime_", "MosaicoHaptic", "MosaicoPerformance", "MosaicoJpeg"):
                     self.assertNotIn(token, text)
                 self.assertIn("raylib_lite_game_module_v1_t", text)
+                self.assertNotIn("raylib_lite_host_input_v1_t", text)
+                self.assertNotIn("RAYLIB_LITE_HOST_INPUT_", text)
+                self.assertNotIn("RAYLIB_LITE_HOST_CONTROL_", text)
 
     def test_reference_examples_have_host_and_direct_entries(self) -> None:
         for directory in (
@@ -416,19 +450,28 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         )
         for directory in required:
             root = ENGINE / "examples" / directory
-            manifest = json.loads((root / "game.sim.json").read_text())
+            sim_manifest = json.loads((root / "game.sim.json").read_text())
             cmake = (root / "main/CMakeLists.txt").read_text()
             top = (root / "CMakeLists.txt").read_text()
+            component_manifest = (root / "main/idf_component.yml").read_text()
             with self.subTest(game=directory):
-                self.assertEqual(manifest.get("schema"), "raylib-lite-game-sim/v1")
-                self.assertIn("main/game_module.c", manifest.get("sources", []))
+                self.assertEqual(sim_manifest.get("schema"), "raylib-lite-game-sim/v1")
+                self.assertIn("main/game_module.c", sim_manifest.get("sources", []))
                 self.assertTrue(
                     '"game_module.c"' in cmake or
                     ("file(GLOB example_sources" in cmake and
                      "SRCS ${example_sources}" in cmake))
-                self.assertIn("examples/common/native_module_main.c", cmake)
+                self.assertNotIn("support/native", cmake)
+                self.assertIn("../../common", cmake)
+                self.assertIn("native_module_main.c", cmake)
+                self.assertTrue((ENGINE / "examples/common/raylib_lite_game_module_contract.h").is_file())
                 self.assertIn("RAYLIB_LITE_GAME_NATIVE=1", cmake)
-                self.assertIn("raylib_lite_native_project.cmake", top)
+                self.assertIn("espressif2022/raylib-lite-engine:", component_manifest)
+                self.assertNotIn("esp-mosaico:", component_manifest)
+                self.assertNotIn("../../boards/", component_manifest)
+                self.assertIn("${RAYLIB_LITE_BOARD}", cmake)
+                self.assertIn("../common/raylib_lite_example_project.cmake", top)
+                self.assertNotIn("raylib_lite_native_project.cmake", top)
 
         living_root = ENGINE / "examples/living_worlds"
         living = living_root / "main"
@@ -436,50 +479,79 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertFalse((living / "living_worlds_native.c").exists())
         self.assertFalse((living / "living_worlds_native_assets.c").exists())
         self.assertTrue((living / "living_worlds_native_assets.h").is_file())
-        self.assertIn('RAYLIB_LITE_BOARD_GAME_EXTENSION "living_worlds"',
-                      (living_root / "CMakeLists.txt").read_text())
-        self.assertIn("${RAYLIB_LITE_BOARD_GAME_COMPONENTS}",
+        living_manifest = (living / "idf_component.yml").read_text()
+        self.assertNotIn("living_worlds:", living_manifest)
+        self.assertNotIn("../../boards/", living_manifest)
+        self.assertIn("REQUIRES ${RAYLIB_LITE_BOARD} living_worlds",
                       (living / "CMakeLists.txt").read_text())
         extension = ENGINE / "examples/boards/esp-mosaico/extensions/living_worlds"
         self.assertTrue((extension / "living_worlds_native_assets.c").is_file())
         self.assertTrue((extension / "CMakeLists.txt").is_file())
+        self.assertTrue((extension / "idf_component.yml").is_file())
 
     def test_native_examples_select_board_adapter(self) -> None:
         board = ENGINE / "examples/boards/esp-mosaico"
         self.assertFalse((ENGINE / "ports/esp_mosaico").exists())
-        for name in ("CMakeLists.txt", "board.cmake", "board.c",
-                     "esp_mosaico_iris.c", "partitions.csv", "sdkconfig.defaults"):
+        self.assertFalse((ENGINE / "cmake").exists())
+        self.assertFalse((board / "board.cmake").exists())
+        for name in ("CMakeLists.txt", "idf_component.yml", "project.cmake", "board.c",
+                     "iris_display_input.c", "iris_display_input.h",
+                     "partitions.csv", "sdkconfig.defaults"):
             with self.subTest(path=name):
                 self.assertTrue((board / name).is_file())
+        self.assertFalse((board / "esp_mosaico_iris.c").exists())
+        self.assertFalse((board / "esp_mosaico_iris.h").exists())
 
-        resolver = (ENGINE / "cmake/raylib_lite_native_project.cmake").read_text()
-        self.assertIn("RAYLIB_LITE_BOARD", resolver)
-        self.assertIn("examples/boards/${RAYLIB_LITE_BOARD}", resolver)
-        for board_token in ("esp-mosaico", "MOSAICO_BSP_ROOT",
-                            "mosaico_board_platform", "raylib_lite_esp_add_port"):
-            self.assertNotIn(board_token, resolver)
-
-        self.assertFalse((ENGINE / "cmake/raylib_lite_esp.cmake").exists())
-        self.assertNotIn("mosaico_", resolver)
-
-        for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
-            if cmake.parent.parent.name == "render_benchmark":
-                continue
-            with self.subTest(path=cmake.relative_to(ENGINE)):
-                source = cmake.read_text()
-                self.assertNotIn("RAYLIB_LITE_BOARD_COMPONENT", source)
-                self.assertNotIn("RAYLIB_LITE_SELECTED_BOARD", source)
-
-        board_selector = (board / "board.cmake").read_text()
-        self.assertIn('"${CMAKE_CURRENT_LIST_DIR}"', board_selector)
-        self.assertIn("EXTRA_COMPONENT_DIRS", board_selector)
-        self.assertIn("ESP_IRIS_COMPONENT_DIR", board_selector)
-        self.assertIn('ESP_IRIS_BUILD_PROFILE "usb"', board_selector)
-        self.assertIn('${CMAKE_BINARY_DIR}/sdkconfig', board_selector)
+        board_manifest = (board / "idf_component.yml").read_text()
+        self.assertIn('version: "0.1.0"', board_manifest)
+        self.assertIn('espressif2022/raylib-lite-engine: "^0.1.0"', board_manifest)
+        self.assertIn("esp-mosaico-bsp:", board_manifest)
+        self.assertIn('version: "0.2.0"', board_manifest)
+        self.assertIn("override_path: ${MOSAICO_BSP_COMPONENT_DIR}", board_manifest)
+        self.assertIn("esp_iris:", board_manifest)
+        self.assertIn('version: "0.1.0"', board_manifest)
+        self.assertIn("override_path: ${MOSAICO_UTILS_ROOT}/ESP-Iris/components/esp_iris", board_manifest)
+        self.assertIn("esp_mosaico_app_recovery:", board_manifest)
+        self.assertIn("override_path: ${MOSAICO_UTILS_ROOT}/esp-mosaico-recovery/components/esp_mosaico_app_recovery", board_manifest)
+        self.assertNotIn("esp-mosaico-bsp.git", board_manifest)
+        self.assertNotIn("esp-mosaico-utils.git", board_manifest)
 
         board_component = (board / "CMakeLists.txt").read_text()
-        self.assertIn('"esp_mosaico_iris.c"', board_component)
-        self.assertRegex(board_component, r"REQUIRES[\s\S]*\besp_iris\b")
+        self.assertIn('"iris_display_input.c"', board_component)
+        self.assertIn("esp_mosaico_app_recovery", board_component)
+        self.assertNotIn("esp_mosaico_iris.c", board_component)
+        self.assertIn('"../../common"', board_component)
+        self.assertIn("raylib-lite-engine", board_component)
+        self.assertNotIn("native_module_main.c", board_component)
+        self.assertNotIn("native_feedback.c", board_component)
+        self.assertNotIn("support/native", board_component)
+        self.assertNotIn("RAYLIB_LITE_ENGINE_ROOT", board_component)
+
+        selector = (ENGINE / "examples/common/raylib_lite_example_project.cmake").read_text()
+        self.assertIn('set(RAYLIB_LITE_BOARD "esp-mosaico" CACHE STRING', selector)
+        self.assertIn('"${_raylib_lite_boards_root}/${RAYLIB_LITE_BOARD}"', selector)
+        self.assertIn("list(APPEND EXTRA_COMPONENT_DIRS \"${RAYLIB_LITE_BOARD_DIR}\")", selector)
+        self.assertIn("extensions/${RAYLIB_LITE_GAME_NAME}", selector)
+        self.assertIn("Unknown RAYLIB_LITE_BOARD", selector)
+        self.assertIn("sdkconfig.defaults", selector)
+        self.assertIn("project.cmake", selector)
+
+        board_project = (board / "project.cmake").read_text()
+        self.assertIn('ESP_IRIS_BUILD_PROFILE "usb"', board_project)
+
+        for root in (ENGINE / "examples").iterdir():
+            manifest_path = root / "main/idf_component.yml"
+            if not manifest_path.is_file() or root.name == "render_benchmark":
+                continue
+            manifest = manifest_path.read_text()
+            top = (root / "CMakeLists.txt").read_text()
+            main_cmake = (root / "main/CMakeLists.txt").read_text()
+            with self.subTest(game=root.name):
+                self.assertNotIn("esp-mosaico:", manifest)
+                self.assertNotIn("../../boards/", manifest)
+                self.assertIn("../common/raylib_lite_example_project.cmake", top)
+                self.assertIn("${RAYLIB_LITE_BOARD}", main_cmake)
+                self.assertNotIn("raylib_lite_native_project.cmake", top)
 
         defaults = (board / "sdkconfig.defaults").read_text()
         self.assertIn("CONFIG_ESP_IRIS_TRANSPORT_USB=y", defaults)
@@ -490,7 +562,6 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn('CONFIG_ESP_IRIS_PRODUCT_CONTRACT="esp-mosaico/v1"', defaults)
         self.assertIn('CONFIG_ESP_IRIS_LAYOUT_ID="mosaico-retained-recovery-2m-v1"', defaults)
         self.assertIn("CONFIG_ESP_IRIS_RECOVERY_ABI=1", defaults)
-        self.assertIn('CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../boards/esp-mosaico/partitions.csv"', defaults)
 
         partitions = (board / "partitions.csv").read_text()
         for token in ("sysmeta", "factory", "coredump", "ota_0"):
@@ -498,25 +569,49 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertNotIn("ota_1", partitions)
 
         board_source = (board / "board.c").read_text()
-        self.assertIn("esp_mosaico_iris_boot_probe", board_source)
-        self.assertIn("esp_mosaico_iris_start", board_source)
+        self.assertIn("esp_iris_boot_probe", board_source)
+        self.assertIn("iris_ota_support_start", board_source)
+        self.assertIn("esp_iris_mark_healthy", board_source)
+        self.assertIn("mosaico_iris_display_input_register", board_source)
+        self.assertIn("mosaico_iris_display_input_unregister", board_source)
         self.assertIn("raylib_lite_native_boot", board_source)
         self.assertIn("raylib_lite_native_first_present", board_source)
 
-        iris_source = (board / "esp_mosaico_iris.c").read_text()
-        self.assertIn("ESP_IRIS_OTA_DEFAULT_VIA_RECOVERY", iris_source)
-        self.assertIn("The ESP-Iris OTA writer belongs in retained Recovery", iris_source)
-        self.assertIn("ENTER_RECOVERY_METHOD", iris_source)
-        self.assertIn("esp_iris_system_inventory_register", iris_source)
-        self.assertNotIn("esp_iris_platform_prepare_ota", iris_source)
+        iris_source = (board / "iris_display_input.c").read_text()
+        self.assertIn("esp_iris_screen_register", iris_source)
+        self.assertIn("ESP_IRIS_POINTER_SERVICE_ID", iris_source)
+        for forbidden in (
+            "OTA_STATE_METHOD_ID", "OTA_ACCEPT_METHOD_ID",
+            "ENTER_RECOVERY_METHOD", "esp_iris_system_inventory_register",
+            "esp_iris_platform_mark_healthy", "esp_iris_start()",
+            "esp_iris_stop()",
+        ):
+            self.assertNotIn(forbidden, iris_source)
+
+        self.assertFalse((board / "components/esp_mosaico_app_recovery").exists())
+        self.assertFalse((board / "components/esp_iris").exists())
+
+    def test_native_game_readmes_use_consistent_mosaico_dependency_exports(self) -> None:
+        for manifest in (ENGINE / "examples").glob("*/main/idf_component.yml"):
+            game = manifest.parent.parent
+            if game.name == "render_benchmark":
+                continue
+            readme = game / "README.md"
+            if not readme.is_file():
+                continue
+            source = readme.read_text(encoding="utf-8")
+            with self.subTest(game=game.name):
+                self.assertIn("MOSAICO_BSP_COMPONENT_DIR", source)
+                self.assertIn("MOSAICO_UTILS_ROOT", source)
 
     def test_shared_example_glue_does_not_include_concrete_bsp(self) -> None:
         forbidden = re.compile(r'#\s*include\s*[<"](?:bsp/|esp_mosaico)')
-        for path in (ENGINE / "examples/common").glob("*"):
-            if path.suffix not in {".c", ".h"}:
+        common = ENGINE / "examples/common"
+        for source_path in common.glob("*"):
+            if source_path.suffix not in {".c", ".h"}:
                 continue
-            with self.subTest(path=path.relative_to(ENGINE)):
-                self.assertIsNone(forbidden.search(path.read_text()))
+            with self.subTest(path=source_path.relative_to(ENGINE)):
+                self.assertIsNone(forbidden.search(source_path.read_text()))
 
     def test_audio_core_is_engine_owned_and_games_do_not_get_api_from_board(self) -> None:
         audio = ENGINE / "src/audio"
@@ -527,34 +622,37 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn("src/audio/raylib_lite_audio_mixer.c", cmake)
 
         board_cmake = (ENGINE / "examples/boards/esp-mosaico/CMakeLists.txt").read_text()
+        board_manifest = (ENGINE / "examples/boards/esp-mosaico/idf_component.yml").read_text()
         self.assertIn("game_audio.c", board_cmake)
         self.assertNotIn("mosaico_game_audio.c", board_cmake)
-        self.assertIn("raylib-lite-engine", board_cmake)
-        board_requires = re.search(r"REQUIRES\s+([^)]*)", board_cmake, re.S)
-        self.assertIsNotNone(board_requires)
-        self.assertNotIn("mosaico_game_audio", board_requires.group(1).split())
+        self.assertIn("espressif2022/raylib-lite-engine", board_manifest)
         self.assertNotIn("raylib_lite_audio_decode.c", board_cmake)
         self.assertNotIn("raylib_lite_audio_mixer.c", board_cmake)
 
         users = set()
-        for path in (ENGINE / "examples").glob("*/main/*"):
-            if path.is_file() and path.suffix in {".c", ".h"} and \
-                    '#include "raylib_lite_game_audio.h"' in path.read_text(errors="ignore"):
-                users.add(path.parent)
+        for source_path in (ENGINE / "examples").glob("*/main/*"):
+            if source_path.is_file() and source_path.suffix in {".c", ".h"} and                     '#include "raylib_lite_game_audio.h"' in source_path.read_text(errors="ignore"):
+                users.add(source_path.parent)
         self.assertTrue(users)
         for main in users:
             with self.subTest(path=main.relative_to(ENGINE)):
-                cmake = (main / "CMakeLists.txt").read_text()
-                self.assertIn("raylib-lite-engine", cmake)
-                self.assertNotIn("mosaico_game_audio", cmake)
+                manifest = (main / "idf_component.yml").read_text()
+                self.assertIn("espressif2022/raylib-lite-engine", manifest)
 
     def test_game_manifests_do_not_own_board_dependencies(self) -> None:
-        forbidden = ("esp_display_present", "lvgl/lvgl", "esp-mosaico")
+        forbidden = ("esp_display_present", "lvgl/lvgl", "esp-mosaico-bsp", "esp_iris", "esp-mosaico:")
         for manifest in (ENGINE / "examples").glob("*/main/idf_component.yml"):
+            if manifest.parent.parent.name == "render_benchmark":
+                continue
             source = manifest.read_text(encoding="utf-8")
             with self.subTest(path=manifest.relative_to(ENGINE)):
                 for token in forbidden:
                     self.assertNotIn(token, source)
+                self.assertNotIn("../../boards/", source)
+
+        benchmark_top = (ENGINE / "examples/render_benchmark/CMakeLists.txt").read_text()
+        self.assertIn("MOSAICO_BSP_COMPONENT_DIR", benchmark_top)
+        self.assertFalse((ENGINE / "examples/render_benchmark/main/idf_component.yml").exists())
 
     def test_game_sources_do_not_depend_on_concrete_boards(self) -> None:
         forbidden = ("mosaico_board_platform", "bsp/esp_mosaico",
@@ -575,22 +673,19 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
             with self.subTest(path=cmake.relative_to(ENGINE)):
                 self.assertIsNone(product.search(cmake.read_text()))
-        common = ENGINE / "examples/common/native_module_main.c"
-        text = common.read_text()
+        launcher = ENGINE / "examples/common/native_module_main.c"
+        text = launcher.read_text()
         for call in ("raylib_lite_native_boot()", "raylib_lite_native_first_present()"):
-            with self.subTest(path=common.relative_to(ENGINE), call=call):
+            with self.subTest(path=launcher.relative_to(ENGINE), call=call):
                 self.assertIn(call, text)
 
-        # Per-game Board extensions may provide assets/configuration, but must
-        # not own a second launcher or product lifecycle.
         for root in (ENGINE / "examples/boards").glob("*/extensions/*"):
-            for path in root.glob("*.c"):
-                source = path.read_text(encoding="utf-8")
-                with self.subTest(path=path.relative_to(ENGINE)):
+            for source_path in root.glob("*.c"):
+                source = source_path.read_text(encoding="utf-8")
+                with self.subTest(path=source_path.relative_to(ENGINE)):
                     for token in ("app_main(", "raylib_lite_native_boot()",
                                   "raylib_lite_native_first_present()"):
                         self.assertNotIn(token, source)
-
 
 if __name__ == "__main__":
     unittest.main()

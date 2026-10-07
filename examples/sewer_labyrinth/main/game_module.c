@@ -1832,21 +1832,21 @@ static void toggle_journal(sl_module_t *s)
     if(s->game.briefing||s->game.paused||s->game.failed||s->game.escaped||s->game.action)return;
     stop_audio(s);s->game.journal=!s->game.journal;clear_input(s);
 }
-static void input(void *value,const raylib_lite_host_input_v1_t *e)
+static void input(void *value,const raylib_lite_game_input_v1_t *e)
 {
     sl_module_t *s=value;if(!s||!e)return;
-    if(e->type==RAYLIB_LITE_HOST_INPUT_CONTROL){
-        if(e->code==RAYLIB_LITE_HOST_CONTROL_RESET){
+    if(e->type==RAYLIB_LITE_GAME_INPUT_CONTROL){
+        if(e->code==RAYLIB_LITE_GAME_CONTROL_RESET){
             stop_audio(s);reset_dispatch(&s->game,s->game.mission,s->game.dispatch,s->game.kit,true);clear_input(s);
             restore_survey(s);
             s->run_ticks=0;
             s->has_checkpoint=false;s->consumed_sfx=0;
         }
-        else if(e->code==RAYLIB_LITE_HOST_CONTROL_PAUSE){s->game.paused=true;stop_audio(s);clear_input(s);}
-        else if(e->code==RAYLIB_LITE_HOST_CONTROL_RESUME)s->game.paused=false;
+        else if(e->code==RAYLIB_LITE_GAME_CONTROL_PAUSE){s->game.paused=true;stop_audio(s);clear_input(s);}
+        else if(e->code==RAYLIB_LITE_GAME_CONTROL_RESUME)s->game.paused=false;
         return;
     }
-    if(e->type==RAYLIB_LITE_HOST_INPUT_ACTION){
+    if(e->type==RAYLIB_LITE_GAME_INPUT_ACTION){
         if(e->code==4){
             if(e->pressed&&!(s->menu_down&16))toggle_journal(s);
             if(e->pressed)s->menu_down|=16;else s->menu_down&=~16;
@@ -1871,7 +1871,7 @@ static void input(void *value,const raylib_lite_host_input_v1_t *e)
         else if(e->code==8)s->strafe_left=e->pressed;else if(e->code==9)s->strafe_right=e->pressed;
         else if(e->code==7)s->sneak=e->pressed;
         else if(e->code==6){if(e->pressed&&!s->fire)s->fire_edge=true;s->fire=e->pressed;}
-    }else if(e->type==RAYLIB_LITE_HOST_INPUT_POINTER){
+    }else if(e->type==RAYLIB_LITE_GAME_INPUT_POINTER){
         if(!e->pressed){
             if(e->track_id==s->pointer_id)s->pointer_id=-1;
             if(e->track_id==s->look_id)s->look_id=-1;

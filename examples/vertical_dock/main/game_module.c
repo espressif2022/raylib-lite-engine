@@ -529,21 +529,21 @@ static int initialize(void *value
     return 0;
 }
 static void shutdown(void *value){(void)value;}
-static void input(void *value,const raylib_lite_host_input_v1_t *e)
+static void input(void *value,const raylib_lite_game_input_v1_t *e)
 {
     vd_module_t *s=value;if(!s||!e)return;
-    if(e->type==RAYLIB_LITE_HOST_INPUT_CONTROL){
-        if(e->code==RAYLIB_LITE_HOST_CONTROL_RESET)reset_game(&s->game);
-        else if(e->code==RAYLIB_LITE_HOST_CONTROL_PAUSE)s->game.paused=true;
-        else if(e->code==RAYLIB_LITE_HOST_CONTROL_RESUME)s->game.paused=false;
+    if(e->type==RAYLIB_LITE_GAME_INPUT_CONTROL){
+        if(e->code==RAYLIB_LITE_GAME_CONTROL_RESET)reset_game(&s->game);
+        else if(e->code==RAYLIB_LITE_GAME_CONTROL_PAUSE)s->game.paused=true;
+        else if(e->code==RAYLIB_LITE_GAME_CONTROL_RESUME)s->game.paused=false;
         return;
     }
-    if(e->type==RAYLIB_LITE_HOST_INPUT_ACTION){
+    if(e->type==RAYLIB_LITE_GAME_INPUT_ACTION){
         if(e->code==0)s->left=e->pressed;else if(e->code==1)s->right=e->pressed;
         else if(e->code==2)s->forward=e->pressed;else if(e->code==5)s->back=e->pressed;
         else if(e->code==8)s->strafe_left=e->pressed;else if(e->code==9)s->strafe_right=e->pressed;
         else if(e->code==6){if(e->pressed&&!s->fire)s->fire_edge=true;s->fire=e->pressed;}
-    }else if(e->type==RAYLIB_LITE_HOST_INPUT_POINTER){
+    }else if(e->type==RAYLIB_LITE_GAME_INPUT_POINTER){
         if(!e->pressed){if(e->track_id==s->pointer_id)s->pointer_id=-1;if(e->track_id==s->look_id)s->look_id=-1;}
         else if(e->track_id==s->pointer_id){s->game.strafe=clampf((e->x-s->start_x)/60.0f,-1,1);s->game.move=clampf((s->start_y-e->y)/60.0f,-1,1);}
         else if(e->track_id==s->look_id){s->game.yaw+=(e->x-s->last_x)*.008f;s->game.pitch=clampf(s->game.pitch-(e->y-s->last_y)*.005f,-.35f,.35f);s->last_x=e->x;s->last_y=e->y;}

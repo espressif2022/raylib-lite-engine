@@ -167,8 +167,7 @@ assert.equal(plays,2);
             command = ["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
                        "-DRAYLIB_LITE_GAME_NATIVE=1", "-ffunction-sections", "-fdata-sections"]
             for include in ["tests/fakes/sewer_audio", "host/include", "host",
-                            "examples/common",
-                            "include/raylib_lite",
+                            "examples/common", "include/raylib_lite",
                             "include/raylib_lite",
                             "include/raylib_lite",
                             "include/raylib_lite",

@@ -152,20 +152,20 @@ static void shutdown(void *value)
 #endif
 }
 
-static void input(void *value, const raylib_lite_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     module_state_t *module = value;
     living_worlds_session_t *session = &module->session;
     if (!event) return;
-    if (event->type == RAYLIB_LITE_HOST_INPUT_POINTER)
+    if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER)
         living_worlds_session_pointer(session, (float)event->x, (float)event->y,
                                       event->pressed);
-    else if (event->type == RAYLIB_LITE_HOST_INPUT_ACTION)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION)
         living_worlds_session_action(session, event->code, event->pressed);
-    else if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL) {
-        if (event->code == RAYLIB_LITE_HOST_CONTROL_PAUSE) session->paused = true;
-        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESUME) session->paused = false;
-        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESET)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) session->paused = true;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESUME) session->paused = false;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESET)
             living_worlds_session_reset(session);
     }
 }

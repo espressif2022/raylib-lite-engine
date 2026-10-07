@@ -78,11 +78,11 @@ static void shutdown(void *value)
     state->background = NULL;
 }
 
-static void input(void *value, const raylib_lite_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     vector_pet_state_t *state = value;
     if (!state || !event) return;
-    if (event->type == RAYLIB_LITE_HOST_INPUT_POINTER && event->track_id == 0) {
+    if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER && event->track_id == 0) {
         if (event->pressed && !state->pointer_down) {
             state->pointer_down = true;
             state->button = pet_button_at(event->x, event->y);
@@ -98,7 +98,7 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
         }
         if (!event->pressed) state->pointer_down = false;
         pet_pointer(&state->pet, event->pressed, (float)event->x, (float)event->y);
-    } else if (event->type == RAYLIB_LITE_HOST_INPUT_ACTION && event->code >= 0 &&
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION && event->code >= 0 &&
                event->code <= ACTION_POKE) {
         /* Hosts repeat held actions every tick; only the press edge counts. */
         uint32_t bit = 1u << event->code;
@@ -108,10 +108,10 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
         if (!event->pressed || was_held) return;
         if (event->code == ACTION_POKE) pet_poke(&state->pet);
         else pet_toggle_mode(&state->pet, (pet_mode_t)(PET_MODE_EAT + event->code));
-    } else if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL) {
-        if (event->code == RAYLIB_LITE_HOST_CONTROL_RESET) reset(state);
-        else if (event->code == RAYLIB_LITE_HOST_CONTROL_PAUSE) state->paused = true;
-        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESUME) state->paused = false;
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_GAME_CONTROL_RESET) reset(state);
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) state->paused = true;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESUME) state->paused = false;
     }
 }
 

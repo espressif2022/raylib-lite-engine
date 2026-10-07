@@ -96,22 +96,22 @@ static void shutdown(void *value)
     raylib_lite_atlas_unload(state->controls);
 }
 
-static void input(void *value, const raylib_lite_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     tomb_module_t *state=value;
     if(!state||!event)return;
 #if defined(TOMB_RAYCAST_BENCHMARK)
     return;
 #endif
-    if(event->type==RAYLIB_LITE_HOST_INPUT_CONTROL){
-        if(event->code==RAYLIB_LITE_HOST_CONTROL_PAUSE)state->paused=true;
-        else if(event->code==RAYLIB_LITE_HOST_CONTROL_RESUME)state->paused=false;
-        else if(event->code==RAYLIB_LITE_HOST_CONTROL_RESET){
+    if(event->type==RAYLIB_LITE_GAME_INPUT_CONTROL){
+        if(event->code==RAYLIB_LITE_GAME_CONTROL_PAUSE)state->paused=true;
+        else if(event->code==RAYLIB_LITE_GAME_CONTROL_RESUME)state->paused=false;
+        else if(event->code==RAYLIB_LITE_GAME_CONTROL_RESET){
             tomb_reset(&state->game);clear_tracks(state);
         }
         return;
     }
-    if(event->type==RAYLIB_LITE_HOST_INPUT_ACTION){
+    if(event->type==RAYLIB_LITE_GAME_INPUT_ACTION){
         if(event->code==0)state->left=event->pressed;
         else if(event->code==1)state->right=event->pressed;
         else if(event->code==2)state->forward=event->pressed;
@@ -121,7 +121,7 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
         else if(event->code==9)state->strafe_right=event->pressed;
         return;
     }
-    if(event->type!=RAYLIB_LITE_HOST_INPUT_POINTER)return;
+    if(event->type!=RAYLIB_LITE_GAME_INPUT_POINTER)return;
     int track=event->track_id;
     if(!event->pressed){
         if(track==state->joystick_track){state->joystick_track=-1;state->move_forward=state->move_strafe=0;}

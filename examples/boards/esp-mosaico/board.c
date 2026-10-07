@@ -10,7 +10,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#include "esp_mosaico_iris.h"
+#include "esp_iris.h"
+#include "iris_ota_support.h"
+#include "iris_display_input.h"
 #include "mosaico_strip_present.h"
 #include "raylib_lite_action.h"
 #include "nvs_flash.h"
@@ -335,7 +337,7 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
         },
         .audio = NULL,
     };
-    err = esp_mosaico_iris_start(
+    err = mosaico_iris_display_input_register(
         p->services.video, &p->input,
         ESP_MOSAICO_GAME_WIDTH, ESP_MOSAICO_GAME_HEIGHT);
     if (err != ESP_OK) {
@@ -419,7 +421,7 @@ esp_err_t raylib_lite_example_board_retry_cleanup(raylib_lite_example_board_t *p
     if (err != ESP_OK) {
         return err;
     }
-    err = esp_mosaico_iris_stop();
+    err = mosaico_iris_display_input_unregister();
     if (err != ESP_OK) {
         return err;
     }
@@ -463,15 +465,18 @@ esp_err_t raylib_lite_example_board_destroy(raylib_lite_example_board_t *p,
     return raylib_lite_example_board_retry_cleanup(p, timeout_ms);
 }
 
-/* Run crash/recovery attribution before any Board peripheral initialization. */
+/* Recovery/Iris is an application-level service. Start it before Board
+ * peripheral initialization so crash attribution and Recovery control remain
+ * available even if the Game or Board initialization later fails. */
 bool raylib_lite_native_boot(void)
 {
-    esp_err_t err = esp_mosaico_iris_boot_probe();
+    esp_err_t err = esp_iris_boot_probe();
     if (err != ESP_OK) {
         ESP_LOGE("esp_mosaico_board", "Iris boot probe: %s",
                  esp_err_to_name(err));
         return false;
     }
+    iris_ota_support_start();
     return true;
 }
 
@@ -480,7 +485,7 @@ bool raylib_lite_native_boot(void)
  * that point so a broken Game/Board initialization can still roll back. */
 void raylib_lite_native_first_present(void)
 {
-    esp_err_t err = esp_mosaico_iris_mark_healthy();
+    esp_err_t err = esp_iris_mark_healthy();
     if (err != ESP_OK) {
         ESP_LOGW("esp_mosaico_board", "Iris healthy mark: %s",
                  esp_err_to_name(err));

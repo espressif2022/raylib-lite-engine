@@ -193,13 +193,7 @@ class GenericHostRuntime:
         includes = [ENGINE_ROOT / "host/include", ENGINE_ROOT / "host",
                     ENGINE_ROOT / "examples/common",
                     ENGINE_ROOT / "include/raylib_lite",
-                    ENGINE_ROOT / "include/raylib_lite",
-                    ENGINE_ROOT / "include/raylib_lite",
-                    ENGINE_ROOT / "include/raylib_lite",
-                    ENGINE_ROOT / "include/raylib_lite",
                     ENGINE_ROOT / "compat/raylib/include",
-                    ENGINE_ROOT / "include/raylib_lite",
-                    ENGINE_ROOT / "include/raylib_lite",
                     project / "main", project / "assets/generated",
                     project / "managed_components/georgik__raylib/include",
                     project / "managed_components/georgik__raylib/raylib/src"]

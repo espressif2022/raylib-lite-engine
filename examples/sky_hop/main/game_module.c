@@ -67,23 +67,23 @@ static void shutdown(void *value)
     if (state) raylib_lite_atlas_unload(state->atlas);
 }
 
-static void input(void *value, const raylib_lite_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     sky_hop_module_state_t *state = value;
     if (!state || !event) return;
-    if (event->type == RAYLIB_LITE_HOST_INPUT_ACTION && event->code >= 0 && event->code <= 4)
+    if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION && event->code >= 0 && event->code <= 4)
         platform_game_set_action(&state->game, (platform_action_t)event->code, event->pressed);
-    else if (event->type == RAYLIB_LITE_HOST_INPUT_POINTER)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER)
         platform_game_set_pointer(&state->game, (float)event->x, (float)event->y,
                                  event->pressed, event->track_id);
-    else if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL &&
-             event->code == RAYLIB_LITE_HOST_CONTROL_RESET)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_RESET)
         platform_game_reset(&state->game);
-    else if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL &&
-             event->code == RAYLIB_LITE_HOST_CONTROL_PAUSE)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE)
         state->paused = true;
-    else if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL &&
-             event->code == RAYLIB_LITE_HOST_CONTROL_RESUME)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_RESUME)
         state->paused = false;
 }
 

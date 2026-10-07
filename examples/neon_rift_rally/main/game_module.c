@@ -365,21 +365,21 @@ static void shutdown(void *value)
 #endif
 }
 
-static void input(void *value, const raylib_lite_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     neon_rift_rally_module_t *state = value;
     if (!state || !event) return;
 
-    if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL) {
-        if (event->code == RAYLIB_LITE_HOST_CONTROL_PAUSE) state->paused = true;
-        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESUME) state->paused = false;
-        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESET) {
+    if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) state->paused = true;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESUME) state->paused = false;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESET) {
             reset_run(state);
         }
         return;
     }
 
-    if (event->type == RAYLIB_LITE_HOST_INPUT_ACTION) {
+    if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION) {
         /* Stable action map shared with browser replays:
            0 left, 1 right, 2 throttle, 3 pause, 4 restart,
            5 brake, 6 nitro, 7 drift. */
@@ -400,7 +400,7 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
         return;
     }
 
-    if (event->type != RAYLIB_LITE_HOST_INPUT_POINTER) return;
+    if (event->type != RAYLIB_LITE_GAME_INPUT_POINTER) return;
     if (event->pressed && state->game.phase == RALLY_PHASE_COUNTDOWN &&
         event->y < 100) {
         if (event->x < 160) select_course(state, -1);

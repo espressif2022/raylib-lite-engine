@@ -53,25 +53,25 @@ static void shutdown(void *value)
     if(state)raylib_lite_atlas_unload(state->atlas);
 }
 
-static void input(void *value,const raylib_lite_host_input_v1_t *event)
+static void input(void *value,const raylib_lite_game_input_v1_t *event)
 {
     shooter_module_state_t *state=value;
     if(!state||!event)return;
-    if(event->type==RAYLIB_LITE_HOST_INPUT_POINTER)
+    if(event->type==RAYLIB_LITE_GAME_INPUT_POINTER)
         shooter_game_set_pointer(&state->game,(float)event->x,(float)event->y,event->pressed);
-    else if(event->type==RAYLIB_LITE_HOST_INPUT_ACTION){
+    else if(event->type==RAYLIB_LITE_GAME_INPUT_ACTION){
         if(event->code==0)state->left=event->pressed;
         else if(event->code==1)state->right=event->pressed;
         else if(event->pressed&&event->code==3)shooter_game_toggle_pause(&state->game);
         else if(event->pressed&&event->code==4)
             shooter_game_set_pointer(&state->game,240,420,true);
-    }else if(event->type==RAYLIB_LITE_HOST_INPUT_IMU){
+    }else if(event->type==RAYLIB_LITE_GAME_INPUT_IMU){
         state->imu_x=event->value_x;
         state->imu_y=event->value_y;
-    }else if(event->type==RAYLIB_LITE_HOST_INPUT_CONTROL){
-        if(event->code==RAYLIB_LITE_HOST_CONTROL_PAUSE)state->paused=true;
-        else if(event->code==RAYLIB_LITE_HOST_CONTROL_RESUME)state->paused=false;
-        else if(event->code==RAYLIB_LITE_HOST_CONTROL_RESET)
+    }else if(event->type==RAYLIB_LITE_GAME_INPUT_CONTROL){
+        if(event->code==RAYLIB_LITE_GAME_CONTROL_PAUSE)state->paused=true;
+        else if(event->code==RAYLIB_LITE_GAME_CONTROL_RESUME)state->paused=false;
+        else if(event->code==RAYLIB_LITE_GAME_CONTROL_RESET)
             shooter_game_reset(&state->game,0x4d4f5341U);
     }
 }

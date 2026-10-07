@@ -174,9 +174,9 @@ static void shutdown(void *value)
 }
 
 #if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
-static void note_contact(last_zone_module_t *state, const raylib_lite_host_input_v1_t *event)
+static void note_contact(last_zone_module_t *state, const raylib_lite_game_input_v1_t *event)
 {
-    if (event->type != RAYLIB_LITE_HOST_INPUT_POINTER) return;
+    if (event->type != RAYLIB_LITE_GAME_INPUT_POINTER) return;
     int track = event->track_id;
     if (track < 0 || track > 7) track = 0;
     uint8_t bit = (uint8_t)(1u << track);
@@ -184,21 +184,21 @@ static void note_contact(last_zone_module_t *state, const raylib_lite_host_input
     else state->contact_mask = (uint8_t)(state->contact_mask & (uint8_t)~bit);
 }
 
-static bool tap_event(const raylib_lite_host_input_v1_t *event)
+static bool tap_event(const raylib_lite_game_input_v1_t *event)
 {
-    return event->pressed && (event->type == RAYLIB_LITE_HOST_INPUT_ACTION ||
-                              event->type == RAYLIB_LITE_HOST_INPUT_POINTER);
+    return event->pressed && (event->type == RAYLIB_LITE_GAME_INPUT_ACTION ||
+                              event->type == RAYLIB_LITE_GAME_INPUT_POINTER);
 }
 #endif
 
-static void input(void *value, const raylib_lite_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     last_zone_module_t *state = value;
     if (!state || !event) return;
-    if (event->type == RAYLIB_LITE_HOST_INPUT_CONTROL) {
-        if (event->code == RAYLIB_LITE_HOST_CONTROL_PAUSE) state->paused = true;
-        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESUME) state->paused = false;
-        else if (event->code == RAYLIB_LITE_HOST_CONTROL_RESET) {
+    if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) state->paused = true;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESUME) state->paused = false;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESET) {
             last_zone_reset(&state->game);
             clear_tracks(state);
 #if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
@@ -224,7 +224,7 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
         return;
     }
     if (state->block_until_up) {
-        bool action_down = event->type == RAYLIB_LITE_HOST_INPUT_ACTION && event->pressed;
+        bool action_down = event->type == RAYLIB_LITE_GAME_INPUT_ACTION && event->pressed;
         if (state->contact_mask == 0 && !action_down) state->block_until_up = false;
         if (state->block_until_up) {
             clear_tracks(state);
@@ -233,8 +233,8 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
     }
 #else
     if (state->game.phase != LAST_ZONE_PHASE_PLAYING) {
-        if (event->pressed && (event->type == RAYLIB_LITE_HOST_INPUT_ACTION ||
-                               event->type == RAYLIB_LITE_HOST_INPUT_POINTER))
+        if (event->pressed && (event->type == RAYLIB_LITE_GAME_INPUT_ACTION ||
+                               event->type == RAYLIB_LITE_GAME_INPUT_POINTER))
             last_zone_confirm(&state->game);
         if (state->game.phase != LAST_ZONE_PHASE_PLAYING || !event->pressed) {
             clear_tracks(state);
@@ -242,7 +242,7 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
         }
     }
 #endif
-    if (event->type == RAYLIB_LITE_HOST_INPUT_ACTION) {
+    if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION) {
         if (event->code == 0) state->left = event->pressed;
         else if (event->code == 1) state->right = event->pressed;
         else if (event->code == 2) state->forward = event->pressed;
@@ -251,7 +251,7 @@ static void input(void *value, const raylib_lite_host_input_v1_t *event)
         else if (event->code == 7) state->sprint = event->pressed;
         else if (event->code == 8) state->strafe_left = event->pressed;
         else if (event->code == 9) state->strafe_right = event->pressed;
-    } else if (event->type == RAYLIB_LITE_HOST_INPUT_POINTER) {
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER) {
         int track = event->track_id;
         if (!event->pressed) {
             /* A release can arrive on a different track id than the press.
