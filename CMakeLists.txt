@@ -32,7 +32,6 @@ set(_audio_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/audio/raylib_lite_audio_decode.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/audio/raylib_lite_audio_mixer.c")
 set(_renderer_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_esp.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_raylib.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_rgb565.c"
@@ -76,7 +75,6 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
     RAYLIB_LITE_DEFAULT_FPS=${CONFIG_RAYLIB_LITE_DEFAULT_FPS})
 
 set(_renderer_c_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_esp.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_raylib.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_rgb565.c"

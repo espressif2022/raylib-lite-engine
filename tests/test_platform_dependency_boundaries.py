@@ -331,6 +331,11 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn("to_renderer_texture", adapter)
         self.assertIn("raylib_lite_renderer_raylib.c", cmake)
         self.assertIn("REQUIRES raylib", cmake)
+        # The IDF component builds the ESP wrapper, which includes the portable
+        # core together with the strong ESP raster logger. Building the core as
+        # a second archive member would let the weak debug fallback win.
+        self.assertIn("src/renderer/raylib_lite_renderer_esp.c", cmake)
+        self.assertEqual(cmake.count("src/renderer/raylib_lite_renderer.c\""), 0)
         legacy_header = (ENGINE / "compat/raylib/include/raylib_lite_2d.h").read_text(
             encoding="utf-8")
         for hot in ("raylib_lite_2d_draw_texture_pro", "raylib_lite_2d_draw_textured_triangle",
