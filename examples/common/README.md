@@ -1,5 +1,12 @@
-# Shared native-example glue
+# Shared native example glue
 
-`native_module_main.c` supplies the generic firmware entry used by standalone native game examples. `raylib_lite_example_board.h` defines the example-side board contract used by that entry, including optional haptic operations; concrete implementations live under `examples/boards/<board>/`. `native_feedback.c`/`.h` provide timed motor pulses and patterns through that contract; the game chooses which semantic events should trigger them. These files are example integration code, not a concrete BSP implementation or a mandatory dependency for Host and lobby ELF games.
+This directory contains board-neutral Application/example glue shared by the repository examples. It is not part of the Engine public API; package-content filtering is currently deferred.
 
-Use the relevant source in a game's `main/CMakeLists.txt`. Board initialization, input sampling, codec output, and shutdown are owned by the selected board adapter; game sources must not include a concrete board API. The cross-game contract is summarized in [reusable design principles](../../docs/reference-designs.EN.md).
+- `raylib_lite_example_project.cmake`: Application-side Board selector; defaults to `esp-mosaico`, adds `examples/boards/<board>` plus an optional `extensions/<game>` component, and loads Board pre-project defaults without introducing Board knowledge into the Engine.
+- `native_module_main.c`: generic native example launcher.
+- `raylib_lite_example_board.h`: abstract Board contract used by the launcher.
+- `native_feedback.[ch]`: generic haptic timing helper over that Board contract.
+- `raylib_lite_game_module.h`: neutral Host/native module contract used only by examples and Host adapters; it is not an Engine public API.
+- `raylib_lite_game_module_contract.h`: example/application bridge used by shared Game sources; Product ELF ABI mapping stays outside the Engine component.
+
+Concrete Board implementations remain under `examples/boards/<board>/`.

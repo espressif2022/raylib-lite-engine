@@ -33,13 +33,13 @@ Host 显示实现通过 `raylib_lite_video_backend_t` 接入通用 framebuffer p
 | `render_rgb565_v1` | 写入调用方提供的 RGB565 缓冲，使用像素 stride |
 | `state_json_v1` | 输出回放检查所需的状态 JSON |
 
-实际导出符号使用 `raylib_lite_host_game_*_v1`；完整签名以 [`raylib_lite_host_game.h`](include/raylib_lite_host_game.h) 为准。`state_hash_v1` 也在 ABI 头中声明；当前 Host runner 读取描述符、状态 JSON 和画面，不靠哈希代替这些检查。产品 ELF Runtime ABI 不在 Host header 中，只由 `examples/common/raylib_lite_game_module_contract.h` 的 ELF 分支做 application-layer 映射。
+实际导出符号使用 `raylib_lite_host_game_*_v1`；完整签名以 Host 专用头 [`raylib_lite_host_game.h`](include/raylib_lite_host_game.h) 为准。`state_hash_v1` 也在 ABI 头中声明；当前 Host runner 读取描述符、状态 JSON 和画面，不靠哈希代替这些检查。产品 ELF Runtime ABI 不在公共 Host header 中；仓库示例通过 `examples/common/raylib_lite_game_module_contract.h` 在 ELF 分支做 application-layer 映射。
 
 启动时 `run_game.py` 会：
 
 1. 运行 `assets_src/prepare_*.py` 和 `generate_*.py`（按文件名，不是清单字段）；
 2. 若有 `assets_src/game_assets.json`，调用 `tools/pack_game_assets.py`；
-3. 把清单里的源码与 Host backend、portable renderer/Raylib compatibility source 编成 `.so` / `.dll`。`examples/common` 通过 include path 提供共享 Game module contract，因此复制到临时目录的单个 Game 也不依赖仓库相对 include。
+3. 把清单里的源码与 Host backend、portable renderer/Raylib compatibility source 编成 `.so` / `.dll`。Game Module/Host contract 头位于组件公共 `include/raylib_lite/`，因此 Game 不依赖 `examples/` 或仓库相对 include。
 
 不要写 `asset_prepare` 或 `tick_hz`：Host 会忽略它们。
 

@@ -34,7 +34,7 @@ The browser preview supports input, pause, single stepping, screenshots, and rec
 
 ## 3. Validate on device
 
-Use [build paths](build-matrix.EN.md) for device integration. Native examples build directly with ESP-IDF and an explicit `RAYLIB_LITE_BOARD`; ELF compilation belongs to the external Module SDK. Board-specific optimized providers belong under the selected Board/application extension, not under the Game `main/` source. Follow `esp-mosaico-vibe` documentation for Iris/Gateway installation and acceptance. On device, verify startup, assets, input, audio and haptics, actual display output, and shutdown cleanup. For performance comparisons, hold the input, scene, board, clocks, and build settings constant; save firmware identity and raw logs. Passing Host tests does not establish device acceptance.
+Use [build paths](build-matrix.EN.md) for device integration. Native examples build directly with ESP-IDF; their `main/idf_component.yml` declares the application-side Board component. ELF compilation belongs to the external Module SDK. Board-specific optimized providers belong under the selected Board/application extension, not under the Game `main/` source. Follow `esp-mosaico-vibe` documentation for Iris/Gateway installation and acceptance. On device, verify startup, assets, input, audio and haptics, actual display output, and shutdown cleanup. For performance comparisons, hold the input, scene, board, clocks, and build settings constant; save firmware identity and raw logs. Passing Host tests does not establish device acceptance.
 
 ## 4. Before submitting
 

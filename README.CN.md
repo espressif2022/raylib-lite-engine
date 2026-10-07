@@ -12,6 +12,16 @@ Raylib Lite Engine 是面向嵌入式 RGB565 显示的轻量 Raylib 兼容游戏
 2. 选择路径：查看[示例支持矩阵（English）](examples/README.md)和[构建路径](docs/build-matrix.CN.md)。引擎说明 Host、通用原生固件与 ELF 接入；Iris/Gateway 的产品流程由 `esp-mosaico-vibe` 维护。
 3. 设计输入、反馈、资产或绘制：查看[可复用设计方法](docs/reference-designs.CN.md)及其中链接的公共接口。
 
+ESP-IDF 工程通过消费组件的 `idf_component.yml` 依赖发布版 Raylib Lite Engine：
+
+```yaml
+dependencies:
+  idf: ">=6.2"
+  espressif2022/raylib-lite-engine: "^0.1.0"
+```
+
+仓库内示例保持同一个版本契约，只额外使用 `override_path: ../../..` 指向当前 checkout 做联调。外部 Game 不需要 include Engine 仓库中的 CMake helper，也不应通过 `EXTRA_COMPONENT_DIRS` 注入 Engine 根目录；组件位置由 IDF Component Manager 解析。
+
 在仓库根目录运行已有示例的 Host 仿真：
 
 ```sh
@@ -19,12 +29,12 @@ python3 -m pip install Pillow
 python3 tools/game_cli.py sim examples/sky_hop
 ```
 
-浏览器预览地址为 `http://127.0.0.1:8460/`。原生示例在构建时选择 Board Adapter；ESP-Mosaico 参考实现位于 [`examples/boards/esp-mosaico`](examples/boards/esp-mosaico/)，使用 `-DRAYLIB_LITE_BOARD=esp-mosaico` 选择，BSP 与 ESP-Iris 路径由该 Board Adapter 配置。ESP-Mosaico normal Game 默认提供 Iris USB 管理、截图和远程 pointer，但固件更新采用 Recovery-first：保留的 factory Recovery 负责 USB OTA writer，并把 normal Game 安装到 `ota_0`。Recovery/Gateway 实现仍由 `esp-mosaico-utils` 维护；设备 ELF 游戏由外部 SDK 构建、打包和安装。
+浏览器预览地址为 `http://127.0.0.1:8460/`。原生示例的 `main/idf_component.yml` 保持 Board-neutral，只依赖 Engine；具体 Board 由示例工程的 Application CMake 层选择。`RAYLIB_LITE_BOARD` 默认是 `esp-mosaico`，也可用 `-D RAYLIB_LITE_BOARD=<board>` 选择 `examples/boards/<board>` 下的其它 Adapter。ESP-Mosaico 的 BSP 与 ESP-Iris 路径继续由其 Board component 的本地依赖配置解析。ESP-Mosaico normal Game 默认提供 Iris USB 管理、截图和远程 pointer，但固件更新采用 Recovery-first：保留的 factory Recovery 负责 USB OTA writer，并把 normal Game 安装到 `ota_0`。Recovery/Gateway 实现仍由 `esp-mosaico-utils` 维护；设备 ELF 游戏由外部 SDK 构建、打包和安装。
 
 ## 仓库目录
 
 - `src/`：引擎内部模块与 IDF backend；`include/raylib_lite/` 保存公共头文件。
-- `cmake/`：board-neutral 的 ESP-IDF 引擎接入与原生示例 Board 选择辅助文件。
+- `tools/`：开发与构建辅助工具；其中 `tools/cmake/` 放置 native asset embedding 等 CMake helper。
 - `examples/boards/`：具体开发板的示例/应用侧 Adapter；`esp-mosaico/` 是参考实现。
 - `examples/`：参考游戏、专用渲染测试、共享原生示例代码和 Board Adapter。
 - `host/`：Host ABI、RGB565 浏览器预览与固定输入回放。

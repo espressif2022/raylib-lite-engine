@@ -33,14 +33,15 @@ modules, and the PC Host simulator. Iris/Gateway product workflows are maintaine
 in `esp-mosaico-vibe`. Their boundaries and example commands are
 in [the build matrix](docs/build-matrix.EN.md).
 
-For ESP-IDF firmware, add the repository root as an extra component directory
-before IDF's `project()` call. Raylib Lite Engine is one component; there is no
-per-feature component-selection wrapper:
+For ESP-IDF firmware, consume the published component from the consuming component's `idf_component.yml`:
 
-```cmake
-set(RAYLIB_LITE_ENGINE_ROOT "/path/to/raylib-lite-engine")
-list(APPEND EXTRA_COMPONENT_DIRS "${RAYLIB_LITE_ENGINE_ROOT}")
+```yaml
+dependencies:
+  idf: ">=6.2"
+  espressif2022/raylib-lite-engine: "^0.1.0"
 ```
+
+The in-repository examples keep the same version contract and add `override_path: ../../..` only to test the current checkout. External games do not include CMake files from the Engine repository and do not add the Engine repository to `EXTRA_COMPONENT_DIRS`; IDF Component Manager resolves the installed component. Raylib Lite Engine remains one component with no per-feature component-selection wrapper.
 
 The engine supplies portable game services and RGB565 software rendering; the
 product supplies board/BSP components, the video backend, and the
@@ -63,12 +64,12 @@ python3 tools/game_cli.py sim examples/tomb_raycast --headless --frames 8
 python3 tools/game_cli.py sim examples/vertical_dock
 ```
 
-Standalone example firmware composes the same game source with a board adapter selected at build time. The ESP-Mosaico reference adapter lives in [`examples/boards/esp-mosaico`](examples/boards/esp-mosaico/) and is selected with `-DRAYLIB_LITE_BOARD=esp-mosaico`; its BSP and ESP-Iris paths are configured by that adapter. ESP-Mosaico native examples expose the Iris USB management plane plus screenshot/pointer services, but application updates are Recovery-first: the retained factory Recovery owns the USB OTA writer and installs the normal Game into `ota_0`. Recovery/Gateway tooling remains in `esp-mosaico-utils` rather than the engine. Documentation index: [docs/README.EN.md](docs/README.EN.md). Host ABI: [host/README.md](host/README.md). Host simulation needs no board adapter.
+Standalone example firmware composes the same game source with an application-side Board selected by the example project's CMake layer. `main/idf_component.yml` remains Board-neutral and depends only on the Engine; `RAYLIB_LITE_BOARD` defaults to `esp-mosaico`, while `-D RAYLIB_LITE_BOARD=<board>` selects another adapter under `examples/boards/<board>`. The ESP-Mosaico reference Board resolves its BSP and ESP-Iris dependencies through the documented local paths. Its native examples expose the Iris USB management plane plus screenshot/pointer services, while application updates remain Recovery-first: retained factory Recovery owns the USB OTA writer and installs the normal Game into `ota_0`. Recovery/Gateway tooling remains in `esp-mosaico-utils` rather than the engine. Documentation index: [docs/README.EN.md](docs/README.EN.md). Host ABI: [host/README.md](host/README.md). Host simulation needs no board adapter.
 
 ## Repository layout
 
 - `src/`: internal engine modules and IDF backends; `include/raylib_lite/` contains the public headers.
-- `cmake/`: board-neutral ESP-IDF engine registration and native-example board selection helpers.
+- `tools/`: development and build tooling; `tools/cmake/` contains CMake helpers such as native asset embedding.
 - `examples/boards/`: concrete example/application-side board adapters; `esp-mosaico/` is the reference implementation.
 - `examples/`: reference games, a dedicated render benchmark, shared native-example glue, and board adapters.
 - `host/`: native Host ABI, RGB565 renderer bridge and browser simulator.

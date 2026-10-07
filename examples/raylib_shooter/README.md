@@ -24,3 +24,15 @@ The fast compatibility layer currently accelerates `InitWindow`,
 `BeginDrawing`/`EndDrawing`, clear, pixels, rectangles, triangles, bitmap text,
 measurement and `TextFormat`. Extend that layer for additional Raylib calls;
 unsupported APIs must not silently fall back to the slow `rlsw` path.
+
+## ESP-Mosaico native dependencies / 真机构建依赖
+
+All standard ESP-Mosaico native Game builds use the same local dependency setup:
+
+```sh
+export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
+idf.py -C examples/raylib_shooter build
+```
+
+`MOSAICO_UTILS_ROOT` supplies both ESP-Iris and the upstream normal-application Recovery component. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.

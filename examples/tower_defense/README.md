@@ -29,3 +29,15 @@ python3 tools/game_cli.py sim examples/tower_defense --headless \
 
 非 headless 预览地址为 `http://127.0.0.1:8460/`；局域网预览可加
 `--listen 0.0.0.0`。
+
+## ESP-Mosaico native dependencies / 真机构建依赖
+
+All standard ESP-Mosaico native Game builds use the same local dependency setup:
+
+```sh
+export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
+idf.py -C examples/tower_defense build
+```
+
+`MOSAICO_UTILS_ROOT` supplies both ESP-Iris and the upstream normal-application Recovery component. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.

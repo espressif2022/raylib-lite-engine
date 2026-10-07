@@ -54,3 +54,15 @@ For device A/B builds, `VERTICAL_DOCK_SUBDIVIDE_SURFACES=0` disables splitting,
 `VERTICAL_DOCK_FACE_SEGMENT=<meters>` changes the split length, and
 `VERTICAL_DOCK_SCENE_DETAIL=0` removes decorative landmarks. Host timing is only
 a regression signal and must not be reported as device FPS.
+
+## ESP-Mosaico native dependencies / 真机构建依赖
+
+All standard ESP-Mosaico native Game builds use the same local dependency setup:
+
+```sh
+export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
+idf.py -C examples/vertical_dock build
+```
+
+`MOSAICO_UTILS_ROOT` supplies both ESP-Iris and the upstream normal-application Recovery component. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.
