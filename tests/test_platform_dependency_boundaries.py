@@ -163,13 +163,14 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                     self.assertIn("idf_component_get_property(RAYLIB_LITE_ENGINE_ROOT", source)
                     self.assertIn("raylib-lite-engine COMPONENT_DIR", source)
                 self.assertNotIn("support/native", source)
-                self.assertIn("RAYLIB_LITE_EXAMPLE_COMMON_DIR", source)
-                self.assertIn("../../common", source)
-                self.assertIn("native_module_main.c", source)
+                self.assertNotIn("RAYLIB_LITE_EXAMPLE_COMMON_DIR", source)
+                self.assertNotIn("../../common", source)
+                self.assertNotIn("native_module_main.c", source)
+                self.assertIn("examples_common", source)
                 self.assertNotRegex(source, r"REQUIRES[^)]*raylib-lite-engine")
                 top_source = top.read_text(encoding="utf-8")
                 self.assertNotIn("raylib_lite_native_project.cmake", top_source)
-                self.assertIn("../common/raylib_lite_example_project.cmake", top_source)
+                self.assertIn("../common_components/examples_common/project.cmake", top_source)
                 self.assertNotIn("../../cmake/", top_source)
                 self.assertIn("${RAYLIB_LITE_BOARD}", source)
                 self.assertNotIn("${RAYLIB_LITE_ENGINE_ROOT}/cmake/raylib_lite_native_assets.cmake", source)
@@ -363,7 +364,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
             self.assertFalse((ENGINE / "examples" / directory / "elf").exists())
 
     def test_example_sources_do_not_include_device_sdks(self) -> None:
-        feedback = (ENGINE / "examples/common/native_feedback.h").read_text()
+        feedback = (ENGINE / "examples/common_components/examples_common/include/native_feedback.h").read_text()
         self.assertNotIn("mosaico_native_feedback_", feedback)
 
         forbidden = re.compile(
@@ -387,7 +388,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertFalse((host / "include/raylib_lite_game_module.h").exists())
         self.assertFalse((ENGINE / "include/raylib_lite/raylib_lite_host_game.h").exists())
         self.assertFalse((ENGINE / "include/raylib_lite/raylib_lite_game_module.h").exists())
-        self.assertTrue((ENGINE / "examples/common/raylib_lite_game_module.h").is_file())
+        self.assertTrue((ENGINE / "examples/common_components/examples_common/include/raylib_lite_game_module.h").is_file())
         header = (host / "include/raylib_lite_host_game.h").read_text()
         for token in ("mosaico_host_", "MOSAICO_HOST_"):
             self.assertNotIn(token, header)
@@ -408,8 +409,8 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
 
     def test_product_runtime_abi_mapping_is_isolated_to_example_bridge(self) -> None:
         self.assertFalse((ENGINE / "support/native").exists())
-        bridge = ENGINE / "examples/common/raylib_lite_game_module_contract.h"
-        module_header = ENGINE / "examples/common/raylib_lite_game_module.h"
+        bridge = ENGINE / "examples/common_components/examples_common/include/raylib_lite_game_module_contract.h"
+        module_header = ENGINE / "examples/common_components/examples_common/include/raylib_lite_game_module.h"
         source = bridge.read_text(encoding="utf-8")
         module_source = module_header.read_text(encoding="utf-8")
         self.assertNotIn("raylib_lite_host_", module_source)
@@ -462,20 +463,22 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
                     ("file(GLOB example_sources" in cmake and
                      "SRCS ${example_sources}" in cmake))
                 self.assertNotIn("support/native", cmake)
-                self.assertIn("../../common", cmake)
-                self.assertIn("native_module_main.c", cmake)
-                self.assertTrue((ENGINE / "examples/common/raylib_lite_game_module_contract.h").is_file())
+                self.assertNotIn("../../common", cmake)
+                self.assertNotIn("native_module_main.c", cmake)
+                self.assertIn("examples_common", cmake)
+                self.assertTrue((ENGINE / "examples/common_components/examples_common/include/raylib_lite_game_module_contract.h").is_file())
                 self.assertIn("RAYLIB_LITE_GAME_NATIVE=1", cmake)
                 self.assertIn("espressif2022/raylib-lite-engine:", component_manifest)
                 self.assertNotIn("esp-mosaico:", component_manifest)
                 self.assertNotIn("../../boards/", component_manifest)
                 self.assertIn("${RAYLIB_LITE_BOARD}", cmake)
-                self.assertIn("../common/raylib_lite_example_project.cmake", top)
+                self.assertIn("../common_components/examples_common/project.cmake", top)
                 self.assertNotIn("raylib_lite_native_project.cmake", top)
 
         living_root = ENGINE / "examples/living_worlds"
         living = living_root / "main"
-        native = living_root / "native"
+        native = living / "native"
+        self.assertFalse((living_root / "native").exists())
         self.assertFalse((living / "main.c").exists())
         self.assertFalse((living / "living_worlds_native.c").exists())
         self.assertFalse((living / "living_worlds_native_assets.c").exists())
@@ -489,7 +492,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertNotIn("living_worlds:", living_manifest)
         self.assertNotIn("../../boards/", living_manifest)
         living_cmake = (living / "CMakeLists.txt").read_text()
-        self.assertIn("REQUIRES ${RAYLIB_LITE_BOARD} esp_driver_jpeg log",
+        self.assertIn("REQUIRES examples_common ${RAYLIB_LITE_BOARD} esp_driver_jpeg log",
                       living_cmake)
         self.assertNotIn("${RAYLIB_LITE_BOARD} living_worlds", living_cmake)
         self.assertIn("raylib_lite_native_embed_assets", living_cmake)
@@ -502,8 +505,23 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertFalse((extension / "idf_component.yml").exists())
         self.assertFalse((extension / "living_worlds_native_assets.c").exists())
 
+    def test_examples_common_owns_launcher_and_native_fps(self) -> None:
+        common = ENGINE / "examples/common_components/examples_common"
+        self.assertFalse((ENGINE / "examples/common").exists())
+        cmake = (common / "CMakeLists.txt").read_text()
+        self.assertIn("RAYLIB_LITE_EXAMPLE_TARGET_FPS", cmake)
+        self.assertIn("RAYLIB_LITE_NATIVE_TARGET_FPS=${RAYLIB_LITE_EXAMPLE_TARGET_FPS}", cmake)
+
+        for game, fps in (("neon_rift_rally", 30), ("tomb_raycast", 50)):
+            top = (ENGINE / "examples" / game / "CMakeLists.txt").read_text()
+            main = (ENGINE / "examples" / game / "main/CMakeLists.txt").read_text()
+            with self.subTest(game=game):
+                self.assertIn(f"set(RAYLIB_LITE_EXAMPLE_TARGET_FPS {fps})", top)
+                self.assertNotIn("RAYLIB_LITE_NATIVE_TARGET_FPS", main)
+
     def test_native_examples_select_board_adapter(self) -> None:
         board = ENGINE / "examples/boards/esp-mosaico"
+        self.assertFalse((ENGINE / "examples/common").exists())
         self.assertFalse((ENGINE / "ports/esp_mosaico").exists())
         self.assertFalse((ENGINE / "cmake").exists())
         self.assertFalse((board / "board.cmake").exists())
@@ -533,17 +551,26 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn('"iris_display_input.c"', board_component)
         self.assertIn("esp_mosaico_app_recovery", board_component)
         self.assertNotIn("esp_mosaico_iris.c", board_component)
-        self.assertIn('"../../common"', board_component)
+        self.assertNotIn('"../../common"', board_component)
+        self.assertIn("examples_common", board_component)
         self.assertIn("raylib-lite-engine", board_component)
         self.assertNotIn("native_module_main.c", board_component)
         self.assertNotIn("native_feedback.c", board_component)
         self.assertNotIn("support/native", board_component)
         self.assertNotIn("RAYLIB_LITE_ENGINE_ROOT", board_component)
 
-        selector = (ENGINE / "examples/common/raylib_lite_example_project.cmake").read_text()
+        common_component = ENGINE / "examples/common_components/examples_common"
+        self.assertTrue((common_component / "CMakeLists.txt").is_file())
+        common_cmake = (common_component / "CMakeLists.txt").read_text()
+        self.assertIn('"native_module_main.c"', common_cmake)
+        self.assertIn('"native_feedback.c"', common_cmake)
+        self.assertIn('"include"', common_cmake)
+        self.assertIn("raylib-lite-engine", common_cmake)
+        selector = (common_component / "project.cmake").read_text()
         self.assertIn('set(RAYLIB_LITE_BOARD "esp-mosaico" CACHE STRING', selector)
         self.assertIn('"${_raylib_lite_boards_root}/${RAYLIB_LITE_BOARD}"', selector)
-        self.assertIn("list(APPEND EXTRA_COMPONENT_DIRS \"${RAYLIB_LITE_BOARD_DIR}\")", selector)
+        self.assertIn('"${CMAKE_CURRENT_LIST_DIR}"', selector)
+        self.assertIn('"${RAYLIB_LITE_BOARD_DIR}"', selector)
         self.assertNotIn("extensions/${RAYLIB_LITE_GAME_NAME}", selector)
         self.assertIn("Unknown RAYLIB_LITE_BOARD", selector)
         self.assertIn("sdkconfig.defaults", selector)
@@ -562,7 +589,8 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
             with self.subTest(game=root.name):
                 self.assertNotIn("esp-mosaico:", manifest)
                 self.assertNotIn("../../boards/", manifest)
-                self.assertIn("../common/raylib_lite_example_project.cmake", top)
+                self.assertIn("../common_components/examples_common/project.cmake", top)
+                self.assertIn("examples_common", main_cmake)
                 self.assertIn("${RAYLIB_LITE_BOARD}", main_cmake)
                 self.assertNotIn("raylib_lite_native_project.cmake", top)
 
@@ -619,9 +647,9 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
 
     def test_shared_example_glue_does_not_include_concrete_bsp(self) -> None:
         forbidden = re.compile(r'#\s*include\s*[<"](?:bsp/|esp_mosaico)')
-        common = ENGINE / "examples/common"
-        for source_path in common.glob("*"):
-            if source_path.suffix not in {".c", ".h"}:
+        common = ENGINE / "examples/common_components/examples_common"
+        for source_path in common.rglob("*"):
+            if not source_path.is_file() or source_path.suffix not in {".c", ".h"}:
                 continue
             with self.subTest(path=source_path.relative_to(ENGINE)):
                 self.assertIsNone(forbidden.search(source_path.read_text()))
@@ -686,7 +714,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
             with self.subTest(path=cmake.relative_to(ENGINE)):
                 self.assertIsNone(product.search(cmake.read_text()))
-        launcher = ENGINE / "examples/common/native_module_main.c"
+        launcher = ENGINE / "examples/common_components/examples_common/native_module_main.c"
         text = launcher.read_text()
         for call in ("raylib_lite_native_boot()", "raylib_lite_native_first_present()"):
             with self.subTest(path=launcher.relative_to(ENGINE), call=call):

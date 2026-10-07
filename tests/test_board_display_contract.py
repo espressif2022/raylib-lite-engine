@@ -7,7 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 BOARD = ROOT / "examples" / "boards" / "esp-mosaico"
 SOURCE = BOARD / "board.c"
 STRIP = BOARD / "mosaico_strip_present.c"
-HEADER = ROOT / "examples" / "common" / "raylib_lite_example_board.h"
+HEADER = (ROOT / "examples" / "common_components" / "examples_common" /
+          "include" / "raylib_lite_example_board.h")
 
 
 class BoardDisplayContractTest(unittest.TestCase):

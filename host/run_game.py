@@ -191,7 +191,7 @@ class GenericHostRuntime:
             ENGINE_ROOT / "src/renderer/raylib_lite_tilemap.c",
         ]
         includes = [ENGINE_ROOT / "host/include", ENGINE_ROOT / "host",
-                    ENGINE_ROOT / "examples/common",
+                    ENGINE_ROOT / "examples/common_components/examples_common/include",
                     ENGINE_ROOT / "include/raylib_lite",
                     ENGINE_ROOT / "compat/raylib/include",
                     project / "main", project / "assets/generated",

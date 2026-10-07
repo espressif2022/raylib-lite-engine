@@ -6,11 +6,10 @@ idf_component_register(
         "game_audio.c"
         "platform_esp_audio.c"
         "platform_audio_write_all.c"
-    INCLUDE_DIRS
-        "../../common"
     PRIV_INCLUDE_DIRS
         "."
     REQUIRES
+        examples_common
         raylib-lite-engine
         esp_display_present
         esp-mosaico-bsp

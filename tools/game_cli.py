@@ -171,7 +171,7 @@ def engine_games() -> list[dict[str, object]]:
         main_source = main_cmake.read_text(encoding="utf-8") if main_cmake.is_file() else ""
         native = (main_cmake.is_file() and top.is_file() and
                   "espressif2022/raylib-lite-engine" in component_source and
-                  "raylib_lite_example_project.cmake" in top_source and
+                  "common_components/examples_common/project.cmake" in top_source and
                   "${RAYLIB_LITE_BOARD}" in main_source)
         game_boards = list(boards) if native else []
         if host or game_boards:

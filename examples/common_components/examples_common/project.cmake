@@ -4,7 +4,7 @@ set(RAYLIB_LITE_BOARD "esp-mosaico" CACHE STRING
     "Raylib Lite example Board component")
 
 get_filename_component(_raylib_lite_boards_root
-    "${CMAKE_CURRENT_LIST_DIR}/../boards" ABSOLUTE)
+    "${CMAKE_CURRENT_LIST_DIR}/../../boards" ABSOLUTE)
 file(GLOB _raylib_lite_board_candidates RELATIVE "${_raylib_lite_boards_root}"
     "${_raylib_lite_boards_root}/*")
 set(_raylib_lite_available_boards)
@@ -26,7 +26,9 @@ if(NOT EXISTS "${RAYLIB_LITE_BOARD_DIR}/CMakeLists.txt" OR
         "Unknown RAYLIB_LITE_BOARD='${RAYLIB_LITE_BOARD}'. Available: ${_available}")
 endif()
 
-list(APPEND EXTRA_COMPONENT_DIRS "${RAYLIB_LITE_BOARD_DIR}")
+list(APPEND EXTRA_COMPONENT_DIRS
+    "${CMAKE_CURRENT_LIST_DIR}"
+    "${RAYLIB_LITE_BOARD_DIR}")
 
 set(_raylib_lite_board_defaults "${RAYLIB_LITE_BOARD_DIR}/sdkconfig.defaults")
 if(EXISTS "${_raylib_lite_board_defaults}")

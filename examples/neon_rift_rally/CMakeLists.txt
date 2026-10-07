@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
-include("${CMAKE_CURRENT_LIST_DIR}/../common/raylib_lite_example_project.cmake")
+set(RAYLIB_LITE_EXAMPLE_TARGET_FPS 30)
+include("${CMAKE_CURRENT_LIST_DIR}/../common_components/examples_common/project.cmake")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(neon_rift_rally VERSION 1.0.0)
