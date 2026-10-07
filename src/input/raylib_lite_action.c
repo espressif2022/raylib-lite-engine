@@ -65,10 +65,13 @@ void raylib_lite_action_reset(void)
 
 void raylib_lite_action_set_zones(const raylib_lite_action_zone_t *zones, size_t count)
 {
-    if (!zones) { s_zone_count = 0; return; }
+    s_zone_count = 0;
+    if (!zones) return;
     if (count > RAYLIB_LITE_ACTION_ZONE_CAPACITY) count = RAYLIB_LITE_ACTION_ZONE_CAPACITY;
-    memcpy(s_zones, zones, count * sizeof(*zones));
-    s_zone_count = count;
+    for (size_t i = 0; i < count; ++i) {
+        if (zones[i].action >= RAYLIB_LITE_ACTION_COUNT) continue;
+        s_zones[s_zone_count++] = zones[i];
+    }
 }
 
 void raylib_lite_action_set_axis_threshold(int32_t threshold)
