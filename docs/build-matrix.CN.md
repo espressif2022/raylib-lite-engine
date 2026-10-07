@@ -14,7 +14,7 @@ Raylib Lite Engine 明确分离三条接入路径：PC Host、ESP-IDF Board 固�
 
 Game 只拥有可移植 model/view/module source。其 `main/idf_component.yml` 声明 `espressif2022/raylib-lite-engine: ^0.1.0`；仅仓库内联调时，额外用 `override_path` 把这一版本依赖指向当前 checkout。Game 的 application manifest 再独立依赖应用侧 Board component。Game 顶层 CMake 不 include Engine 仓库 helper，也不通过 `EXTRA_COMPONENT_DIRS` 发现 Engine。
 
-Host 的 `game.sim.json` 和 Board build 编译同一个 `main/game_module.c`。Board-neutral 的示例 glue 放在 [`examples/common`](../examples/common/)：generic native launcher、抽象 Board contract、haptic helper 和共享 Product ABI bridge；具体 Board 代码只放在 `examples/boards/<board>/`。Game 若需要仅设备侧使用的实现，可隔离在自身的 `native/` 目录；这里可以使用板卡无关的 ESP-IDF / Engine 服务和 example-Board contract，但不能包含具体 Board API。Living Worlds 的 ESP-IDF JPEG decode 就位于 `examples/living_worlds/native/`，资源仍由通用 native asset helper 嵌入；Host/native 继续共用同一个 `game_module.c`。这些都属于 example/Application 层而不是 Engine public API。
+Host 的 `game.sim.json` 和 Board build 编译同一个 `main/game_module.c`。Board-neutral 的共享示例 glue 由 [`examples/common_components/examples_common`](../examples/common_components/examples_common/) IDF component 拥有：generic native launcher、抽象 Board contract、haptic helper 和共享 Product ABI bridge；具体 Board 代码只放在 `examples/boards/<board>/`。Game 若需要仅设备侧使用的实现，可隔离在自身的 `main/native/` 目录；它仍由 Game `main` component 编译，可以使用板卡无关的 ESP-IDF / Engine 服务和 example-Board contract，但不能包含具体 Board API。Living Worlds 的 ESP-IDF JPEG decode 位于 `examples/living_worlds/main/native/`，资源仍由通用 native asset helper 嵌入；Host/native 继续共用同一个 `game_module.c`。这些都属于 example/Application 层而不是 Engine public API。
 
 查询支持矩阵：
 
@@ -35,7 +35,7 @@ W07 已在 Host 与 ESP-Mosaico 两条路径实际验证：
 
 ## 原生固件
 
-ESP-Mosaico 是默认 application-side Board component，位于 [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/)。Game manifest 不再写具体 Board；Application CMake 层默认选择 `RAYLIB_LITE_BOARD=esp-mosaico`，只把 `examples/boards/<board>` 作为所选 Board component 加入构建。使用 `-D RAYLIB_LITE_BOARD=<board>` 可选择其它 Adapter。Game-specific device glue 留在 Game 自己的 `native/` 边界；如果它需要新的板级能力，应扩展通用 Board contract/provider，而不是增加 `boards/<board>/extensions/<game>`。ESP-Mosaico 仍对所有标准 Game 统一使用 BSP 与 utils 两个本地依赖变量。它的 retained-Recovery partition contract 保持 normal Game 位于 `ota_0`、factory partition 保留给 Recovery。
+ESP-Mosaico 是默认 application-side Board component，位于 [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/)。Game manifest 不再写具体 Board；Application CMake 层默认选择 `RAYLIB_LITE_BOARD=esp-mosaico`，并把共享 `examples_common` component 与 `examples/boards/<board>` 所选 Board component 加入构建。使用 `-D RAYLIB_LITE_BOARD=<board>` 可选择其它 Adapter。Game-specific device glue 留在 Game 自己的 `main/native/` 边界；如果它需要新的板级能力，应扩展通用 Board contract/provider，而不是增加 `boards/<board>/extensions/<game>`。ESP-Mosaico 仍对所有标准 Game 统一使用 BSP 与 utils 两个本地依赖变量。它的 retained-Recovery partition contract 保持 normal Game 位于 `ota_0`、factory partition 保留给 Recovery。
 
 ```sh
 export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
@@ -49,7 +49,7 @@ idf.py -C examples/sky_hop -B /tmp/sky-hop-native build
 
 ## ELF 接入
 
-先用 Host 验证 portable gameplay，再构建对应的外部 Module SDK 工程。仓库示例共用 [`examples/common/raylib_lite_game_module_contract.h`](../examples/common/raylib_lite_game_module_contract.h)；它只在 `MOSAICO_GAME_ELF` 条件下映射外部产品 module/runtime ABI。Engine 组件既不拥有 Host ABI header，也不拥有 example Game Module contract，并且不导入 Product Runtime ABI。
+先用 Host 验证 portable gameplay，再构建对应的外部 Module SDK 工程。仓库示例共用 [`examples/common_components/examples_common/include/raylib_lite_game_module_contract.h`](../examples/common_components/examples_common/include/raylib_lite_game_module_contract.h)；它只在 `MOSAICO_GAME_ELF` 条件下映射外部产品 module/runtime ABI。Engine 组件既不拥有 Host ABI header，也不拥有 example Game Module contract，并且不导入 Product Runtime ABI。
 
 ELF 编译/打包由外部 Module SDK 负责。安装、更新、设备身份、Gateway、Iris/Recovery 由 `esp-mosaico-vibe` 负责。Engine `game_cli.py` 刻意没有 ELF build 命令。
 

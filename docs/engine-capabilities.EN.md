@@ -46,6 +46,6 @@ Raylib Lite Engine is one ESP-IDF component: `raylib-lite-engine`. Public neutra
 
 ## Configuration and lifecycle
 
-The component-root `Kconfig` uses `RAYLIB_LITE_*` Engine configuration names. Board-specific ESP-Mosaico options use the `ESP_MOSAICO_*` namespace. Shared native-example launcher/Board/feedback/Product-ABI glue lives under `examples/common` and is intentionally excluded from the published Engine component.
+The component-root `Kconfig` uses `RAYLIB_LITE_*` Engine configuration names. Board-specific ESP-Mosaico options use the `ESP_MOSAICO_*` namespace. Shared native-example launcher/Board/feedback/Product-ABI glue is owned by the application-side `examples/common_components/examples_common` IDF component and is intentionally excluded from the published Engine component.
 
 Runtime asset services consume a read-only mmap partition, a resident image alias, a bounded read backing, or explicitly registered memory. Host simulation reads generated assets and does not mount device flash.

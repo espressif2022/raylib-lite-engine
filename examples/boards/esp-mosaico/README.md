@@ -2,7 +2,7 @@
 
 This directory is the ESP-Mosaico board implementation used by Raylib Lite native examples. It is an example/application-side IDF component, not part of the Engine component.
 
-It implements the shared Board contract from [`examples/common/raylib_lite_example_board.h`](../../common/raylib_lite_example_board.h) on top of `esp-mosaico-bsp`, and provides RGB565 display submission, touch/optional IMU input, PCM audio output, and board lifecycle management. Generic launcher/feedback glue remains in `examples/common`; concrete ESP-Mosaico implementation stays here.
+It implements the shared Board contract from [`examples/common_components/examples_common/include/raylib_lite_example_board.h`](../../common_components/examples_common/include/raylib_lite_example_board.h) on top of `esp-mosaico-bsp`, and provides RGB565 display submission, touch/optional IMU input, PCM audio output, and board lifecycle management. Generic launcher/feedback/contracts are owned by the `examples_common` application component; concrete ESP-Mosaico implementation stays here.
 
 Repository Game manifests remain Board-neutral. The example Application CMake selector defaults `RAYLIB_LITE_BOARD` to `esp-mosaico`; explicitly passing `-D RAYLIB_LITE_BOARD=esp-mosaico` selects the same component. `project.cmake` supplies the Board's pre-project USB-only ESP-Iris profile. All standard ESP-Mosaico native builds use the same local dependency setup:
 

@@ -33,7 +33,7 @@ Host 显示实现通过 `raylib_lite_video_backend_t` 接入通用 framebuffer p
 | `render_rgb565_v1` | 写入调用方提供的 RGB565 缓冲，使用像素 stride |
 | `state_json_v1` | 输出回放检查所需的状态 JSON |
 
-实际导出符号使用 `raylib_lite_host_game_*_v1`；完整签名以 Host 专用头 [`raylib_lite_host_game.h`](include/raylib_lite_host_game.h) 为准。`state_hash_v1` 也在 ABI 头中声明；当前 Host runner 读取描述符、状态 JSON 和画面，不靠哈希代替这些检查。产品 ELF Runtime ABI 不在公共 Host header 中；仓库示例通过 `examples/common/raylib_lite_game_module_contract.h` 在 ELF 分支做 application-layer 映射。
+实际导出符号使用 `raylib_lite_host_game_*_v1`；完整签名以 Host 专用头 [`raylib_lite_host_game.h`](include/raylib_lite_host_game.h) 为准。`state_hash_v1` 也在 ABI 头中声明；当前 Host runner 读取描述符、状态 JSON 和画面，不靠哈希代替这些检查。产品 ELF Runtime ABI 不在公共 Host header 中；仓库示例通过 `examples/common_components/examples_common/include/raylib_lite_game_module_contract.h` 在 ELF 分支做 application-layer 映射。
 
 启动时 `run_game.py` 会：
 
