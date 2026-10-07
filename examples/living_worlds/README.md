@@ -34,7 +34,7 @@ python3 tools/game_cli.py sim examples/living_worlds
 python3 tools/game_cli.py sim examples/living_worlds --headless --frames 300
 ```
 
-本目录也是独立 ESP-IDF native 工程。`main/idf_component.yml` 声明 Engine、ESP-Mosaico Board 及 Living Worlds Board extension；仓库内通过 `override_path` 联调本仓库组件。ESP-Mosaico BSP 与 utils checkout 使用统一的本地依赖变量；设备安装与更新仍由 Board/Recovery 流程负责。设备安装与更新由 `esp-mosaico-vibe` 的 Recovery-first 流程维护。Host 仿真不需要板级依赖。
+本目录也是独立 ESP-IDF native 工程。`main/idf_component.yml` 只声明版本化 Engine 依赖，Application CMake 选择通用 Board component；Living Worlds 的 device-only JPEG adapter 隔离在 `native/`，不依赖具体 Board API。仓库内通过 `override_path` 联调 Engine；ESP-Mosaico BSP 与 utils checkout 使用统一的本地依赖变量。设备安装与更新由 `esp-mosaico-vibe` 的 Recovery-first 流程维护，Host 仿真不需要板级依赖。
 
 ```bash
 idf.py -C examples/living_worlds build

@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-import re
 import shutil
 import subprocess
 import sys
@@ -174,15 +173,7 @@ def engine_games() -> list[dict[str, object]]:
                   "espressif2022/raylib-lite-engine" in component_source and
                   "raylib_lite_example_project.cmake" in top_source and
                   "${RAYLIB_LITE_BOARD}" in main_source)
-        game_boards: list[str] = []
-        if native:
-            extension_required = re.search(
-                rf"\bREQUIRES\b[^)]*\b{re.escape(project.name)}\b", main_source) is not None
-            for board in boards:
-                extension = (ENGINE_ROOT / "examples/boards" / board /
-                             "extensions" / project.name / "CMakeLists.txt")
-                if not extension_required or extension.is_file():
-                    game_boards.append(board)
+        game_boards = list(boards) if native else []
         if host or game_boards:
             games.append({"name": project.name, "path": str(project),
                           "host": host, "boards": game_boards})

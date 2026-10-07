@@ -1,9 +1,0 @@
-version: "0.1.0"
-description: ESP-Mosaico native asset extension for the Living Worlds example
-license: Apache-2.0
-dependencies:
-  idf: ">=6.2"
-  espressif2022/raylib-lite-engine: "^0.1.0"
-  esp-mosaico:
-    version: "0.1.0"
-    override_path: ../..

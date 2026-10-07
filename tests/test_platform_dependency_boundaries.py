@@ -475,19 +475,32 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
 
         living_root = ENGINE / "examples/living_worlds"
         living = living_root / "main"
+        native = living_root / "native"
         self.assertFalse((living / "main.c").exists())
         self.assertFalse((living / "living_worlds_native.c").exists())
         self.assertFalse((living / "living_worlds_native_assets.c").exists())
         self.assertTrue((living / "living_worlds_native_assets.h").is_file())
+        self.assertTrue((native / "living_worlds_native_assets.c").is_file())
+        native_source = (native / "living_worlds_native_assets.c").read_text()
+        self.assertIn('#include "driver/jpeg_decode.h"', native_source)
+        for token in ("esp-mosaico", "esp_mosaico", "esp_iris", "bsp/"):
+            self.assertNotIn(token, native_source)
         living_manifest = (living / "idf_component.yml").read_text()
         self.assertNotIn("living_worlds:", living_manifest)
         self.assertNotIn("../../boards/", living_manifest)
-        self.assertIn("REQUIRES ${RAYLIB_LITE_BOARD} living_worlds",
-                      (living / "CMakeLists.txt").read_text())
+        living_cmake = (living / "CMakeLists.txt").read_text()
+        self.assertIn("REQUIRES ${RAYLIB_LITE_BOARD} esp_driver_jpeg log",
+                      living_cmake)
+        self.assertNotIn("${RAYLIB_LITE_BOARD} living_worlds", living_cmake)
+        self.assertIn("raylib_lite_native_embed_assets", living_cmake)
+        self.assertIn("EXCLUDE aurora.atlas ocean.atlas sunrise.atlas rainforest.atlas",
+                      living_cmake)
+        self.assertIn("EXTRA_FILES aurora.jpg ocean.jpg sunrise.jpg rainforest.jpg",
+                      living_cmake)
         extension = ENGINE / "examples/boards/esp-mosaico/extensions/living_worlds"
-        self.assertTrue((extension / "living_worlds_native_assets.c").is_file())
-        self.assertTrue((extension / "CMakeLists.txt").is_file())
-        self.assertTrue((extension / "idf_component.yml").is_file())
+        self.assertFalse((extension / "CMakeLists.txt").exists())
+        self.assertFalse((extension / "idf_component.yml").exists())
+        self.assertFalse((extension / "living_worlds_native_assets.c").exists())
 
     def test_native_examples_select_board_adapter(self) -> None:
         board = ENGINE / "examples/boards/esp-mosaico"
@@ -531,7 +544,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn('set(RAYLIB_LITE_BOARD "esp-mosaico" CACHE STRING', selector)
         self.assertIn('"${_raylib_lite_boards_root}/${RAYLIB_LITE_BOARD}"', selector)
         self.assertIn("list(APPEND EXTRA_COMPONENT_DIRS \"${RAYLIB_LITE_BOARD_DIR}\")", selector)
-        self.assertIn("extensions/${RAYLIB_LITE_GAME_NAME}", selector)
+        self.assertNotIn("extensions/${RAYLIB_LITE_GAME_NAME}", selector)
         self.assertIn("Unknown RAYLIB_LITE_BOARD", selector)
         self.assertIn("sdkconfig.defaults", selector)
         self.assertIn("project.cmake", selector)

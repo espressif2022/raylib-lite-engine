@@ -28,13 +28,6 @@ endif()
 
 list(APPEND EXTRA_COMPONENT_DIRS "${RAYLIB_LITE_BOARD_DIR}")
 
-get_filename_component(RAYLIB_LITE_GAME_NAME "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
-set(RAYLIB_LITE_BOARD_EXTENSION_DIR
-    "${RAYLIB_LITE_BOARD_DIR}/extensions/${RAYLIB_LITE_GAME_NAME}")
-if(EXISTS "${RAYLIB_LITE_BOARD_EXTENSION_DIR}/CMakeLists.txt")
-    list(APPEND EXTRA_COMPONENT_DIRS "${RAYLIB_LITE_BOARD_EXTENSION_DIR}")
-endif()
-
 set(_raylib_lite_board_defaults "${RAYLIB_LITE_BOARD_DIR}/sdkconfig.defaults")
 if(EXISTS "${_raylib_lite_board_defaults}")
     list(PREPEND SDKCONFIG_DEFAULTS "${_raylib_lite_board_defaults}")

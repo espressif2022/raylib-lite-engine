@@ -9,79 +9,14 @@
 #include "raylib_lite_example_board.h"
 
 static const char *TAG = "living_worlds_assets";
-static raylib_lite_result_t s_registration_result = RAYLIB_LITE_OK;
-
-#define ATLAS_SYMBOLS(name) \
-    extern const uint8_t _binary_##name##_atlas_start[]; \
-    extern const uint8_t _binary_##name##_atlas_end[]
-ATLAS_SYMBOLS(sunrise_cliff_front);
-ATLAS_SYMBOLS(sunrise_cliff_side);
-ATLAS_SYMBOLS(sunrise_cliff_rear);
-ATLAS_SYMBOLS(aurora_ice_front);
-ATLAS_SYMBOLS(aurora_ice_side);
-ATLAS_SYMBOLS(aurora_ice_rear);
-ATLAS_SYMBOLS(ocean_reef_left_front);
-ATLAS_SYMBOLS(ocean_reef_left_side);
-ATLAS_SYMBOLS(ocean_reef_left_rear);
-ATLAS_SYMBOLS(ocean_reef_right_front);
-ATLAS_SYMBOLS(ocean_reef_right_side);
-ATLAS_SYMBOLS(ocean_reef_right_rear);
-ATLAS_SYMBOLS(rainforest_falls);
-#define SOUND_SYMBOLS(name) \
-    extern const uint8_t _binary_##name##_sound_start[]; \
-    extern const uint8_t _binary_##name##_sound_end[]
-SOUND_SYMBOLS(aurora_wind_ice);
-SOUND_SYMBOLS(ocean_ambience);
-SOUND_SYMBOLS(sunrise_wind);
-SOUND_SYMBOLS(rainforest_ambience);
-extern const uint8_t _binary_ocean_jpg_start[], _binary_ocean_jpg_end[];
-extern const uint8_t _binary_aurora_jpg_start[], _binary_aurora_jpg_end[];
-extern const uint8_t _binary_sunrise_jpg_start[], _binary_sunrise_jpg_end[];
-extern const uint8_t _binary_rainforest_jpg_start[], _binary_rainforest_jpg_end[];
 
 struct living_worlds_native_assets {
     jpeg_decoder_handle_t jpeg;
     void *background_pixels;
 };
 
-static void register_asset(const char *name, const uint8_t *start,
-                           const uint8_t *end)
-{
-    if (s_registration_result != RAYLIB_LITE_OK) return;
-    s_registration_result = raylib_lite_asset_register_memory(
-        name, start, (size_t)(end - start));
-}
-
-void raylib_lite_register_native_assets(void)
-{
-    s_registration_result = RAYLIB_LITE_OK;
-#define REGISTER_ATLAS(name) register_asset(#name ".atlas", \
-    _binary_##name##_atlas_start, _binary_##name##_atlas_end)
-    REGISTER_ATLAS(sunrise_cliff_front);
-    REGISTER_ATLAS(sunrise_cliff_side);
-    REGISTER_ATLAS(sunrise_cliff_rear);
-    REGISTER_ATLAS(aurora_ice_front);
-    REGISTER_ATLAS(aurora_ice_side);
-    REGISTER_ATLAS(aurora_ice_rear);
-    REGISTER_ATLAS(ocean_reef_left_front);
-    REGISTER_ATLAS(ocean_reef_left_side);
-    REGISTER_ATLAS(ocean_reef_left_rear);
-    REGISTER_ATLAS(ocean_reef_right_front);
-    REGISTER_ATLAS(ocean_reef_right_side);
-    REGISTER_ATLAS(ocean_reef_right_rear);
-    REGISTER_ATLAS(rainforest_falls);
-#undef REGISTER_ATLAS
-#define REGISTER_SOUND(name) register_asset(#name ".sound", \
-    _binary_##name##_sound_start, _binary_##name##_sound_end)
-    REGISTER_SOUND(aurora_wind_ice);
-    REGISTER_SOUND(ocean_ambience);
-    REGISTER_SOUND(sunrise_wind);
-    REGISTER_SOUND(rainforest_ambience);
-#undef REGISTER_SOUND
-}
-
-/* Preserve the established Living Worlds native Board tuning while using the
- * shared native launcher. This remains application-layer policy. */
+/* Game-side native requirements consumed through the abstract example-Board
+ * contract. No concrete Board API is referenced here. */
 void raylib_lite_example_game_board_config(raylib_lite_example_board_config_t *config)
 {
     if (!config) return;
@@ -110,7 +45,6 @@ raylib_lite_result_t living_worlds_native_assets_open(
 {
     if (!out_assets) return RAYLIB_LITE_INVALID_ARGUMENT;
     *out_assets = NULL;
-    if (s_registration_result != RAYLIB_LITE_OK) return s_registration_result;
     living_worlds_native_assets_t *assets = calloc(1, sizeof(*assets));
     if (!assets) return RAYLIB_LITE_NO_MEMORY;
     const jpeg_decode_engine_cfg_t config = {
@@ -127,13 +61,19 @@ raylib_lite_result_t living_worlds_native_assets_open(
 }
 
 static raylib_lite_result_t decode_background(living_worlds_native_assets_t *assets,
-    const char *name, const uint8_t *start, const uint8_t *end,
-    raylib_lite_atlas_t *out, void **out_pixels)
+    const char *name, raylib_lite_atlas_t *out, void **out_pixels)
 {
+    raylib_lite_asset_view_t source = {0};
+    raylib_lite_result_t result = raylib_lite_asset_open(name, &source);
+    if (result != RAYLIB_LITE_OK) return result;
+
     jpeg_decode_picture_info_t info = {0};
-    const size_t stream_size = (size_t)(end - start);
-    esp_err_t error = jpeg_decoder_get_info(start, stream_size, &info);
-    if (error != ESP_OK) return from_esp_error(error);
+    const size_t stream_size = source.size;
+    esp_err_t error = jpeg_decoder_get_info(source.data, stream_size, &info);
+    if (error != ESP_OK) {
+        raylib_lite_asset_release(&source);
+        return from_esp_error(error);
+    }
     const size_t padded_width = (info.width + 15U) & ~15U;
     const size_t padded_height = (info.height + 15U) & ~15U;
     const size_t required = padded_width * padded_height * 2U;
@@ -143,6 +83,7 @@ static raylib_lite_result_t decode_background(living_worlds_native_assets_t *ass
     };
     void *pixels = jpeg_alloc_decoder_mem(required, &memory, &allocated);
     if (!pixels || allocated < required) {
+        raylib_lite_asset_release(&source);
         free(pixels);
         return RAYLIB_LITE_NO_MEMORY;
     }
@@ -152,8 +93,9 @@ static raylib_lite_result_t decode_background(living_worlds_native_assets_t *ass
         .conv_std = JPEG_YUV_RGB_CONV_STD_BT601,
     };
     uint32_t output_size = 0;
-    error = jpeg_decoder_process(assets->jpeg, &config, start, stream_size,
+    error = jpeg_decoder_process(assets->jpeg, &config, source.data, stream_size,
                                  pixels, allocated, &output_size);
+    raylib_lite_asset_release(&source);
     if (error != ESP_OK) {
         free(pixels);
         return from_esp_error(error);
@@ -189,22 +131,15 @@ static int load_background(void *context, living_worlds_atlases_t *atlases,
     living_worlds_native_assets_t *assets = context;
     if (!assets) return -1;
     const char *name;
-    const uint8_t *start, *end;
     switch (scene) {
-    case LIVING_SCENE_AURORA:
-        name = "aurora"; start = _binary_aurora_jpg_start; end = _binary_aurora_jpg_end; break;
-    case LIVING_SCENE_SUNRISE:
-        name = "sunrise"; start = _binary_sunrise_jpg_start; end = _binary_sunrise_jpg_end; break;
-    case LIVING_SCENE_RAINFOREST:
-        name = "rainforest"; start = _binary_rainforest_jpg_start; end = _binary_rainforest_jpg_end; break;
-    default:
-        scene = LIVING_SCENE_OCEAN;
-        name = "ocean"; start = _binary_ocean_jpg_start; end = _binary_ocean_jpg_end; break;
+    case LIVING_SCENE_AURORA: name = "aurora.jpg"; break;
+    case LIVING_SCENE_SUNRISE: name = "sunrise.jpg"; break;
+    case LIVING_SCENE_RAINFOREST: name = "rainforest.jpg"; break;
+    default: scene = LIVING_SCENE_OCEAN; name = "ocean.jpg"; break;
     }
     raylib_lite_atlas_t next = {0};
     void *pixels = NULL;
-    raylib_lite_result_t result = decode_background(
-        assets, name, start, end, &next, &pixels);
+    raylib_lite_result_t result = decode_background(assets, name, &next, &pixels);
     if (result != RAYLIB_LITE_OK) return -1;
     clear_background(assets, atlases);
     assets->background_pixels = pixels;
