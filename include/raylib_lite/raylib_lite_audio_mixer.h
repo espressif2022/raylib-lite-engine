@@ -92,6 +92,14 @@ raylib_lite_result_t raylib_lite_audio_mixer_set_sound_volume(
 
 raylib_lite_result_t raylib_lite_audio_mixer_play_music(
     raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip);
+/* Stop only if this clip still owns the singleton music voice. */
+raylib_lite_result_t raylib_lite_audio_mixer_stop_music_clip(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip);
+/* Per-clip gain, retained across play calls; does not affect other clips. */
+raylib_lite_result_t raylib_lite_audio_mixer_set_music_clip_volume(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip,
+    float volume);
+/* Global music bus controls, for clients that intentionally use them. */
 void raylib_lite_audio_mixer_stop_music(raylib_lite_audio_mixer_t *mixer);
 void raylib_lite_audio_mixer_set_music_volume(
     raylib_lite_audio_mixer_t *mixer, float volume);

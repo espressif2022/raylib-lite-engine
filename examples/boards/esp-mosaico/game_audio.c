@@ -132,6 +132,8 @@ void raylib_lite_game_audio_init(void)
         s_service = NULL;
         return;
     }
+    /* Keep Raylib Music gain per handle. The mixer bus remains at unity. */
+    raylib_lite_audio_mixer_set_music_volume(s_mixer, 1.0f);
     raylib_lite_audio_mixer_set_master_volume(s_mixer, s_master_volume);
 }
 
@@ -212,6 +214,12 @@ Music raylib_lite_game_audio_load_music(const char *path)
     raylib_lite_audio_clip_t clip = RAYLIB_LITE_AUDIO_CLIP_INVALID;
     if (!s_mixer || raylib_lite_audio_mixer_load(s_mixer, path, &clip) !=
                         RAYLIB_LITE_OK) return (Music){0};
+    /* Match the previous default music loudness without a global voice gain. */
+    if (raylib_lite_audio_mixer_set_music_clip_volume(s_mixer, clip, 0.28f) !=
+            RAYLIB_LITE_OK) {
+        (void)raylib_lite_audio_mixer_unload(s_mixer, clip);
+        return (Music){0};
+    }
     audio_ticket_t *ticket = ticket_create(clip, AUDIO_TICKET_MUSIC);
     if (!ticket) {
         (void)raylib_lite_audio_mixer_unload(s_mixer, clip);
@@ -251,14 +259,16 @@ void raylib_lite_game_audio_update_music(Music music)
 
 void raylib_lite_game_audio_stop_music(Music music)
 {
-    (void)music;
-    raylib_lite_audio_mixer_stop_music(s_mixer);
+    audio_ticket_t *ticket = music_ticket(music);
+    if (ticket) (void)raylib_lite_audio_mixer_stop_music_clip(
+        s_mixer, ticket->clip);
 }
 
 void raylib_lite_game_audio_set_music_volume(Music music, float volume)
 {
-    (void)music;
-    raylib_lite_audio_mixer_set_music_volume(s_mixer, volume);
+    audio_ticket_t *ticket = music_ticket(music);
+    if (ticket) (void)raylib_lite_audio_mixer_set_music_clip_volume(
+        s_mixer, ticket->clip, volume);
 }
 
 void raylib_lite_game_audio_set_master_volume(float volume)

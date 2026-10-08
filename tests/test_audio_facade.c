@@ -96,8 +96,43 @@ int main(void)
     PlaySound(current);
     assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
     assert(output[0] == 1000 && output[1] == 2000);
+
+    Music first = LoadMusicStream("music-a");
+    Music second = LoadMusicStream("music-b");
+    assert(first.frameCount == 2 && second.frameCount == 2);
+    /* Raylib SetMusicVolume must retain independent values before playback. */
+    SetMusicVolume(first, 0.5f);
+    SetMusicVolume(second, 1.0f);
+    PlayMusicStream(first);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 500 && output[1] == 1000);
+
+    PlayMusicStream(second);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 1000 && output[1] == 2000);
+    StopMusicStream(first);
+    SetMusicVolume(first, 0.0f);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 1000 && output[1] == 2000);
+
+    /* An unloaded or forged ticket may not stop or mute current playback. */
+    UnloadMusicStream(first);
+    StopMusicStream(first);
+    SetMusicVolume(first, 0.0f);
+    Music bogus = {.ctxData = (void *)(uintptr_t)0x1234};
+    StopMusicStream(bogus);
+    SetMusicVolume(bogus, 0.0f);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 1000 && output[1] == 2000);
+
+    SetMusicVolume(second, 0.25f);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 250 && output[1] == 500);
+    StopMusicStream(second);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 0 && output[1] == 0);
     CloseAudioDevice();
-    assert(asset_releases == 2);
+    assert(asset_releases == 4);
     puts("audio facade: ok");
     return 0;
 }

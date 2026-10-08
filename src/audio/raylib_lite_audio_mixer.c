@@ -296,6 +296,35 @@ raylib_lite_result_t raylib_lite_audio_mixer_play_music(
     return clip ? RAYLIB_LITE_OK : RAYLIB_LITE_INVALID_ARGUMENT;
 }
 
+raylib_lite_result_t raylib_lite_audio_mixer_stop_music_clip(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t handle)
+{
+    if (!mixer) return RAYLIB_LITE_INVALID_ARGUMENT;
+    mixer_lock(mixer);
+    if (!find_clip(mixer, handle)) {
+        mixer_unlock(mixer);
+        return RAYLIB_LITE_INVALID_ARGUMENT;
+    }
+    if (mixer->music.active && mixer->music.clip_slot == handle.slot &&
+            mixer->music.clip_generation == handle.generation) {
+        mixer->music.active = false;
+    }
+    mixer_unlock(mixer);
+    return RAYLIB_LITE_OK;
+}
+
+raylib_lite_result_t raylib_lite_audio_mixer_set_music_clip_volume(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t handle,
+    float volume)
+{
+    if (!mixer) return RAYLIB_LITE_INVALID_ARGUMENT;
+    mixer_lock(mixer);
+    mixer_clip_t *clip = find_clip(mixer, handle);
+    if (clip) clip->volume = clamp_volume(volume);
+    mixer_unlock(mixer);
+    return clip ? RAYLIB_LITE_OK : RAYLIB_LITE_INVALID_ARGUMENT;
+}
+
 void raylib_lite_audio_mixer_stop_music(raylib_lite_audio_mixer_t *mixer)
 {
     if (!mixer) return;
@@ -356,7 +385,8 @@ raylib_lite_result_t raylib_lite_audio_mixer_mix(
                     sample = 0;
                 }
             }
-            mixed += (int64_t)(sample * mixer->music_volume);
+            mixed += (int64_t)(sample * mixer->music_volume *
+                               music_clip->volume);
         }
         if (mixer->master_volume < 1.0f) {
             int master = (int)(mixer->master_volume * 256.0f + 0.5f);
