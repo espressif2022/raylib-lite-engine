@@ -8,13 +8,15 @@
 
 _Static_assert(RAYLIB_LITE_HOST_GAME_ABI_V1 == RAYLIB_LITE_GAME_MODULE_ABI_V1,
                "Host and example module ABI versions must match");
-_Static_assert(RAYLIB_LITE_HOST_INPUT_ACTION == RAYLIB_LITE_GAME_INPUT_ACTION,
+/* The Host and Game constants belong to distinct anonymous enums.
+ * Compare their integer values without GCC's -Wenum-compare warning. */
+_Static_assert((int)RAYLIB_LITE_HOST_INPUT_ACTION == (int)RAYLIB_LITE_GAME_INPUT_ACTION,
                "Host and example action input values must match");
-_Static_assert(RAYLIB_LITE_HOST_INPUT_POINTER == RAYLIB_LITE_GAME_INPUT_POINTER,
+_Static_assert((int)RAYLIB_LITE_HOST_INPUT_POINTER == (int)RAYLIB_LITE_GAME_INPUT_POINTER,
                "Host and example pointer input values must match");
-_Static_assert(RAYLIB_LITE_HOST_INPUT_CONTROL == RAYLIB_LITE_GAME_INPUT_CONTROL,
+_Static_assert((int)RAYLIB_LITE_HOST_INPUT_CONTROL == (int)RAYLIB_LITE_GAME_INPUT_CONTROL,
                "Host and example control input values must match");
-_Static_assert(RAYLIB_LITE_HOST_INPUT_IMU == RAYLIB_LITE_GAME_INPUT_IMU,
+_Static_assert((int)RAYLIB_LITE_HOST_INPUT_IMU == (int)RAYLIB_LITE_GAME_INPUT_IMU,
                "Host and example IMU input values must match");
 
 typedef struct {
