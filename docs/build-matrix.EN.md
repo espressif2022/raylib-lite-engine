@@ -33,7 +33,16 @@ The W07 reference matrix is validated on both Host and ESP-Mosaico for:
 - `tomb_raycast`
 - `vertical_dock`
 
-A second selectable Board, [`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md), uses `espressif/esp_board_manager` with a physical 320x240 LCD. Games retain their logical resolution; the Board adapter scales the display and maps touch coordinates back. Run `idf.py bmgr -b esp32_s3_box_3` per example to generate its board configuration, then select `-D RAYLIB_LITE_BOARD=esp32-s3-box-3`. **Selectable does not mean every Game has passed device acceptance.**
+A second selectable Board, [`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md), uses `espressif/esp_board_manager` with a physical 320x240 LCD. Games retain their logical resolution; the Board adapter scales the display and maps touch coordinates back. Every Game must generate its Board Manager configuration with the required `bmgr_amend` profile, which removes the conflicting GPIO47 owner and controls optional device initialization (shown for `raylib_shooter`):
+
+```sh
+AMEND="$PWD/examples/boards/esp32-s3-box-3/bmgr_amend"
+idf.py -C examples/raylib_shooter bmgr -b esp32_s3_box_3 -a "$AMEND"
+idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
+    -D RAYLIB_LITE_BOARD=esp32-s3-box-3 build
+```
+
+BOX-3 selects each Game's `partitions.csv` by default: a 15 MiB factory app partition on the standard 16 MB Flash device. `raylib_shooter` has passed initial real-device rendering and TT21100 touch-direction checks; `neon_rift_rally` has demonstrated ES8311 initialization and non-silent PCM submission. Audible speaker output and other Games still need acceptance. **Selectable does not mean every Game has passed device acceptance.**
 
 ## Native firmware
 

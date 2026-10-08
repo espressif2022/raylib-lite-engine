@@ -33,7 +33,16 @@ W07 已在 Host 与 ESP-Mosaico 两条路径实际验证：
 - `tomb_raycast`
 - `vertical_dock`
 
-可选择的第二块 Board：[`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md) 使用 `espressif/esp_board_manager`，物理 LCD 为 320×240。Game 保留自己的逻辑分辨率，由 Board adapter 等比缩放并反向映射触摸。此 Board 需要为每个示例运行 `idf.py bmgr -b esp32_s3_box_3` 生成配置，使用 `-D RAYLIB_LITE_BOARD=esp32-s3-box-3` 构建。**Board 可选择不等于所有 Game 已通过实机验收。**
+可选择的第二块 Board：[`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md) 使用 `espressif/esp_board_manager`，物理 LCD 为 320×240。Game 保留自己的逻辑分辨率，由 Board adapter 等比缩放并反向映射触摸。此 Board 必须使用包含 GPIO47 与设备初始化修订的 `bmgr_amend` 配置，为每个 Game 独立生成 Board Manager 代码（下方以 `raylib_shooter` 为例）：
+
+```sh
+AMEND="$PWD/examples/boards/esp32-s3-box-3/bmgr_amend"
+idf.py -C examples/raylib_shooter bmgr -b esp32_s3_box_3 -a "$AMEND"
+idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
+    -D RAYLIB_LITE_BOARD=esp32-s3-box-3 build
+```
+
+此 Board 使用各 Game 的 `partitions.csv`，默认 16 MB Flash，factory 应用分区为 15 MiB。已在 BOX-3 实机验证 `raylib_shooter` 运行与 TT21100 触摸方向，`neon_rift_rally` 的 ES8311 初始化与非静音 PCM 提交；扬声器听音及其他 Game 仍待逐项验收。**Board 可选择不等于所有 Game 已通过实机验收。**
 
 ## 原生固件
 
