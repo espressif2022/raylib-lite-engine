@@ -1,8 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-import shutil
-import subprocess
 import tempfile
-import textwrap
 import unittest
 from pathlib import Path
 
@@ -12,9 +9,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import svg2vg  # noqa: E402
 
-RUNTIME = ROOT / "examples" / "vector_cat" / "main"
-RENDERER = ROOT / "src" / "renderer"
-ENGINE_INCLUDE = ROOT / "include" / "raylib_lite"
 
 RIG_SVG = """\
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
@@ -101,71 +95,6 @@ class LayerModel(unittest.TestCase):
         self.assertIn("#define RIG_ARM 1", header)
         self.assertIn("#define RIG_PART_COUNT 2", header)
         self.assertIn('{"arm", 0, 70.00f, 50.00f', source)
-
-
-RENDER_MAIN = r"""
-#include <math.h>
-#include <stdio.h>
-#include "rig.h"
-static uint16_t fb[100 * 100];
-int main(int argc, char **argv)
-{
-    (void)argv;
-    vg_bone_t bones[RIG_PART_COUNT];
-    for (int i = 0; i < RIG_PART_COUNT; ++i) bones[i] = vg_bone_rest();
-    if (argc > 1) bones[RIG_BODY].rotation = 3.14159265f / 2;
-    vg_mat_t mats[RIG_PART_COUNT];
-    vg_asset_pose(&rig, bones, vg_identity(), mats);
-    vg_begin(fb, 100, 100, 100);
-    uint8_t visible[RIG_PART_COUNT] = {1, 1};
-    if (argc > 2) visible[RIG_ARM] = 0;
-    vg_asset_draw_range(&rig, mats, visible, 0, RIG_PART_COUNT);
-    fwrite(fb, sizeof(fb), 1, stdout);
-    return 0;
-}
-"""
-
-
-@unittest.skipUnless(shutil.which("cc"), "needs a host C compiler")
-class RenderedPose(unittest.TestCase):
-    def render(self, rotate: bool, hide_arm: bool = False) -> bytes:
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp)
-            (out / "in.svg").write_text(RIG_SVG)
-            self.assertEqual(svg2vg.main([str(out / "in.svg"), "--name", "rig",
-                                          "--out-dir", str(out)]), 0)
-            (out / "main.c").write_text(RENDER_MAIN)
-            exe = out / "render"
-            subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", str(out),
-                            "-I", str(RUNTIME), "-I", str(ENGINE_INCLUDE), str(out / "main.c"), str(out / "rig.c"),
-                            str(RUNTIME / "vg_asset.c"), str(RUNTIME / "vg_raster.c"), str(RENDERER / "raylib_lite_rgb565.c"),
-                            "-lm", "-o", str(exe)], check=True)
-            return subprocess.run([str(exe)] + (["rotate"] if rotate or hide_arm else [])
-                                  + (["hide"] if hide_arm else []),
-                                  check=True, capture_output=True).stdout
-
-    @staticmethod
-    def pixel(frame: bytes, x: int, y: int) -> int:
-        i = (y * 100 + x) * 2
-        return frame[i] | frame[i + 1] << 8
-
-    def test_rest_pose_matches_artwork(self):
-        frame = self.render(False)
-        self.assertEqual(self.pixel(frame, 30, 50), 0xF800)   # body
-        self.assertEqual(self.pixel(frame, 85, 50), 0x07E0)   # arm, shifted by its group
-        self.assertEqual(self.pixel(frame, 10, 10), 0)
-
-    def test_child_follows_parent_rotation(self):
-        frame = self.render(True)
-        # A quarter turn about (50, 55) moves the arm from the right to below.
-        self.assertEqual(self.pixel(frame, 50, 88), 0x07E0)
-        self.assertEqual(self.pixel(frame, 85, 50), 0)
-        self.assertEqual(self.pixel(frame, 50, 40), 0xF800)
-
-    def test_hidden_layer_is_skipped(self):
-        frame = self.render(True, hide_arm=True)
-        self.assertEqual(self.pixel(frame, 50, 88), 0)
-        self.assertEqual(self.pixel(frame, 50, 40), 0xF800)
 
 
 if __name__ == "__main__":

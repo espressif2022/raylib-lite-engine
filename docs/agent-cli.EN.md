@@ -30,8 +30,8 @@ Examples:
 python3 tools/game_cli.py list --json --target esp-mosaico
 python3 tools/game_cli.py sim examples/raylib_shooter --headless --frames 30 --json
 python3 tools/game_cli.py test examples/raylib_shooter --frames 300 --json
-python3 tools/game_cli.py replay examples/vertical_dock \
-  examples/vertical_dock/scenarios/power-on.json --frames 300 --json
+python3 tools/game_cli.py replay examples/tower_defense \
+  examples/tower_defense/scenarios/start.json --frames 300 --json
 python3 tools/game_cli.py assets examples/raylib_shooter --dry-run --json
 python3 tools/game_cli.py benchmark list
 ```

@@ -22,3 +22,10 @@ artifacts/
 **/.codex-runs/
 # Local documentation drafts, experiment logs, and historical snapshots.
 /docs/debug/
+
+# Unfinished local experiments
+/examples/vertical_dock/
+/examples/vector_cat/
+/examples/vector_pet/
+/examples/vector_puppet/
+/examples/sewer_labyrinth/

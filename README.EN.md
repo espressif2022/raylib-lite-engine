@@ -61,7 +61,7 @@ python3 tools/game_cli.py sim examples/sky_hop
 python3 tools/game_cli.py sim examples/living_worlds --headless --frames 300
 python3 tools/game_cli.py sim examples/last_zone_extraction --headless --frames 90
 python3 tools/game_cli.py sim examples/tomb_raycast --headless --frames 8
-python3 tools/game_cli.py sim examples/vertical_dock
+python3 tools/game_cli.py sim examples/tower_defense
 ```
 
 Standalone example firmware composes the same game source with an application-side Board selected by the example project's CMake layer. `main/idf_component.yml` remains Board-neutral and depends only on the Engine; `RAYLIB_LITE_BOARD` defaults to `esp-mosaico`, while `-D RAYLIB_LITE_BOARD=<board>` selects another adapter under `examples/boards/<board>`. The ESP-Mosaico reference Board resolves its BSP and ESP-Iris dependencies through the documented local paths. Its native examples expose the Iris USB management plane plus screenshot/pointer services, while application updates remain Recovery-first: retained factory Recovery owns the USB OTA writer and installs the normal Game into `ota_0`. Recovery/Gateway tooling remains in `esp-mosaico-utils` rather than the engine. Documentation index: [docs/README.EN.md](docs/README.EN.md). Host ABI: [host/README.md](host/README.md). Host simulation needs no board adapter.

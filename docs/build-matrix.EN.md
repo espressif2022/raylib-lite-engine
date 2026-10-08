@@ -31,7 +31,6 @@ The W07 reference matrix is validated on both Host and ESP-Mosaico for:
 - `living_worlds`
 - `last_zone_extraction`
 - `tomb_raycast`
-- `vertical_dock`
 
 A second selectable Board, [`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md), uses `espressif/esp_board_manager` with a physical 320x240 LCD. Games retain their logical resolution; the Board adapter scales the display and maps touch coordinates back. Every Game must generate its Board Manager configuration with the required `bmgr_amend` profile, which removes the conflicting GPIO47 owner and controls optional device initialization (shown for `raylib_shooter`):
 

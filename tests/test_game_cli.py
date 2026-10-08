@@ -17,7 +17,7 @@ CLI = ENGINE / "tools/game_cli.py"
 CLI_SCHEMA = "raylib-lite-game-cli/v1"
 REQUIRED_MATRIX = (
     "raylib_shooter", "tower_defense", "sky_hop", "living_worlds",
-    "last_zone_extraction", "tomb_raycast", "vertical_dock",
+    "last_zone_extraction", "tomb_raycast",
 )
 
 
@@ -100,8 +100,8 @@ class GameCliTests(unittest.TestCase):
         self.assertEqual(tested["result"]["frames"], 3)
 
         replayed = json.loads(subprocess.check_output([
-            sys.executable, str(CLI), "replay", "examples/vertical_dock",
-            "examples/vertical_dock/scenarios/power-on.json",
+            sys.executable, str(CLI), "replay", "examples/tower_defense",
+            "examples/tower_defense/scenarios/start.json",
             "--frames", "3", "--json",
         ], cwd=ENGINE))
         self.assertEqual(replayed["command"], "replay")

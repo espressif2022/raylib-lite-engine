@@ -369,8 +369,6 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
                     self.assertFalse((main / f"{stem}_app{suffix}").exists())
                     self.assertFalse((main / f"{stem}_mosaico_app{suffix}").exists())
                 self.assertTrue((main / "game_module.c").is_file())
-        for directory in ("sewer_labyrinth", "vertical_dock"):
-            self.assertFalse((ENGINE / "examples" / directory / "elf").exists())
 
     def test_example_sources_do_not_include_device_sdks(self) -> None:
         feedback = (ENGINE / "examples/common_components/examples_common/include/native_feedback.h").read_text()
@@ -456,7 +454,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
     def test_required_game_matrix_uses_same_module_source_for_host_and_board(self) -> None:
         required = (
             "raylib_shooter", "tower_defense", "sky_hop", "living_worlds",
-            "last_zone_extraction", "tomb_raycast", "vertical_dock",
+            "last_zone_extraction", "tomb_raycast",
         )
         for directory in required:
             root = ENGINE / "examples" / directory

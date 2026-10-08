@@ -18,11 +18,10 @@ idf.py -C examples/raylib_shooter build
 | [living_worlds](living_worlds/README.md) | Panoramic scenes and volume meshes | ✓ | ✓ | ✓ |
 | [last_zone_extraction](last_zone_extraction/README.md) | DDA wall columns and campaign shooter | ✓ | ✓ | ✓ |
 | [tomb_raycast](tomb_raycast/README.md) | Portal rooms and INDEX8 textured planes | ✓ | ✓ | ✓ |
-| [vertical_dock](vertical_dock/README.md) | Stairs, connected elevations, cover, and painter-sorted solid geometry | ✓ | ✓ | ✓ |
 | [neon_rift_rally](neon_rift_rally/README.md) | Deterministic panoramic racing | ✓ | ✓ | — |
 | [render_benchmark](render_benchmark/README.md) | Raster acceptance and optional display preview | Dedicated Host test | Dedicated device project | — |
 
-The seven rows from `raylib_shooter` through `vertical_dock` are W07's required matrix and are validated on both Host and ESP-Mosaico. `python3 tools/game_cli.py list --json` reports each game's `host` flag and `boards[]`. “External ELF SDK” means a matching project in the external `esp-mosaico-elf-game-sdk`. The Iris native adapter (`mosaico.py game build --target iris`), Gateway, flashing, and updates are maintained by `esp-mosaico-vibe`. SDK-only examples such as `snake`, `tilt`, and `maze_evil` are not part of this repository. `render_benchmark` uses its own Host/CMake and ESP-IDF entry points, not `game.sim.json`.
+The six reference games from `raylib_shooter` through `tomb_raycast` support both Host and ESP-Mosaico. `python3 tools/game_cli.py list --json` reports each game's `host` flag and `boards[]`. “External ELF SDK” means a matching project in the external `esp-mosaico-elf-game-sdk`. The Iris native adapter (`mosaico.py game build --target iris`), Gateway, flashing, and updates are maintained by `esp-mosaico-vibe`. SDK-only examples such as `snake`, `tilt`, and `maze_evil` are not part of this repository. `render_benchmark` uses its own Host/CMake and ESP-IDF entry points, not `game.sim.json`.
 
 Shared board-neutral native-example glue lives in [common](common/README.md): the firmware launcher, abstract Board contract, haptic helper, and Product-ABI bridge. Concrete Board implementation remains under `boards/<board>/`. These are example/application layers rather than Engine public APIs; package-content filtering is currently deferred.
 

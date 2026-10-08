@@ -1,9 +1,0 @@
-{
-  "schema": "raylib-lite-game-sim/v1",
-  "sources": [
-    "main/game_module.c",
-    "main/puppet_rig.c",
-    "main/puppet_draw.c",
-    "main/vg_raster.c"
-  ]
-}
