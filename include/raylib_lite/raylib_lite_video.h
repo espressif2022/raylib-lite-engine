@@ -74,6 +74,10 @@ typedef struct {
      * nonblocking snapshot is temporarily unavailable. */
     raylib_lite_result_t (*copy_latest)(
         void *context, uint16_t *out_pixels, size_t pixel_capacity);
+
+    /* Optional. Returns frames accepted for asynchronous presentation that
+     * have not yet reached the backend's release point. */
+    uint32_t (*in_flight)(void *context);
 } raylib_lite_video_backend_t;
 
 #ifdef __cplusplus

@@ -53,6 +53,18 @@ typedef struct {
     bool closing;
 } strip_video_t;
 
+static uint32_t in_flight_locked(const strip_video_t *video)
+{
+    uint32_t count = 0;
+    for (unsigned i = 0; i < FRAME_COUNT; ++i) {
+        if (video->states[i] == FRAME_PENDING ||
+                video->states[i] == FRAME_WORKING) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 static esp_err_t submit_strips(strip_video_t *video, const uint16_t *pixels);
 
 static void strip_worker(void *arg)
@@ -83,10 +95,13 @@ static void strip_worker(void *arg)
             video->states[index] = FRAME_FREE;
             video->worker_error = err;
         }
+        uint32_t in_flight = in_flight_locked(video);
         xSemaphoreGive(video->mutex);
         if (err == ESP_OK)
             raylib_lite_runtime_stats_record_display_release(
-                (uint64_t)esp_timer_get_time(), submit_us, 0);
+                (uint64_t)esp_timer_get_time(), submit_us, in_flight);
+        else
+            raylib_lite_runtime_stats_record_display_failure(in_flight);
 #ifdef ESP_PLATFORM
         if (err == ESP_OK && ++video->completed_frames % 300 == 0) {
             ESP_LOGI("strip_present",
@@ -269,9 +284,11 @@ static raylib_lite_result_t strip_present(void *ctx, raylib_lite_frame_t *frame)
     }
     /* A new complete frame supersedes one waiting behind active stripe I/O.
      * Never make the renderer wait for the panel. */
-    if (video->pending >= 0) video->states[video->pending] = FRAME_FREE;
+    bool superseded = video->pending >= 0;
+    if (superseded) video->states[video->pending] = FRAME_FREE;
     video->pending = index;
     video->states[index] = FRAME_PENDING;
+    if (superseded) raylib_lite_runtime_stats_record_superseded();
     xSemaphoreGive(video->mutex);
     xSemaphoreGive(video->ready);
     return RAYLIB_LITE_OK;
@@ -428,6 +445,16 @@ static raylib_lite_result_t strip_flush(void *ctx, uint32_t timeout_ms)
                                                   timeout_ms ? timeout_ms : 1));
 }
 
+static uint32_t strip_in_flight(void *ctx)
+{
+    strip_video_t *video = ctx;
+    if (!video) return 0;
+    xSemaphoreTake(video->mutex, portMAX_DELAY);
+    uint32_t count = in_flight_locked(video);
+    xSemaphoreGive(video->mutex);
+    return count;
+}
+
 raylib_lite_video_backend_t mosaico_strip_present_backend(void *video)
 {
     return (raylib_lite_video_backend_t){
@@ -438,6 +465,7 @@ raylib_lite_video_backend_t mosaico_strip_present_backend(void *video)
         .discard = strip_discard,
         .flush = strip_flush,
         .copy_latest = strip_copy_latest,
+        .in_flight = strip_in_flight,
     };
 }
 

@@ -23,6 +23,16 @@ static raylib_lite_result_t last_frame_result(void)
     return raylib_lite_raylib_get_last_present_result();
 }
 
+static raylib_lite_frame_result_t stats_frame_result(
+    raylib_lite_result_t acquire, raylib_lite_result_t present)
+{
+    if (acquire == RAYLIB_LITE_BUSY || present == RAYLIB_LITE_BUSY)
+        return RAYLIB_LITE_FRAME_BUSY;
+    if (acquire != RAYLIB_LITE_OK || present != RAYLIB_LITE_OK)
+        return RAYLIB_LITE_FRAME_DISPLAY_ERROR;
+    return RAYLIB_LITE_FRAME_ACCEPTED;
+}
+
 static bool frame_result_is_fatal(raylib_lite_result_t result)
 {
     /* Runtime display/back-pressure failures drop a frame; only
@@ -90,6 +100,10 @@ static void render(void *context)
     uint64_t started = runtime->app->platform.clock.monotonic_us(
         runtime->app->platform.clock.context);
     runtime->app->on_render(runtime->app->user);
+    raylib_lite_result_t acquire =
+        raylib_lite_raylib_get_last_acquire_result();
+    raylib_lite_result_t present =
+        raylib_lite_raylib_get_last_present_result();
     raylib_lite_result_t frame_result = last_frame_result();
     /* Strip submission failures are dropped frames, as in the proven legacy
      * loop. They must not unwind the launcher and trigger app_main's reset. */
@@ -98,9 +112,16 @@ static void render(void *context)
     uint64_t finished = runtime->app->platform.clock.monotonic_us(
         runtime->app->platform.clock.context);
     uint32_t elapsed = (uint32_t)(finished - started);
-    raylib_lite_runtime_stats_record_frame(
-        finished, runtime->update_us, elapsed, 0,
-        frame_result != RAYLIB_LITE_OK);
+    uint32_t acquire_us = raylib_lite_raylib_port_last_acquire_us();
+    uint32_t present_us = raylib_lite_raylib_port_last_present_us();
+    uint64_t io_us = (uint64_t)acquire_us + present_us;
+    uint32_t render_us = io_us < elapsed ? elapsed - (uint32_t)io_us : 0;
+    /* Preserve the total update cost across all logic ticks in this frame. */
+    raylib_lite_runtime_stats_record_timing(runtime->update_us, render_us);
+    raylib_lite_runtime_stats_record_render(
+        finished, acquire_us, render_us, present_us,
+        stats_frame_result(acquire, present),
+        raylib_lite_raylib_port_in_flight_frames());
     runtime->update_us = 0;
     uint32_t interval = runtime->app->stats_interval
         ? runtime->app->stats_interval : 100;
@@ -131,9 +152,13 @@ raylib_lite_result_t raylib_lite_game_app_run(
 
     raylib_lite_action_reset();
     bool started = false;
+    raylib_lite_raylib_port_set_clock(&app->platform.clock);
     raylib_lite_result_t result = raylib_lite_raylib_port_init_backend(
         &app->platform.video);
-    if (result != RAYLIB_LITE_OK) return result;
+    if (result != RAYLIB_LITE_OK) {
+        raylib_lite_raylib_port_set_clock(NULL);
+        return result;
+    }
 
     uint16_t width = 0, height = 0;
     raylib_lite_raylib_port_get_dimensions(&width, &height);

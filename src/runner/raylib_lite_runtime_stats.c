@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "raylib_lite_runtime_stats.h"
 
+#include <stdbool.h>
+
 #include <stdatomic.h>
 
 /* Stats only compare sub-second/one-second windows. Store the low 32 bits of
@@ -88,17 +90,12 @@ void raylib_lite_runtime_stats_reset(void)
 #undef RESET
 }
 
-void raylib_lite_runtime_stats_record_frame(
-    uint64_t now_us_value, uint32_t update_us, uint32_t render_us,
-    uint32_t present_us, int dropped)
+static void record_frame_sample(uint32_t now_us, bool dropped)
 {
-    const uint32_t now_us = low_us(now_us_value);
     atomic_fetch_add_explicit(&s_stats.frames, 1, memory_order_relaxed);
     if (dropped)
-        atomic_fetch_add_explicit(&s_stats.dropped_frames, 1, memory_order_relaxed);
-    atomic_store_explicit(&s_stats.update_us, update_us, memory_order_relaxed);
-    atomic_store_explicit(&s_stats.render_us, render_us, memory_order_relaxed);
-    atomic_store_explicit(&s_stats.present_us, present_us, memory_order_relaxed);
+        atomic_fetch_add_explicit(&s_stats.dropped_frames, 1,
+                                  memory_order_relaxed);
 
     uint32_t previous = (uint32_t)atomic_exchange_explicit(
         &s_stats.last_frame_us, now_us, memory_order_relaxed);
@@ -118,6 +115,16 @@ void raylib_lite_runtime_stats_record_frame(
                               memory_order_relaxed);
         atomic_store_explicit(&s_stats.window_frames, 0, memory_order_relaxed);
     }
+}
+
+void raylib_lite_runtime_stats_record_frame(
+    uint64_t now_us_value, uint32_t update_us, uint32_t render_us,
+    uint32_t present_us, int dropped)
+{
+    record_frame_sample(low_us(now_us_value), dropped != 0);
+    atomic_store_explicit(&s_stats.update_us, update_us, memory_order_relaxed);
+    atomic_store_explicit(&s_stats.render_us, render_us, memory_order_relaxed);
+    atomic_store_explicit(&s_stats.present_us, present_us, memory_order_relaxed);
 }
 
 void raylib_lite_runtime_stats_record_timing(
@@ -147,18 +154,18 @@ void raylib_lite_runtime_stats_record_logic(
 }
 
 void raylib_lite_runtime_stats_record_render(
-    uint32_t acquire_us, uint32_t render_us, uint32_t present_us,
-    raylib_lite_frame_result_t result, uint32_t in_flight_frames)
+    uint64_t now_us_value, uint32_t acquire_us, uint32_t render_us,
+    uint32_t present_us, raylib_lite_frame_result_t result,
+    uint32_t in_flight_frames)
 {
+    record_frame_sample(low_us(now_us_value),
+                        result != RAYLIB_LITE_FRAME_ACCEPTED);
     atomic_store_explicit(&s_stats.acquire_us, acquire_us, memory_order_relaxed);
     atomic_store_explicit(&s_stats.render_us, render_us, memory_order_relaxed);
     atomic_store_explicit(&s_stats.present_us, present_us, memory_order_relaxed);
     atomic_store_explicit(&s_stats.in_flight_frames, in_flight_frames,
                           memory_order_relaxed);
     update_peak(in_flight_frames);
-    atomic_fetch_add_explicit(&s_stats.frames, 1, memory_order_relaxed);
-    if (result != RAYLIB_LITE_FRAME_ACCEPTED)
-        atomic_fetch_add_explicit(&s_stats.dropped_frames, 1, memory_order_relaxed);
     if (result == RAYLIB_LITE_FRAME_BUSY)
         atomic_fetch_add_explicit(&s_stats.busy_frames, 1, memory_order_relaxed);
     else if (result == RAYLIB_LITE_FRAME_SUPERSEDED)
@@ -186,6 +193,22 @@ void raylib_lite_runtime_stats_record_display_release(
                               memory_order_relaxed);
         atomic_store_explicit(&s_stats.display_frames, 0, memory_order_relaxed);
     }
+}
+
+void raylib_lite_runtime_stats_record_superseded(void)
+{
+    atomic_fetch_add_explicit(&s_stats.dropped_frames, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&s_stats.superseded_frames, 1,
+                              memory_order_relaxed);
+}
+
+void raylib_lite_runtime_stats_record_display_failure(uint32_t in_flight_frames)
+{
+    atomic_fetch_add_explicit(&s_stats.dropped_frames, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&s_stats.display_errors, 1, memory_order_relaxed);
+    atomic_store_explicit(&s_stats.in_flight_frames, in_flight_frames,
+                          memory_order_relaxed);
+    update_peak(in_flight_frames);
 }
 
 void raylib_lite_runtime_stats_record_queue_overflow(void)

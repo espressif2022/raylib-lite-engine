@@ -39,15 +39,27 @@ int main(void)
     assert(stats.release_us == 55 && stats.in_flight_frames == 2);
     assert(stats.peak_in_flight_frames == 2);
 
+    raylib_lite_runtime_stats_record_timing(98, 6);
     raylib_lite_runtime_stats_record_render(
-        5, 6, 7, RAYLIB_LITE_FRAME_BUSY, 3);
+        2000100U, 5, 6, 7, RAYLIB_LITE_FRAME_BUSY, 3);
     raylib_lite_runtime_stats_record_queue_overflow();
     raylib_lite_runtime_stats_set_queue_overflows(9);
     raylib_lite_runtime_stats_get(&stats);
     assert(stats.frames == 1 && stats.dropped_frames == 1);
     assert(stats.busy_frames == 1 && stats.peak_in_flight_frames == 3);
+    assert(stats.update_us == 98);
     assert(stats.acquire_us == 5 && stats.render_us == 6 && stats.present_us == 7);
     assert(stats.queue_overflows == 9);
+
+    raylib_lite_runtime_stats_record_superseded();
+    raylib_lite_runtime_stats_get(&stats);
+    assert(stats.frames == 1 && stats.dropped_frames == 2);
+    assert(stats.busy_frames == 1 && stats.superseded_frames == 1);
+
+    raylib_lite_runtime_stats_record_display_failure(2);
+    raylib_lite_runtime_stats_get(&stats);
+    assert(stats.frames == 1 && stats.dropped_frames == 3);
+    assert(stats.display_errors == 1 && stats.in_flight_frames == 2);
 
     raylib_lite_runtime_stats_reset();
     const uint64_t near_wrap = 0xffffffffULL - 499999ULL;

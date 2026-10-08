@@ -43,10 +43,14 @@ void raylib_lite_runtime_stats_record_timing(
 void raylib_lite_runtime_stats_record_logic(
     uint64_t now_us, uint32_t input_us, uint32_t update_us);
 void raylib_lite_runtime_stats_record_render(
-    uint32_t acquire_us, uint32_t render_us, uint32_t present_us,
-    raylib_lite_frame_result_t result, uint32_t in_flight_frames);
+    uint64_t now_us, uint32_t acquire_us, uint32_t render_us,
+    uint32_t present_us, raylib_lite_frame_result_t result,
+    uint32_t in_flight_frames);
 void raylib_lite_runtime_stats_record_display_release(
     uint64_t now_us, uint32_t release_us, uint32_t in_flight_frames);
+void raylib_lite_runtime_stats_record_superseded(void);
+/* An asynchronously accepted frame may fail in the display worker. */
+void raylib_lite_runtime_stats_record_display_failure(uint32_t in_flight_frames);
 void raylib_lite_runtime_stats_record_queue_overflow(void);
 void raylib_lite_runtime_stats_set_queue_overflows(uint32_t count);
 void raylib_lite_runtime_stats_get(raylib_lite_runtime_stats_t *out_stats);

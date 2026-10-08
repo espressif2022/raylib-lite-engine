@@ -5,6 +5,7 @@
 #include <string.h>
 #include <time.h>
 #include "mosaico_strip_present.h"
+#include "raylib_lite_runtime_stats.h"
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -181,6 +182,7 @@ static void fill_frame(raylib_lite_frame_t *frame, uint16_t base)
 
 int main(void)
 {
+    raylib_lite_runtime_stats_reset();
     fake_presenter_t fake = {.width = 4, .height = 5, .strip_rows = 2};
     pthread_mutex_init(&fake.gate, NULL);
     pthread_cond_init(&fake.entered, NULL);
@@ -204,21 +206,36 @@ int main(void)
     while (!fake.in_submit) pthread_cond_wait(&fake.entered, &fake.gate);
     pthread_mutex_unlock(&fake.gate);
     assert(fake.commits == 0);
-    /* The renderer can acquire and draw while the panel worker is stalled. */
+    assert(b.in_flight && b.in_flight(b.context) == 1);
+
+    /* The renderer can queue a second frame while the panel worker is stalled. */
     assert(b.acquire(b.context, &frame) == RAYLIB_LITE_OK);
     fill_frame(&frame, 0x500);
     assert(b.copy_latest(b.context, snapshot, 20) == RAYLIB_LITE_NOT_READY);
+    assert(b.present(b.context, &frame) == RAYLIB_LITE_OK);
+    assert(b.in_flight(b.context) == 2);
+
+    /* A third completed frame replaces the pending second frame without
+     * blocking the renderer and records the supersede event. */
+    assert(b.acquire(b.context, &frame) == RAYLIB_LITE_OK);
+    fill_frame(&frame, 0x600);
+    assert(b.present(b.context, &frame) == RAYLIB_LITE_OK);
+    assert(b.in_flight(b.context) == 2);
+    raylib_lite_runtime_stats_t stats = {0};
+    raylib_lite_runtime_stats_get(&stats);
+    assert(stats.superseded_frames == 1 && stats.dropped_frames == 1);
+
     pthread_mutex_lock(&fake.gate);
     fake.block_submit = 0;
     pthread_cond_signal(&fake.entered);
     pthread_mutex_unlock(&fake.gate);
-    assert(b.present(b.context, &frame) == RAYLIB_LITE_OK);
     assert(b.flush(b.context, 1000) == RAYLIB_LITE_OK);
+    assert(b.in_flight(b.context) == 0);
     assert(fake.submits == 6 && fake.commits == 2);
     assert(fake.coverage == ESP_DISPLAY_PRESENT_COVERAGE_FULL);
     for (unsigned y = 0; y < 5; ++y)
         for (unsigned x = 0; x < 4; ++x)
-            assert(fake.assembled[y * 4 + x] == 0x500 + y * 16 + x);
+            assert(fake.assembled[y * 4 + x] == 0x600 + y * 16 + x);
 
     /* A later renderer write must not mutate the accepted-frame snapshot. */
     assert(b.copy_latest(b.context, snapshot, 20) == RAYLIB_LITE_OK);
@@ -227,7 +244,7 @@ int main(void)
     assert(b.copy_latest(b.context, snapshot, 20) == RAYLIB_LITE_OK);
     for (unsigned y = 0; y < 5; ++y)
         for (unsigned x = 0; x < 4; ++x)
-            assert(snapshot[y * 4 + x] == 0x500 + y * 16 + x);
+            assert(snapshot[y * 4 + x] == 0x600 + y * 16 + x);
 
     /* A failed stripe submit cancels and does not replace latest. */
     fake.fail_submit = 1;
@@ -236,10 +253,14 @@ int main(void)
     assert(b.flush(b.context, 1000) == RAYLIB_LITE_PLATFORM_ERROR);
     assert(frame.pixels == NULL && fake.commits == commits_before);
     assert(fake.cancels == cancels_before + 1);
+    /* The asynchronous worker failed a previously accepted frame. */
+    raylib_lite_runtime_stats_get(&stats);
+    assert(stats.display_errors == 1 && stats.superseded_frames == 1);
+    assert(stats.dropped_frames == 2 && stats.in_flight_frames == 0);
     fake.fail_submit = 0;
     assert(b.acquire(b.context, &frame) == RAYLIB_LITE_OK);
     assert(b.copy_latest(b.context, snapshot, 20) == RAYLIB_LITE_OK);
-    assert(snapshot[0] == 0x500);
+    assert(snapshot[0] == 0x600);
     b.discard(b.context, &frame);
 
     /* A timed-out teardown keeps the worker and frame storage retryable. */

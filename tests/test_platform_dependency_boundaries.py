@@ -40,6 +40,9 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
                           "RAYLIB_LITE_PLATFORM_ERROR"):
             self.assertNotIn(transient, fatal)
         self.assertIn("if (frame_result_is_fatal(frame_result))", source)
+        self.assertIn("raylib_lite_runtime_stats_record_timing(runtime->update_us", source)
+        self.assertIn("raylib_lite_runtime_stats_record_render(", source)
+        self.assertNotIn("raylib_lite_runtime_stats_record_frame(", source)
 
     def test_portable_app_stops_after_failed_start(self) -> None:
         source = (ENGINE / "src/runtime/raylib_lite_game_app.c").read_text(

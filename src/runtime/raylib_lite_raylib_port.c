@@ -10,11 +10,40 @@ typedef struct {
     raylib_lite_frame_t frame;
     raylib_lite_result_t last_acquire;
     raylib_lite_result_t last_present;
+    raylib_lite_clock_t clock;
+    uint32_t last_acquire_us;
+    uint32_t last_present_us;
+    uint32_t in_flight_frames;
     bool initialized;
     bool frame_acquired;
 } raylib_port_state_t;
 
 static raylib_port_state_t s_port;
+
+static uint64_t port_now_us(void)
+{
+    return s_port.clock.monotonic_us
+        ? s_port.clock.monotonic_us(s_port.clock.context) : 0;
+}
+
+static uint32_t elapsed_us(uint64_t started, uint64_t finished)
+{
+    if (!s_port.clock.monotonic_us || finished < started) return 0;
+    uint64_t elapsed = finished - started;
+    return elapsed > UINT32_MAX ? UINT32_MAX : (uint32_t)elapsed;
+}
+
+static void update_in_flight(void)
+{
+    s_port.in_flight_frames = s_port.backend.in_flight
+        ? s_port.backend.in_flight(s_port.backend.context) : 0;
+}
+
+void raylib_lite_raylib_port_set_clock(const raylib_lite_clock_t *clock)
+{
+    if (s_port.initialized) return;
+    s_port.clock = clock ? *clock : (raylib_lite_clock_t){0};
+}
 
 static void clear_frame(raylib_lite_frame_t *frame)
 {
@@ -58,11 +87,14 @@ raylib_lite_result_t raylib_lite_raylib_port_begin_frame(
     uint16_t **out_pixels, size_t *out_stride_pixels)
 {
     if (!out_pixels || !out_stride_pixels) {
+        s_port.last_acquire_us = 0;
         s_port.last_acquire = RAYLIB_LITE_INVALID_ARGUMENT;
         return s_port.last_acquire;
     }
     *out_pixels = NULL;
     *out_stride_pixels = 0;
+    s_port.last_acquire_us = 0;
+    s_port.last_present_us = 0;
     s_port.last_present = RAYLIB_LITE_NOT_READY;
     if (!s_port.initialized || s_port.frame_acquired) {
         s_port.last_acquire = RAYLIB_LITE_INVALID_STATE;
@@ -70,8 +102,11 @@ raylib_lite_result_t raylib_lite_raylib_port_begin_frame(
     }
 
     raylib_lite_frame_t frame = {0};
+    uint64_t started_us = port_now_us();
     raylib_lite_result_t result = s_port.backend.acquire(
         s_port.backend.context, &frame);
+    s_port.last_acquire_us = elapsed_us(started_us, port_now_us());
+    update_in_flight();
     if (result != RAYLIB_LITE_OK) {
         s_port.last_acquire = result;
         return result;
@@ -96,6 +131,7 @@ raylib_lite_result_t raylib_lite_raylib_port_begin_frame(
 raylib_lite_result_t raylib_lite_raylib_port_present_frame(void)
 {
     if (!s_port.initialized || !s_port.frame_acquired) {
+        s_port.last_present_us = 0;
         s_port.last_present = RAYLIB_LITE_INVALID_STATE;
         return s_port.last_present;
     }
@@ -103,9 +139,12 @@ raylib_lite_result_t raylib_lite_raylib_port_present_frame(void)
     /* present consumes the frame on every return path. Clear local ownership
      * before calling out so even a backend error cannot leave a stale frame. */
     s_port.frame_acquired = false;
+    uint64_t started_us = port_now_us();
     raylib_lite_result_t result = s_port.backend.present(
         s_port.backend.context, &s_port.frame);
+    s_port.last_present_us = elapsed_us(started_us, port_now_us());
     clear_frame(&s_port.frame);
+    update_in_flight();
     s_port.last_present = result;
     return result;
 }
@@ -116,6 +155,7 @@ void raylib_lite_raylib_port_discard_frame(void)
     s_port.frame_acquired = false;
     s_port.backend.discard(s_port.backend.context, &s_port.frame);
     clear_frame(&s_port.frame);
+    update_in_flight();
 }
 
 raylib_lite_result_t raylib_lite_raylib_port_last_acquire_result(void)
@@ -126,6 +166,21 @@ raylib_lite_result_t raylib_lite_raylib_port_last_acquire_result(void)
 raylib_lite_result_t raylib_lite_raylib_port_last_present_result(void)
 {
     return s_port.initialized ? s_port.last_present : RAYLIB_LITE_NOT_READY;
+}
+
+uint32_t raylib_lite_raylib_port_last_acquire_us(void)
+{
+    return s_port.initialized ? s_port.last_acquire_us : 0;
+}
+
+uint32_t raylib_lite_raylib_port_last_present_us(void)
+{
+    return s_port.initialized ? s_port.last_present_us : 0;
+}
+
+uint32_t raylib_lite_raylib_port_in_flight_frames(void)
+{
+    return s_port.initialized ? s_port.in_flight_frames : 0;
 }
 
 raylib_lite_result_t raylib_lite_raylib_port_flush(uint32_t timeout_ms)
