@@ -1,6 +1,6 @@
 # Game development guide
 
-[Documentation index](README.EN.md) · [简体中文](game-development.CN.md)
+[Documentation index](README.md) · [简体中文](game-development.CN.md)
 
 This guide takes a reference game through a verifiable change. Read [reusable design principles](reference-designs.EN.md) for ownership and rendering decisions, and [build paths](build-matrix.EN.md) for each target's entry point.
 

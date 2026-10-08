@@ -45,11 +45,9 @@ idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
 
 ## 原生固件
 
-ESP-Mosaico 是默认 application-side Board component，位于 [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/)。Game manifest 不再写具体 Board；Application CMake 层默认选择 `RAYLIB_LITE_BOARD=esp-mosaico`，并把共享 `examples_common` component 与 `examples/boards/<board>` 所选 Board component 加入构建。使用 `-D RAYLIB_LITE_BOARD=<board>` 可选择其它 Adapter。Game-specific device glue 留在 Game 自己的 `main/native/` 边界；如果它需要新的板级能力，应扩展通用 Board contract/provider，而不是增加 `boards/<board>/extensions/<game>`。ESP-Mosaico 仍对所有标准 Game 统一使用 BSP 与 utils 两个本地依赖变量。它的 retained-Recovery partition contract 保持 normal Game 位于 `ota_0`、factory partition 保留给 Recovery。
+ESP-Mosaico 是默认 application-side Board component，位于 [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/)。Game manifest 不再写具体 Board；Application CMake 层默认选择 `RAYLIB_LITE_BOARD=esp-mosaico`，并把共享 `examples_common` component 与 `examples/boards/<board>` 所选 Board component 加入构建。使用 `-D RAYLIB_LITE_BOARD=<board>` 可选择其它 Adapter。Game-specific device glue 留在 Game 自己的 `main/native/` 边界；如果它需要新的板级能力，应扩展通用 Board contract/provider，而不是增加 `boards/<board>/extensions/<game>`。ESP-Mosaico 自动获取固定版本的 BSP 与 utils Git 依赖，无需手动设置依赖环境变量。它的 retained-Recovery partition contract 保持 normal Game 位于 `ota_0`、factory partition 保留给 Recovery。
 
 ```sh
-export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
-export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
 idf.py -C examples/sky_hop -B /tmp/sky-hop-native build
 # 其它 Board：
 # idf.py -C examples/sky_hop -B /tmp/sky-hop-other -D RAYLIB_LITE_BOARD=<board> build

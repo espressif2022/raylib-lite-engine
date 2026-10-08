@@ -2,15 +2,15 @@
 
 ## Unreleased
 
-- Added `docs/README.md` and `host/README.md` for this repository's sim and
-  flash workflow; aligned example READMEs to `tools/game_cli.py` and the
-  5MB `factory` slot. Dropped unused `asset_prepare` / `tick_hz` keys.
-- Grew the example `factory` app slot from 1.75MB to 5MB so `idf.py flash`
-  can hold Last Zone and Living Worlds; `ota_0` and `game_assets` shift
-  after it on the 16MB map.
-- Pull `esp-mosaico-bsp` from Git with the Component Manager.
-- Removed ESP-Iris from the engine and examples: no `esp_iris` manifest,
-  no Recovery cmake, no screen-mirror RPC, and `mosaico_game_iris` is gone.
+- Prepared the single Engine component for Registry distribution with explicit
+  package filters, a minimal offscreen consumer, API contracts and release CI.
+- Registry game examples are assembled with private copies of their shared
+  launcher and Board; downloaded examples require no sibling source directory.
+- Kept BSP, Iris USB and Recovery application services in the example Board;
+  the Engine itself does not depend on these product components. Board dependencies
+  resolve from pinned Git revisions without mandatory environment exports.
+- Native games use the Board partition table; vibe generates a retained Recovery
+  layout and installs normal games into `ota_0`. Recovery provisioning remains separate.
 - Imported Sky Hop, Tower Defense, Raylib Shooter, Living Worlds, Last Zone,
   and Tomb Raycast from ESP-Mosaico Vibe into `examples/`, with Host CLI
   templates and game-development guides.
@@ -53,4 +53,6 @@
 - Split the reusable game runtime and tools from ESP-Mosaico Vibe while
   preserving their Git history.
 - Added explicit GSP compiler and recovery-component integration paths.
-- Preserved the existing `mosaico_*` API for source compatibility.
+- Initial extraction used the `mosaico_*` names. The current independent Engine
+  uses `raylib_lite_*`; this is a source migration and is not ABI-compatible
+  with the historical extraction.

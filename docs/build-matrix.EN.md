@@ -1,6 +1,6 @@
 # Build paths
 
-[Documentation index](README.EN.md) · [简体中文](build-matrix.CN.md) · [Game development](game-development.EN.md)
+[Documentation index](README.md) · [简体中文](build-matrix.CN.md) · [Game development](game-development.EN.md)
 
 Raylib Lite Engine keeps three integration paths separate: PC Host, ESP-IDF Board builds, and external ELF module builds. The Engine CLI owns Host/development workflows only; product Runtime/installation workflows stay outside this repository.
 
@@ -45,11 +45,9 @@ BOX-3 selects each Game's `partitions.csv` by default: a 15 MiB factory app part
 
 ## Native firmware
 
-ESP-Mosaico is the default application-side Board component at [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/). Game manifests do not name a Board. The Application CMake layer selects `RAYLIB_LITE_BOARD=esp-mosaico` by default and adds the shared `examples_common` component plus `examples/boards/<board>` as the selected Board component. Use `-D RAYLIB_LITE_BOARD=<board>` to select another adapter. Game-specific device glue stays at the Game's own `main/native/` boundary; if it needs a new board capability, generalize the example-Board contract/provider instead of adding `boards/<board>/extensions/<game>`. ESP-Mosaico still uses the same two local dependency variables for BSP and utilities. Its retained-Recovery partition contract places the normal Game in `ota_0` and reserves the factory partition for Recovery.
+ESP-Mosaico is the default application-side Board component at [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/). Game manifests do not name a Board. The Application CMake layer selects `RAYLIB_LITE_BOARD=esp-mosaico` by default and adds the shared `examples_common` component plus `examples/boards/<board>` as the selected Board component. Use `-D RAYLIB_LITE_BOARD=<board>` to select another adapter. Game-specific device glue stays at the Game's own `main/native/` boundary; if it needs a new board capability, generalize the example-Board contract/provider instead of adding `boards/<board>/extensions/<game>`. ESP-Mosaico automatically fetches pinned BSP and utilities Git dependencies; no dependency environment exports are required. Its retained-Recovery partition contract places the normal Game in `ota_0` and reserves the factory partition for Recovery.
 
 ```sh
-export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
-export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
 idf.py -C examples/sky_hop -B /tmp/sky-hop-native build
 # Another Board:
 # idf.py -C examples/sky_hop -B /tmp/sky-hop-other -D RAYLIB_LITE_BOARD=<board> build

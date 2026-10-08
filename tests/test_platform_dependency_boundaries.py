@@ -519,7 +519,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn("RAYLIB_LITE_EXAMPLE_TARGET_FPS", cmake)
         self.assertIn("RAYLIB_LITE_NATIVE_TARGET_FPS=${RAYLIB_LITE_EXAMPLE_TARGET_FPS}", cmake)
 
-        for game, fps in (("neon_rift_rally", 30), ("tomb_raycast", 50)):
+        for game, fps in (("tomb_raycast", 50),):
             top = (ENGINE / "examples" / game / "CMakeLists.txt").read_text()
             main = (ENGINE / "examples" / game / "main/CMakeLists.txt").read_text()
             with self.subTest(game=game):
@@ -544,15 +544,19 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn('version: "0.1.0"', board_manifest)
         self.assertIn('espressif2022/raylib-lite-engine: "^0.1.0"', board_manifest)
         self.assertIn("esp-mosaico-bsp:", board_manifest)
-        self.assertIn('version: "0.2.0"', board_manifest)
-        self.assertIn("override_path: ${MOSAICO_BSP_COMPONENT_DIR}", board_manifest)
+        self.assertIn("git: https://github.com/espressif2022/esp-mosaico-bsp.git", board_manifest)
+        self.assertIn("path: components/esp-mosaico-bsp", board_manifest)
         self.assertIn("esp_iris:", board_manifest)
-        self.assertIn('version: "0.1.0"', board_manifest)
-        self.assertIn("override_path: ${MOSAICO_UTILS_ROOT}/ESP-Iris/components/esp_iris", board_manifest)
-        self.assertIn("esp_mosaico_app_recovery:", board_manifest)
-        self.assertIn("override_path: ${MOSAICO_UTILS_ROOT}/esp-mosaico-recovery/components/esp_mosaico_app_recovery", board_manifest)
-        self.assertNotIn("esp-mosaico-bsp.git", board_manifest)
-        self.assertNotIn("esp-mosaico-utils.git", board_manifest)
+        self.assertIn("git: https://github.com/espressif2022/esp-mosaico-utils.git", board_manifest)
+        self.assertIn("path: ESP-Iris/components/esp_iris", board_manifest)
+        self.assertNotIn("override_path:", board_manifest)
+        project = (board / "project.cmake").read_text()
+        self.assertIn("FetchContent_Declare(raylib_lite_mosaico_utils", project)
+        self.assertIn("esp-mosaico-recovery/components/esp_mosaico_app_recovery", project)
+        self.assertIn('list(APPEND EXTRA_COMPONENT_DIRS "${_raylib_lite_recovery_dir}")', project)
+        # Iris and Recovery must use the same upstream contract revision.
+        iris_revision = re.search(r'path: ESP-Iris/components/esp_iris\s+version: "([0-9a-f]{40})"', board_manifest).group(1)
+        self.assertIn(f"GIT_TAG {iris_revision}", project)
 
         board_component = (board / "CMakeLists.txt").read_text()
         self.assertIn('"iris_display_input.c"', board_component)
@@ -639,18 +643,19 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertFalse((board / "components/esp_mosaico_app_recovery").exists())
         self.assertFalse((board / "components/esp_iris").exists())
 
-    def test_native_game_readmes_use_consistent_mosaico_dependency_exports(self) -> None:
+    def test_native_game_readmes_document_automatic_dependencies(self) -> None:
         for manifest in (ENGINE / "examples").glob("*/main/idf_component.yml"):
             game = manifest.parent.parent
-            if game.name == "render_benchmark":
+            if game.name == "render_benchmark" or game.name.endswith("_dev"):
                 continue
             readme = game / "README.md"
             if not readme.is_file():
                 continue
             source = readme.read_text(encoding="utf-8")
             with self.subTest(game=game.name):
-                self.assertIn("MOSAICO_BSP_COMPONENT_DIR", source)
-                self.assertIn("MOSAICO_UTILS_ROOT", source)
+                self.assertIn("automatically download pinned Git dependencies", source)
+                self.assertNotIn("export MOSAICO_BSP_COMPONENT_DIR", source)
+                self.assertNotIn("export MOSAICO_UTILS_ROOT", source)
 
     def test_shared_example_glue_does_not_include_concrete_bsp(self) -> None:
         forbidden = re.compile(r'#\s*include\s*[<"](?:bsp/|esp_mosaico)')

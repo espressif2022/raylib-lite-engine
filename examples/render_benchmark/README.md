@@ -27,11 +27,10 @@ ESP32-S31 直接新建构建时 `RENDER_BENCH_DISPLAY` 默认 ON，烧录后上�
 - DONE FPS 是最近 60 帧**全帧 DMA 传输完成速率**，不是面板扫描刷新率。串口 `RENDERPREVIEW_STATS` 同时记录平均耗时。
 - 发送使用一个内部 DMA 条带，RGB565 字节交换后提交；收到完成回调才复用。无异步丢旧帧队列，TE 同步关闭。
 
-上屏预览只依赖 ESP-Mosaico BSP，不使用 ESP-Iris/Recovery。构建前显式设置与其它 native Game 相同的 BSP component 路径：
-
-```sh
-export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
-```
+上屏预览只依赖 ESP-Mosaico BSP，不使用 ESP-Iris/Recovery。未指定本地 BSP 时，
+CMake 自动从 GitHub 获取固定版本，无需手动 export。依赖保存在独立 build 目录的 `_deps/` 中。
+本地联合开发可传 `-DMOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp`；
+显式指定但无效的路径会报错。离屏构建仍不获取 BSP。
 
 首次显示构建会解析 BSP 的组件依赖。裸屏构建关闭 LVGL，使用独立 build 目录，避免已有 sdkconfig 覆盖这些默认值。
 可设 `-DRENDER_BENCH_PREVIEW_FRAMES=300`，显示 300 帧后停止提交并保留最后画面；默认 0 持续运行。

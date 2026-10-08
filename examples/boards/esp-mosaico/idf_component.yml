@@ -6,12 +6,11 @@ dependencies:
   idf: ">=6.2"
   espressif2022/raylib-lite-engine: "^0.1.0"
   esp-mosaico-bsp:
-    version: "0.2.0"
-    override_path: ${MOSAICO_BSP_COMPONENT_DIR}
+    git: https://github.com/espressif2022/esp-mosaico-bsp.git
+    path: components/esp-mosaico-bsp
+    version: "75984766e64e156bc8046f90fd2e0ac0c41a24e2"
   esp_iris:
-    version: "0.1.0"
-    override_path: ${MOSAICO_UTILS_ROOT}/ESP-Iris/components/esp_iris
-  esp_mosaico_app_recovery:
-    override_path: ${MOSAICO_UTILS_ROOT}/esp-mosaico-recovery/components/esp_mosaico_app_recovery
+    git: https://github.com/espressif2022/esp-mosaico-utils.git
+    path: ESP-Iris/components/esp_iris
+    version: "e9509a4cd6323d64bd0d2a7c432c96654de7a633"
   espressif/esp_display_present: "==1.0.2"
-  lvgl/lvgl: "==9.5.0"

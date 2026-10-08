@@ -13,10 +13,11 @@ LINK = re.compile(r"(?<!!)\[[^\]]+\]\((<[^>]+>|[^\s)]+)(?:\s+\"[^\"]*\")?\)")
 
 def main() -> int:
     failures: list[str] = []
-    paths = [ROOT / name for name in ("README.md", "README.CN.md", "README.EN.md",
+    paths = [ROOT / name for name in ("README.md", "README.CN.md", "README.EN.md", "API.md",
                                         "CONTRIBUTING.md", "CONTRIBUTING.CN.md",
                                         "CONTRIBUTING.EN.md", "THIRD_PARTY_NOTICES.md")]
     paths += sorted((ROOT / "docs").rglob("*.md"))
+    paths += sorted((ROOT / "release").rglob("*.md"))
     paths += sorted((ROOT / "components").rglob("README.md"))
     paths += sorted((ROOT / "examples").glob("*/README.md"))
     paths += sorted((ROOT / "host").rglob("README.md"))

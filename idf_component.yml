@@ -7,6 +7,26 @@ documentation: https://github.com/espressif2022/raylib-lite-engine/tree/main/doc
 issues: https://github.com/espressif2022/raylib-lite-engine/issues
 changelog: https://github.com/espressif2022/raylib-lite-engine/blob/main/CHANGELOG.md
 
+maintainers:
+  - "xuxin <xuxin@espressif.com>"
+
+# Repository examples are assembled by tools/prepare_release.py before upload.
+files:
+  use_gitignore: true
+  exclude:
+    - "examples/**/*"
+    - "release/**/*"
+    - "tests/**/*"
+    - "host/**/*"
+    - "artifacts/**/*"
+    - "**/*.patch"
+    - "**/.codex-runs/**/*"
+    - "**/.agents/**/*"
+    - "**/.codex/**/*"
+    - "**/.aws/**/*"
+    - "AGENTS.md"
+    - "CONTRIBUTING*"
+
 tags:
   - graphics
   - game

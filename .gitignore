@@ -24,8 +24,13 @@ artifacts/
 /docs/debug/
 
 # Unfinished local experiments
-/examples/vertical_dock/
-/examples/vector_cat/
-/examples/vector_pet/
-/examples/vector_puppet/
-/examples/sewer_labyrinth/
+/examples/*_dev/
+/examples/vertical_dock_dev/
+/examples/vector_cat_dev/
+/examples/vector_pet_dev/
+/examples/vector_puppet_dev/
+/examples/sewer_labyrinth_dev/
+
+# Local integration backups and generated release output
+/*.patch
+/dist/

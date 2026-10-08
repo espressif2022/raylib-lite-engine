@@ -1,6 +1,6 @@
 # Reusable design principles
 
-[Documentation index](README.EN.md) · [简体中文](reference-designs.CN.md) · [Game development](game-development.EN.md) · [Build paths](build-matrix.EN.md)
+[Documentation index](README.md) · [简体中文](reference-designs.CN.md) · [Game development](game-development.EN.md) · [Build paths](build-matrix.EN.md)
 
 When designing a game or backend, decide who owns each resource and capability, choose the rendering path, then validate correctness and device cost with the same inputs. This page records rules shared across games. Build commands and individual measurements belong to their respective projects.
 

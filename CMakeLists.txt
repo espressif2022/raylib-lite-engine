@@ -1,6 +1,6 @@
 # Raylib Lite Engine single ESP-IDF component definition.
-# IDF derives the component name from this repository directory basename, so
-# consumers depend on the root component as `raylib-lite-engine`.
+# IDF resolves local and namespaced Registry installations; consumers use
+# the manifest dependency espressif2022/raylib-lite-engine.
 get_filename_component(RAYLIB_LITE_ENGINE_ROOT "${CMAKE_CURRENT_LIST_DIR}" ABSOLUTE)
 
 set(RAYLIB_LITE_WALL_MODE "0" CACHE STRING "0 legacy, 1 exact, 2 fixed, 3 error bounded")
