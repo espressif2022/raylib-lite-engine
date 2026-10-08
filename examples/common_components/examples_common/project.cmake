@@ -28,6 +28,7 @@ endif()
 
 list(APPEND EXTRA_COMPONENT_DIRS
     "${CMAKE_CURRENT_LIST_DIR}"
+    "${CMAKE_CURRENT_LIST_DIR}/../examples_audio"
     "${RAYLIB_LITE_BOARD_DIR}")
 
 set(_raylib_lite_board_defaults "${RAYLIB_LITE_BOARD_DIR}/sdkconfig.defaults")

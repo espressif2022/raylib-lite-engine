@@ -3,13 +3,12 @@ idf_component_register(
         "board.c"
         "iris_display_input.c"
         "mosaico_strip_present.c"
-        "game_audio.c"
-        "platform_esp_audio.c"
-        "platform_audio_write_all.c"
+        "board_audio_codec.c"
     PRIV_INCLUDE_DIRS
         "."
     REQUIRES
         examples_common
+        examples_audio
         raylib-lite-engine
         esp_display_present
         esp-mosaico-bsp
@@ -20,4 +19,6 @@ idf_component_register(
         nvs_flash
         esp_timer
         esp_driver_dma
-    PRIV_REQUIRES freertos)
+    PRIV_REQUIRES freertos
+    # Retain the selected Board's audio backend factory at final link.
+    WHOLE_ARCHIVE)

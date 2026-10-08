@@ -40,6 +40,12 @@ static raylib_lite_result_t fake_stop(void *opaque, uint32_t timeout_ms)
 
 int main(void)
 {
+    /* Deadline with no signal is not successful startup. DONE takes priority
+     * even when both bits become visible in the same event-group snapshot. */
+    assert(platform_audio_start_status(false, false) == RAYLIB_LITE_TIMEOUT);
+    assert(platform_audio_start_status(true, false) == RAYLIB_LITE_OK);
+    assert(platform_audio_start_status(false, true) == RAYLIB_LITE_NOT_READY);
+    assert(platform_audio_start_status(true, true) == RAYLIB_LITE_NOT_READY);
     int16_t frames[10] = {0};
     fake_sink_t sink = {.max_write = 3};
     raylib_lite_audio_backend_t backend = {

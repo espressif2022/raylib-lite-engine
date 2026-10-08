@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 ENGINE = Path(__file__).resolve().parents[1]
-PORT = ENGINE / "examples/boards/esp-mosaico"
+PORT = ENGINE / "examples/common_components/examples_audio"
 FAKES = ENGINE / "tests/fakes/esp_mosaico_port"
 
 class AudioFacadeTests(unittest.TestCase):

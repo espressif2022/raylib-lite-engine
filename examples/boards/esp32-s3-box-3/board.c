@@ -15,6 +15,7 @@
 #include "freertos/task.h"
 #include "raylib_lite_action.h"
 #include "box3_video.h"
+#include "platform_esp_audio.h"
 
 #define INPUT_CAPACITY 32U
 #define POLL_MS 12U
@@ -346,6 +347,9 @@ esp_err_t raylib_lite_example_board_retry_cleanup(
     raylib_lite_example_board_t *board, uint32_t timeout_ms)
 {
     if (!board || board != &s_board) return ESP_ERR_INVALID_ARG;
+    /* Also fence direct Board cleanup, not just the Native Game launcher. */
+    raylib_lite_result_t audio_result = raylib_lite_game_audio_shutdown(timeout_ms);
+    if (audio_result != RAYLIB_LITE_OK) return to_esp(audio_result);
     esp_err_t err = raylib_lite_example_board_stop(board, timeout_ms);
     if (err != ESP_OK) return err;
     if (board->video) {

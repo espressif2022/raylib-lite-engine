@@ -1,4 +1,7 @@
-menu "ESP-Mosaico Game Audio"
+menu "Native Example Game Audio"
+
+# Preserve existing ESP-Mosaico sdkconfig overrides when sharing the audio
+# mixer/worker with other native Boards.
 
 config ESP_MOSAICO_AUDIO_CLIPS
     int "Maximum loaded audio clips"
