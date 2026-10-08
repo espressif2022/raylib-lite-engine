@@ -279,11 +279,20 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
    return;
   }
  }
- if(identity&&!s->alpha&&tint.r==255&&tint.g==255&&tint.b==255&&tint.a==255){
+ if(identity&&!s->alpha&&tint.a==255){
   int left=(int)(dest.x-origin.x),top=(int)(dest.y-origin.y),isw=(int)sw,ish=(int)sh;
   int source_x=(int)source.x,source_y=(int)source.y;
   int first_lx=x0-left,first_ly=y0-top;
   uint32_t drawn=0,runs=0;
+  bool white=tint.r==255&&tint.g==255&&tint.b==255;
+  uint16_t red[32],green[64],blue[32];
+  if(!white){
+   /* Tint opaque RGB565 directly. The component tables preserve tint565's
+    * integer rounding and avoid destination reads/blending for opaque pixels. */
+   for(unsigned i=0;i<32;++i){red[i]=(uint16_t)((i*tint.r/255U)<<11);
+    blue[i]=(uint16_t)(i*tint.b/255U);}
+   for(unsigned i=0;i<64;++i)green[i]=(uint16_t)((i*tint.g/255U)<<5);
+  }
   /* Bounded horizontal lookup: sample X once per block, not once per row.
    * Keep exact rational sampling and the existing out-of-atlas skip behavior. */
   sample_step_t xstep=sample_step(first_lx,isw,dw);
@@ -300,7 +309,12 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
     if((unsigned)sy>=s->header->height)continue;
     const uint16_t *src=s->rgb+(size_t)sy*s->header->width;
     uint16_t *dst=s_target+(size_t)y*s_stride+left_x;
-    for(int i=0;i<count;++i)if(samples[i]>=0){dst[i]=src[samples[i]];++drawn;}
+    if(white){
+     for(int i=0;i<count;++i)if(samples[i]>=0){dst[i]=src[samples[i]];++drawn;}
+    }else{
+     for(int i=0;i<count;++i)if(samples[i]>=0){uint16_t p=src[samples[i]];
+      dst[i]=(uint16_t)(red[p>>11]|green[(p>>5)&63U]|blue[p&31U]);++drawn;}
+    }
     ++runs;
    }
    left_x+=count;

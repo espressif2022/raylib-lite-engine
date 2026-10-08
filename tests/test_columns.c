@@ -138,7 +138,9 @@ int main(int argc,char **argv){
  }
  /* Opaque scaling oracle: flipped sources, clipping, invalid atlas edges,
   * integer destinations and widths spanning multiple lookup blocks. */
- for(int trial=0;trial<100;trial++){
+ for(int mode=0;mode<2;mode++)for(int trial=0;trial<100;trial++){
+  Color tint=mode?(Color){(uint8_t)(trial*17),(uint8_t)(trial*29),
+                          (uint8_t)(trial*31),255}:(Color){255,255,255,255};
   int dx=trial%30-15,dy=trial%20-10,dw=65+trial*3,dh=15+trial;
   int sx0=trial%5-1,sy0=trial%4-1,sw=trial%7+1,sh=trial%6+1;
   bool fx=(trial&1)!=0,fy=(trial&2)!=0;
@@ -148,10 +150,15 @@ int main(int argc,char **argv){
    if(x<dx||x>=dx+dw||y<dy||y>=dy+dh)continue;
    int sx=(x-dx)*sw/dw,sy=(y-dy)*sh/dh;
    sx=sx0+(fx?sw-1-sx:sx);sy=sy0+(fy?sh-1-sy:sy);
-   if((unsigned)sx<8&&(unsigned)sy<8)expected[y*STRIDE+x]=pixel(sx,sy);
+   if((unsigned)sx<8&&(unsigned)sy<8){
+    uint16_t p=pixel(sx,sy);
+    unsigned r=(p/2048)*tint.r/255U,g=((p/32)%64)*tint.g/255U;
+    unsigned b=(p%32)*tint.b/255U;
+    expected[y*STRIDE+x]=(uint16_t)(r*2048+g*32+b);
+   }
   }
   raylib_lite_2d_draw_texture_pro(texture,(Rectangle){sx0,sy0,fx?-sw:sw,fy?-sh:sh},
-    (Rectangle){dx,dy,dw,dh},(Vector2){0,0},0,(Color){255,255,255,255});
+    (Rectangle){dx,dy,dw,dh},(Vector2){0,0},0,tint);
   assert(!memcmp(actual,expected,sizeof(actual)));
  }
  /* Constant-UV triangle/quad: every written pixel equals one atlas texel. */
@@ -253,7 +260,7 @@ int main(int argc,char **argv){
  for(int i=0;i<240;i++)columns[i]=(raylib_lite_raycast_wall_t){i*2,-30,2,450,i%8,0,1,8,160,0,0};
  clock_t start=clock();
  for(int i=0;i<500;i++)raylib_lite_2d_draw_raycast_walls(texture,columns,240);
- printf("100 RGB565 wall, 100 INDEX8 wall, 50 solid wall, 400 floor/span, 100 opaque-scale oracle cases passed; wall benchmark %.3f ms/frame\n",
+ printf("100 RGB565 wall, 100 INDEX8 wall, 50 solid wall, 400 floor/span, 200 opaque/tinted-scale oracle cases passed; wall benchmark %.3f ms/frame\n",
   (double)(clock()-start)*1000/CLOCKS_PER_SEC/500);
  start=clock();
  for(int i=0;i<500;i++)raylib_lite_2d_draw_indexed_raycast_walls(wall,columns,240);

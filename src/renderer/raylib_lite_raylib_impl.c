@@ -698,9 +698,21 @@ void raylib_lite_raylib_draw_rectangle_rounded_lines(Rectangle r,float roundness
     }
 }
 
-static inline int edge(int ax, int ay, int bx, int by, int px, int py)
+static inline int64_t edge(int ax, int ay, int bx, int by, int px, int py)
 {
-    return (px-ax)*(by-ay) - (py-ay)*(bx-ax);
+    return ((int64_t)px-ax)*((int64_t)by-ay) -
+           ((int64_t)py-ay)*((int64_t)bx-ax);
+}
+
+/* Positive denominator; C division truncates toward zero rather than floor. */
+static inline int64_t triangle_floor_div(int64_t n, int64_t d)
+{
+    return n/d - (n%d < 0);
+}
+
+static inline int64_t triangle_ceil_div(int64_t n, int64_t d)
+{
+    return n/d + (n%d > 0);
 }
 
 void raylib_lite_raylib_draw_triangle(Vector2 av, Vector2 bv, Vector2 cv, Color color)
@@ -722,25 +734,35 @@ void raylib_lite_raylib_draw_triangle(Vector2 av, Vector2 bv, Vector2 cv, Color 
         if(maxx>=s_scissor_x1)maxx=s_scissor_x1-1;
         if(maxy>=s_scissor_y1)maxy=s_scissor_y1-1;
     }
-    int area=edge(ax,ay,bx,by,cx,cy);
+    int64_t area=edge(ax,ay,bx,by,cx,cy);
     if(!area||!color.a||minx>maxx||miny>maxy)return;
     span_paint_t paint=span_paint(color);
-    /* A filled triangle intersects each scanline in one contiguous interval.
-     * Find that interval with edge tests, then use the shared span writer so
-     * opaque interiors take the S31 PIE bulk-store path.  This keeps exact
-     * legacy edge inclusion while turning thousands of framebuffer writes
-     * into a few dozen cache-friendly runs. */
+    /* Intersect the three inclusive integer half-planes directly. This is
+     * exactly the legacy edge test at integer pixel coordinates, including
+     * shared edges and either winding, without scanning each row's box. */
+    int winding=area>0?1:-1;
+    int vx[3]={ax,bx,cx},vy[3]={ay,by,cy};
+    int64_t slope[3],value[3],step[3];
+    for(int i=0;i<3;++i){
+        int j=(i+1)%3;
+        slope[i]=((int64_t)vy[j]-vy[i])*winding;
+        step[i]=-((int64_t)vx[j]-vx[i])*winding;
+        value[i]=edge(vx[i],vy[i],vx[j],vy[j],0,miny)*winding;
+    }
     for(int y=miny;y<=maxy;++y){
-        int first=-1,last=-1;
-        for(int x=minx;x<=maxx;++x){
-            int w0=edge(bx,by,cx,cy,x,y),w1=edge(cx,cy,ax,ay,x,y);
-            int w2=edge(ax,ay,bx,by,x,y);
-            bool inside=(area>=0&&w0>=0&&w1>=0&&w2>=0)||
-                        (area<0&&w0<=0&&w1<=0&&w2<=0);
-            if(inside){if(first<0)first=x;last=x;}
-            else if(first>=0)break;
+        int64_t first=minx,last=maxx;
+        bool inside=true;
+        for(int i=0;i<3;++i){
+            if(slope[i]>0){
+                int64_t lo=triangle_ceil_div(-value[i],slope[i]);
+                if(lo>first)first=lo;
+            }else if(slope[i]<0){
+                int64_t hi=triangle_floor_div(value[i],-slope[i]);
+                if(hi<last)last=hi;
+            }else if(value[i]<0)inside=false;
+            value[i]+=step[i];
         }
-        if(first>=0)fill_span(y,first,last+1,&paint);
+        if(inside&&first<=last)fill_span(y,(int)first,(int)last+1,&paint);
     }
 }
 
