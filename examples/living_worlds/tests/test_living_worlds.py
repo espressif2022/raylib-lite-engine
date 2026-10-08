@@ -8,7 +8,7 @@ import sys
 import tempfile
 import unittest
 
-ENGINE = Path(__file__).resolve().parents[1]
+ENGINE = Path(__file__).resolve().parents[3]
 PROJECT = ENGINE / "examples/living_worlds"
 WORLD_SOURCES = [
     PROJECT / "main/living_worlds_world.c",

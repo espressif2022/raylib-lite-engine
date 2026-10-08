@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 
-ENGINE = Path(__file__).resolve().parents[1]
+ENGINE = Path(__file__).resolve().parents[3]
 PROJECT = ENGINE / "examples/neon_rift_rally"
 
 
