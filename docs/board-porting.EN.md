@@ -15,3 +15,11 @@ A concrete native-example Board adapter is an application-side IDF component und
 | Assets and power | Product selects partition/embedding, backlight, and sleep policy | Names, capacity, startup/shutdown cleanup |
 
 To add a Board, create `examples/boards/<board>/CMakeLists.txt` plus its IDF manifest and `sdkconfig.defaults`; add `project.cmake` only for pre-project CMake settings. Keep the component name equal to the Board directory name so `${RAYLIB_LITE_BOARD}` can be used directly as the main component dependency. Do not add `boards/<board>/extensions/<game>` for one Game; when a Game exposes a new hardware requirement, first generalize an example-Board capability/provider, while Game-specific device adaptation stays at that Game's `main/native/` boundary. Accept in order: lifecycle tests with a fake backend or Host, isolated panel/touch/audio checks, then one reference game covering startup, input, actual display, sound, shutdown, and error recovery. Report render time, buffer wait, DMA completion, and full-frame rate separately; a successful `present` return is not proof of visibility. If a second board requires changing shared raster code, first provide a board-independent contract or reproducible measurements before moving the boundary.
+
+## Ownership and concurrency
+
+See the [API contract](../API.md) for exact lifecycle rules. After a successful `acquire`, return the frame exactly once through `present` or `discard`. `present` consumes it on every return, including busy or failure; do not discard or retry the same frame afterward. A successful submission does not imply DMA completion or screen visibility.
+
+When driver callbacks and the game task access the input queue concurrently, provide both queue lock and unlock callbacks. Keep ISR work outside task-context Engine APIs. Define overflow and disconnect recovery so held actions cannot remain stuck.
+
+The reference ESP-Mosaico Board includes Iris/Recovery deployment policy. A new Board must choose its own partition table and deployment flow; importing the Engine does not require that product profile.

@@ -15,3 +15,11 @@
 | 资产和电源 | 产品选择分区/内嵌、背光和睡眠策略 | 名称一致、容量、启动/退出资源归还 |
 
 新增 Board 时创建 `examples/boards/<board>/CMakeLists.txt`、IDF manifest 与 `sdkconfig.defaults`；只有需要 `project()` 之前的 CMake 配置时才增加 `project.cmake`。Board 目录名应与 component name 一致，使 `${RAYLIB_LITE_BOARD}` 可以直接作为 main component dependency。不要为单个 Game 增加 `boards/<board>/extensions/<game>`；若某个 Game 暴露出新的硬件需求，应先形成通用 Board capability/provider，Game-specific device adapter 则保留在该 Game 的 `main/native/` 边界。验收顺序：先用假后端或 Host 测生命周期，再单独测面板/触摸/音频，最后在同一个参考游戏中记录启动、输入、真实上屏、声音、退出和错误恢复。性能报告同时记录帧计算、buffer 等待、DMA 完成和整帧速率；不能把 `present` 返回当作屏幕已显示。若第二块板需要修改共享光栅器，先给出与板级细节无关的通用接口或可复现实测，再调整平台边界。
+
+## 所有权与并发
+
+具体生命周期规则见[公开 API 契约（English）](../API.md)。`acquire` 成功后，该帧必须且只能通过 `present` 或 `discard` 归还一次。`present` 在所有返回路径上消费帧，包括 busy 或失败；返回后不要再 discard 或重试同一帧。提交成功不代表 DMA 完成或屏幕已经显示。
+
+驱动回调和游戏任务并发访问输入队列时，必须同时提供队列 lock/unlock 回调。不要在 ISR 中调用仅支持任务上下文的 Engine API。定义队列溢出和断连恢复，避免动作保持按下。
+
+参考 ESP-Mosaico Board 包含 Iris/Recovery 部署策略。新增 Board 自行选择分区表与部署流程；依赖 Engine 不要求采用这一产品配置。

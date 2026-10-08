@@ -36,22 +36,17 @@ python3 tools/game_cli.py sim examples/tomb_raycast
 python3 tools/game_cli.py sim examples/tomb_raycast --headless --frames 8
 ```
 
-目录根部也是可独立构建的 ESP-IDF native 工程。Engine 与 ESP-Mosaico Board 均由 `main/idf_component.yml` 声明；仓库内用 `override_path` 联调，外部工程使用发布版 Engine 依赖。配置 Board 的 BSP/Iris override 环境后可在本目录运行 `idf.py build`。设备 provisioning/update 仍走 retained Recovery，不直接烧 normal Game 覆盖 Recovery。
+目录根部也是可独立构建的 ESP-IDF native 工程。`main/idf_component.yml` 声明 Engine，Application CMake 选择 Board；仓库内用 `override_path` 联调，外部工程使用发布版 Engine 依赖。Board 自动获取固定版本依赖，无需手动设置 BSP/Iris override。设备 provisioning/update 仍走 retained Recovery，不直接烧 normal Game 覆盖 Recovery。
 native 画面上的 FPS 显示实际送屏帧率，首次统计完成前显示 `FPS: --`。
 
-同初始视角的两块板对照（约 25 万像素、28 个三角形、165 个四边形）：
-旧 GSP 固件约 31.2 FPS / 30.9 ms 绘制；当前 DMA2D 条带版约 30.3 FPS /
-31.6 ms 绘制，条带提交约 25.4 ms，无 CPU 拷贝回退。两者均为逻辑 30 Hz、
-渲染目标 50 FPS、游戏循环 CPU1、34 行双缓冲条带；送屏任务优先级 4。
-先前约 26.4 FPS 的 DMA2D 结果使用 CPU0 游戏循环、CPU1 送屏任务和 40 行条带，
-不能作为同配置的 GSP 对照。纹理绘制使用 `-O3 -funroll-loops`。
+历史对照见[历史真机记录](HISTORICAL_PERFORMANCE.md)。当前支持 Host 和 native，不支持 ELF 游戏构建、打包或加载。
 
 ## ESP-Mosaico native dependencies / 真机构建依赖
 
 Standard ESP-Mosaico native Game builds automatically download pinned Git dependencies:
 
 ```sh
-idf.py -C examples/tomb_raycast build
+idf.py -C examples/tomb_raycast -B /tmp/tomb-raycast-native -DIDF_TARGET=esp32s31 build
 ```
 
 No BSP or utilities environment exports are required. The selected Board fetches BSP, ESP-Iris, and the upstream Recovery component at fixed revisions. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.

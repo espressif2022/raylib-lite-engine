@@ -1,10 +1,12 @@
-# Living Worlds performance log
+# Living Worlds historical performance log
+
+Historical experiments only. These measurements are not acceptance results for the current release; reproduce them with identified firmware and comparable board captures before making a current performance claim.
 
 Hardware: ESP-Mosaico ESP32-S31, 480x480 RGB565, native firmware, FX LIVING.
 Measurements are 50-60 second serial captures. `render` includes scene drawing;
 `release` is the display handoff and is reported separately.
 
-## 2026-09-26 current result
+## 2026-09-26 experiment result
 
 | Scene | Initial FPS | Current FPS | Initial render | Current render | Change |
 | --- | ---: | ---: | ---: | ---: | ---: |

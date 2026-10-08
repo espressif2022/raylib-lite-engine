@@ -9,7 +9,7 @@ First use: follow the [quickstart](quickstart.EN.md) to create a game and see it
 | Read in order | Purpose |
 | --- | --- |
 | [Game development](game-development.EN.md) | Organize game sources and validate a change |
-| [Build paths](build-matrix.EN.md) | Choose Host, generic native, or ELF integration; Vibe owns Iris product workflows |
+| [Build paths](build-matrix.EN.md) | Choose Host or native ESP-IDF firmware; Vibe owns Iris product workflows |
 | [Reusable design principles](reference-designs.EN.md) | Design platform, input, feedback, assets, and rendering |
 
 ## Reference material
@@ -32,4 +32,4 @@ First use: follow the [quickstart](quickstart.EN.md) to create a game and see it
 
 Repository and documentation indexes use `README.md` for English and `README.CN.md` for Chinese. Contribution and detailed bilingual guides use `.EN.md` and `.CN.md`. `SKILL.md` remains the tool-compatible entry point. Single-language references are labelled in this index.
 
-Public Engine APIs use the `raylib_lite_*` namespace; Raylib-shaped compatibility lives under `compat/raylib/`. See [versioning](../README.md#versioning). One-off measurements and migration notes belong outside the maintained `docs/` guides; local `docs/debug/` is ignored by Git.
+Public Engine APIs use the `raylib_lite_*` namespace; Raylib-shaped compatibility lives under `compat/raylib/`. See [versioning](../API.md#installation-and-compatibility). One-off measurements and migration notes belong outside the maintained `docs/` guides; local `docs/debug/` is ignored by Git.

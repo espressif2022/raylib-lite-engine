@@ -1,7 +1,7 @@
 # Last Zone: Extraction
 
-A compact battle-royale-inspired training-ground game for the ESP-Mosaico Game
-SDK. Fight through five tactical drills, scavenge supplies, clear the last
+A compact battle-royale-inspired training-ground game for the Host simulator and ESP-Mosaico native
+firmware. Fight through five tactical drills, scavenge supplies, clear the last
 hostile, and reach the extraction pad. The native C Host preview and the
 device share the same fixed-step model and RGB565 view.
 
