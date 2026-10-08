@@ -178,7 +178,9 @@ raylib_lite_result_t raylib_lite_game_app_run(
     }
     app->on_render(app->user);
     result = last_frame_result();
-    if (frame_result_is_fatal(result)) goto shutdown_port;
+    /* Recovery must never accept an app without a successfully submitted
+     * initial frame. A flush with no accepted frames may still return OK. */
+    if (result != RAYLIB_LITE_OK) goto shutdown_port;
     result = raylib_lite_raylib_port_flush(3000);
     if (result != RAYLIB_LITE_OK) goto shutdown_port;
     if (app->on_first_present) {
