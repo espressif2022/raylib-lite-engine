@@ -2,17 +2,17 @@
 #include "sky_hop_view.h"
 
 #include "assets_ids.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 
 static void centered(const char *text, int y, int size, Color color)
 {
     DrawText(text, (480 - MeasureText(text, size)) / 2, y, size, color);
 }
 
-static void draw_sprite(MosaicoAtlas atlas, mosaico_asset_id_t id, float x, float y,
+static void draw_sprite(raylib_lite_atlas_t atlas, raylib_lite_asset_id_t id, float x, float y,
                         float width, float height, bool flip)
 {
-    const MosaicoSpriteFrame *frame = MosaicoAtlasGetFrame(atlas, id);
+    const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, id);
     if (!frame) return;
     Rectangle source = frame->source;
     if (flip) source.width = -source.width;
@@ -61,24 +61,24 @@ void sky_hop_overlay_sync(sky_hop_overlay_t *overlay, platform_phase_t phase)
     if (want && !overlay->shown) {
         overlay->shown = true;
         overlay->y = -190.0f;
-        mosaico_tween_start(&overlay->tween, -190.0f, 120.0f, 12, MOSAICO_EASE_OUT);
+        raylib_lite_tween_start(&overlay->tween, -190.0f, 120.0f, 12, RAYLIB_LITE_EASE_OUT);
     } else if (!want && overlay->shown) {
         overlay->shown = false;
         overlay->y = -190.0f;
         overlay->tween.active = false;
     }
     if (overlay->shown && overlay->tween.active)
-        overlay->y = mosaico_tween_tick(&overlay->tween);
+        overlay->y = raylib_lite_tween_tick(&overlay->tween);
 }
 
-void sky_hop_view_spawn_particles(mosaico_particle_pool_t *pool, float x, float y,
+void sky_hop_view_spawn_particles(raylib_lite_particle_pool_t *pool, float x, float y,
                                   Color color, unsigned count)
 {
     static const float vx[] = {-2.4f, -1.6f, -.8f, .8f, 1.6f, 2.4f};
     for (unsigned i = 0; i < count; ++i) {
         uint32_t packed = (uint32_t)color.r | ((uint32_t)color.g << 8) |
             ((uint32_t)color.b << 16) | ((uint32_t)color.a << 24);
-        (void)mosaico_particle_spawn(pool, (mosaico_particle_t){
+        (void)raylib_lite_particle_spawn(pool, (raylib_lite_particle_t){
             x, y, vx[i % 6], -2.8f - (float)(i % 3), .22f, packed,
             (uint16_t)(18 + i % 8), true});
     }
@@ -92,7 +92,7 @@ bool sky_hop_view_render(const sky_hop_view_t *view)
     Camera2D world_camera = {.offset={0, 0}, .target={game->camera_x, 0},
                              .rotation=0, .zoom=1};
     BeginDrawing();
-    if (!MosaicoFastFrameAvailable()) {
+    if (!raylib_lite_raylib_frame_available()) {
         EndDrawing();
         return false;
     }
@@ -126,7 +126,7 @@ bool sky_hop_view_render(const sky_hop_view_t *view)
         int x = (int)blocks[i].x;
         if (x + (int)blocks[i].width < camera || x >= camera + 480) continue;
         for (int tile_x = x; tile_x < x + (int)blocks[i].width; tile_x += 48)
-            draw_sprite(view->atlas, MOSAICO_ASSET_ID_TERRAIN_NATIVE, tile_x,
+            draw_sprite(view->atlas, RAYLIB_LITE_ASSET_ID_TERRAIN_NATIVE, tile_x,
                         blocks[i].y - 2, 50, 50, false);
         if (blocks[i].y >= 390)
             DrawRectangle(x, (int)blocks[i].y + 48, (int)blocks[i].width, 42,
@@ -151,30 +151,30 @@ bool sky_hop_view_render(const sky_hop_view_t *view)
         int x = (int)game->coins[i].x, y = (int)game->coins[i].y;
         unsigned pulse_index = (unsigned)((game->tick / 5 + i) % 3);
         float pulse = 25.0f + (float)pulse_index * 2.0f;
-        static const mosaico_asset_id_t coin_frames[] = {
-            MOSAICO_ASSET_ID_COIN_25, MOSAICO_ASSET_ID_COIN_27,
-            MOSAICO_ASSET_ID_COIN_29};
+        static const raylib_lite_asset_id_t coin_frames[] = {
+            RAYLIB_LITE_ASSET_ID_COIN_25, RAYLIB_LITE_ASSET_ID_COIN_27,
+            RAYLIB_LITE_ASSET_ID_COIN_29};
         draw_sprite(view->atlas, coin_frames[pulse_index], x - pulse / 2, y - pulse / 2,
                     pulse, pulse, false);
     }
     for (size_t i = 0; i < game->enemy_count; ++i) if (game->enemies[i].active) {
-        draw_sprite(view->atlas, MOSAICO_ASSET_ID_ENEMY_BEETLE_NATIVE,
+        draw_sprite(view->atlas, RAYLIB_LITE_ASSET_ID_ENEMY_BEETLE_NATIVE,
                     game->enemies[i].x - 7, game->enemies[i].y - 12, 44, 44,
                     game->enemies[i].speed < 0);
     }
-    mosaico_asset_id_t hero = !game->grounded ? MOSAICO_ASSET_ID_HERO_JUMP_NATIVE
+    raylib_lite_asset_id_t hero = !game->grounded ? RAYLIB_LITE_ASSET_ID_HERO_JUMP_NATIVE
         : (game->move_left || game->move_right)
         ? ((game->tick / MOSAICO_ANIMATION_HERO_RUN_FRAME_TICKS) & 1U
-           ? MOSAICO_ASSET_ID_HERO_RUN_NATIVE : MOSAICO_ASSET_ID_HERO_IDLE_NATIVE)
-        : MOSAICO_ASSET_ID_HERO_IDLE_NATIVE;
+           ? RAYLIB_LITE_ASSET_ID_HERO_RUN_NATIVE : RAYLIB_LITE_ASSET_ID_HERO_IDLE_NATIVE)
+        : RAYLIB_LITE_ASSET_ID_HERO_IDLE_NATIVE;
     draw_sprite(view->atlas, hero, game->player_x - 14, game->player_y - 22,
                 58, 64, game->facing_left);
     const float finish_x = platform_game_finish_x(game);
     if (finish_x - camera < 500)
-        draw_sprite(view->atlas, MOSAICO_ASSET_ID_FINISH_FLAG_NATIVE, finish_x - 12, 292,
+        draw_sprite(view->atlas, RAYLIB_LITE_ASSET_ID_FINISH_FLAG_NATIVE, finish_x - 12, 292,
                     70, 98, false);
     for (size_t i = 0; i < view->particle_count; ++i) {
-        const mosaico_particle_t *particle = &view->particles[i];
+        const raylib_lite_particle_t *particle = &view->particles[i];
         if (!particle->active) continue;
         const uint32_t packed = particle->color;
         const Color color = {(uint8_t)packed, (uint8_t)(packed >> 8),

@@ -9,9 +9,7 @@ simulator. It is not affiliated with or endorsed by the raylib project.
 
 The engine contains shared game code, a PC Host backend, and ESP-IDF
 integration. Board startup and device services belong to product or example
-firmware. Public APIs retain their `mosaico_*` names so existing games remain
-source compatible; neutral `raylite_*` APIs will be introduced through versioned
-compatibility aliases rather than a flag-day rename.
+firmware. Public Engine APIs use the `raylib_lite_*` namespace. Raylib-shaped source compatibility is isolated under `compat/raylib/`; neutral Engine headers do not expose ESP-IDF or Raylib types.
 
 ## Capabilities
 
@@ -35,14 +33,15 @@ modules, and the PC Host simulator. Iris/Gateway product workflows are maintaine
 in `esp-mosaico-vibe`. Their boundaries and example commands are
 in [the build matrix](docs/build-matrix.EN.md).
 
-For ESP-IDF firmware, include the engine integration helper before IDF's
-`project()` call and select the component paths there:
+For ESP-IDF firmware, consume the published component from the consuming component's `idf_component.yml`:
 
-```cmake
-set(RAYLIB_LITE_ENGINE_ROOT "/path/to/raylib-lite-engine")
-include("${RAYLIB_LITE_ENGINE_ROOT}/cmake/raylib_lite_esp.cmake")
-mosaico_game_sdk_add_components(RAYLIB AUDIO TILEMAP SCENE UI FX SAVE)
+```yaml
+dependencies:
+  idf: ">=6.2"
+  espressif2022/raylib-lite-engine: "^0.1.0"
 ```
+
+The in-repository examples keep the same version contract and add `override_path: ../../..` only to test the current checkout. External games do not include CMake files from the Engine repository and do not add the Engine repository to `EXTRA_COMPONENT_DIRS`; IDF Component Manager resolves the installed component. Raylib Lite Engine remains one component with no per-feature component-selection wrapper.
 
 The engine supplies portable game services and RGB565 software rendering; the
 product supplies board/BSP components, the video backend, and the
@@ -65,31 +64,21 @@ python3 tools/game_cli.py sim examples/tomb_raycast --headless --frames 8
 python3 tools/game_cli.py sim examples/vertical_dock
 ```
 
-Standalone example firmware can be built from supported example directories;
-production board policy belongs to the product repository. Documentation index:
-[docs/README.EN.md](docs/README.EN.md). Host ABI:
-[host/README.md](host/README.md).
-The Mosaico device examples depend only on the BSP (`MOSAICO_BSP_ROOT`); the
-ESP-Mosaico board port lives in `ports/esp_mosaico/`. Iris product integration
-is documented in Vibe. Host simulation needs neither.
+Standalone example firmware composes the same game source with an application-side Board selected by the example project's CMake layer. `main/idf_component.yml` remains Board-neutral and depends only on the Engine; `RAYLIB_LITE_BOARD` defaults to `esp-mosaico`, while `-D RAYLIB_LITE_BOARD=<board>` selects another adapter under `examples/boards/<board>`. The ESP-Mosaico reference Board resolves its BSP and ESP-Iris dependencies through the documented local paths. Its native examples expose the Iris USB management plane plus screenshot/pointer services, while application updates remain Recovery-first: retained factory Recovery owns the USB OTA writer and installs the normal Game into `ota_0`. Recovery/Gateway tooling remains in `esp-mosaico-utils` rather than the engine. Documentation index: [docs/README.EN.md](docs/README.EN.md). Host ABI: [host/README.md](host/README.md). Host simulation needs no board adapter.
 
 ## Repository layout
 
-- `components/`: reusable game modules and ESP-IDF service implementations.
-- `ports/esp_mosaico/`: ESP-Mosaico board platform and audio output on top of
-  the BSP.
-- `cmake/`: ESP-IDF component registration for device firmware.
-- `examples/`: eight reference games, including Vertical Dock, plus a
-  dedicated render benchmark and shared native-example glue.
+- `src/`: internal engine modules and IDF backends; `include/raylib_lite/` contains the public headers.
+- `tools/`: development and build tooling; `tools/cmake/` contains CMake helpers such as native asset embedding.
+- `examples/boards/`: concrete example/application-side board adapters; `esp-mosaico/` is the reference implementation.
+- `examples/`: reference games, a dedicated render benchmark, shared native-example glue, and board adapters.
 - `host/`: native Host ABI, RGB565 renderer bridge and browser simulator.
 - `tools/`: game CLI, asset compiler, and performance analysis tools.
 - `docs/`: game development guides and the mosaico-game-development skill.
 
 ## Versioning
 
-The initial `0.x` series preserves the existing Mosaico API while platform
-boundaries are separated. Host ABI and binary asset formats are independently
-versioned and reject incompatible inputs.
+The initial `0.x` series keeps Host ABI and binary asset formats independently versioned while the Engine API uses the neutral `raylib_lite_*` namespace. Incompatible Host ABI and asset-format inputs are rejected.
 
 ## License
 

@@ -13,7 +13,8 @@ sys.path.insert(0, str(ROOT / "tools"))
 import svg2vg  # noqa: E402
 
 RUNTIME = ROOT / "examples" / "vector_cat" / "main"
-GAME_2D = ROOT / "components" / "mosaico_game_2d"
+RENDERER = ROOT / "src" / "renderer"
+ENGINE_INCLUDE = ROOT / "include" / "raylib_lite"
 
 RIG_SVG = """\
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
@@ -136,8 +137,8 @@ class RenderedPose(unittest.TestCase):
             (out / "main.c").write_text(RENDER_MAIN)
             exe = out / "render"
             subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", str(out),
-                            "-I", str(RUNTIME), "-I", str(GAME_2D / "include"), str(out / "main.c"), str(out / "rig.c"),
-                            str(RUNTIME / "vg_asset.c"), str(RUNTIME / "vg_raster.c"), str(GAME_2D / "mosaico_rgb565.c"),
+                            "-I", str(RUNTIME), "-I", str(ENGINE_INCLUDE), str(out / "main.c"), str(out / "rig.c"),
+                            str(RUNTIME / "vg_asset.c"), str(RUNTIME / "vg_raster.c"), str(RENDERER / "raylib_lite_rgb565.c"),
                             "-lm", "-o", str(exe)], check=True)
             return subprocess.run([str(exe)] + (["rotate"] if rotate or hide_arm else [])
                                   + (["hide"] if hide_arm else []),

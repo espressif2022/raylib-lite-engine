@@ -1,0 +1,23 @@
+idf_component_register(
+    SRCS
+        "board.c"
+        "iris_display_input.c"
+        "mosaico_strip_present.c"
+        "game_audio.c"
+        "platform_esp_audio.c"
+        "platform_audio_write_all.c"
+    PRIV_INCLUDE_DIRS
+        "."
+    REQUIRES
+        examples_common
+        raylib-lite-engine
+        esp_display_present
+        esp-mosaico-bsp
+        esp_iris
+        esp_mosaico_app_recovery
+        esp_system
+        heap
+        nvs_flash
+        esp_timer
+        esp_driver_dma
+    PRIV_REQUIRES freertos)

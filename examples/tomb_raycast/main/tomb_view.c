@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "tomb_view.h"
 #include "assets_ids.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "raylib_lite_clock.h"
 #include <math.h>
 #include <stdio.h>
@@ -32,7 +32,7 @@ typedef struct {
     int x0, y0, x1, y1;
 } tomb_vis_t;
 typedef struct {
-    mosaico_textured_vertex_t a, b, c, d;
+    raylib_lite_textured_vertex_t a, b, c, d;
     unsigned light;
     float depth;
     uint8_t corners;
@@ -153,7 +153,7 @@ static int cmp_depth(const void *a, const void *b)
     return 0;
 }
 
-static bool push_surface(const mosaico_textured_vertex_t *v, int n,
+static bool push_surface(const raylib_lite_textured_vertex_t *v, int n,
                          unsigned light, float depth)
 {
     float min_x=v[0].x,max_x=v[0].x,min_y=v[0].y,max_y=v[0].y;
@@ -254,7 +254,7 @@ static bool should_subdivide(const tomb_clip_t *poly, int level, int allowed_lev
 static bool push_view_quad_flat(const tomb_clip_t *poly, float bias)
 {
     tomb_clip_t clipped[8];
-    mosaico_textured_vertex_t p[8];
+    raylib_lite_textured_vertex_t p[8];
     float vzs[8];
     int in_front=0;
     for(int i=0;i<4;++i){
@@ -292,7 +292,7 @@ static bool push_view_quad_flat(const tomb_clip_t *poly, float bias)
     bool ok=true;
     for(int i=1;i<n-1;++i){
         float depth=(vzs[0]+vzs[i]+vzs[i+1])/3.0f+bias;
-        mosaico_textured_vertex_t tri[3]={p[0],p[i],p[i+1]};
+        raylib_lite_textured_vertex_t tri[3]={p[0],p[i],p[i+1]};
         if(!push_surface(tri,3,lit,depth))ok=false;
     }
     return ok;
@@ -337,16 +337,16 @@ static bool push_quad(const tomb_vec3_t *w, const float *u, const float *v,
     return push_view_quad(poly,bias,0,subdivide_levels);
 }
 
-static void draw_buffered(MosaicoWallAtlas textures)
+static void draw_buffered(raylib_lite_wall_atlas_t textures)
 {
     if(s_draw_count<=0)return;
     qsort(s_draw,(size_t)s_draw_count,sizeof(s_draw[0]),cmp_depth);
     for(int i=0;i<s_draw_count;++i){
         if(s_draw[i].corners==4)
-            Mosaico2DDrawIndexedTexturedQuad(textures,s_draw[i].a,s_draw[i].b,
+            raylib_lite_2d_draw_indexed_textured_quad(textures,s_draw[i].a,s_draw[i].b,
                                              s_draw[i].c,s_draw[i].d,s_draw[i].light);
         else
-            Mosaico2DDrawIndexedTexturedTriangle(textures,s_draw[i].a,s_draw[i].b,
+            raylib_lite_2d_draw_indexed_textured_triangle(textures,s_draw[i].a,s_draw[i].b,
                                                  s_draw[i].c,s_draw[i].light);
     }
 }
@@ -553,14 +553,14 @@ static void emit_character(const tomb_game_t *game)
     emit_box(rll,0.14f,0.42f,0.14f,-0.21f,6,UV_LEATHER,side);
 }
 
-static void draw_hud(const tomb_game_t *game, MosaicoAtlas controls,
+static void draw_hud(const tomb_game_t *game, raylib_lite_atlas_t controls,
                      const tomb_hud_input_t *input)
 {
     Rectangle stick_src={0}, jump_src={0};
     bool has_stick=false, has_jump=false;
-    const MosaicoSpriteFrame *stick=MosaicoAtlasGetFrame(controls,MOSAICO_ASSET_ID_JOYSTICK_BASE);
+    const raylib_lite_sprite_frame_t *stick=raylib_lite_atlas_get_frame(controls,RAYLIB_LITE_ASSET_ID_JOYSTICK_BASE);
     if(stick){stick_src=stick->source;has_stick=true;}
-    const MosaicoSpriteFrame *jump=MosaicoAtlasGetFrame(controls,MOSAICO_ASSET_ID_JUMP_BUTTON);
+    const raylib_lite_sprite_frame_t *jump=raylib_lite_atlas_get_frame(controls,RAYLIB_LITE_ASSET_ID_JUMP_BUTTON);
     if(jump){jump_src=jump->source;has_jump=true;}
     int stick_x=input&&input->stick_active?input->stick_x:TOMB_MOVE_X;
     int stick_y=input&&input->stick_active?input->stick_y:TOMB_MOVE_Y;
@@ -582,11 +582,11 @@ static void draw_hud(const tomb_game_t *game, MosaicoAtlas controls,
     DrawText("W walk  F jump  left stick / right look",86,458,10,(Color){160,140,100,255});
 }
 
-void tomb_view_render(const tomb_game_t *game, MosaicoWallAtlas textures, MosaicoAtlas controls,
+void tomb_view_render(const tomb_game_t *game, raylib_lite_wall_atlas_t textures, raylib_lite_atlas_t controls,
                       const tomb_hud_input_t *input)
 {
     if(!game)return;
-    mosaico_game_2d_reset_raster_stats();
+    raylib_lite_renderer_reset_raster_stats();
     uint64_t t0=view_now_us();
     BeginDrawing();
     /* Every camera position is enclosed by opaque floor, ceiling and wall
@@ -616,6 +616,6 @@ void tomb_view_render(const tomb_game_t *game, MosaicoWallAtlas textures, Mosaic
     uint64_t t3=view_now_us();
     uint64_t setup_us=t1-t0;
     uint64_t hud_us=t3-t2;
-    mosaico_game_2d_set_phase_us((uint32_t)setup_us,(uint32_t)emit_us,
+    raylib_lite_renderer_set_phase_us((uint32_t)setup_us,(uint32_t)emit_us,
                                  (uint32_t)raster_us,0,(uint32_t)hud_us);
 }

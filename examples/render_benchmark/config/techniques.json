@@ -18,7 +18,7 @@
         "adaptive025",
         "adaptive05"
       ],
-      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "source": "src/renderer/raylib_lite_renderer.c",
       "gate": "UV≤0.26、覆盖正确、稳定计时"
     },
     {
@@ -30,7 +30,7 @@
         "quad",
         "triangles"
       ],
-      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "source": "src/renderer/raylib_lite_renderer.c",
       "gate": "同平面、同UV、相同覆盖与画质"
     },
     {
@@ -45,7 +45,7 @@
         "quad_rgb565",
         "quad_index8"
       ],
-      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "source": "src/renderer/raylib_lite_renderer.c",
       "gate": "先要求同组输出完全相同，再比较耗时"
     },
     {
@@ -57,7 +57,7 @@
         "columns_index8_row",
         "columns_index8_column"
       ],
-      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "source": "src/renderer/raylib_lite_renderer.c",
       "gate": "相同纹理、采样、输出"
     },
     {
@@ -68,7 +68,7 @@
       "variants": [
         "span_rgb565"
       ],
-      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "source": "src/renderer/raylib_lite_renderer.c",
       "gate": "独立整数采样参考"
     },
     {
@@ -80,7 +80,7 @@
         "copy_rgb565",
         "fill_rgb565"
       ],
-      "source": "components/mosaico_game_2d/mosaico_rgb565.c",
+      "source": "src/renderer/raylib_lite_rgb565.c",
       "gate": "包括 framebuffer padding 的逐像素检查"
     },
     {
@@ -92,7 +92,7 @@
         "shade_rgb565",
         "columns_index8_row"
       ],
-      "source": "components/mosaico_game_2d/mosaico_rgb565.c",
+      "source": "src/renderer/raylib_lite_rgb565.c",
       "gate": "当前两组输入不同，不能直接互相算加速比"
     },
     {
@@ -103,7 +103,7 @@
       "variants": [
         "span_mtx2"
       ],
-      "source": "components/mosaico_game_2d/mosaico_mtx2.c",
+      "source": "src/renderer/raylib_lite_mtx2.c",
       "gate": "独立调色板解码参考；尚无同图RGB565性能对照"
     },
     {
@@ -127,7 +127,7 @@
         "RENDER_BENCH_PIE=OFF",
         "RENDER_BENCH_PIE=ON"
       ],
-      "source": "components/mosaico_game_2d/mosaico_rgb565_pie.S",
+      "source": "src/arch/esp32s31/raylib_lite_rgb565_pie.S",
       "gate": "copy/fill 输出相同，固定同一硬件环境"
     },
     {
@@ -139,7 +139,7 @@
         "RENDER_BENCH_LUT_INTERNAL=OFF",
         "RENDER_BENCH_LUT_INTERNAL=ON"
       ],
-      "source": "components/mosaico_game_2d/mosaico_wall_bench.c",
+      "source": "src/renderer/raylib_lite_wall_bench.c",
       "gate": "同图同策略，内存位置作为独立维度；各自基线"
     },
     {
@@ -193,7 +193,7 @@
       "status": "integration_pending",
       "suite": "last_zone",
       "variants": [],
-      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "source": "src/renderer/raylib_lite_renderer.c",
       "gate": "地板oracle、重复覆盖和完整帧耗时"
     },
     {
@@ -209,7 +209,7 @@
         "tint",
         "overlap_order"
       ],
-      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "source": "src/renderer/raylib_lite_renderer.c",
       "gate": "同背景同纹理逐像素对标标量混合；验证0/半透明/255、重叠顺序、边界与stride；再测板端成本"
     },
     {
@@ -225,7 +225,7 @@
         "rotate",
         "origin"
       ],
-      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "source": "src/renderer/raylib_lite_renderer.c",
       "gate": "Host已有不透明缩放/翻转100例；仍需旋转/原点/透明纹理组合与板端同输入测试"
     },
     {
@@ -238,7 +238,7 @@
         "copy_scanline",
         "floor_row_occlusion"
       ],
-      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "source": "src/renderer/raylib_lite_renderer.c",
       "gate": "纹理边界、屏幕裁剪、行覆盖和遮挡后输出逐像素正确，再采集单核与整帧耗时"
     },
     {
@@ -252,7 +252,7 @@
         "clip",
         "stride"
       ],
-      "source": "components/mosaico_raylib_fast/mosaico_raylib_fast.c",
+      "source": "src/renderer/raylib_lite_raylib_impl.c",
       "gate": "Host 1024 个标量参考用例已有；尚未纳入专用板端同输入性能/上屏验收"
     },
     {
@@ -261,7 +261,7 @@
       "status": "integration_pending",
       "suite": "2d",
       "variants": [],
-      "source": "components/mosaico_game_2d/mosaico_game_2d.c",
+      "source": "src/renderer/raylib_lite_renderer.c",
       "gate": "复用现有host oracle，再建立同输入板端suite"
     },
     {

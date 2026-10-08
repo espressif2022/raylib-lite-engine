@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <stdio.h>
-#include "mosaico_wall_config.h"
+#include "raylib_lite_wall_config.h"
 #ifdef ESP_PLATFORM
 #include "sdkconfig.h"
 #include "esp_chip_info.h"
@@ -23,20 +23,20 @@ int main(int argc,char **argv){
 #endif
 #else
 #ifdef RENDER_BENCH_WALL
-int mosaico_wall_benchmark(void);
-#define RUN_BENCHMARK mosaico_wall_benchmark
+int raylib_lite_wall_benchmark(void);
+#define RUN_BENCHMARK raylib_lite_wall_benchmark
 #define SUITE "wall"
 #else
 int render_core_benchmark(void);
 #define RUN_BENCHMARK render_core_benchmark
 #define SUITE "core"
 #endif
-#ifdef M2D_WALL_AUDIT
+#ifdef RAYLIB_LITE_WALL_AUDIT
 #define AUDIT 1
 #else
 #define AUDIT 0
 #endif
-#ifdef MOSAICO_RGB565_PIE
+#ifdef RAYLIB_LITE_RGB565_PIE
 #define PIE 1
 #else
 #define PIE 0
@@ -52,7 +52,7 @@ static int run(void){
  printf("RENDERBENCH_BEGIN {\"schema\":\"render-example/v1\",\"suite\":\"%s\","
         "\"audit\":%d,\"mode\":%d,\"fixed\":%d,\"bound\":%.6f,\"pie\":%d,"
         "\"lut_storage\":\"%s\",\"workload_sha256\":\"%s\",\"display_active\":false}\n",
-        SUITE,AUDIT,M2D_WALL_MODE,M2D_WALL_FIXED_PIXELS,(double)M2D_WALL_ERROR_TEXELS,PIE,LUT,RENDER_BENCH_WORKLOAD_SHA256);
+        SUITE,AUDIT,RAYLIB_LITE_WALL_MODE,RAYLIB_LITE_WALL_FIXED_PIXELS,(double)RAYLIB_LITE_WALL_ERROR_TEXELS,PIE,LUT,RENDER_BENCH_WORKLOAD_SHA256);
 #ifdef ESP_PLATFORM
  esp_chip_info_t info;esp_chip_info(&info);
  const esp_app_desc_t *app=esp_app_get_description();

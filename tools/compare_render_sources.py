@@ -25,8 +25,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args=parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    overrides={str(ROOT / "components/mosaico_game_2d/mosaico_game_2d.c"):str(args.baseline_raster.resolve()),
-               str(ROOT / "components/mosaico_raylib_fast/mosaico_raylib_fast.c"):str(args.baseline_fast.resolve()),
+    overrides={str(ROOT / "src/renderer/raylib_lite_renderer.c"):str(args.baseline_raster.resolve()),
+               str(ROOT / "src/renderer/raylib_lite_raylib_impl.c"):str(args.baseline_fast.resolve()),
                str(ROOT / "examples/last_zone_extraction/main/last_zone_view.c"):str(args.baseline_last_zone_view.resolve())}
     if args.baseline_ocean:
         overrides[str(ROOT / "examples/living_worlds/main/living_worlds_ocean.c")]=str(args.baseline_ocean.resolve())
@@ -34,8 +34,10 @@ def main():
              for path in [*overrides.keys(),*overrides.values()]}
     (args.output/"source-sha256.json").write_text(json.dumps(sources,indent=2)+"\n")
     original_run=subprocess.run
+    adapter_source=str(ROOT / "src/renderer/raylib_lite_renderer_raylib.c")
     def baseline_compile(command, *values, **kwargs):
-        return original_run([overrides.get(str(value),value) for value in command], *values, **kwargs)
+        mapped=[overrides.get(str(value),value) for value in command if str(value)!=adapter_source]
+        return original_run(mapped, *values, **kwargs)
     reports=[]
     original_layout=os.environ.get("LAST_ZONE_SIM_LAYOUT")
     try:
@@ -49,7 +51,7 @@ def main():
                     try:
                         for case in range(12 if game=="living_worlds" else 4):
                             for runtime in (old,new):
-                                runtime.control(3)  # MOSAICO_HOST_CONTROL_RESET
+                                runtime.control(3)  # RAYLIB_LITE_HOST_CONTROL_RESET
                                 if game=="living_worlds" and case<4:
                                     runtime.pointer(1,[190,80,300,410][case],440,True)
                                     runtime.pointer(1,[190,80,300,410][case],440,False)

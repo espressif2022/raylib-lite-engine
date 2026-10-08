@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "mosaico_game_audio.h"
+#include "raylib_lite_game_audio.h"
 #include "living_worlds_world.h"
 
 enum { SCENE_AUDIO_COUNT = LIVING_SCENE_RAINFOREST + 1 };

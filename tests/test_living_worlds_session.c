@@ -8,14 +8,14 @@ static unsigned atlas_loads, atlas_unloads, background_loads, background_release
 static unsigned audio_inits, audio_closes, music_loads, music_unloads;
 static unsigned music_plays[SCENE_AUDIO_COUNT], music_stops, music_updates;
 
-MosaicoAtlas LoadMosaicoAtlas(const char *path)
+raylib_lite_atlas_t raylib_lite_atlas_load(const char *path)
 {
     ++atlas_loads;
     if (fail_aurora && strcmp(path, "aurora_ice_side.atlas") == 0)
-        return (MosaicoAtlas){0};
-    return (MosaicoAtlas){.texture.id = atlas_loads};
+        return (raylib_lite_atlas_t){0};
+    return (raylib_lite_atlas_t){.texture.id = atlas_loads};
 }
-void UnloadMosaicoAtlas(MosaicoAtlas atlas)
+void raylib_lite_atlas_unload(raylib_lite_atlas_t atlas)
 {
     assert(atlas.texture.id);
     ++atlas_unloads;
@@ -37,35 +37,35 @@ void living_worlds_view_render(const living_world_t *world,
 {
     assert(world && atlases);
 }
-void MosaicoAudioInit(void) { ++audio_inits; }
-void MosaicoAudioClose(void) { ++audio_closes; }
-bool MosaicoAudioReady(void) { return true; }
-Music MosaicoAudioLoadMusic(const char *path)
+void raylib_lite_game_audio_init(void) { ++audio_inits; }
+void raylib_lite_game_audio_close(void) { ++audio_closes; }
+bool raylib_lite_game_audio_ready(void) { return true; }
+Music raylib_lite_game_audio_load_music(const char *path)
 {
     assert(path && music_loads < SCENE_AUDIO_COUNT);
     return (Music){.frameCount = 1, .id = music_loads++};
 }
-void MosaicoAudioUnloadMusic(Music music)
+void raylib_lite_game_audio_unload_music(Music music)
 {
     assert(music.frameCount);
     ++music_unloads;
 }
-void MosaicoAudioPlayMusic(Music music)
+void raylib_lite_game_audio_play_music(Music music)
 {
     assert(music.frameCount && music.id < SCENE_AUDIO_COUNT);
     ++music_plays[music.id];
 }
-void MosaicoAudioUpdateMusic(Music music)
+void raylib_lite_game_audio_update_music(Music music)
 {
     assert(music.frameCount);
     ++music_updates;
 }
-void MosaicoAudioStopMusic(Music music)
+void raylib_lite_game_audio_stop_music(Music music)
 {
     assert(music.frameCount);
     ++music_stops;
 }
-void MosaicoAudioSetMusicVolume(Music music, float volume)
+void raylib_lite_game_audio_set_music_volume(Music music, float volume)
 {
     assert(music.frameCount && volume > 0.0f && volume < 1.0f);
 }

@@ -165,14 +165,17 @@ assert.equal(plays,2);
         with tempfile.TemporaryDirectory() as directory:
             executable = Path(directory) / "sewer_model"
             command = ["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
-                       "-DMOSAICO_GAME_NATIVE=1", "-ffunction-sections", "-fdata-sections"]
+                       "-DRAYLIB_LITE_GAME_NATIVE=1", "-ffunction-sections", "-fdata-sections"]
             for include in ["tests/fakes/sewer_audio", "host/include", "host",
-                            "components/mosaico_game_2d/include",
-                            "components/mosaico_game_assets/include",
-                            "components/raylib_lite_platform/include",
-                            "components/mosaico_raylib_fast/include"]:
+                            "examples/common_components/examples_common/include", "include/raylib_lite",
+                            "include/raylib_lite",
+                            "include/raylib_lite",
+                            "include/raylib_lite",
+                            "compat/raylib/include"]:
                 command += ["-I", str(ENGINE / include)]
-            command += [str(ENGINE / "tests/test_sewer_model.c"), "-Wl,--gc-sections", "-lm", "-o", str(executable)]
+            linker_gc = "-Wl,-dead_strip" if sys.platform == "darwin" else "-Wl,--gc-sections"
+            command += [str(ENGINE / "tests/test_sewer_model.c"), linker_gc,
+                        "-lm", "-o", str(executable)]
             subprocess.run(command, check=True)
             subprocess.run([str(executable)], check=True)
 

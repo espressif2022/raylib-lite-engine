@@ -9,8 +9,8 @@
  * Host timings are informational and do not establish device FPS. */
 #define _POSIX_C_SOURCE 200809L /* clock_gettime under -std=c11 */
 
-#include "mosaico_mtx2.h"
-#include "mosaico_rgb565.h"
+#include "raylib_lite_mtx2.h"
+#include "raylib_lite_rgb565.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,7 +58,7 @@ static void rgb565_span(uint16_t *dst, const uint16_t *row, int32_t u_16, int32_
         }
     } else {
         for (int i = 0; i < count; ++i) {
-            dst[i] = mosaico_shade565(row[u_16 >> 16], light);
+            dst[i] = raylib_lite_rgb565_shade_pixel(row[u_16 >> 16], light);
             u_16 += du_16;
         }
     }
@@ -73,9 +73,9 @@ static int check_oracle(const char *dir, const char *name, int blocks_side)
     snprintf(path, sizeof(path), "%s/%s.expect", dir, name);
     int32_t *expect = read_file(path, &expect_size);
 
-    mosaico_mtx2_t texture;
-    if (!mosaico_mtx2_open(blob, blob_size, &texture)) {
-        fprintf(stderr, "mosaico_mtx2_open rejected a valid blob\n");
+    raylib_lite_mtx2_t texture;
+    if (!raylib_lite_mtx2_open(blob, blob_size, &texture)) {
+        fprintf(stderr, "raylib_lite_mtx2_open rejected a valid blob\n");
         return 1;
     }
     const int width = blocks_side * 4, height = blocks_side * 4;
@@ -95,7 +95,7 @@ static int check_oracle(const char *dir, const char *name, int blocks_side)
             for (int x = 0; x < width; ++x) {
                 line[x] = 0xDEADU;
             }
-            mosaico_mtx2_span_constv(line, &texture, 0, 1 << 16, y, width, lights[l]);
+            raylib_lite_mtx2_span_constv(line, &texture, 0, 1 << 16, y, width, lights[l]);
             for (int x = 0; x < width; ++x) {
                 int32_t want = expect[cursor + (size_t)x];
                 uint16_t got = line[x];
@@ -120,8 +120,8 @@ static int check_oracle(const char *dir, const char *name, int blocks_side)
         for (int x = 0; x < count; ++x) {
             a[x] = b[x] = 0xDEADU;
         }
-        mosaico_mtx2_span_constv(a, &texture, 0, 1 << 16, y, count, 192U);
-        mosaico_mtx2_span(b, &texture, 0, y << 16, 1 << 16, 0, count, 192U);
+        raylib_lite_mtx2_span_constv(a, &texture, 0, 1 << 16, y, count, 192U);
+        raylib_lite_mtx2_span(b, &texture, 0, y << 16, 1 << 16, 0, count, 192U);
         if (memcmp(a, b, sizeof(uint16_t) * (size_t)count) != 0) {
             fprintf(stderr, "constv and general span disagree on row %d\n", y);
             ++failures;
@@ -153,26 +153,26 @@ static uint32_t next_random(void)
 /* Build an opaque MTX2 texture of the requested size plus its decoded RGB565
  * twin, so both samplers read identical content and differ only in storage. */
 static void make_pair(int side, uint8_t **out_blob, size_t *out_blob_size,
-                      uint16_t **out_raw, mosaico_mtx2_t *out_texture)
+                      uint16_t **out_raw, raylib_lite_mtx2_t *out_texture)
 {
     const int blocks_side = side / 4;
     const size_t block_count = (size_t)blocks_side * (size_t)blocks_side;
-    const size_t payload = block_count * MOSAICO_MTX2_BLOCK_BYTES;
-    const size_t total = MOSAICO_MTX2_HEADER_BYTES + payload;
+    const size_t payload = block_count * RAYLIB_LITE_MTX2_BLOCK_BYTES;
+    const size_t total = RAYLIB_LITE_MTX2_HEADER_BYTES + payload;
 
     uint8_t *blob = malloc(total);
-    mosaico_mtx2_header_t header = {
-        .magic = MOSAICO_MTX2_MAGIC,
+    raylib_lite_mtx2_header_t header = {
+        .magic = RAYLIB_LITE_MTX2_MAGIC,
         .width = (uint16_t)side,
         .height = (uint16_t)side,
         .frame_count = 0,
-        .flags = MOSAICO_MTX2_FLAG_OPAQUE,
+        .flags = RAYLIB_LITE_MTX2_FLAG_OPAQUE,
         .mip_levels = 1,
         .reserved = 0,
         .block_bytes = (uint32_t)payload,
     };
     memcpy(blob, &header, sizeof(header));
-    uint8_t *blocks = blob + MOSAICO_MTX2_HEADER_BYTES;
+    uint8_t *blocks = blob + RAYLIB_LITE_MTX2_HEADER_BYTES;
     for (size_t i = 0; i < block_count; ++i) {
         uint32_t a = next_random() & 0xFFFFu;
         uint32_t b = next_random() & 0xFFFFu;
@@ -180,7 +180,7 @@ static void make_pair(int side, uint8_t **out_blob, size_t *out_blob_size,
         if (c0 == c1) {
             c0 = c1 + 1u > 0xFFFFu ? 0xFFFFu : c1 + 1u;
         }
-        uint8_t *block = blocks + i * MOSAICO_MTX2_BLOCK_BYTES;
+        uint8_t *block = blocks + i * RAYLIB_LITE_MTX2_BLOCK_BYTES;
         block[0] = (uint8_t)c0;
         block[1] = (uint8_t)(c0 >> 8);
         block[2] = (uint8_t)c1;
@@ -192,13 +192,13 @@ static void make_pair(int side, uint8_t **out_blob, size_t *out_blob_size,
         block[7] = (uint8_t)(bits >> 24);
     }
 
-    if (!mosaico_mtx2_open(blob, total, out_texture)) {
+    if (!raylib_lite_mtx2_open(blob, total, out_texture)) {
         fprintf(stderr, "generated blob rejected\n");
         exit(1);
     }
     uint16_t *raw = malloc(sizeof(uint16_t) * (size_t)side * (size_t)side);
     for (int y = 0; y < side; ++y) {
-        mosaico_mtx2_span_constv(raw + (size_t)y * (size_t)side, out_texture, 0, 1 << 16, y,
+        raylib_lite_mtx2_span_constv(raw + (size_t)y * (size_t)side, out_texture, 0, 1 << 16, y,
                                  side, 256U);
     }
     *out_blob = blob;
@@ -211,7 +211,7 @@ static void benchmark(const char *label, int side)
     uint8_t *blob = NULL;
     uint16_t *raw = NULL;
     size_t blob_size = 0;
-    mosaico_mtx2_t texture;
+    raylib_lite_mtx2_t texture;
     make_pair(side, &blob, &blob_size, &raw, &texture);
 
     uint16_t dst[SPAN];
@@ -240,7 +240,7 @@ static void benchmark(const char *label, int side)
 
         t0 = now_seconds();
         for (int r = 0; r < rounds; ++r) {
-            mosaico_mtx2_span_constv(dst, &texture, 0, 1 << 16, rows[r], SPAN, light);
+            raylib_lite_mtx2_span_constv(dst, &texture, 0, 1 << 16, rows[r], SPAN, light);
             sink = (uint16_t)(sink + dst[0]);
         }
         double mtx2_ns = (now_seconds() - t0) * 1e9 / (rounds * (double)SPAN);
@@ -274,7 +274,7 @@ static void benchmark(const char *label, int side)
 
         t0 = now_seconds();
         for (int r = 0; r < blits; ++r) {
-            mosaico_mtx2_blit(target, tile, &texture, 0, rows[r] % (side - tile), tile, tile,
+            raylib_lite_mtx2_blit(target, tile, &texture, 0, rows[r] % (side - tile), tile, tile,
                               light);
             sink = (uint16_t)(sink + target[0]);
         }
@@ -288,12 +288,12 @@ static void benchmark(const char *label, int side)
     /* The blit must agree with the span path it is meant to replace. */
     uint16_t *reference = malloc(sizeof(uint16_t) * (size_t)tile * (size_t)tile);
     for (int y = 0; y < tile; ++y) {
-        mosaico_mtx2_span_constv(reference + (size_t)y * (size_t)tile, &texture, 5 << 16,
+        raylib_lite_mtx2_span_constv(reference + (size_t)y * (size_t)tile, &texture, 5 << 16,
                                  1 << 16, 7 + y, tile, 192U);
     }
-    mosaico_mtx2_blit(target, tile, &texture, 5, 7, tile, tile, 192U);
+    raylib_lite_mtx2_blit(target, tile, &texture, 5, 7, tile, tile, 192U);
     if (memcmp(reference, target, sizeof(uint16_t) * (size_t)tile * (size_t)tile) != 0) {
-        fprintf(stderr, "mosaico_mtx2_blit disagrees with the span path\n");
+        fprintf(stderr, "raylib_lite_mtx2_blit disagrees with the span path\n");
         exit(1);
     }
 
@@ -310,7 +310,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "usage: %s DIR ORACLE_BLOCKS\n", argv[0]);
         return 2;
     }
-    mosaico_shade_lut_init();
+    raylib_lite_rgb565_shade_lut_init();
     if (check_oracle(argv[1], "punch", atoi(argv[2])) != 0
         || check_oracle(argv[1], "opaque", atoi(argv[2])) != 0) {
         return 1;

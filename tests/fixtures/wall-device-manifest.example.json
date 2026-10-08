@@ -1,6 +1,6 @@
 {
   "schema": "wall-device-input/v1",
-  "workload_source": "source/mosaico_wall_bench.c",
+  "workload_source": "source/raylib_lite_wall_bench.c",
   "environment": {
     "board": "REPLACE_WITH_BOARD_AND_REVISION",
     "chip": "REPLACE_WITH_CHIP",

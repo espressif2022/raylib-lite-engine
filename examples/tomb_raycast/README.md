@@ -36,10 +36,7 @@ python3 tools/game_cli.py sim examples/tomb_raycast
 python3 tools/game_cli.py sim examples/tomb_raycast --headless --frames 8
 ```
 
-目录根部也是可独立构建的 ESP-IDF native 工程。配置板级组件路径后，
-可在本目录运行 `idf.py build`，或用 `idf.py -p PORT flash monitor` 直接烧录；
-直接烧录会替换当前启动器固件。板级依赖配置见
-[`../../cmake/raylib_lite_native_project.cmake`](../../cmake/raylib_lite_native_project.cmake)。
+目录根部也是可独立构建的 ESP-IDF native 工程。Engine 与 ESP-Mosaico Board 均由 `main/idf_component.yml` 声明；仓库内用 `override_path` 联调，外部工程使用发布版 Engine 依赖。配置 Board 的 BSP/Iris override 环境后可在本目录运行 `idf.py build`。设备 provisioning/update 仍走 retained Recovery，不直接烧 normal Game 覆盖 Recovery。
 native 画面上的 FPS 显示实际送屏帧率，首次统计完成前显示 `FPS: --`。
 
 同初始视角的两块板对照（约 25 万像素、28 个三角形、165 个四边形）：
@@ -48,3 +45,15 @@ native 画面上的 FPS 显示实际送屏帧率，首次统计完成前显示 `
 渲染目标 50 FPS、游戏循环 CPU1、34 行双缓冲条带；送屏任务优先级 4。
 先前约 26.4 FPS 的 DMA2D 结果使用 CPU0 游戏循环、CPU1 送屏任务和 40 行条带，
 不能作为同配置的 GSP 对照。纹理绘制使用 `-O3 -funroll-loops`。
+
+## ESP-Mosaico native dependencies / 真机构建依赖
+
+All standard ESP-Mosaico native Game builds use the same local dependency setup:
+
+```sh
+export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
+idf.py -C examples/tomb_raycast build
+```
+
+`MOSAICO_UTILS_ROOT` supplies both ESP-Iris and the upstream normal-application Recovery component. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.

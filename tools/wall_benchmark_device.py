@@ -39,7 +39,7 @@ def import_run(manifest_path):
             # Keep actual firmware and sdkconfig bytes, not self-reported hashes alone.
             read(value[kind+'_image'])
             config = read(value[kind+'_sdkconfig']).decode()
-            if 'CONFIG_MOSAICO_GAME_RASTER_PROFILE=y' in config.splitlines():
+            if 'CONFIG_RAYLIB_LITE_RASTER_PROFILE=y' in config.splitlines():
                 raise ValueError('raster timing profile enabled in sdkconfig')
         if archives[value['audit_image']] == archives[value['timing_image']]:
             raise ValueError('audit and timing firmware must be separate builds')

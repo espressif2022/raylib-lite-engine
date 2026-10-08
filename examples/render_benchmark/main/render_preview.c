@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "render_preview.h"
-#include "mosaico_game_2d.h"
-#include "mosaico_wall_config.h"
+#include "raylib_lite_2d.h"
+#include "raylib_lite_wall_config.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,7 +11,7 @@
 #endif
 static uint8_t *indices;
 static uint16_t *palette;
-static MosaicoWallAtlas atlas;
+static raylib_lite_wall_atlas_t atlas;
 static const struct { const char *name; float ax,ay,shear; bool clip,triangles,affine; } scenes[]={
  {"FRONT",0,0,0,0,0,0},{"SHALLOW",-.1f,0,0,0,0,0},
  {"OBLIQUE",-.75f,0,0,0,0,0},{"NEAR",-.94f,0,0,0,0,0},
@@ -69,29 +69,29 @@ bool render_preview_init(void){
  }
  const uint16_t colors[]={0xef7d,0x196a,0x2c15,0xfcc0};
  for(int level=0;level<16;++level)for(int i=0;i<256;++i)palette[level*256+i]=colors[i%4];
- atlas=(MosaicoWallAtlas){.descriptor=indices,.indices=indices,.light_lut=palette,
+ atlas=(raylib_lite_wall_atlas_t){.descriptor=indices,.indices=indices,.light_lut=palette,
   .width=128,.height=128,.light_levels=16,.row_major=1};
  return true;
 }
-void render_preview_shutdown(void){render_core_preview_shutdown();mosaico_game_2d_set_target(NULL,0,0,0);free(indices);free(palette);indices=NULL;palette=NULL;memset(&atlas,0,sizeof(atlas));}
+void render_preview_shutdown(void){render_core_preview_shutdown();raylib_lite_renderer_set_target(NULL,0,0,0);free(indices);free(palette);indices=NULL;palette=NULL;memset(&atlas,0,sizeof(atlas));}
 const char *render_preview_scene_name(unsigned scene){return scene<RENDER_PREVIEW_WALL_SCENES?scenes[scene].name:render_core_preview_name((scene-RENDER_PREVIEW_WALL_SCENES)%RENDER_PREVIEW_CORE_SCENES);}
 static void wall(int x,int width,const render_preview_state_t *state,bool affine){
  unsigned scene=state->scene%RENDER_PREVIEW_WALL_SCENES;
  float motion=8*sinf(state->frame*.025f);
  float ox=x+18+motion,oy=108+4*cosf(state->frame*.025f),w=width-64,h=246;
  float ax=scenes[scene].ax,ay=scenes[scene].ay,base=fminf(1,1+ax+ay);
- mosaico_textured_vertex_t p[4];
+ raylib_lite_textured_vertex_t p[4];
  for(int i=0;i<4;++i){
   float t=i&1,s=i>>1,q=1+ax*t+ay*s;
-  p[i]=(mosaico_textured_vertex_t){ox+w*t+scenes[scene].shear*s,oy+h*s,
+  p[i]=(raylib_lite_textured_vertex_t){ox+w*t+scenes[scene].shear*s,oy+h*s,
    (5+100*t+8*s)*base/q,(4+4*t+105*s)*base/q,(affine||scenes[scene].affine)?0:q};
  }
- mosaico_game_2d_set_clip(x+4,96,width-8,276);
- if(scenes[scene].clip)mosaico_game_2d_set_clip(x+width/4,142,width/2,168);
+ raylib_lite_renderer_set_clip(x+4,96,width-8,276);
+ if(scenes[scene].clip)raylib_lite_renderer_set_clip(x+width/4,142,width/2,168);
  if(scenes[scene].triangles){
-  Mosaico2DDrawIndexedTexturedTriangle(atlas,p[0],p[2],p[1],256);
-  Mosaico2DDrawIndexedTexturedTriangle(atlas,p[1],p[2],p[3],256);
- }else Mosaico2DDrawIndexedTexturedQuad(atlas,p[0],p[1],p[2],p[3],256);
+  raylib_lite_2d_draw_indexed_textured_triangle(atlas,p[0],p[2],p[1],256);
+  raylib_lite_2d_draw_indexed_textured_triangle(atlas,p[1],p[2],p[3],256);
+ }else raylib_lite_2d_draw_indexed_textured_quad(atlas,p[0],p[1],p[2],p[3],256);
 }
 static uint16_t core_actual[64*64],core_reference[64*64];
 static void core_page(unsigned scene,bool split){
@@ -115,24 +115,24 @@ static void core_page(unsigned scene,bool split){
 void render_preview_draw(uint16_t *pixels,size_t stride,const render_preview_state_t *state){
  if(!pixels||stride<480||!state||!indices)return;
  screen=pixels;screen_stride=stride;
- mosaico_game_2d_set_target(pixels,stride,480,480);box(0,0,480,480,0x0862);
+ raylib_lite_renderer_set_target(pixels,stride,480,480);box(0,0,480,480,0x0862);
  box(0,0,480,64,0x1126);text(16,12,state->scene<RENDER_PREVIEW_WALL_SCENES?"WALL PREVIEW":"CORE PREVIEW",3,0xffff);
  char line[80];
  const char *mode[]={"LEGACY","EXACT","FIXED","ADAPT"};
- snprintf(line,sizeof(line),"%s %.3f  %s",mode[M2D_WALL_MODE],(double)M2D_WALL_ERROR_TEXELS,render_preview_scene_name(state->scene));
+ snprintf(line,sizeof(line),"%s %.3f  %s",mode[RAYLIB_LITE_WALL_MODE],(double)RAYLIB_LITE_WALL_ERROR_TEXELS,render_preview_scene_name(state->scene));
  if(state->scene>=RENDER_PREVIEW_WALL_SCENES){
   snprintf(line,sizeof(line),"CASE %u  %s",state->scene-RENDER_PREVIEW_WALL_SCENES+1,render_preview_scene_name(state->scene));
   for(char *p=line;*p;++p){if(*p>='a'&&*p<='z')*p-=32;else if(*p=='_')*p=' ';}
  }
- if(state->scene<RENDER_PREVIEW_WALL_SCENES&&M2D_WALL_MODE==M2D_WALL_FIXED)snprintf(line,sizeof(line),"FIXED %d  %s",M2D_WALL_FIXED_PIXELS,render_preview_scene_name(state->scene));
+ if(state->scene<RENDER_PREVIEW_WALL_SCENES&&RAYLIB_LITE_WALL_MODE==RAYLIB_LITE_WALL_FIXED)snprintf(line,sizeof(line),"FIXED %d  %s",RAYLIB_LITE_WALL_FIXED_PIXELS,render_preview_scene_name(state->scene));
  text(16,40,line,2,0x9e7f);
- if(state->scene>=RENDER_PREVIEW_WALL_SCENES){core_page(state->scene,state->split);mosaico_game_2d_set_target(pixels,stride,480,480);}
+ if(state->scene>=RENDER_PREVIEW_WALL_SCENES){core_page(state->scene,state->split);raylib_lite_renderer_set_target(pixels,stride,480,480);}
  else{
   text(18,76,state->split?"SELECTED":"SELECTED FULL",2,0xffff);
   if(state->split){text(254,76,"AFFINE",2,0xfcc0);box(238,96,2,278,0x4a69);wall(0,238,state,false);wall(242,238,state,true);}
   else wall(0,480,state,false);
  }
- mosaico_game_2d_set_clip(0,0,480,480);
+ raylib_lite_renderer_set_clip(0,0,480,480);
  snprintf(line,sizeof(line),"RENDER %.2f MS  SEND %.2f MS",(double)state->render_ms,(double)state->send_ms);
  text(16,384,line,2,0xffff);
  snprintf(line,sizeof(line),"DONE %.1f FPS  %s",(double)state->complete_fps,state->automatic?"AUTO":"MANUAL");
@@ -163,5 +163,5 @@ int render_preview_write_ppm(const char *path,unsigned scene){
   for(int i=0;i<480*480;++i){uint16_t c=pixels[i];unsigned char rgb[3]={(c>>11)*255/31,((c>>5)&63)*255/63,(c&31)*255/31};if(fwrite(rgb,1,3,f)!=3){status=2;break;}}
   if(fclose(f))status=2;
  }
- mosaico_game_2d_set_target(NULL,0,0,0);free(pixels);render_preview_shutdown();return status;
+ raylib_lite_renderer_set_target(NULL,0,0,0);free(pixels);render_preview_shutdown();return status;
 }

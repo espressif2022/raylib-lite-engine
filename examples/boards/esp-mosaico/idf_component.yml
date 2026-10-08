@@ -1,0 +1,17 @@
+version: "0.1.0"
+description: ESP-Mosaico application-side Board adapter for Raylib Lite Engine examples
+license: Apache-2.0
+
+dependencies:
+  idf: ">=6.2"
+  espressif2022/raylib-lite-engine: "^0.1.0"
+  esp-mosaico-bsp:
+    version: "0.2.0"
+    override_path: ${MOSAICO_BSP_COMPONENT_DIR}
+  esp_iris:
+    version: "0.1.0"
+    override_path: ${MOSAICO_UTILS_ROOT}/ESP-Iris/components/esp_iris
+  esp_mosaico_app_recovery:
+    override_path: ${MOSAICO_UTILS_ROOT}/esp-mosaico-recovery/components/esp_mosaico_app_recovery
+  espressif/esp_display_present: "==1.0.2"
+  lvgl/lvgl: "==9.5.0"

@@ -88,7 +88,7 @@ void rally_set_controls(rally_game_t *game, float throttle, float brake,
                         float steer, bool drift, bool nitro);
 void rally_update(rally_game_t *game);
 uint32_t rally_state_hash(const rally_game_t *game);
-int rally_view_render(const rally_game_t *game, MosaicoAtlas rally_art);
+int rally_view_render(const rally_game_t *game, raylib_lite_atlas_t rally_art);
 ```
 
 The deterministic model owns track-local motion, jumping, checkpoints, laps,
@@ -97,3 +97,15 @@ track function, so collision and perspective geometry cannot drift apart.
 
 For repeatable device measurements, record the firmware hash, display
 configuration, fixed input sequence, and raw logs alongside each result.
+
+## ESP-Mosaico native dependencies / 真机构建依赖
+
+All standard ESP-Mosaico native Game builds use the same local dependency setup:
+
+```sh
+export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
+idf.py -C examples/neon_rift_rally build
+```
+
+`MOSAICO_UTILS_ROOT` supplies both ESP-Iris and the upstream normal-application Recovery component. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.

@@ -1,38 +1,49 @@
 // SPDX-License-Identifier: Apache-2.0
-/* Host and ELF adapters for the shared Living Worlds session. */
+#include "raylib_lite_game_module_contract.h"
+/* Host, native and ELF adapters for the shared Living Worlds session. */
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#if !defined(MOSAICO_GAME_ELF)
+#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif
-#include "mosaico_game_module.h"
-#include "mosaico_raylib_fast.h"
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+#include "living_worlds_native_assets.h"
+#endif
+#include "raylib_lite_raylib.h"
 #include "living_worlds_session.h"
 
-typedef living_worlds_session_t module_state_t;
+typedef struct {
+    living_worlds_session_t session;
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    living_worlds_native_assets_t *native_assets;
+#endif
+} module_state_t;
 
-static void unload_atlas(MosaicoAtlas *atlas)
+#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
+static void unload_atlas(raylib_lite_atlas_t *atlas)
 {
     if (!atlas->texture.id) return;
-    UnloadMosaicoAtlas(*atlas);
-    *atlas = (MosaicoAtlas){0};
+    raylib_lite_atlas_unload(*atlas);
+    *atlas = (raylib_lite_atlas_t){0};
 }
 
-static int load_atlas(MosaicoAtlas *atlas, const char *path)
+static int load_atlas(raylib_lite_atlas_t *atlas, const char *path)
 {
-    *atlas = LoadMosaicoAtlas(path);
+    *atlas = raylib_lite_atlas_load(path);
     return atlas->texture.id ? 0 : -1;
 }
+#endif
 
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
 static void clear_backgrounds(living_worlds_atlases_t *atlases)
 {
 #if defined(MOSAICO_GAME_ELF)
-    /* The runtime owns the decoded JPEG texture. */
-    atlases->aurora = (MosaicoAtlas){0};
-    atlases->ocean = (MosaicoAtlas){0};
-    atlases->sunrise = (MosaicoAtlas){0};
-    atlases->rainforest = (MosaicoAtlas){0};
+    /* The product runtime owns the decoded JPEG texture. */
+    atlases->aurora = (raylib_lite_atlas_t){0};
+    atlases->ocean = (raylib_lite_atlas_t){0};
+    atlases->sunrise = (raylib_lite_atlas_t){0};
+    atlases->rainforest = (raylib_lite_atlas_t){0};
 #else
     unload_atlas(&atlases->aurora);
     unload_atlas(&atlases->ocean);
@@ -51,12 +62,12 @@ static const char *background_path(uint8_t scene)
 }
 #endif
 
-static int load_background(void *context, living_worlds_atlases_t *atlases,
-                           uint8_t scene)
+static int default_load_background(void *context, living_worlds_atlases_t *atlases,
+                                   uint8_t scene)
 {
     (void)context;
 #if defined(MOSAICO_GAME_ELF)
-    MosaicoAtlas photo = MosaicoJpegLoad(background_path(scene));
+    raylib_lite_atlas_t photo = raylib_lite_product_jpeg_load(background_path(scene));
     if (!photo.texture.id) return -1;
     clear_backgrounds(atlases);
     if (scene == LIVING_SCENE_AURORA) atlases->aurora = photo;
@@ -64,7 +75,7 @@ static int load_background(void *context, living_worlds_atlases_t *atlases,
     else if (scene == LIVING_SCENE_RAINFOREST) atlases->rainforest = photo;
     else {
         atlases->ocean = photo;
-        (void)Mosaico2DCacheTextureLight(photo.texture, 232);
+        (void)raylib_lite_2d_cache_texture_light(photo.texture, 232);
     }
 #else
     (void)atlases;
@@ -73,19 +84,21 @@ static int load_background(void *context, living_worlds_atlases_t *atlases,
     return 0;
 }
 
-static void release_background(void *context, living_worlds_atlases_t *atlases)
+static void default_release_background(void *context, living_worlds_atlases_t *atlases)
 {
     (void)context;
 #if defined(MOSAICO_GAME_ELF)
-    MosaicoJpegRelease();
+    raylib_lite_product_jpeg_release();
 #endif
     clear_backgrounds(atlases);
 }
 
-static const living_worlds_session_assets_t s_assets = {
-    .load_background = load_background,
-    .release_background = release_background,
+static const living_worlds_session_assets_t s_default_assets = {
+    .load_background = default_load_background,
+    .release_background = default_release_background,
 };
+
+#endif
 
 static int initialize(void *value
 #if !defined(MOSAICO_GAME_ELF)
@@ -93,19 +106,37 @@ static int initialize(void *value
 #endif
 )
 {
-    module_state_t *s = value;
-#if !defined(MOSAICO_GAME_ELF)
-    mosaico_host_assets_set_root(asset_root);
-    if (load_atlas(&s->atlases.aurora, "aurora.atlas") ||
-        load_atlas(&s->atlases.ocean, "ocean.atlas") ||
-        load_atlas(&s->atlases.sunrise, "sunrise.atlas") ||
-        load_atlas(&s->atlases.rainforest, "rainforest.atlas")) {
-        clear_backgrounds(&s->atlases);
+    module_state_t *module = value;
+    living_worlds_session_t *session = &module->session;
+
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    (void)asset_root;
+    raylib_lite_result_t result = living_worlds_native_assets_open(
+        &module->native_assets);
+    if (result != RAYLIB_LITE_OK) return -1;
+    if (living_worlds_session_start(session,
+            living_worlds_native_assets_callbacks(), module->native_assets) != 0) {
+        living_worlds_native_assets_close(module->native_assets);
+        module->native_assets = NULL;
         return -1;
     }
-    (void)Mosaico2DCacheTextureLight(s->atlases.ocean.texture, 232);
+#elif !defined(MOSAICO_GAME_ELF)
+    raylib_lite_host_assets_set_root(asset_root);
+    if (load_atlas(&session->atlases.aurora, "aurora.atlas") ||
+        load_atlas(&session->atlases.ocean, "ocean.atlas") ||
+        load_atlas(&session->atlases.sunrise, "sunrise.atlas") ||
+        load_atlas(&session->atlases.rainforest, "rainforest.atlas")) {
+        clear_backgrounds(&session->atlases);
+        return -1;
+    }
+    (void)raylib_lite_2d_cache_texture_light(session->atlases.ocean.texture, 232);
+    if (living_worlds_session_start(session, &s_default_assets, session) != 0)
+        return -1;
+#else
+    if (living_worlds_session_start(session, &s_default_assets, session) != 0)
+        return -1;
 #endif
-    if (living_worlds_session_start(s, &s_assets, s) != 0) return -1;
+
     InitWindow(480, 480, "Living Worlds");
     SetTargetFPS(30);
     return 0;
@@ -113,85 +144,94 @@ static int initialize(void *value
 
 static void shutdown(void *value)
 {
-    living_worlds_session_close(value);
+    module_state_t *module = value;
+    living_worlds_session_close(&module->session);
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    living_worlds_native_assets_close(module->native_assets);
+    module->native_assets = NULL;
+#endif
 }
 
-static void input(void *value, const mosaico_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
-    module_state_t *s = value;
-    if (!s || !event) return;
-    if (event->type == MOSAICO_HOST_INPUT_POINTER)
-        living_worlds_session_pointer(s, (float)event->x, (float)event->y,
+    module_state_t *module = value;
+    living_worlds_session_t *session = &module->session;
+    if (!event) return;
+    if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER)
+        living_worlds_session_pointer(session, (float)event->x, (float)event->y,
                                       event->pressed);
-    else if (event->type == MOSAICO_HOST_INPUT_ACTION)
-        living_worlds_session_action(s, event->code, event->pressed);
-    else if (event->type == MOSAICO_HOST_INPUT_CONTROL) {
-        if (event->code == MOSAICO_HOST_CONTROL_PAUSE) s->paused = true;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESUME) s->paused = false;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESET)
-            living_worlds_session_reset(s);
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION)
+        living_worlds_session_action(session, event->code, event->pressed);
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) session->paused = true;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESUME) session->paused = false;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESET)
+            living_worlds_session_reset(session);
     }
 }
 
 static void update(void *value)
 {
-    module_state_t *s = value;
-    if (s) (void)living_worlds_session_update(s);
+    module_state_t *module = value;
+    (void)living_worlds_session_update(&module->session);
 }
 
 static int render(void *value)
 {
-    living_worlds_session_render(value);
+    module_state_t *module = value;
+    living_worlds_session_render(&module->session);
     return 0;
 }
 
 static uint32_t state_hash(const void *value)
 {
-    return living_world_hash(&((const module_state_t *)value)->world);
+    const module_state_t *module = value;
+    return living_world_hash(&module->session.world);
 }
 
 static int state_json(const void *value, char *output, size_t capacity)
 {
-    const living_world_t *w = &((const module_state_t *)value)->world;
+    const module_state_t *module = value;
+    const living_world_t *world = &module->session.world;
 #if defined(MOSAICO_GAME_ELF)
     return snprintf(output, capacity,
         "{\"scene\":%u,\"yaw\":%d,\"pitch\":%d,\"dragging\":%s,\"tick\":%lu,"
         "\"state_hash\":\"%08lx\"}",
-        w->scene, (int)(w->yaw * 100.0f), (int)(w->pitch * 100.0f),
-        w->dragging ? "true" : "false",
-        (unsigned long)w->tick, (unsigned long)living_world_hash(w));
+        world->scene, (int)(world->yaw * 100.0f), (int)(world->pitch * 100.0f),
+        world->dragging ? "true" : "false",
+        (unsigned long)world->tick, (unsigned long)living_world_hash(world));
 #else
     return snprintf(output, capacity,
         "{\"scene\":%u,\"yaw\":%.2f,\"pitch\":%.2f,\"dragging\":%s,\"tick\":%lu,\"state_hash\":\"%08lx\"}",
-        w->scene, w->yaw, w->pitch, w->dragging ? "true" : "false",
-        (unsigned long)w->tick, (unsigned long)living_world_hash(w));
+        world->scene, world->yaw, world->pitch, world->dragging ? "true" : "false",
+        (unsigned long)world->tick, (unsigned long)living_world_hash(world));
 #endif
 }
 
-static const mosaico_game_module_v1_t s_module = {
+static const raylib_lite_game_module_v1_t s_module = {
     .descriptor = {
-#if defined(MOSAICO_GAME_ELF)
-                   MOSAICO_HOST_GAME_ABI,
-#else
-                   MOSAICO_HOST_GAME_ABI_V1,
-#endif
-                   "living_worlds", "Living Worlds",
-                   480, 480, 30, 1},
+        RAYLIB_LITE_GAME_MODULE_ABI,
+        "living_worlds", "Living Worlds", 480, 480, 30, 1,
+    },
     .state_size = sizeof(module_state_t),
-    .initialize = initialize, .shutdown = shutdown, .input = input,
-    .update = update, .render = render, .state_hash = state_hash,
+    .initialize = initialize,
+    .shutdown = shutdown,
+    .input = input,
+    .update = update,
+    .render = render,
+    .state_hash = state_hash,
     .state_json = state_json,
 };
 
 #if defined(MOSAICO_GAME_ELF)
-MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
-mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
+raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
 {
-    if (runtime) g_mosaico_rt = runtime;
+    if (runtime) raylib_lite_product_runtime = runtime;
     return &s_module;
 }
 #else
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {
     return &s_module;
 }

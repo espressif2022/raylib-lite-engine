@@ -284,15 +284,16 @@ python3 examples/sewer_labyrinth/scenarios/render_workshop.py
 
 ## Lobby ELF / 游戏大厅安装包
 
-Build this game's `elf/` wrapper in its own build directory, with the matching
-external SDK and launcher paths:
+ELF 编译、打包与安装由外部 `esp-mosaico-elf-game-sdk` 和产品工具负责；本仓库只维护可复用的 Game source 与 Product ABI bridge，不再保留仓库内 ELF wrapper。先在 Host 验证玩法，再按外部 Module SDK 的构建流程消费同一份 `main/game_module.c`。
+
+## ESP-Mosaico native dependencies / 真机构建依赖
+
+All standard ESP-Mosaico native Game builds use the same local dependency setup:
 
 ```sh
-cmake -S examples/sewer_labyrinth/elf -B build/sewer_labyrinth_elf \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/../esp-mosaico-elf-game-sdk/cmake/mosaico-riscv32.cmake" \
-  -DMOSAICO_LAUNCHER_ROOT="$PWD/../esp-mosaico-game"
-cmake --build build/sewer_labyrinth_elf
+export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
+idf.py -C examples/sewer_labyrinth build
 ```
 
-The bundle is `build/sewer_labyrinth_elf/game/game.bin`. Building does not
-install it on a device.
+`MOSAICO_UTILS_ROOT` supplies both ESP-Iris and the upstream normal-application Recovery component. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.

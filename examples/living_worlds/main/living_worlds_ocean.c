@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <string.h>
 #ifndef LIVING_WORLDS_SCENE_SIM_ONLY
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "raylib_lite_clock.h"
 #include "ocean_depth.h"
 #include "ocean_left_volume.h"
@@ -301,7 +301,7 @@ static bool ocean_project_depth(const living_camera_t *camera,float u,float v,
 }
 
 static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *camera,
-                             MosaicoAtlas water,int jelly_count,float t)
+                             raylib_lite_atlas_t water,int jelly_count,float t)
 {
     if(!water.texture.id||!camera)return;
     uint32_t setup_start=ocean_now_us();
@@ -414,11 +414,11 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
             int span=(iy_bits&0x8000)?2:1;
             int a=iy*GW+ix,b=a+span,c=a+span*GW,d=c+span;
             unsigned background_light=band_light[band][i];
-            mosaico_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy],0.f};
-            mosaico_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+span],tv[iy],0.f};
-            mosaico_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+span],0.f};
-            mosaico_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+span],tv[iy+span],0.f};
-            Mosaico2DDrawTexturedQuad(water.texture,va,vb,vc,vd,background_light);
+            raylib_lite_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy],0.f};
+            raylib_lite_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+span],tv[iy],0.f};
+            raylib_lite_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+span],0.f};
+            raylib_lite_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+span],tv[iy+span],0.f};
+            raylib_lite_2d_draw_textured_quad(water.texture,va,vb,vc,vd,background_light);
         }
         /* Depth values map to z as 1 / (raw * .3 / 65535).  Insert each
            jelly after the farther water bands; subsequent, nearer terrain
@@ -429,11 +429,11 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
             if(jelly_band<0)jelly_band=0;
             if(jelly_band>7)jelly_band=7;
             if(jelly_band==band){
-#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+#if CONFIG_RAYLIB_LITE_RASTER_PROFILE
                 uint32_t jelly_start=ocean_now_us();
 #endif
                 draw_ocean_jelly(camera,&ocean->jellies[i],t);
-#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
+#if CONFIG_RAYLIB_LITE_RASTER_PROFILE
                 draw_profile.jelly_us+=ocean_now_us()-jelly_start;
 #endif
             }
@@ -450,18 +450,18 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
         int iy=iy_bits&0x7fff;
         int span=(iy_bits&0x8000)?2:1;
         int a=iy*GW+ix,b=a+span,c=a+span*GW,d=c+span;
-        mosaico_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy],0.f};
-        mosaico_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+span],tv[iy],0.f};
-        mosaico_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+span],0.f};
-        mosaico_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+span],tv[iy+span],0.f};
-        Mosaico2DDrawTexturedQuad(water.texture,va,vb,vc,vd,band_light[band][i]);
+        raylib_lite_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy],0.f};
+        raylib_lite_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+span],tv[iy],0.f};
+        raylib_lite_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+span],0.f};
+        raylib_lite_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+span],tv[iy+span],0.f};
+        raylib_lite_2d_draw_textured_quad(water.texture,va,vb,vc,vd,band_light[band][i]);
     }
 }
 
-static void draw_ocean_reefs(const living_camera_t *camera,float yaw,MosaicoAtlas left_front,
-                             MosaicoAtlas left_side,MosaicoAtlas left_rear,
-                             MosaicoAtlas right_front,MosaicoAtlas right_side,
-                             MosaicoAtlas right_rear)
+static void draw_ocean_reefs(const living_camera_t *camera,float yaw,raylib_lite_atlas_t left_front,
+                             raylib_lite_atlas_t left_side,raylib_lite_atlas_t left_rear,
+                             raylib_lite_atlas_t right_front,raylib_lite_atlas_t right_side,
+                             raylib_lite_atlas_t right_rear)
 {
     /* Painter order: farther reef first.  Reef fronts sit over the continuous
        water mesh.  The authored side UVs stretch into detached diagonal slabs
@@ -631,10 +631,10 @@ static void draw_ocean_wanderer(const living_camera_t *camera,const ocean_wander
 }
 
 void living_ocean_draw(const living_ocean_t *ocean,float yaw,float pitch,
-                           uint8_t effects_level,MosaicoAtlas water,
-                           MosaicoAtlas left_front,MosaicoAtlas left_side,
-                           MosaicoAtlas left_rear,MosaicoAtlas right_front,
-                           MosaicoAtlas right_side,MosaicoAtlas right_rear)
+                           uint8_t effects_level,raylib_lite_atlas_t water,
+                           raylib_lite_atlas_t left_front,raylib_lite_atlas_t left_side,
+                           raylib_lite_atlas_t left_rear,raylib_lite_atlas_t right_front,
+                           raylib_lite_atlas_t right_side,raylib_lite_atlas_t right_rear)
 {
     uint32_t phase_start=ocean_now_us();
     float nx=yaw/OCEAN_YAW_LIMIT,ny=pitch/OCEAN_PITCH_LIMIT,length=sqrtf(nx*nx+ny*ny);
@@ -650,15 +650,15 @@ void living_ocean_draw(const living_ocean_t *ocean,float yaw,float pitch,
     int jellies=effects_level==0?3:ocean->jelly_count;
     uint32_t cover_us=ocean_now_us()-phase_start;
     memset(&draw_profile,0,sizeof draw_profile);
-#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
-    mosaico_game_2d_raster_stats_t before_water,after_water,after_reefs;
-    mosaico_game_2d_get_raster_stats(&before_water);
+#if CONFIG_RAYLIB_LITE_RASTER_PROFILE
+    raylib_lite_renderer_raster_stats_t before_water,after_water,after_reefs;
+    raylib_lite_renderer_get_raster_stats(&before_water);
 #endif
     phase_start=ocean_now_us();
     draw_ocean_water(ocean,&camera,water,jellies,t);
     uint32_t water_us=ocean_now_us()-phase_start;
-#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
-    mosaico_game_2d_get_raster_stats(&after_water);
+#if CONFIG_RAYLIB_LITE_RASTER_PROFILE
+    raylib_lite_renderer_get_raster_stats(&after_water);
     uint32_t accounted=water_setup_us+draw_profile.jelly_us+
         after_water.triangle_raster_us-before_water.triangle_raster_us;
     draw_profile.water_emit_us=water_us>accounted?water_us-accounted:0;
@@ -667,8 +667,8 @@ void living_ocean_draw(const living_ocean_t *ocean,float yaw,float pitch,
     /* The reefs frame the canyon as the closest foreground layer. */
     draw_ocean_reefs(&camera,yaw,left_front,left_side,left_rear,right_front,right_side,right_rear);
     uint32_t reefs_us=ocean_now_us()-phase_start;
-#if CONFIG_MOSAICO_GAME_RASTER_PROFILE
-    mosaico_game_2d_get_raster_stats(&after_reefs);
+#if CONFIG_RAYLIB_LITE_RASTER_PROFILE
+    raylib_lite_renderer_get_raster_stats(&after_reefs);
     accounted=after_reefs.triangle_raster_us-after_water.triangle_raster_us;
     draw_profile.reefs_emit_us=reefs_us>accounted?reefs_us-accounted:0;
 #endif
@@ -719,6 +719,6 @@ void living_ocean_draw(const living_ocean_t *ocean,float yaw,float pitch,
             DrawCircle((int)screen.x,(int)screen.y,1,(Color){195,238,255,80});
         }
     }
-    mosaico_game_2d_set_phase_us(cover_us,water_us,reefs_us,ocean_now_us()-phase_start,water_setup_us);
+    raylib_lite_renderer_set_phase_us(cover_us,water_us,reefs_us,ocean_now_us()-phase_start,water_setup_us);
 }
 #endif

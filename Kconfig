@@ -1,0 +1,21 @@
+menu "Raylib Lite Engine"
+
+config RAYLIB_LITE_DEFAULT_FPS
+    int "Default target frame rate"
+    range 1 120
+    default 30
+
+config RAYLIB_LITE_MAX_TEXTURES
+    int "Maximum simultaneously loaded atlases"
+    range 1 32
+    default 12
+
+config RAYLIB_LITE_RASTER_PROFILE
+    bool "Time triangle setup and raster stages"
+    default n
+
+config RAYLIB_LITE_RASTER_BENCHMARK
+    bool "Run startup raster microbenchmarks"
+    default n
+
+endmenu

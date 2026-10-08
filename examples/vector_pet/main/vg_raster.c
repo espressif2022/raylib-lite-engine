@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mosaico_rgb565.h"
+#include "raylib_lite_rgb565.h"
 
 #define VG_SUBROWS 4
 #define VG_SUBPIXEL 16
@@ -300,7 +300,7 @@ void vg_fill(uint16_t color, uint8_t alpha)
                 continue;
             }
             if (run_start >= 0) {
-                mosaico_fill_rgb565(row + run_start, color, (size_t)(x - run_start));
+                raylib_lite_rgb565_fill(row + run_start, color, (size_t)(x - run_start));
                 s_stats.solid_pixels += (uint32_t)(x - run_start);
                 run_start = -1;
             }
@@ -313,7 +313,7 @@ void vg_fill(uint16_t color, uint8_t alpha)
         }
         if (run_start >= 0) {
             int end = row_max > ix1 ? ix1 + 1 : row_max + 1;
-            mosaico_fill_rgb565(row + run_start, color, (size_t)(end - run_start));
+            raylib_lite_rgb565_fill(row + run_start, color, (size_t)(end - run_start));
             s_stats.solid_pixels += (uint32_t)(end - run_start);
         }
     }

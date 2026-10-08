@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include <stdbool.h>
-#include "raylib_lite_compat.h"
+#include "raylib_lite_result.h"
 
 typedef enum {
     TOWER_AUDIO_START,
@@ -13,6 +13,6 @@ typedef enum {
     TOWER_AUDIO_GAME_OVER,
 } tower_audio_cue_t;
 
-esp_err_t tower_audio_init(void);
-esp_err_t tower_audio_play(tower_audio_cue_t cue);
+raylib_lite_result_t tower_audio_init(void);
+raylib_lite_result_t tower_audio_play(tower_audio_cue_t cue);
 void tower_audio_set_music(bool paused, bool game_over);

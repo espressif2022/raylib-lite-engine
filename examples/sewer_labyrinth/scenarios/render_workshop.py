@@ -37,7 +37,7 @@ def main():
                     runtime.action(event["code"], event["pressed"])
                 if frame + 1 == checkpoints["bench"]:
                     side_view(runtime, 1)
-                runtime.api.mosaico_host_game_update_v1(runtime.context)
+                runtime.api.raylib_lite_host_game_update_v1(runtime.context)
                 runtime.frames += 1
                 state = runtime.metadata()
                 if frame + 1 in captures or (state["action"] == 14 and frame % 2 == 0):

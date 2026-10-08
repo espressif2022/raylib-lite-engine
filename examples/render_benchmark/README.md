@@ -16,7 +16,7 @@ idf.py -C examples/render_benchmark -B /tmp/render-preview \
 ```
 
 ESP32-S31 直接新建构建时 `RENDER_BENCH_DISPLAY` 默认 ON，烧录后上屏；Host 默认 OFF。CMake 会记住旧 build 目录的开关，若此前建过离屏固件，需对该目录显式传 `-DRENDER_BENCH_DISPLAY=ON` 后重新 build，再 flash 同一个 `-B` 目录。显示模式只支持 wall、audit OFF，
-不运行或输出离屏评分数据。默认仍使用 `M2D_WALL_MODE=3`、误差预算 0.25。
+不运行或输出离屏评分数据。默认仍使用 `RAYLIB_LITE_WALL_MODE=3`、误差预算 0.25。
 可用原来的模式宏编译其它算法；**触摸切换的是场景和视图，不是运行时切换算法**。
 
 - 480×480；默认从 `copy_rgb565` 开始。墙面页左侧 SELECTED 使用所选算法，右侧 AFFINE 为 q=0 仿射对照。
@@ -27,10 +27,10 @@ ESP32-S31 直接新建构建时 `RENDER_BENCH_DISPLAY` 默认 ON，烧录后上�
 - DONE FPS 是最近 60 帧**全帧 DMA 传输完成速率**，不是面板扫描刷新率。串口 `RENDERPREVIEW_STATS` 同时记录平均耗时。
 - 发送使用一个内部 DMA 条带，RGB565 字节交换后提交；收到完成回调才复用。无异步丢旧帧队列，TE 同步关闭。
 
-BSP 默认从相邻 `esp-mosaico-vibe` 仓库解析，也可以显式传入：
+上屏预览只依赖 ESP-Mosaico BSP，不使用 ESP-Iris/Recovery。构建前显式设置与其它 native Game 相同的 BSP component 路径：
 
 ```sh
--DMOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
+export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
 ```
 
 首次显示构建会解析 BSP 的组件依赖。裸屏构建关闭 LVGL，使用独立 build 目录，避免已有 sdkconfig 覆盖这些默认值。
@@ -47,7 +47,7 @@ cmake --build /tmp/render-preview-host
 ctest --test-dir /tmp/render-preview-host --output-on-failure
 ```
 
-最后的数字为场景编号 0–8。实际输出示例：[近墙对照图](../../artifacts/render-benchmark/preview/near.png)。
+最后的数字为场景编号 0–8。预览图是运行时生成物，例如可输出到 `artifacts/render-benchmark/preview/near.png`；仓库不提交这类本地 benchmark 产物。
 Host 图中耗时为 0，因为它是静态快照，没有假填设备性能。
 
 ## 两个 suite
@@ -114,10 +114,10 @@ python3 tools/render_benchmark.py collect core-0.log core-1.log core-2.log \
 ```sh
 idf.py -C examples/render_benchmark -B /tmp/render-s31-wall-audit \
   -DIDF_TARGET=esp32s31 -DRENDER_BENCH_DISPLAY=OFF -DRENDER_BENCH_SUITE=wall \
-  -DM2D_WALL_MODE=3 -DM2D_WALL_ERROR_TEXELS=0.25 -DM2D_WALL_AUDIT=ON build
+  -DRAYLIB_LITE_WALL_MODE=3 -DRAYLIB_LITE_WALL_ERROR_TEXELS=0.25 -DRAYLIB_LITE_WALL_AUDIT=ON build
 idf.py -C examples/render_benchmark -B /tmp/render-s31-wall-timing \
   -DIDF_TARGET=esp32s31 -DRENDER_BENCH_DISPLAY=OFF -DRENDER_BENCH_SUITE=wall \
-  -DM2D_WALL_MODE=3 -DM2D_WALL_ERROR_TEXELS=0.25 -DM2D_WALL_AUDIT=OFF build
+  -DRAYLIB_LITE_WALL_MODE=3 -DRAYLIB_LITE_WALL_ERROR_TEXELS=0.25 -DRAYLIB_LITE_WALL_AUDIT=OFF build
 ```
 
 分别烧录/启动，保存一份 audit 和三份 timing：

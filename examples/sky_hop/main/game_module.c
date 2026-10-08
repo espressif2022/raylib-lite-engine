@@ -1,29 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "raylib_lite_game_module_contract.h"
 #include <stdio.h>
 #if defined(MOSAICO_GAME_ELF)
-#include "mosaico_game_module.h"
-#include "mosaico_runtime_v1.h"
 #else
-#include "mosaico_game_module.h"
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif
 #endif
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "platform_game.h"
 #include "sky_hop_view.h"
 
 #if defined(MOSAICO_GAME_ELF)
-#define SKY_HOP_ABI MOSAICO_HOST_GAME_ABI
+#define SKY_HOP_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #else
-#define SKY_HOP_ABI MOSAICO_HOST_GAME_ABI_V1
+#define SKY_HOP_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #endif
 
 typedef struct {
     platform_game_t game;
-    MosaicoAtlas atlas;
-    mosaico_particle_t particles[SKY_HOP_PARTICLE_COUNT];
-    mosaico_particle_pool_t pool;
+    raylib_lite_atlas_t atlas;
+    raylib_lite_particle_t particles[SKY_HOP_PARTICLE_COUNT];
+    raylib_lite_particle_pool_t pool;
     sky_hop_overlay_t overlay;
     uint16_t best_score;
     bool paused;
@@ -48,17 +46,17 @@ static int initialize(void *value
 )
 {
     sky_hop_module_state_t *state = value;
-#if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
-    mosaico_host_assets_set_root(asset_root);
+#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
+    raylib_lite_host_assets_set_root(asset_root);
 #endif
-    state->atlas = LoadMosaicoAtlas("tower.atlas");
+    state->atlas = raylib_lite_atlas_load("tower.atlas");
     if (!state->atlas.texture.id) return -1;
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(480, 480, "Sky Hop");
     SetTargetFPS(30);
 #endif
     platform_game_reset(&state->game);
-    mosaico_particle_pool_init(&state->pool, state->particles, SKY_HOP_PARTICLE_COUNT);
+    raylib_lite_particle_pool_init(&state->pool, state->particles, SKY_HOP_PARTICLE_COUNT);
     sky_hop_overlay_sync(&state->overlay, state->game.phase);
     return 0;
 }
@@ -66,26 +64,26 @@ static int initialize(void *value
 static void shutdown(void *value)
 {
     sky_hop_module_state_t *state = value;
-    if (state) UnloadMosaicoAtlas(state->atlas);
+    if (state) raylib_lite_atlas_unload(state->atlas);
 }
 
-static void input(void *value, const mosaico_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     sky_hop_module_state_t *state = value;
     if (!state || !event) return;
-    if (event->type == MOSAICO_HOST_INPUT_ACTION && event->code >= 0 && event->code <= 4)
+    if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION && event->code >= 0 && event->code <= 4)
         platform_game_set_action(&state->game, (platform_action_t)event->code, event->pressed);
-    else if (event->type == MOSAICO_HOST_INPUT_POINTER)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER)
         platform_game_set_pointer(&state->game, (float)event->x, (float)event->y,
                                  event->pressed, event->track_id);
-    else if (event->type == MOSAICO_HOST_INPUT_CONTROL &&
-             event->code == MOSAICO_HOST_CONTROL_RESET)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_RESET)
         platform_game_reset(&state->game);
-    else if (event->type == MOSAICO_HOST_INPUT_CONTROL &&
-             event->code == MOSAICO_HOST_CONTROL_PAUSE)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE)
         state->paused = true;
-    else if (event->type == MOSAICO_HOST_INPUT_CONTROL &&
-             event->code == MOSAICO_HOST_CONTROL_RESUME)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_RESUME)
         state->paused = false;
 }
 
@@ -111,7 +109,7 @@ static void update(void *value)
         sky_hop_view_spawn_particles(&state->pool, state->game.player_x + 14,
             state->game.player_y + 12, (Color){255, 95, 80, 255}, 12);
     if (state->game.score > state->best_score) state->best_score = state->game.score;
-    mosaico_particle_pool_update(&state->pool);
+    raylib_lite_particle_pool_update(&state->pool);
     sky_hop_overlay_sync(&state->overlay, state->game.phase);
 }
 
@@ -141,7 +139,7 @@ static int state_json(const void *value, char *output, size_t capacity)
         (unsigned long)game->tick, (unsigned long)platform_game_state_hash(game));
 }
 
-static const mosaico_game_module_v1_t s_module = {
+static const raylib_lite_game_module_v1_t s_module = {
     .descriptor = {SKY_HOP_ABI, "sky_hop", "Sky Hop", 480, 480, 30, 2},
     .state_size = sizeof(sky_hop_module_state_t),
     .initialize = initialize, .shutdown = shutdown, .input = input,
@@ -150,14 +148,14 @@ static const mosaico_game_module_v1_t s_module = {
 };
 
 #if defined(MOSAICO_GAME_ELF)
-MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
-mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
+raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
 {
-    g_mosaico_rt = runtime;
+    raylib_lite_product_runtime = runtime;
     return &s_module;
 }
 #else
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {
     return &s_module;
 }

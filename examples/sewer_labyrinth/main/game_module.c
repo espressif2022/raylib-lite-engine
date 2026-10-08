@@ -1,21 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "raylib_lite_game_module_contract.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if !defined(MOSAICO_GAME_NATIVE) && !defined(MOSAICO_GAME_ELF)
+#if !defined(RAYLIB_LITE_GAME_NATIVE) && !defined(MOSAICO_GAME_ELF)
 #include "host_asset_runtime.h"
 #endif
-#include "mosaico_game_2d.h"
-#include "mosaico_game_module.h"
-#include "mosaico_raylib_fast.h"
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
-#include "mosaico_game_audio.h"
+#include "raylib_lite_2d.h"
+#include "raylib_lite_raylib.h"
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#include "raylib_lite_raylib_audio.h"
 #endif
 #if defined(MOSAICO_GAME_ELF)
-#include "mosaico_runtime_v1.h"
 #endif
 
 #define SL_W 480
@@ -37,9 +36,9 @@
 #define SL_CAMERA_DIST 2.55f
 #include "sewer_contracts.h"
 #if defined(MOSAICO_GAME_ELF)
-#define SL_ABI MOSAICO_HOST_GAME_ABI
+#define SL_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #else
-#define SL_ABI MOSAICO_HOST_GAME_ABI_V1
+#define SL_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #endif
 
 typedef struct { float x,y,z; } sl_vec3_t;
@@ -91,7 +90,7 @@ typedef struct {uint32_t best_ticks;uint16_t wins;uint8_t badges;} sl_run_record
 typedef struct {
     sl_game_t game;
     sl_game_t checkpoint;
-    MosaicoWallAtlas materials;
+    raylib_lite_wall_atlas_t materials;
     bool left,right,forward,back,strafe_left,strafe_right,fire,fire_edge,sneak,touch_sneak,has_checkpoint;
     uint32_t consumed_sfx;
     uint16_t menu_down;
@@ -100,7 +99,7 @@ typedef struct {
     sl_run_record_t records[SL_MISSIONS][SL_SITES][6];
     uint8_t learned;
     uint32_t surveyed[SL_MAP];
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     Sound sounds[SL_CUES];
 #endif
     int pointer_id,look_id,sneak_id,start_x,start_y,last_x,last_y;
@@ -687,7 +686,7 @@ static int ground_layer(const sl_face_t *f)
     return 2;
 }
 
-static void draw_face(const sl_face_t *f,MosaicoWallAtlas materials,Texture2D details)
+static void draw_face(const sl_face_t *f,raylib_lite_wall_atlas_t materials,Texture2D details)
 {
     sl_view_t input[4],clipped[SL_MAX_POLY];
     for(int i=0;i<4;++i){
@@ -714,16 +713,16 @@ static void draw_face(const sl_face_t *f,MosaicoWallAtlas materials,Texture2D de
         unsigned light=(unsigned)clampf(226.0f*room_light-
             clampf((f->depth-2.0f)*4.0f,0,82),116,226);
         for(int i=1;i<n-1;++i){
-            mosaico_textured_vertex_t a={p[0].x,p[0].y,ox+clipped[0].u,oy+clipped[0].v,
+            raylib_lite_textured_vertex_t a={p[0].x,p[0].y,ox+clipped[0].u,oy+clipped[0].v,
                                           1.0f/clipped[0].z};
-            mosaico_textured_vertex_t b={p[i].x,p[i].y,ox+clipped[i].u,oy+clipped[i].v,
+            raylib_lite_textured_vertex_t b={p[i].x,p[i].y,ox+clipped[i].u,oy+clipped[i].v,
                                           1.0f/clipped[i].z};
-            mosaico_textured_vertex_t d={p[i+1].x,p[i+1].y,ox+clipped[i+1].u,oy+clipped[i+1].v,
+            raylib_lite_textured_vertex_t d={p[i+1].x,p[i+1].y,ox+clipped[i+1].u,oy+clipped[i+1].v,
                                           1.0f/clipped[i+1].z};
             if(f->material>=SL_MAT_PANEL)
-                Mosaico2DDrawTexturedTriangle(details,a,b,d,light);
+                raylib_lite_2d_draw_textured_triangle(details,a,b,d,light);
             else
-                Mosaico2DDrawIndexedTexturedTriangle(materials,a,b,d,light);
+                raylib_lite_2d_draw_indexed_textured_triangle(materials,a,b,d,light);
         }
     }else for(int i=1;i<n-1;++i)DrawTriangle(p[0],p[i],p[i+1],c);
 }
@@ -1694,7 +1693,7 @@ static void draw_hud(const sl_game_t *g)
     }
 }
 
-static void render_game(sl_game_t *g,MosaicoWallAtlas materials)
+static void render_game(sl_game_t *g,raylib_lite_wall_atlas_t materials)
 {
     s_cam_x=g->cam_x;s_cam_y=g->cam_y;s_cam_z=g->cam_z;
     s_room_power=true;
@@ -1710,7 +1709,7 @@ static void render_game(sl_game_t *g,MosaicoWallAtlas materials)
 
 static void stop_audio(sl_module_t *s)
 {
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     for(int i=1;i<SL_CUES;++i)if(s->sounds[i].frameCount)StopSound(s->sounds[i]);
 #endif
     s->consumed_sfx=s->game.sfx_seq;
@@ -1720,7 +1719,7 @@ static void consume_audio(sl_module_t *s)
 {
     if(s->consumed_sfx==s->game.sfx_seq)return;
     s->consumed_sfx=s->game.sfx_seq;
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     unsigned id=s->game.cue;
     if(id>0&&id<SL_CUES&&s->sounds[id].frameCount)PlaySound(s->sounds[id]);
 #endif
@@ -1771,16 +1770,16 @@ static int initialize(void *value
 #endif
 )
 {
-#if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
-    mosaico_host_assets_set_root(asset_root);
-#elif defined(MOSAICO_GAME_NATIVE)
+#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
+    raylib_lite_host_assets_set_root(asset_root);
+#elif defined(RAYLIB_LITE_GAME_NATIVE)
     (void)asset_root;
 #endif
     sl_module_t *s=value;reset_dispatch(&s->game,0,0,0,true);restore_survey(s);
-    s->materials=LoadMosaicoWallAtlas("materials.wall");
+    s->materials=raylib_lite_wall_atlas_load("materials.wall");
     if(!s->materials.descriptor)return -1;
     clear_input(s);
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     InitAudioDevice();
     if(IsAudioDeviceReady())for(int i=1;i<SL_CUES;++i){
         char path[32];snprintf(path,sizeof(path),"%s.sound",s_cues[i]);
@@ -1788,7 +1787,7 @@ static int initialize(void *value
         if(s->sounds[i].frameCount)SetSoundVolume(s->sounds[i],i==SL_STEP?.25f:.55f);
     }
 #endif
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(480,480,"Below the Tide");SetTargetFPS(30);
 #endif
     return 0;
@@ -1798,13 +1797,13 @@ static void shutdown(void *value)
     sl_module_t *s=value;
     if(!s)return;
     stop_audio(s);
-#if defined(MOSAICO_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
+#if defined(RAYLIB_LITE_GAME_NATIVE) || defined(MOSAICO_GAME_ELF)
     for(int i=1;i<SL_CUES;++i)if(s->sounds[i].frameCount){
         UnloadSound(s->sounds[i]);memset(&s->sounds[i],0,sizeof(s->sounds[i]));
     }
     CloseAudioDevice();
 #endif
-    if(s&&s->materials.descriptor)UnloadMosaicoWallAtlas(s->materials);
+    if(s&&s->materials.descriptor)raylib_lite_wall_atlas_unload(s->materials);
 }
 static void dispatch_choice(sl_module_t *s,int code)
 {
@@ -1833,21 +1832,21 @@ static void toggle_journal(sl_module_t *s)
     if(s->game.briefing||s->game.paused||s->game.failed||s->game.escaped||s->game.action)return;
     stop_audio(s);s->game.journal=!s->game.journal;clear_input(s);
 }
-static void input(void *value,const mosaico_host_input_v1_t *e)
+static void input(void *value,const raylib_lite_game_input_v1_t *e)
 {
     sl_module_t *s=value;if(!s||!e)return;
-    if(e->type==MOSAICO_HOST_INPUT_CONTROL){
-        if(e->code==MOSAICO_HOST_CONTROL_RESET){
+    if(e->type==RAYLIB_LITE_GAME_INPUT_CONTROL){
+        if(e->code==RAYLIB_LITE_GAME_CONTROL_RESET){
             stop_audio(s);reset_dispatch(&s->game,s->game.mission,s->game.dispatch,s->game.kit,true);clear_input(s);
             restore_survey(s);
             s->run_ticks=0;
             s->has_checkpoint=false;s->consumed_sfx=0;
         }
-        else if(e->code==MOSAICO_HOST_CONTROL_PAUSE){s->game.paused=true;stop_audio(s);clear_input(s);}
-        else if(e->code==MOSAICO_HOST_CONTROL_RESUME)s->game.paused=false;
+        else if(e->code==RAYLIB_LITE_GAME_CONTROL_PAUSE){s->game.paused=true;stop_audio(s);clear_input(s);}
+        else if(e->code==RAYLIB_LITE_GAME_CONTROL_RESUME)s->game.paused=false;
         return;
     }
-    if(e->type==MOSAICO_HOST_INPUT_ACTION){
+    if(e->type==RAYLIB_LITE_GAME_INPUT_ACTION){
         if(e->code==4){
             if(e->pressed&&!(s->menu_down&16))toggle_journal(s);
             if(e->pressed)s->menu_down|=16;else s->menu_down&=~16;
@@ -1872,7 +1871,7 @@ static void input(void *value,const mosaico_host_input_v1_t *e)
         else if(e->code==8)s->strafe_left=e->pressed;else if(e->code==9)s->strafe_right=e->pressed;
         else if(e->code==7)s->sneak=e->pressed;
         else if(e->code==6){if(e->pressed&&!s->fire)s->fire_edge=true;s->fire=e->pressed;}
-    }else if(e->type==MOSAICO_HOST_INPUT_POINTER){
+    }else if(e->type==RAYLIB_LITE_GAME_INPUT_POINTER){
         if(!e->pressed){
             if(e->track_id==s->pointer_id)s->pointer_id=-1;
             if(e->track_id==s->look_id)s->look_id=-1;
@@ -2011,7 +2010,7 @@ static int state_json(const void *value,char *out,size_t cap)
         s_face_count,s_faces_dropped,(unsigned long)state_hash(value));
 }
 #endif
-static const mosaico_game_module_v1_t s_module={
+static const raylib_lite_game_module_v1_t s_module={
     .descriptor={SL_ABI,"sewer_labyrinth","Below the Tide",480,480,30,2},
     .state_size=sizeof(sl_module_t),.initialize=initialize,.shutdown=shutdown,
     .input=input,.update=update,.render=render,.state_hash=state_hash,
@@ -2020,11 +2019,11 @@ static const mosaico_game_module_v1_t s_module={
 #endif
 };
 #if defined(MOSAICO_GAME_ELF)
-MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
-mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
+raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
 {
-    g_mosaico_rt=runtime;return &s_module;
+    raylib_lite_product_runtime=runtime;return &s_module;
 }
 #else
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void){return &s_module;}
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void){return &s_module;}
 #endif

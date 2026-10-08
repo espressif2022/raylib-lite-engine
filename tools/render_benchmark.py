@@ -134,9 +134,9 @@ def compare(base,new,dimension):
 
 def defs(args,audit=False):
     mode,fixed,bound=VARIANTS[args.variant]
-    return [f'-DRENDER_BENCH_SUITE={args.suite}',f'-DM2D_WALL_MODE={mode}',
-        f'-DM2D_WALL_FIXED_PIXELS={fixed}',f'-DM2D_WALL_ERROR_TEXELS={bound}',
-        f'-DM2D_WALL_AUDIT={"ON" if audit else "OFF"}']
+    return [f'-DRENDER_BENCH_SUITE={args.suite}',f'-DRAYLIB_LITE_WALL_MODE={mode}',
+        f'-DRAYLIB_LITE_WALL_FIXED_PIXELS={fixed}',f'-DRAYLIB_LITE_WALL_ERROR_TEXELS={bound}',
+        f'-DRAYLIB_LITE_WALL_AUDIT={"ON" if audit else "OFF"}']
 
 
 def plan(output):
@@ -145,14 +145,14 @@ def plan(output):
         for audit in (True,False):
             name=label+('-audit' if audit else '-timing');build=output/name
             command=['idf.py','-C',str(EXAMPLE),'-B',str(build),'-DIDF_TARGET=esp32s31',
-                     '-DRENDER_BENCH_DISPLAY=OFF','-DRENDER_BENCH_SUITE=wall',f'-DM2D_WALL_MODE={mode}',
-                     f'-DM2D_WALL_FIXED_PIXELS={fixed}',f'-DM2D_WALL_ERROR_TEXELS={bound}',
-                     f'-DM2D_WALL_AUDIT={"ON" if audit else "OFF"}','build']
+                     '-DRENDER_BENCH_DISPLAY=OFF','-DRENDER_BENCH_SUITE=wall',f'-DRAYLIB_LITE_WALL_MODE={mode}',
+                     f'-DRAYLIB_LITE_WALL_FIXED_PIXELS={fixed}',f'-DRAYLIB_LITE_WALL_ERROR_TEXELS={bound}',
+                     f'-DRAYLIB_LITE_WALL_AUDIT={"ON" if audit else "OFF"}','build']
             entries.append({'name':name,'build':command,'captures':1 if audit else 3,
                 'flash_monitor':['idf.py','-C',str(EXAMPLE),'-B',str(build),'-p','PORT','flash','monitor']})
     for name,suite,options in (
         ('core-scalar','core',[]),('core-pie','core',['-DRENDER_BENCH_PIE=ON']),
-        ('adaptive025-lut-internal-audit','wall',['-DM2D_WALL_AUDIT=ON','-DRENDER_BENCH_LUT_INTERNAL=ON']),
+        ('adaptive025-lut-internal-audit','wall',['-DRAYLIB_LITE_WALL_AUDIT=ON','-DRENDER_BENCH_LUT_INTERNAL=ON']),
         ('adaptive025-lut-internal-timing','wall',['-DRENDER_BENCH_LUT_INTERNAL=ON'])):
         build=output/name
         entries.append({'name':name,'build':['idf.py','-C',str(EXAMPLE),'-B',str(build),
@@ -197,9 +197,9 @@ def main():
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     # Archive inputs before compilation and reject concurrent source changes.
     files=set(EXAMPLE.rglob('*'))
-    files.update((ROOT/'components/mosaico_game_2d').rglob('*'))
-    files.update((ROOT/'components/mosaico_game_assets/include').glob('*.h'))
-    files.update((ROOT/'components/raylib_lite_platform/include').glob('*.h'))
+    files.update((ROOT/'src/renderer').rglob('*'))
+    files.update((ROOT/'include/raylib_lite').glob('*.h'))
+    files.update((ROOT/'include/raylib_lite').glob('*.h'))
     files.add(ROOT/'host/include/raylib.h');files.add(Path(__file__).resolve());files.add(ROOT/'tools/wall_benchmark.py')
     files={x for x in files if x.is_file() and x.suffix in ('.c','.h','.S','.cmake','.txt','.json','.py') and not any(part.startswith('build') or part in ('managed_components','.git','__pycache__') for part in x.relative_to(ROOT).parts)}
     manifest={str(f.relative_to(ROOT)):sha(f) for f in sorted(files)}

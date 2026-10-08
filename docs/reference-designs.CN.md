@@ -4,17 +4,18 @@
 
 设计新游戏或后端时，先确定数据和能力的所有者，再选择绘制路径，最后用相同输入分别验证正确性与设备成本。本页记录跨游戏可复用的规则；具体构建命令和单轮测量留在各自入口。
 
-## 1. 划清游戏、引擎与平台
+## 1. 划清 Game、Engine、Board 与 Product Runtime
 
 | 层 | 负责 | 边界 |
 |---|---|---|
-| 游戏模型与视图 | 状态、输入语义、资源名、音画事件、投影与图层顺序 | 可移植 C；不持有 BSP/显示驱动句柄 |
-| 引擎 | 固定步长、输入队列、RGB565 光栅、资源与音频服务 | 通过 video、clock、input、audio 契约调用平台能力 |
-| 平台与产品 | BSP、面板、触摸、codec、电源、任务、固件入口 | 创建后端，交付设备资源并负责清理 |
+| 游戏模型与视图 | 状态、输入语义、资源名、音画事件、投影与图层顺序 | 共享 C；不持有具体 BSP 或板级驱动句柄 |
+| Engine | 固定步长、输入队列、RGB565 光栅、资源与音频服务、平台契约 | 不依赖具体开发板 |
+| Board Adapter | BSP、面板、触摸、codec、IMU、板级资源和 backend 构造 | 位于 `examples/boards/<board>/` 的示例/应用侧 IDF component；依赖 Engine |
+| Product Runtime | 产品任务、Loader/Session 策略、安装/更新/Recovery、设备归属 | 组合 Engine 和 Board 能力，但不成为两者的一部分 |
 
-玩法先将原始输入转成语义命令；模型产生带序号的声音/震动事件，消费端只处理一次。资产使用逻辑名称，加载方式由平台提供。单调时钟驱动逻辑；显示落后可以丢旧画面，不能改变逻辑速度。
+玩法先将原始输入转成语义命令；模型产生带序号的声音/震动事件，消费端只处理一次。资产使用逻辑名称，存储方式由所选集成层提供。单调时钟驱动逻辑；显示落后可以丢旧画面，不能改变逻辑速度。
 
-RGB565 帧缓冲的借出、提交、释放必须明确所有权；繁忙、失败、退出时也只能归还一次。`present` 接受、缓冲可复用、屏幕实际显示完成是不同时间点，统计口径须注明。新增板卡应只适配平台入口和服务，不修改游戏循环或通用光栅器。
+RGB565 帧缓冲的借出、提交、释放必须明确所有权；繁忙、失败、退出时也只能归还一次。`present` 接受、缓冲可复用、屏幕实际显示完成是不同时间点，统计口径须注明。新增板卡只需增加 Board Adapter 并在构建时选择，不能要求修改游戏循环、通用光栅器或 Game 源码。
 
 ## 2. 输入、反馈与资产的设计卡
 
@@ -26,11 +27,11 @@ RGB565 帧缓冲的借出、提交、释放必须明确所有权；繁忙、失�
 | 音频/震动 | 模型语义事件 → 一次性消费 → cue/触觉映射 → 平台输出 | 声音资源、音量、震动强度与节奏、codec | 连续同类事件不漏播、缺资源可诊断、退出后无残留输出 |
 | 资产 | 源文件/清单 → 确定性打包 → 逻辑名称查找 → 受控生命周期 | 资源格式、分区或内嵌策略、容量预算 | Host/设备名称一致、缺资源失败、卸载前不留悬空引用 |
 
-**输入映射。** 驱动保留接触点 ID、坐标、按下状态与时间，不能在映射前把多指压成一个鼠标点；当前动作映射器支持最多两个跟踪接触点，容量是实现限制，不是所有设备的设计常量。每个逻辑节拍明确处理按住、按下、松开状态；事件队列满时记录丢失并定义恢复/清理策略，避免操作一直卡在按下状态。公共入口见[输入事件](../components/raylib_lite_runner/include/raylib_lite_input.h)与[动作映射](../components/mosaico_game_input/include/mosaico_game_action.h)；板级触摸驱动与点数配置由 BSP/产品工程验收。
+**输入映射。** 驱动保留接触点 ID、坐标、按下状态与时间，不能在映射前把多指压成一个鼠标点；当前动作映射器支持最多两个跟踪接触点，容量是实现限制，不是所有设备的设计常量。每个逻辑节拍明确处理按住、按下、松开状态；事件队列满时记录丢失并定义恢复/清理策略，避免操作一直卡在按下状态。公共入口见[输入事件](../include/raylib_lite/raylib_lite_input.h)与[动作映射](../include/raylib_lite/raylib_lite_action.h)；板级触摸驱动与点数配置由 BSP/产品工程验收。
 
-**反馈事件。** 模型只声明“发生了什么”和事件序号，不直接播放声音或驱动电机；消费端对每个新序号处理一次，视觉保持时长不充当事件计数。初始化时加载音频片段，更新时触发短音效并维护音乐流，退出时停止/释放输出；电机脉冲按真实时间关断。混音与编解码器后端分层，设备后端需处理部分写入和停止超时。公共入口见[音频服务](../components/mosaico_game_audio/include/mosaico_game_audio.h)、[PCM 后端](../components/raylib_lite_platform/include/raylib_lite_audio.h)；[Last Zone 模块](../examples/last_zone_extraction/main/game_module.c)展示一种事件映射，并非通用音效表。
+**反馈事件。** 模型只声明“发生了什么”和事件序号，不直接播放声音或驱动电机；消费端对每个新序号处理一次，视觉保持时长不充当事件计数。初始化时加载音频片段，更新时触发短音效并维护音乐流，退出时停止/释放输出；电机脉冲按真实时间关断。混音与编解码器后端分层，设备后端需处理部分写入和停止超时。公共入口见[音频服务](../compat/raylib/include/raylib_lite_game_audio.h)、[PCM 后端](../include/raylib_lite/raylib_lite_audio.h)；[Last Zone 模块](../examples/last_zone_extraction/main/game_module.c)展示一种事件映射，并非通用音效表。
 
-**资产管线。** 可编辑源和生成器放在 `assets_src/`，打包产物按逻辑名称访问；运行时不把 Host 路径、分区偏移或内嵌符号写进玩法模型。Host 从生成目录读取，设备可用只读分区、模块镜像或内嵌数据；若同名资源共存，当前实现优先分区/镜像再内嵌。资源视图是借用的，卸载或 unmount 前停止使用；加载失败应在初始化阶段报告。公共入口见 [资产 API](../components/mosaico_game_assets/include/mosaico_game_assets.h)、[打包器](../tools/pack_game_assets.py)和 [native 内嵌 helper](../cmake/raylib_lite_native_assets.cmake)。
+**资产管线。** 可编辑源和生成器放在 `assets_src/`，打包产物按逻辑名称访问；运行时不把 Host 路径、分区偏移或内嵌符号写进玩法模型。Host 从生成目录读取，设备可用 IDF mmap 分区 backend、内存 image alias、有界 read backing 或内嵌数据；若同名资源共存，当前实现先查挂载的 partition/backend，再查 backing/image，最后查内嵌数据。从 read backing 打开的 view 可能持有按需物化的缓冲区，用完必须调用 `raylib_lite_asset_release()`，并在 unmount 前释放所有 view；stream 可直接从 backing 读取，不需要整块物化。加载失败应在初始化阶段报告。公共入口见 [资产 API](../include/raylib_lite/raylib_lite_assets.h)、[打包器](../tools/pack_game_assets.py)和 [native 内嵌 helper](../tools/cmake/raylib_lite_native_assets.cmake)。
 
 ### 资源清单的最小格式
 
@@ -50,6 +51,8 @@ RGB565 帧缓冲的借出、提交、释放必须明确所有权；繁忙、失�
 
 项目视图负责视空间裁剪、投影、遮挡和提交顺序；光栅器负责屏幕裁剪、纹理采样、混合和像素输出；平台负责送屏。
 
+光栅核心刻意保持 Raylib-neutral：`raylib_lite_renderer.h` 定义 renderer 的纹理、矩形、向量和颜色 contract，`raylib_lite_2d_*` API 作为 Raylib-shaped compatibility adapter；支持的上游 Raylib 名称则独立由 `compat/raylib/raylib_lite_raylib.h` 提供。SoC-specific RGB565 加速统一隔离在 `src/arch/<soc>/`，所有目标始终保留 generic C 实现。
+
 | 场景条件 | 路径 | 参考示例 | 必须验证 |
 |---|---|---|---|
 | 正交格子、水平射线 | DDA 墙柱与地板行 | [Last Zone](../examples/last_zone_extraction/README.md) | 命中格子/侧面的边界、列深度与精灵遮挡 |
@@ -57,7 +60,7 @@ RGB565 帧缓冲的借出、提交、释放必须明确所有权；繁忙、失�
 | 环视深度网格和体积面 | RGB565 Quad 与 Triangle | [Living Worlds](../examples/living_worlds/README.md) | 深度层、动画缓存失效、全屏覆盖与清屏条件 |
 | 2D 精灵、tilemap、HUD | Atlas 与基础图元 | [Sky Hop](../examples/sky_hop/README.md)、[Tower Defense](../examples/tower_defense/README.md) | 源裁剪、缩放、旋转、tint、alpha 与叠加顺序 |
 
-**当前三维路径的约束。** INDEX8 三角形和 Quad 的顶点 `q > 0` 表示 `1/z`，会在水平段端点进行透视 UV 校正；`q == 0` 保留仿射采样。RGB565 三角形和 Quad 当前忽略 `q`，不能把这条能力推广到所有纹理格式。[光栅配置](../components/mosaico_game_2d/include/mosaico_wall_config.h)有 legacy、逐像素、固定段长、误差约束四种编译模式；legacy 模式才使用 `1/z` 比值 1.15 的分段启发式，专用 benchmark 默认尝试误差约束模式，不代表产品已采用它。新游戏应先设 UV 误差预算，再用相同场景分别验证画质、内核耗时和完整帧率。
+**当前三维路径的约束。** INDEX8 三角形和 Quad 的顶点 `q > 0` 表示 `1/z`，会在水平段端点进行透视 UV 校正；`q == 0` 保留仿射采样。RGB565 三角形和 Quad 当前忽略 `q`，不能把这条能力推广到所有纹理格式。[光栅配置](../include/raylib_lite/raylib_lite_wall_config.h)有 legacy、逐像素、固定段长、误差约束四种编译模式；legacy 模式才使用 `1/z` 比值 1.15 的分段启发式，专用 benchmark 默认尝试误差约束模式，不代表产品已采用它。新游戏应先设 UV 误差预算，再用相同场景分别验证画质、内核耗时和完整帧率。
 
 **光照与遮挡。** 当前三角形/Quad 的 `light256` 是一次 draw 的统一光照，没有按顶点插值。Tomb Raycast 将顶点光照汇总后按 draw 提交，并把面按深度从远到近排序绘制；该示例没有通用 Z 缓冲，深度排序对互相穿插的面仍需靠几何拆分或裁剪解决。Last Zone 另用逐列深度处理 billboard 遮挡；两条路径不可混称为引擎统一遮挡方案。
 

@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "mosaico_game_audio.h"
+#include "raylib_lite_game_audio.h"
 #include "last_zone_game.h"
 
 typedef struct {

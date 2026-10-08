@@ -1,28 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "raylib_lite_game_module_contract.h"
 #include <stdio.h>
 #if defined(MOSAICO_GAME_ELF)
-#include "mosaico_game_module.h"
-#include "mosaico_runtime_v1.h"
 #else
-#include "mosaico_game_module.h"
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif
 #endif
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "tower_game.h"
 #include "tower_view.h"
 
 #if defined(MOSAICO_GAME_ELF)
-#define TOWER_DEFENSE_ABI MOSAICO_HOST_GAME_ABI
+#define TOWER_DEFENSE_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #else
-#define TOWER_DEFENSE_ABI MOSAICO_HOST_GAME_ABI_V1
+#define TOWER_DEFENSE_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #endif
 
 typedef struct {
     tower_game_t game;
-    MosaicoAtlas atlas;
-    MosaicoTilemap map;
+    raylib_lite_atlas_t atlas;
+    raylib_lite_tilemap_t map;
     tower_effect_t effects[TOWER_EFFECT_COUNT];
     bool paused;
 } tower_module_state_t;
@@ -45,14 +43,14 @@ static int initialize(void *value
 )
 {
     tower_module_state_t *state = value;
-#if !defined(MOSAICO_GAME_ELF) && !defined(MOSAICO_GAME_NATIVE)
-    mosaico_host_assets_set_root(asset_root);
+#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
+    raylib_lite_host_assets_set_root(asset_root);
 #endif
-    state->atlas = LoadMosaicoAtlas("tower.atlas");
-    state->map = LoadMosaicoTilemap("level01.map");
+    state->atlas = raylib_lite_atlas_load("tower.atlas");
+    state->map = raylib_lite_tilemap_load("level01.map");
     if (!state->atlas.texture.id || !state->map) return -1;
     (void)tower_view_apply_map(&state->game, state->map);
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(480, 480, "Circuit Keep");
     SetTargetFPS(30);
 #endif
@@ -64,26 +62,26 @@ static void shutdown(void *value)
 {
     tower_module_state_t *state = value;
     if (!state) return;
-    UnloadMosaicoTilemap(state->map);
-    UnloadMosaicoAtlas(state->atlas);
+    raylib_lite_tilemap_unload(state->map);
+    raylib_lite_atlas_unload(state->atlas);
 }
 
-static void input(void *value, const mosaico_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     tower_module_state_t *state = value;
     if (!state || !event) return;
-    if (event->type == MOSAICO_HOST_INPUT_POINTER)
+    if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER)
         tower_game_set_pointer(&state->game, (float)event->x, (float)event->y, event->pressed);
-    else if (event->type == MOSAICO_HOST_INPUT_ACTION)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION)
         tower_game_set_pointer(&state->game, 240, 220, event->pressed);
-    else if (event->type == MOSAICO_HOST_INPUT_CONTROL &&
-             event->code == MOSAICO_HOST_CONTROL_RESET)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_RESET)
         tower_game_reset(&state->game, 0x544f5745U);
-    else if (event->type == MOSAICO_HOST_INPUT_CONTROL &&
-             event->code == MOSAICO_HOST_CONTROL_PAUSE)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE)
         state->paused = true;
-    else if (event->type == MOSAICO_HOST_INPUT_CONTROL &&
-             event->code == MOSAICO_HOST_CONTROL_RESUME)
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+             event->code == RAYLIB_LITE_GAME_CONTROL_RESUME)
         state->paused = false;
 }
 
@@ -135,7 +133,7 @@ static int state_json(const void *value, char *output, size_t capacity)
         (unsigned long)tower_game_state_hash(game));
 }
 
-static const mosaico_game_module_v1_t s_module = {
+static const raylib_lite_game_module_v1_t s_module = {
     .descriptor = {TOWER_DEFENSE_ABI, "tower_defense", "Circuit Keep",
                    480, 480, 30, 1},
     .state_size = sizeof(tower_module_state_t),
@@ -145,14 +143,14 @@ static const mosaico_game_module_v1_t s_module = {
 };
 
 #if defined(MOSAICO_GAME_ELF)
-MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
-mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
+raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
 {
-    g_mosaico_rt = runtime;
+    raylib_lite_product_runtime = runtime;
     return &s_module;
 }
 #else
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {
     return &s_module;
 }

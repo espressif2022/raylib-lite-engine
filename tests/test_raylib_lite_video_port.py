@@ -19,9 +19,9 @@ class RaylibLiteVideoPortTests(unittest.TestCase):
             command += shlex.split(os.environ.get("CFLAGS", ""))
             command += [
                 str(ROOT / "tests/test_raylib_lite_video_port.c"),
-                str(ROOT / "components/mosaico_raylib_port/mosaico_raylib_port.c"),
-                "-I", str(ROOT / "components/mosaico_raylib_port/include"),
-                "-I", str(ROOT / "components/raylib_lite_platform/include"),
+                str(ROOT / "src/runtime/raylib_lite_raylib_port.c"),
+                "-I", str(ROOT / "include/raylib_lite"),
+                "-I", str(ROOT / "include/raylib_lite"),
                 "-o", executable,
             ]
             subprocess.run(command, check=True)

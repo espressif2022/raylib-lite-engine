@@ -147,12 +147,12 @@ def main():
         parser.error('C compiler not found')
     previous = json.loads(args.baseline.read_text()) if args.baseline else None
     out = args.output.resolve(); out.mkdir(parents=True, exist_ok=False)
-    sources = [ROOT/'components/mosaico_game_2d'/name for name in
-               ('mosaico_wall_bench.c', 'mosaico_game_2d.c', 'mosaico_rgb565.c')]
+    sources = [ROOT/'src/renderer'/name for name in
+               ('raylib_lite_wall_bench.c', 'raylib_lite_renderer.c', 'raylib_lite_renderer_raylib.c', 'raylib_lite_rgb565.c')]
     sources += [ROOT/'host/host_asset_runtime.c']
     flags = ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-DWALL_BENCH_HOST=1']
-    for folder in ('host/include', 'host', 'components/mosaico_game_assets/include',
-                   'components/mosaico_game_2d/include'):
+    for folder in ('host/include', 'host', 'include/raylib_lite',
+                   'include/raylib_lite'):
         flags += ['-I', str(ROOT/folder)]
     environment = {'platform': platform.platform(), 'machine': platform.machine(),
                    'compiler': subprocess.check_output([compiler, '--version'], text=True),
@@ -180,7 +180,7 @@ def main():
               'protocol': {'rounds': args.rounds, 'warmup_replays': 2, 'frames': 8,
                            'samples_per_round': 7, 'replays_per_sample': 4,
                            'clock': 'monotonic', 'timing': 'microseconds/draw; batched, no clear/oracle/display'},
-              'workload_sha256': manifest['components/mosaico_game_2d/mosaico_wall_bench.c'],
+              'workload_sha256': manifest['src/renderer/raylib_lite_wall_bench.c'],
               'git_head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'source_manifest_sha256': digest(json.dumps(manifest, sort_keys=True).encode()),
               'device_score': None, 'full_game_acceptance': 'pending', 'binaries': {}, 'commands': []}
@@ -189,12 +189,12 @@ def main():
         check_comparable(previous, probe)
     audits, timings = {}, {}
     for label, (mode, fixed, error) in VARIANTS.items():
-        defs = [f'-DM2D_WALL_MODE={mode}', f'-DM2D_WALL_FIXED_PIXELS={fixed}',
-                f'-DM2D_WALL_ERROR_TEXELS={error}f']
+        defs = [f'-DRAYLIB_LITE_WALL_MODE={mode}', f'-DRAYLIB_LITE_WALL_FIXED_PIXELS={fixed}',
+                f'-DRAYLIB_LITE_WALL_ERROR_TEXELS={error}f']
         timings[label] = {case: [] for case in CASES}
         for audit in (True, False):
             binary = out/(label+('-audit' if audit else '-timing'))
-            command = [compiler, *flags, *defs, *(['-DM2D_WALL_AUDIT=1'] if audit else []),
+            command = [compiler, *flags, *defs, *(['-DRAYLIB_LITE_WALL_AUDIT=1'] if audit else []),
                        *map(str, sources), '-lm', '-o', str(binary)]
             report['commands'].append(command);subprocess.run(command, check=True)
             report['binaries'][binary.name] = digest(binary.read_bytes())

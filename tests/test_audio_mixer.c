@@ -145,7 +145,24 @@ int main(void)
     assert(raylib_lite_audio_mixer_play_music(mixer, pcm_clip) == RAYLIB_LITE_OK);
     assert(raylib_lite_audio_mixer_mix(mixer, output, 6) == RAYLIB_LITE_OK);
     assert(output[0] == 1000 && output[1] == -20000 && output[4] == 1000);
-    raylib_lite_audio_mixer_stop_music(mixer);
+
+    /* Clip-scoped music control must not affect a replacement track. */
+    assert(raylib_lite_audio_mixer_set_music_clip_volume(mixer, pcm_clip,
+                                                        0.5f) == RAYLIB_LITE_OK);
+    assert(raylib_lite_audio_mixer_play_music(mixer, pcm_clip) == RAYLIB_LITE_OK);
+    assert(raylib_lite_audio_mixer_mix(mixer, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 500 && output[1] == -10000);
+    assert(raylib_lite_audio_mixer_play_music(mixer, adpcm_clip) == RAYLIB_LITE_OK);
+    assert(raylib_lite_audio_mixer_stop_music_clip(mixer, pcm_clip) == RAYLIB_LITE_OK);
+    assert(raylib_lite_audio_mixer_mix(mixer, output, 3) == RAYLIB_LITE_OK);
+    assert(output[0] == 1000 && output[1] == 1000 && output[2] == 1011);
+    assert(raylib_lite_audio_mixer_set_music_clip_volume(mixer, pcm_clip,
+                                                        0.0f) == RAYLIB_LITE_OK);
+    assert(raylib_lite_audio_mixer_mix(mixer, output, 3) == RAYLIB_LITE_OK);
+    assert(output[0] == 1000 && output[1] == 1000 && output[2] == 1011);
+    assert(raylib_lite_audio_mixer_stop_music_clip(mixer, adpcm_clip) == RAYLIB_LITE_OK);
+    assert(raylib_lite_audio_mixer_mix(mixer, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 0 && output[1] == 0);
 
     assert(raylib_lite_audio_mixer_play_sound(mixer, pcm_clip) == RAYLIB_LITE_OK);
     raylib_lite_audio_clip_t stale = pcm_clip;
@@ -155,6 +172,14 @@ int main(void)
     assert(raylib_lite_audio_mixer_load(mixer, "pcm", &pcm_clip) == RAYLIB_LITE_OK);
     assert(pcm_clip.slot == stale.slot && pcm_clip.generation != stale.generation);
     assert(raylib_lite_audio_mixer_stop_sound(mixer, stale) == RAYLIB_LITE_INVALID_ARGUMENT);
+    assert(raylib_lite_audio_mixer_play_music(mixer, pcm_clip) == RAYLIB_LITE_OK);
+    assert(raylib_lite_audio_mixer_stop_music_clip(mixer, stale) ==
+           RAYLIB_LITE_INVALID_ARGUMENT);
+    assert(raylib_lite_audio_mixer_set_music_clip_volume(mixer, stale, 0.0f) ==
+           RAYLIB_LITE_INVALID_ARGUMENT);
+    assert(raylib_lite_audio_mixer_mix(mixer, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 1000 && output[1] == -20000);
+    raylib_lite_audio_mixer_stop_music(mixer);
 
     /* A 32-bit generation must not revive the original handle at the old
      * 16-bit wrap boundary. */
@@ -168,7 +193,7 @@ int main(void)
 
     raylib_lite_audio_mixer_stats_t stats;
     raylib_lite_audio_mixer_get_stats(mixer, &stats);
-    assert(stats.mixed_frames == 17);
+    assert(stats.mixed_frames == 29);
     assert(context.locks == context.unlocks);
     raylib_lite_audio_mixer_destroy(mixer);
     assert(context.opens == context.closes);

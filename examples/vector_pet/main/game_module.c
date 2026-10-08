@@ -1,23 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "raylib_lite_game_module_contract.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #if defined(MOSAICO_GAME_ELF)
-#include "mosaico_game_module.h"
-#include "mosaico_runtime_v1.h"
 #else
-#include "mosaico_game_module.h"
 #endif
-#include "mosaico_raylib_fast.h"
-#include "mosaico_rgb565.h"
+#include "raylib_lite_raylib.h"
+#include "raylib_lite_rgb565.h"
 #include "pet.h"
 #include "pet_draw.h"
 #include "vg_raster.h"
 
 #if defined(MOSAICO_GAME_ELF)
-#define VECTOR_PET_ABI MOSAICO_HOST_GAME_ABI
+#define VECTOR_PET_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #else
-#define VECTOR_PET_ABI MOSAICO_HOST_GAME_ABI_V1
+#define VECTOR_PET_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #endif
 
 #define SCREEN 480
@@ -38,7 +36,7 @@ typedef struct {
     vg_stats_t stats;
 } vector_pet_state_t;
 
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 /* No packed assets: the pet and room are drawn from code. */
 void raylib_lite_register_native_assets(void) {}
 #endif
@@ -64,7 +62,7 @@ static int initialize(void *value
     state->background = malloc((size_t)SCREEN * SCREEN * sizeof(uint16_t));
     if (!state->background) return -1;
     pet_draw_background(state->background, SCREEN, SCREEN, SCREEN);
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(SCREEN, SCREEN, "Vector Pet");
     SetTargetFPS(TICK_HZ);
 #endif
@@ -80,11 +78,11 @@ static void shutdown(void *value)
     state->background = NULL;
 }
 
-static void input(void *value, const mosaico_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     vector_pet_state_t *state = value;
     if (!state || !event) return;
-    if (event->type == MOSAICO_HOST_INPUT_POINTER && event->track_id == 0) {
+    if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER && event->track_id == 0) {
         if (event->pressed && !state->pointer_down) {
             state->pointer_down = true;
             state->button = pet_button_at(event->x, event->y);
@@ -100,7 +98,7 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
         }
         if (!event->pressed) state->pointer_down = false;
         pet_pointer(&state->pet, event->pressed, (float)event->x, (float)event->y);
-    } else if (event->type == MOSAICO_HOST_INPUT_ACTION && event->code >= 0 &&
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION && event->code >= 0 &&
                event->code <= ACTION_POKE) {
         /* Hosts repeat held actions every tick; only the press edge counts. */
         uint32_t bit = 1u << event->code;
@@ -110,10 +108,10 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
         if (!event->pressed || was_held) return;
         if (event->code == ACTION_POKE) pet_poke(&state->pet);
         else pet_toggle_mode(&state->pet, (pet_mode_t)(PET_MODE_EAT + event->code));
-    } else if (event->type == MOSAICO_HOST_INPUT_CONTROL) {
-        if (event->code == MOSAICO_HOST_CONTROL_RESET) reset(state);
-        else if (event->code == MOSAICO_HOST_CONTROL_PAUSE) state->paused = true;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESUME) state->paused = false;
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_GAME_CONTROL_RESET) reset(state);
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) state->paused = true;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESUME) state->paused = false;
     }
 }
 
@@ -129,13 +127,13 @@ static int render(void *value)
 {
     vector_pet_state_t *state = value;
     BeginDrawing();
-    if (!MosaicoFastFrameAvailable()) {
+    if (!raylib_lite_raylib_frame_available()) {
         EndDrawing();
         return -1;
     }
     int width = 0, height = 0;
     size_t stride = 0;
-    uint16_t *fb = MosaicoFastGetFramebuffer(&width, &height, &stride);
+    uint16_t *fb = raylib_lite_raylib_get_framebuffer(&width, &height, &stride);
     if (!fb || width <= 0 || height <= 0) {
         EndDrawing();
         return -1;
@@ -144,7 +142,7 @@ static int render(void *value)
     int copy_w = width < SCREEN ? width : SCREEN;
     int copy_h = height < SCREEN ? height : SCREEN;
     for (int y = 0; y < copy_h; ++y)
-        mosaico_copy_rgb565(fb + (size_t)y * stride,
+        raylib_lite_rgb565_copy(fb + (size_t)y * stride,
                             state->background + (size_t)y * SCREEN, (size_t)copy_w);
     vg_begin(fb, width, height, stride);
     vg_reset_stats();
@@ -182,7 +180,7 @@ static int state_json(const void *value, char *output, size_t capacity)
         state->render_ms_avg, (unsigned long)state_hash(state));
 }
 
-static const mosaico_game_module_v1_t s_module = {
+static const raylib_lite_game_module_v1_t s_module = {
     .descriptor = {VECTOR_PET_ABI, "vector_pet", "Vector Pet", SCREEN, SCREEN, TICK_HZ, 1},
     .state_size = sizeof(vector_pet_state_t),
     .initialize = initialize, .shutdown = shutdown, .input = input,
@@ -191,14 +189,14 @@ static const mosaico_game_module_v1_t s_module = {
 };
 
 #if defined(MOSAICO_GAME_ELF)
-MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
-mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
+raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
 {
-    g_mosaico_rt = runtime;
+    raylib_lite_product_runtime = runtime;
     return &s_module;
 }
 #else
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {
     return &s_module;
 }

@@ -1,5 +1,5 @@
 {
-  "schema": "mosaico-game-sim/v1",
+  "schema": "raylib-lite-game-sim/v1",
   "sources": [
     "main/game_module.c",
     "main/tower_game.c",

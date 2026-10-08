@@ -8,45 +8,45 @@ static unsigned inits, closes, loads, unloads, plays[LAST_ZONE_SOUND_COUNT];
 static unsigned music_loads, music_unloads, music_plays, music_stops;
 static unsigned haptic_inits, haptic_pulses, haptic_patterns, haptic_stops;
 
-void MosaicoAudioInit(void) { ++inits; }
-void MosaicoAudioClose(void) { ++closes; }
-bool MosaicoAudioReady(void) { return ready; }
-Sound MosaicoAudioLoadSound(const char *path)
+void raylib_lite_game_audio_init(void) { ++inits; }
+void raylib_lite_game_audio_close(void) { ++closes; }
+bool raylib_lite_game_audio_ready(void) { return ready; }
+Sound raylib_lite_game_audio_load_sound(const char *path)
 {
     assert(strstr(path, "bolt") == NULL);
     assert(loads < LAST_ZONE_SOUND_COUNT);
     return (Sound){.frameCount = 1, .id = loads++};
 }
-void MosaicoAudioUnloadSound(Sound sound)
+void raylib_lite_game_audio_unload_sound(Sound sound)
 {
     assert(sound.frameCount && sound.id < LAST_ZONE_SOUND_COUNT);
     ++unloads;
 }
-void MosaicoAudioPlaySound(Sound sound)
+void raylib_lite_game_audio_play_sound(Sound sound)
 {
     assert(sound.frameCount && sound.id < LAST_ZONE_SOUND_COUNT);
     ++plays[sound.id];
 }
-bool MosaicoAudioIsSoundPlaying(Sound sound)
+bool raylib_lite_game_audio_is_sound_playing(Sound sound)
 {
     assert(sound.frameCount);
     return false;
 }
-void MosaicoAudioSetSoundVolume(Sound sound, float volume)
+void raylib_lite_game_audio_set_sound_volume(Sound sound, float volume)
 {
     assert(sound.frameCount && volume >= 0.0f && volume <= 1.0f);
 }
-Music MosaicoAudioLoadMusic(const char *path)
+Music raylib_lite_game_audio_load_music(const char *path)
 {
     assert(strcmp(path, "music.sound") == 0);
     ++music_loads;
     return (Music){.frameCount = 1};
 }
-void MosaicoAudioUnloadMusic(Music music) { assert(music.frameCount); ++music_unloads; }
-void MosaicoAudioPlayMusic(Music music) { assert(music.frameCount); ++music_plays; }
-void MosaicoAudioUpdateMusic(Music music) { assert(music.frameCount); }
-void MosaicoAudioStopMusic(Music music) { assert(music.frameCount); ++music_stops; }
-void MosaicoAudioSetMusicVolume(Music music, float volume)
+void raylib_lite_game_audio_unload_music(Music music) { assert(music.frameCount); ++music_unloads; }
+void raylib_lite_game_audio_play_music(Music music) { assert(music.frameCount); ++music_plays; }
+void raylib_lite_game_audio_update_music(Music music) { assert(music.frameCount); }
+void raylib_lite_game_audio_stop_music(Music music) { assert(music.frameCount); ++music_stops; }
+void raylib_lite_game_audio_set_music_volume(Music music, float volume)
 {
     assert(music.frameCount && volume >= 0.0f && volume <= 1.0f);
 }

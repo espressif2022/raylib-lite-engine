@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "raylib_lite_game_module_contract.h"
 //
 // Host/native lifecycle and input adapter for Neon Rift Rally. The gameplay
 // model and renderer intentionally live in rally_game.[ch] and rally_view.[ch]
@@ -10,16 +11,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "mosaico_game_module.h"
-#include "mosaico_raylib_fast.h"
-#if !defined(MOSAICO_GAME_NATIVE)
+#include "raylib_lite_raylib.h"
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif
 #include "rally_game.h"
 #include "rally_view.h"
-#if defined(MOSAICO_GAME_NATIVE)
-#include "mosaico_game_audio.h"
-#include "mosaico_game_save.h"
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+#include "raylib_lite_raylib_audio.h"
+#include "raylib_lite_save.h"
 #include "native_feedback.h"
 #include "raylib_lite_clock.h"
 #endif
@@ -45,8 +45,8 @@ static const neon_rift_course_t COURSES[NEON_RIFT_COURSE_COUNT] = {
 
 typedef struct {
     rally_game_t game;
-    MosaicoAtlas rally_art;
-    MosaicoAtlas track_background;
+    raylib_lite_atlas_t rally_art;
+    raylib_lite_atlas_t track_background;
     bool paused;
     bool steer_left;
     bool steer_right;
@@ -64,15 +64,15 @@ typedef struct {
     uint32_t best_lap_ticks;
     uint32_t best_race_ticks;
     uint8_t course_id;
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     Sound sounds[8];
     Music engine;
-    mosaico_save_t save;
+    raylib_lite_save_t save;
     bool save_ready;
 #endif
 } neon_rift_rally_module_t;
 
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 typedef struct {
     uint32_t best_lap_ticks[NEON_RIFT_COURSE_COUNT];
     uint32_t best_race_ticks[NEON_RIFT_COURSE_COUNT];
@@ -84,7 +84,7 @@ typedef struct {
 } neon_rift_rally_record_v1_t;
 #endif
 
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 static const char *const SFX_PATHS[8] = {
     "boost.sound", "drift.sound", "jump.sound", "land.sound",
     "checkpoint.sound", "lap.sound", "finish.sound", "offtrack.sound"
@@ -93,7 +93,7 @@ static const char *const SFX_PATHS[8] = {
 static void feedback_pulse(int strength, int duration_ms)
 {
 #if NEON_RIFT_HAPTICS_ENABLED
-    mosaico_native_feedback_pulse(strength, duration_ms);
+    raylib_lite_native_feedback_pulse(strength, duration_ms);
 #else
     (void)strength;
     (void)duration_ms;
@@ -105,7 +105,7 @@ static void feedback_pattern(int first_strength, int first_duration_ms,
                              int gap_ms)
 {
 #if NEON_RIFT_HAPTICS_ENABLED
-    mosaico_native_feedback_pattern(first_strength, first_duration_ms,
+    raylib_lite_native_feedback_pattern(first_strength, first_duration_ms,
                                     second_strength, second_duration_ms,
                                     gap_ms);
 #else
@@ -127,7 +127,7 @@ static void feedback_init(neon_rift_rally_module_t *state)
         PlayMusicStream(state->engine);
     }
 #if NEON_RIFT_HAPTICS_ENABLED
-    mosaico_native_feedback_init();
+    raylib_lite_native_feedback_init();
 #endif
 }
 
@@ -216,10 +216,10 @@ static void select_course(neon_rift_rally_module_t *state, int direction)
     state->course_id = (uint8_t)course;
     state->best_lap_ticks = 0;
     state->best_race_ticks = 0;
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     if (state->save_ready) {
         neon_rift_rally_record_t record = {0};
-        if (mosaico_save_load(&state->save, &record, NULL) == ESP_OK) {
+        if (raylib_lite_save_load(&state->save, &record, NULL) == RAYLIB_LITE_OK) {
             state->best_lap_ticks = record.best_lap_ticks[course];
             state->best_race_ticks = record.best_race_ticks[course];
         }
@@ -253,12 +253,12 @@ static const char *start_hint(const rally_game_t *game)
             (game->countdown_ticks > 30U ? "hold_drift" : "nitro_go"));
 }
 
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 static esp_err_t migrate_record(uint16_t old_version, const void *old_data,
                                 size_t old_size, void *new_data, size_t new_size)
 {
     if (!new_data || new_size < sizeof(neon_rift_rally_record_t))
-        return ESP_ERR_INVALID_ARG;
+        return RAYLIB_LITE_INVALID_ARGUMENT;
     memset(new_data, 0, new_size);
     if (old_version == 1U && old_data && old_size >= sizeof(neon_rift_rally_record_v1_t)) {
         const neon_rift_rally_record_v1_t *old = old_data;
@@ -266,7 +266,7 @@ static esp_err_t migrate_record(uint16_t old_version, const void *old_data,
         record->best_lap_ticks[0] = old->best_lap_ticks;
         record->best_race_ticks[0] = old->best_race_ticks;
     }
-    return ESP_OK;
+    return RAYLIB_LITE_OK;
 }
 
 static uint64_t save_now_ms(void)
@@ -276,18 +276,19 @@ static uint64_t save_now_ms(void)
 
 static void load_record(neon_rift_rally_module_t *state)
 {
-    mosaico_save_config_t config = {
-        .nvs_namespace = "neon_rift_rally",
+    raylib_lite_save_config_t config = {
+        .storage = raylib_lite_save_nvs_storage(),
+        .storage_namespace = "neon_rift_rally",
         .key = "record",
         .version = 2,
         .payload_size = sizeof(neon_rift_rally_record_t),
         .debounce_ms = 750,
         .migrate = migrate_record,
     };
-    state->save_ready = mosaico_save_init(&state->save, &config) == ESP_OK;
+    state->save_ready = raylib_lite_save_init(&state->save, &config) == RAYLIB_LITE_OK;
     if (!state->save_ready) return;
     neon_rift_rally_record_t record = {0};
-    if (mosaico_save_load(&state->save, &record, NULL) == ESP_OK) {
+    if (raylib_lite_save_load(&state->save, &record, NULL) == RAYLIB_LITE_OK) {
         state->best_lap_ticks = record.best_lap_ticks[state->course_id];
         state->best_race_ticks = record.best_race_ticks[state->course_id];
     }
@@ -299,12 +300,12 @@ static void save_record(neon_rift_rally_module_t *state, bool force)
     neon_rift_rally_record_t record = {
         {0}, {0}
     };
-    if (mosaico_save_load(&state->save, &record, NULL) != ESP_OK)
+    if (raylib_lite_save_load(&state->save, &record, NULL) != RAYLIB_LITE_OK)
         memset(&record, 0, sizeof(record));
     record.best_lap_ticks[state->course_id] = state->best_lap_ticks;
     record.best_race_ticks[state->course_id] = state->best_race_ticks;
-    (void)mosaico_save_request(&state->save, &record, save_now_ms());
-    (void)mosaico_save_flush(&state->save, save_now_ms(), force);
+    (void)raylib_lite_save_request(&state->save, &record, save_now_ms());
+    (void)raylib_lite_save_flush(&state->save, save_now_ms(), force);
 }
 #endif
 
@@ -326,17 +327,17 @@ static int initialize(void *value, const char *asset_root)
 {
     neon_rift_rally_module_t *state = value;
     reset_run(state);
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     load_record(state);
     feedback_init(state);
 #endif
-#if !defined(MOSAICO_GAME_NATIVE)
-    mosaico_host_assets_set_root(asset_root);
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
+    raylib_lite_host_assets_set_root(asset_root);
     InitWindow(480, 480, "Neon Rift Rally");
     SetTargetFPS(30);
 #endif
-    state->rally_art = LoadMosaicoAtlas("rally.atlas");
-    state->track_background = LoadMosaicoAtlas("track_background.atlas");
+    state->rally_art = raylib_lite_atlas_load("rally.atlas");
+    state->track_background = raylib_lite_atlas_load("track_background.atlas");
     return state->rally_art.texture.id && state->track_background.texture.id ? 0 : -1;
 }
 
@@ -344,12 +345,12 @@ static void shutdown(void *value)
 {
     neon_rift_rally_module_t *state = value;
     if (state) {
-        UnloadMosaicoAtlas(state->rally_art);
-        UnloadMosaicoAtlas(state->track_background);
+        raylib_lite_atlas_unload(state->rally_art);
+        raylib_lite_atlas_unload(state->track_background);
     }
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 #if NEON_RIFT_HAPTICS_ENABLED
-    mosaico_native_feedback_stop();
+    raylib_lite_native_feedback_stop();
 #endif
     if (state && IsAudioDeviceReady()) {
         StopMusicStream(state->engine);
@@ -364,21 +365,21 @@ static void shutdown(void *value)
 #endif
 }
 
-static void input(void *value, const mosaico_host_input_v1_t *event)
+static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     neon_rift_rally_module_t *state = value;
     if (!state || !event) return;
 
-    if (event->type == MOSAICO_HOST_INPUT_CONTROL) {
-        if (event->code == MOSAICO_HOST_CONTROL_PAUSE) state->paused = true;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESUME) state->paused = false;
-        else if (event->code == MOSAICO_HOST_CONTROL_RESET) {
+    if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
+        if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) state->paused = true;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESUME) state->paused = false;
+        else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESET) {
             reset_run(state);
         }
         return;
     }
 
-    if (event->type == MOSAICO_HOST_INPUT_ACTION) {
+    if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION) {
         /* Stable action map shared with browser replays:
            0 left, 1 right, 2 throttle, 3 pause, 4 restart,
            5 brake, 6 nitro, 7 drift. */
@@ -399,7 +400,7 @@ static void input(void *value, const mosaico_host_input_v1_t *event)
         return;
     }
 
-    if (event->type != MOSAICO_HOST_INPUT_POINTER) return;
+    if (event->type != RAYLIB_LITE_GAME_INPUT_POINTER) return;
     if (event->pressed && state->game.phase == RALLY_PHASE_COUNTDOWN &&
         event->y < 100) {
         if (event->x < 160) select_course(state, -1);
@@ -445,7 +446,7 @@ static void update(void *value)
         steer = (state->steer_right ? 1.0f : 0.0f) -
                 (state->steer_left ? 1.0f : 0.0f);
     bool drive_throttle = state->throttle || state->touch_throttle;
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     /* Touch-first kart controls: native play auto-accelerates so one finger
        steers and the second can boost. Host/replay controls remain explicit. */
     drive_throttle = true;
@@ -464,11 +465,11 @@ static void update(void *value)
         if ((state->game.event_flags & RALLY_EVENT_FINISH) &&
             (!state->best_race_ticks || state->game.tick < state->best_race_ticks))
             state->best_race_ticks = state->game.tick;
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
         save_record(state, (state->game.event_flags & RALLY_EVENT_FINISH) != 0);
 #endif
     }
-#if defined(MOSAICO_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     feedback_events(state);
     UpdateMusicStream(state->engine);
 #endif
@@ -522,9 +523,9 @@ static int state_json(const void *value, char *output, size_t capacity)
         (unsigned long)rally_state_hash(game));
 }
 
-static const mosaico_game_module_v1_t s_module = {
+static const raylib_lite_game_module_v1_t s_module = {
     .descriptor = {
-        MOSAICO_HOST_GAME_ABI_V1, "neon_rift_rally", "Neon Rift Rally",
+        RAYLIB_LITE_GAME_MODULE_ABI, "neon_rift_rally", "Neon Rift Rally",
         480, 480, 30, 2
     },
     .state_size = sizeof(neon_rift_rally_module_t),
@@ -537,7 +538,7 @@ static const mosaico_game_module_v1_t s_module = {
     .state_json = state_json,
 };
 
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void)
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {
     return &s_module;
 }

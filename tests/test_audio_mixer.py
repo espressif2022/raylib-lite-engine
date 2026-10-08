@@ -15,8 +15,8 @@ class AudioMixerTests(unittest.TestCase):
             executable = Path(directory) / ("audio_mixer_test.exe" if os.name == "nt" else "audio_mixer_test")
             compiler = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
             self.assertIsNotNone(compiler, "a C compiler is required")
-            audio = ENGINE / "components/mosaico_game_audio"
-            platform = ENGINE / "components/raylib_lite_platform/include"
+            audio = ENGINE / "src/audio"
+            platform = ENGINE / "include/raylib_lite"
             subprocess.run([
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
                 f"-I{audio / 'include'}", f"-I{audio}", f"-I{platform}",

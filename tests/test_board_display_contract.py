@@ -4,10 +4,11 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-BOARD = ROOT / "ports" / "esp_mosaico" / "mosaico_board_platform"
-SOURCE = BOARD / "mosaico_board_platform.c"
+BOARD = ROOT / "examples" / "boards" / "esp-mosaico"
+SOURCE = BOARD / "board.c"
 STRIP = BOARD / "mosaico_strip_present.c"
-HEADER = BOARD / "include" / "mosaico_board_platform.h"
+HEADER = (ROOT / "examples" / "common_components" / "examples_common" /
+          "include" / "raylib_lite_example_board.h")
 
 
 class BoardDisplayContractTest(unittest.TestCase):
@@ -47,7 +48,7 @@ class BoardDisplayContractTest(unittest.TestCase):
         self.assertNotIn("esp_gsp", self.source)
         self.assertNotIn("mosaico_full_present", self.source)
 
-    def test_latest_snapshot_is_coherent_for_iris_mirror(self):
+    def test_latest_snapshot_is_coherent(self):
         self.assertIn(".copy_latest = strip_copy_latest", self.strip)
         self.assertIn("memcpy(out_pixels, video->frames[video->latest]", self.strip)
         self.assertIn("video->states[index] = FRAME_LATEST", self.strip)

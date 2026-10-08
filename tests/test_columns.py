@@ -27,14 +27,18 @@ class ColumnTests(unittest.TestCase):
             (temp / 'test_row.wall').write_bytes(
                 struct.pack('<4sHHHHII', b'MSW2', 8, 8, 0, 16, 256, 64) +
                 light_lut + row_indices)
-            source = os.environ.get('M2D_TEST_SOURCE', str(ROOT / 'components/mosaico_game_2d/mosaico_game_2d.c'))
+            source = os.environ.get('M2D_TEST_SOURCE', str(ROOT / 'src/renderer/raylib_lite_renderer.c'))
             command = [os.environ.get('CC', 'cc'), '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror']
             command += shlex.split(os.environ.get('CFLAGS', ''))
             command += [str(ROOT / 'tests/test_columns.c'), str(ROOT / 'host/host_asset_runtime.c'), source]
-            rgb565 = ROOT / 'components/mosaico_game_2d/mosaico_rgb565.c'
+            current = ROOT / 'src/renderer/raylib_lite_renderer.c'
+            if Path(source).resolve() == current.resolve():
+                command.append(str(ROOT / 'src/renderer/raylib_lite_renderer_raylib.c'))
+            rgb565 = ROOT / 'src/renderer/raylib_lite_rgb565.c'
             if Path(source).resolve() != rgb565.resolve():
                 command.append(str(rgb565))
-            for include in ['host/include', 'host', 'components/mosaico_game_assets/include', 'components/mosaico_game_2d/include']:
+            for include in ['host/include', 'host', 'include/raylib_lite',
+                            'compat/raylib/include']:
                 command += ['-I', str(ROOT / include)]
             command += ['-lm', '-o', str(temp / 'columns')]
             subprocess.run(command, check=True)

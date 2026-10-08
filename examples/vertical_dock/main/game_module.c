@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "raylib_lite_game_module_contract.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "mosaico_game_module.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #if defined(MOSAICO_GAME_ELF)
-#include "mosaico_runtime_v1.h"
 #endif
 
 #define VD_W 480
@@ -29,9 +28,9 @@
 #define VD_ENEMIES 5
 #define VD_PI 3.14159265f
 #if defined(MOSAICO_GAME_ELF)
-#define VD_ABI MOSAICO_HOST_GAME_ABI
+#define VD_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #else
-#define VD_ABI MOSAICO_HOST_GAME_ABI_V1
+#define VD_ABI RAYLIB_LITE_GAME_MODULE_ABI
 #endif
 
 typedef struct { float x,y,z; } vd_vec3_t;
@@ -524,27 +523,27 @@ static int initialize(void *value
 #endif
     vd_module_t *s=value;reset_game(&s->game);s->game.camera_y=1.55f;
     s->pointer_id=s->look_id=-1;
-#if !defined(MOSAICO_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(480,480,"Vertical Dock");SetTargetFPS(30);
 #endif
     return 0;
 }
 static void shutdown(void *value){(void)value;}
-static void input(void *value,const mosaico_host_input_v1_t *e)
+static void input(void *value,const raylib_lite_game_input_v1_t *e)
 {
     vd_module_t *s=value;if(!s||!e)return;
-    if(e->type==MOSAICO_HOST_INPUT_CONTROL){
-        if(e->code==MOSAICO_HOST_CONTROL_RESET)reset_game(&s->game);
-        else if(e->code==MOSAICO_HOST_CONTROL_PAUSE)s->game.paused=true;
-        else if(e->code==MOSAICO_HOST_CONTROL_RESUME)s->game.paused=false;
+    if(e->type==RAYLIB_LITE_GAME_INPUT_CONTROL){
+        if(e->code==RAYLIB_LITE_GAME_CONTROL_RESET)reset_game(&s->game);
+        else if(e->code==RAYLIB_LITE_GAME_CONTROL_PAUSE)s->game.paused=true;
+        else if(e->code==RAYLIB_LITE_GAME_CONTROL_RESUME)s->game.paused=false;
         return;
     }
-    if(e->type==MOSAICO_HOST_INPUT_ACTION){
+    if(e->type==RAYLIB_LITE_GAME_INPUT_ACTION){
         if(e->code==0)s->left=e->pressed;else if(e->code==1)s->right=e->pressed;
         else if(e->code==2)s->forward=e->pressed;else if(e->code==5)s->back=e->pressed;
         else if(e->code==8)s->strafe_left=e->pressed;else if(e->code==9)s->strafe_right=e->pressed;
         else if(e->code==6){if(e->pressed&&!s->fire)s->fire_edge=true;s->fire=e->pressed;}
-    }else if(e->type==MOSAICO_HOST_INPUT_POINTER){
+    }else if(e->type==RAYLIB_LITE_GAME_INPUT_POINTER){
         if(!e->pressed){if(e->track_id==s->pointer_id)s->pointer_id=-1;if(e->track_id==s->look_id)s->look_id=-1;}
         else if(e->track_id==s->pointer_id){s->game.strafe=clampf((e->x-s->start_x)/60.0f,-1,1);s->game.move=clampf((s->start_y-e->y)/60.0f,-1,1);}
         else if(e->track_id==s->look_id){s->game.yaw+=(e->x-s->last_x)*.008f;s->game.pitch=clampf(s->game.pitch-(e->y-s->last_y)*.005f,-.35f,.35f);s->last_x=e->x;s->last_y=e->y;}
@@ -573,17 +572,17 @@ static int state_json(const void *value,char *out,size_t cap)
         g->power?"true":"false",g->terminal?"true":"false",g->shots,g->hits,s_face_count,s_faces_dropped,
         (unsigned long)state_hash(value));
 }
-static const mosaico_game_module_v1_t s_module={
+static const raylib_lite_game_module_v1_t s_module={
     .descriptor={VD_ABI,"vertical_dock","Night Shift: Dock 17",480,480,30,2},
     .state_size=sizeof(vd_module_t),.initialize=initialize,.shutdown=shutdown,
     .input=input,.update=update,.render=render,.state_hash=state_hash,.state_json=state_json};
 #if defined(MOSAICO_GAME_ELF)
-MOSAICO_GAME_MODULE_EXPORT const mosaico_game_module_v1_t *
-mosaico_game_module_v1(const mosaico_runtime_v1_t *runtime)
+RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
+raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
 {
-    g_mosaico_rt=runtime;
+    raylib_lite_product_runtime=runtime;
     return &s_module;
 }
 #else
-const mosaico_game_module_v1_t *mosaico_game_module_v1(void){return &s_module;}
+const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void){return &s_module;}
 #endif

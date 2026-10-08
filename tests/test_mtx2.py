@@ -38,7 +38,7 @@ def palette565(c0: int, c1: int) -> tuple[list[int], bool]:
 
 
 def shade565(pixel: int, light: int) -> int:
-    """Mirror of mosaico_shade565 for the LUT-aligned light levels used here."""
+    """Mirror of raylib_lite_rgb565_shade_pixel for the LUT-aligned light levels used here."""
     if light >= 256:
         return pixel
     r, g, b = (pixel >> 11) & 31, (pixel >> 5) & 63, pixel & 31
@@ -111,10 +111,10 @@ class Mtx2Tests(unittest.TestCase):
             command += shlex.split(os.environ.get("CFLAGS", ""))
             command += [
                 str(ROOT / "tests/test_mtx2.c"),
-                str(ROOT / "components/mosaico_game_2d/mosaico_mtx2.c"),
-                str(ROOT / "components/mosaico_game_2d/mosaico_rgb565.c"),
+                str(ROOT / "src/renderer/raylib_lite_mtx2.c"),
+                str(ROOT / "src/renderer/raylib_lite_rgb565.c"),
             ]
-            command += ["-I", str(ROOT / "components/mosaico_game_2d/include")]
+            command += ["-I", str(ROOT / "include/raylib_lite")]
             command += ["-lm", "-o", str(binary)]
             subprocess.run(command, check=True)
             subprocess.run([str(binary), str(temp), str(BLOCK_W)], check=True)

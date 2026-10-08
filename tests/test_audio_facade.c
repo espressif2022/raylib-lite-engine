@@ -2,8 +2,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include "mosaico_game_audio.h"
-#include "mosaico_game_assets.h"
+#include "raylib_lite_raylib_audio.h"
+#include "raylib_lite_assets.h"
 #include "platform_esp_audio.h"
 
 struct platform_esp_audio_service { bool ready; };
@@ -11,12 +11,20 @@ static struct platform_esp_audio_service fake_service;
 static platform_esp_audio_pull_fn fake_pull;
 static void *fake_pull_context;
 static uint8_t sound_file[24];
+static unsigned asset_releases;
 
-esp_err_t mosaico_game_asset_open(const char *name, mosaico_asset_view_t *out)
+raylib_lite_result_t raylib_lite_asset_open(const char *name, raylib_lite_asset_view_t *out)
 {
     (void)name;
-    *out = (mosaico_asset_view_t){.data = sound_file, .size = sizeof(sound_file)};
-    return ESP_OK;
+    *out = (raylib_lite_asset_view_t){.data = sound_file, .size = sizeof(sound_file)};
+    return RAYLIB_LITE_OK;
+}
+
+void raylib_lite_asset_release(raylib_lite_asset_view_t *view)
+{
+    assert(view && view->data == sound_file);
+    ++asset_releases;
+    view->data = NULL;
 }
 
 raylib_lite_result_t platform_esp_audio_service_create(
@@ -75,7 +83,7 @@ int main(void)
     put32(sound_file + 16, 0);
     put16(sound_file + 20, 1000);
     put16(sound_file + 22, 2000);
-    MosaicoAudioInit();
+    raylib_lite_game_audio_init();
     assert(IsAudioDeviceReady());
     Sound old = LoadSound("one");
     Sound stale = old;
@@ -88,7 +96,43 @@ int main(void)
     PlaySound(current);
     assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
     assert(output[0] == 1000 && output[1] == 2000);
+
+    Music first = LoadMusicStream("music-a");
+    Music second = LoadMusicStream("music-b");
+    assert(first.frameCount == 2 && second.frameCount == 2);
+    /* Raylib SetMusicVolume must retain independent values before playback. */
+    SetMusicVolume(first, 0.5f);
+    SetMusicVolume(second, 1.0f);
+    PlayMusicStream(first);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 500 && output[1] == 1000);
+
+    PlayMusicStream(second);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 1000 && output[1] == 2000);
+    StopMusicStream(first);
+    SetMusicVolume(first, 0.0f);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 1000 && output[1] == 2000);
+
+    /* An unloaded or forged ticket may not stop or mute current playback. */
+    UnloadMusicStream(first);
+    StopMusicStream(first);
+    SetMusicVolume(first, 0.0f);
+    Music bogus = {.ctxData = (void *)(uintptr_t)0x1234};
+    StopMusicStream(bogus);
+    SetMusicVolume(bogus, 0.0f);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 1000 && output[1] == 2000);
+
+    SetMusicVolume(second, 0.25f);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 250 && output[1] == 500);
+    StopMusicStream(second);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(output[0] == 0 && output[1] == 0);
     CloseAudioDevice();
+    assert(asset_releases == 4);
     puts("audio facade: ok");
     return 0;
 }

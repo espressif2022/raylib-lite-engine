@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include <stdint.h>
-#include "mosaico_game_2d.h"
+#include "raylib_lite_2d.h"
 #include "last_zone_game.h"
 
 typedef struct {
@@ -19,8 +19,8 @@ typedef struct {
     uint16_t refined_columns;
 } last_zone_view_stats_t;
 
-void last_zone_view_render(const last_zone_game_t *game,MosaicoAtlas enemies,
-                           MosaicoAtlas weapon,MosaicoAtlas environment,
-                           MosaicoAtlas floor,MosaicoWallAtlas walls,MosaicoAtlas controls,
-                           MosaicoAtlas props);
+void last_zone_view_render(const last_zone_game_t *game,raylib_lite_atlas_t enemies,
+                           raylib_lite_atlas_t weapon,raylib_lite_atlas_t environment,
+                           raylib_lite_atlas_t floor,raylib_lite_wall_atlas_t walls,raylib_lite_atlas_t controls,
+                           raylib_lite_atlas_t props);
 void last_zone_view_get_stats(last_zone_view_stats_t *stats);

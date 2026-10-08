@@ -162,7 +162,7 @@ class GenericHostRuntime:
         suffix = ".dll" if os.name == "nt" else ".so"
         library = directory / f"host_game_{generation}{suffix}"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if manifest.get("schema") != "mosaico-game-sim/v1":
+        if manifest.get("schema") != "raylib-lite-game-sim/v1":
             raise RuntimeError(f"unsupported simulator manifest: {manifest_path}")
         project_sources = []
         for value in manifest.get("sources", []):
@@ -181,27 +181,24 @@ class GenericHostRuntime:
             ENGINE_ROOT / "host/host_module_bridge.c",
             ENGINE_ROOT / "host/host_video_backend.c",
             ENGINE_ROOT / "host/host_clock.c",
-            ENGINE_ROOT / "components/mosaico_raylib_port/mosaico_raylib_port.c",
+            ENGINE_ROOT / "src/runtime/raylib_lite_raylib_port.c",
             ENGINE_ROOT / "host/host_asset_runtime.c",
-            ENGINE_ROOT / "components/mosaico_game_2d/mosaico_game_2d.c",
-            ENGINE_ROOT / "components/mosaico_game_2d/mosaico_rgb565.c",
-            ENGINE_ROOT / "components/mosaico_raylib_fast/mosaico_raylib_fast.c",
-            ENGINE_ROOT / "components/mosaico_game_fx/mosaico_game_fx.c",
-            ENGINE_ROOT / "components/mosaico_game_tilemap/mosaico_game_tilemap.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_renderer.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_renderer_raylib.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_rgb565.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_raylib_impl.c",
+            ENGINE_ROOT / "src/fx/raylib_lite_fx.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_tilemap.c",
         ]
         includes = [ENGINE_ROOT / "host/include", ENGINE_ROOT / "host",
-                    ENGINE_ROOT / "components/mosaico_raylib_port/include",
-                    ENGINE_ROOT / "components/raylib_lite_platform/include",
-                    ENGINE_ROOT / "components/mosaico_game_assets/include",
-                    ENGINE_ROOT / "components/mosaico_game_2d/include",
-                    ENGINE_ROOT / "components/mosaico_raylib_fast/include",
-                    ENGINE_ROOT / "components/mosaico_game_fx/include",
-                    ENGINE_ROOT / "components/mosaico_game_tilemap/include",
+                    ENGINE_ROOT / "examples/common_components/examples_common/include",
+                    ENGINE_ROOT / "include/raylib_lite",
+                    ENGINE_ROOT / "compat/raylib/include",
                     project / "main", project / "assets/generated",
                     project / "managed_components/georgik__raylib/include",
                     project / "managed_components/georgik__raylib/raylib/src"]
         command = [_host_compiler(), "-shared", "-O3", "-funroll-loops", "-std=c11", "-Wall",
-                   "-Wextra", "-Werror", "-DMOSAICO_HOST_SIMULATION=1",
+                   "-Wextra", "-Werror", "-DRAYLIB_LITE_HOST_SIMULATION=1",
                    *(str(path) for path in sources)]
         if os.name != "nt":
             command.insert(2, "-fPIC")
@@ -214,24 +211,24 @@ class GenericHostRuntime:
                 (compiled.stdout or "") + (compiled.stderr or "")
             )
         self.api = ctypes.CDLL(str(library))
-        self.api.mosaico_host_game_v1.restype = ctypes.POINTER(HostGameDescriptor)
-        descriptor = self.api.mosaico_host_game_v1().contents
+        self.api.raylib_lite_host_game_v1.restype = ctypes.POINTER(HostGameDescriptor)
+        descriptor = self.api.raylib_lite_host_game_v1().contents
         if descriptor.abi_version != 1:
             raise RuntimeError(f"unsupported host game ABI {descriptor.abi_version}")
         self.descriptor = descriptor
-        self.api.mosaico_host_game_create_v1.argtypes = [ctypes.c_char_p]
-        self.api.mosaico_host_game_create_v1.restype = ctypes.c_void_p
-        self.api.mosaico_host_game_destroy_v1.argtypes = [ctypes.c_void_p]
-        self.api.mosaico_host_game_input_v1.argtypes = [ctypes.c_void_p,
+        self.api.raylib_lite_host_game_create_v1.argtypes = [ctypes.c_char_p]
+        self.api.raylib_lite_host_game_create_v1.restype = ctypes.c_void_p
+        self.api.raylib_lite_host_game_destroy_v1.argtypes = [ctypes.c_void_p]
+        self.api.raylib_lite_host_game_input_v1.argtypes = [ctypes.c_void_p,
                                                         ctypes.POINTER(HostGameInput)]
-        self.api.mosaico_host_game_update_v1.argtypes = [ctypes.c_void_p]
-        self.api.mosaico_host_game_render_rgb565_v1.argtypes = [ctypes.c_void_p,
+        self.api.raylib_lite_host_game_update_v1.argtypes = [ctypes.c_void_p]
+        self.api.raylib_lite_host_game_render_rgb565_v1.argtypes = [ctypes.c_void_p,
             ctypes.POINTER(ctypes.c_uint16), ctypes.c_size_t]
-        self.api.mosaico_host_game_state_json_v1.argtypes = [ctypes.c_void_p,
+        self.api.raylib_lite_host_game_state_json_v1.argtypes = [ctypes.c_void_p,
             ctypes.c_char_p, ctypes.c_size_t]
-        self.api.mosaico_game_2d_get_raster_stats.argtypes = [ctypes.POINTER(RasterStats)]
-        self.api.mosaico_game_2d_reset_raster_stats.argtypes = []
-        self.context = self.api.mosaico_host_game_create_v1(
+        self.api.raylib_lite_renderer_get_raster_stats.argtypes = [ctypes.POINTER(RasterStats)]
+        self.api.raylib_lite_renderer_reset_raster_stats.argtypes = []
+        self.context = self.api.raylib_lite_host_game_create_v1(
             str(project / "assets/generated").encode())
         if not self.context: raise RuntimeError("host adapter create failed")
         self.framebuffer = (ctypes.c_uint16 * (descriptor.width * descriptor.height))()
@@ -241,12 +238,12 @@ class GenericHostRuntime:
         self.encode_ns = 0
         self.last_render_ns = 0
         self.last_encode_ns = 0
-        self.api.mosaico_game_2d_reset_raster_stats()
+        self.api.raylib_lite_renderer_reset_raster_stats()
         self.lock = threading.Lock()
 
     def close(self) -> None:
         if self.context:
-            self.api.mosaico_host_game_destroy_v1(self.context)
+            self.api.raylib_lite_host_game_destroy_v1(self.context)
             self.context = None
         if os.name == "nt" and self.api is not None:
             handle = self.api._handle
@@ -259,7 +256,7 @@ class GenericHostRuntime:
                value_z: float = 0) -> None:
         value = HostGameInput(kind, code, x, y, track_id, pressed,
                               value_x, value_y, value_z)
-        self.api.mosaico_host_game_input_v1(self.context, ctypes.byref(value))
+        self.api.raylib_lite_host_game_input_v1(self.context, ctypes.byref(value))
 
     def step(self, left: bool, right: bool, jump: bool,
              restart: bool = False, pause: bool = False) -> None:
@@ -267,7 +264,7 @@ class GenericHostRuntime:
             self._input(1, code, pressed)
         if restart: self._input(1, 4)
         if pause: self._input(1, 3)
-        self.api.mosaico_host_game_update_v1(self.context); self.frames += 1
+        self.api.raylib_lite_host_game_update_v1(self.context); self.frames += 1
 
     def control(self, code: int) -> None: self._input(3, code)
     def action(self, code: int, pressed: bool) -> None:
@@ -278,11 +275,11 @@ class GenericHostRuntime:
         self._input(4, 0, True, value_x=x, value_y=y, value_z=z)
     def metadata(self) -> dict[str, object]:
         output = ctypes.create_string_buffer(2048)
-        if self.api.mosaico_host_game_state_json_v1(self.context, output, len(output)) < 0:
+        if self.api.raylib_lite_host_game_state_json_v1(self.context, output, len(output)) < 0:
             return {"error": "state unavailable"}
         value = json.loads(output.value)
         raster = RasterStats()
-        self.api.mosaico_game_2d_get_raster_stats(ctypes.byref(raster))
+        self.api.raylib_lite_renderer_get_raster_stats(ctypes.byref(raster))
         value.update({"frames": self.frames, "abi": 1,
                       "game_id": self.descriptor.game_id.decode(),
                       "title": self.descriptor.title.decode(),
@@ -299,7 +296,7 @@ class GenericHostRuntime:
         return value
     def snapshot_rgb565(self) -> tuple[bytes, int, int]:
         started = time.perf_counter_ns()
-        status = self.api.mosaico_host_game_render_rgb565_v1(
+        status = self.api.raylib_lite_host_game_render_rgb565_v1(
             self.context, self.framebuffer, self.descriptor.width)
         if status: raise RuntimeError(f"host render failed: {status}")
         rendered = time.perf_counter_ns()

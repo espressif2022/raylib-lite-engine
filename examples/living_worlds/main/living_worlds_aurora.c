@@ -6,7 +6,7 @@
 #ifndef LIVING_WORLDS_SCENE_SIM_ONLY
 #include "aurora_depth.h"
 #include "aurora_ice_volume.h"
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "living_worlds_aurora_draw.h"
 #include "living_worlds_volume.h"
 #endif
@@ -221,7 +221,7 @@ static bool aurora_project_depth(const living_camera_t *camera,float u,float v,
 }
 
 static void draw_aurora_light_field(const living_aurora_t *aurora,
-                                    const living_camera_t *camera,MosaicoAtlas space)
+                                    const living_camera_t *camera,raylib_lite_atlas_t space)
 {
     if(!space.texture.id||!camera)return;
     const int n=AURORA_DEPTH_GRID;
@@ -281,18 +281,18 @@ static void draw_aurora_light_field(const living_aurora_t *aurora,
         for(int i=0;i<band_n[band];++i){
             int ix=band_ix[band][i],iy=band_iy[band][i];
             int a=iy*GW+ix,b=a+1,c=a+GW,d=c+1;
-            mosaico_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy],0.f};
-            mosaico_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+1],tv[iy],0.f};
-            mosaico_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+1],0.f};
-            mosaico_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+1],tv[iy+1],0.f};
-            Mosaico2DDrawTexturedQuad(space.texture,va,vb,vc,vd,256);
+            raylib_lite_textured_vertex_t va={mesh[a].x,mesh[a].y,tu[ix],tv[iy],0.f};
+            raylib_lite_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+1],tv[iy],0.f};
+            raylib_lite_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+1],0.f};
+            raylib_lite_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+1],tv[iy+1],0.f};
+            raylib_lite_2d_draw_textured_quad(space.texture,va,vb,vc,vd,256);
         }
     }
     (void)aurora;
 }
 
-static void draw_aurora_ice(const living_camera_t *camera,MosaicoAtlas front,MosaicoAtlas side,
-                            MosaicoAtlas rear)
+static void draw_aurora_ice(const living_camera_t *camera,raylib_lite_atlas_t front,raylib_lite_atlas_t side,
+                            raylib_lite_atlas_t rear)
 {
     float fw=(float)front.texture.width,fh=(float)front.texture.height;
     living_draw_volume(camera,AURORA_ICE_REAR_VERTICES,AURORA_ICE_REAR_VERTEX_COUNT,
@@ -316,9 +316,9 @@ static void aurora_dot(const living_camera_t *camera,float x,float y,float z,
 }
 
 void living_aurora_draw(const living_aurora_t *aurora,float yaw,float pitch,
-                            uint8_t effects_level,MosaicoAtlas space,
-                            MosaicoAtlas ice_front,MosaicoAtlas ice_side,
-                            MosaicoAtlas ice_rear)
+                            uint8_t effects_level,raylib_lite_atlas_t space,
+                            raylib_lite_atlas_t ice_front,raylib_lite_atlas_t ice_side,
+                            raylib_lite_atlas_t ice_rear)
 {
     aurora_clamp_cone(&yaw,&pitch);
     living_camera_t camera=living_camera_orbit(yaw,pitch,AURORA_FOCUS);

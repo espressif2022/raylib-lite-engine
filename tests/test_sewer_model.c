@@ -12,7 +12,7 @@ void PlaySound(Sound sound){assert(sound.frameCount);++plays;}
 void StopSound(Sound sound){assert(sound.frameCount);++stops;}
 void UnloadSound(Sound sound){assert(sound.frameCount);++unloads;}
 void CloseAudioDevice(void){++closes;}
-void UnloadMosaicoWallAtlas(MosaicoWallAtlas atlas){(void)atlas;}
+void raylib_lite_wall_atlas_unload(raylib_lite_wall_atlas_t atlas){(void)atlas;}
 
 static float distance(sl_vec3_t a,sl_vec3_t b)
 {sl_vec3_t d=vsub(a,b);return sqrtf(vdot(d,d));}
@@ -145,7 +145,7 @@ static void check_dispatches(void)
     for(int i=0;i<120;++i)update_game(&g);
     assert(!g.lure_ticks&&g.drone_x==x);use_lure(&g);assert(!g.lure_ticks);
     sl_module_t s={0};reset_dispatch(&s.game,0,0,0,true);clear_input(&s);
-    mosaico_host_input_v1_t e={.type=MOSAICO_HOST_INPUT_ACTION,.code=1,.pressed=true};
+    raylib_lite_game_input_v1_t e={.type=RAYLIB_LITE_GAME_INPUT_ACTION,.code=1,.pressed=true};
     input(&s,&e);input(&s,&e);assert(s.game.mission==1);
     e.code=6;input(&s,&e);assert(!s.game.briefing);
     s.game.pumping=true;s.game.water=0;s.game.west=true;update(&s);
@@ -190,7 +190,7 @@ static void check_notebook_and_salvage(void)
     sl_module_t s={0};reset_dispatch(&s.game,0,0,0,false);clear_input(&s);
     s.game.chart=true;s.game.logs=2;s.game.pumping=true;s.game.relay=true;update(&s);
     assert(s.learned==(1|4|16)&&s.game.knowledge==s.learned);
-    mosaico_host_input_v1_t key={.type=MOSAICO_HOST_INPUT_ACTION,.code=4,.pressed=true};
+    raylib_lite_game_input_v1_t key={.type=RAYLIB_LITE_GAME_INPUT_ACTION,.code=4,.pressed=true};
     input(&s,&key);input(&s,&key);assert(s.game.journal);
     uint32_t tick=s.game.tick;float water=s.game.water,drone=s.game.drone_x;
     s.game.lure_charge=true;use_lure(&s.game);assert(s.game.lure_charge);
@@ -205,10 +205,10 @@ static void check_notebook_and_salvage(void)
     reset_dispatch(&s.game,0,0,1,false);s.game.logs=2;
     s.game.x=tile_center(11);s.game.z=tile_center(11);interact(&s.game);
     assert(!s.game.action&&!s.game.salvaged&&s.game.signal==21);
-    mosaico_host_input_v1_t reset={.type=MOSAICO_HOST_INPUT_CONTROL,.code=MOSAICO_HOST_CONTROL_RESET};
+    raylib_lite_game_input_v1_t reset={.type=RAYLIB_LITE_GAME_INPUT_CONTROL,.code=RAYLIB_LITE_GAME_CONTROL_RESET};
     input(&s,&reset);update(&s);assert(s.game.knowledge==(1|4|16)&&!s.game.salvaged);
     s.game.briefing=false;
-    mosaico_host_input_v1_t tap={.type=MOSAICO_HOST_INPUT_POINTER,.track_id=9,.x=400,.y=220,.pressed=true};
+    raylib_lite_game_input_v1_t tap={.type=RAYLIB_LITE_GAME_INPUT_POINTER,.track_id=9,.x=400,.y=220,.pressed=true};
     input(&s,&tap);input(&s,&tap);assert(s.game.journal);
     tap.pressed=false;input(&s,&tap);tap.pressed=true;input(&s,&tap);assert(!s.game.journal);
     puts("notebook: pause, retained knowledge, one-shot salvage and touch/key edges ok");
@@ -278,9 +278,9 @@ static void check_expedition_records(void)
     clock.run_ticks=123;clock.game.failed=true;clock.fire_edge=true;update(&clock);
     assert(clock.game.elapsed==124&&clock.game.tick==11);
     clock.game.record=true;update(&clock);assert(clock.game.best_ticks==125);
-    mosaico_host_input_v1_t reset={.type=MOSAICO_HOST_INPUT_CONTROL,.code=MOSAICO_HOST_CONTROL_RESET};
+    raylib_lite_game_input_v1_t reset={.type=RAYLIB_LITE_GAME_INPUT_CONTROL,.code=RAYLIB_LITE_GAME_CONTROL_RESET};
     input(&clock,&reset);update(&clock);assert(clock.run_ticks==0&&clock.game.best_ticks==125);
-    mosaico_host_input_v1_t touch={.type=MOSAICO_HOST_INPUT_POINTER,.track_id=5,.pressed=true,.x=300,.y=430};
+    raylib_lite_game_input_v1_t touch={.type=RAYLIB_LITE_GAME_INPUT_POINTER,.track_id=5,.pressed=true,.x=300,.y=430};
     input(&clock,&touch);assert(clock.game.briefing); /* Progress board is not a departure button. */
     touch.pressed=false;input(&clock,&touch);
     clock.game.briefing=false;clock.game.escaped=true;
@@ -288,7 +288,7 @@ static void check_expedition_records(void)
     unsigned site=clock.game.site;input(&clock,&touch);assert(clock.game.briefing&&clock.game.site==site);
     touch.pressed=false;input(&clock,&touch);
     clock.game.briefing=false;clock.game.escaped=true;
-    mosaico_host_input_v1_t fire={.type=MOSAICO_HOST_INPUT_ACTION,.code=6,.pressed=true};
+    raylib_lite_game_input_v1_t fire={.type=RAYLIB_LITE_GAME_INPUT_ACTION,.code=6,.pressed=true};
     input(&clock,&fire);update(&clock);input(&clock,&fire);assert(clock.game.briefing);
     fire.pressed=false;input(&clock,&fire);fire.pressed=true;input(&clock,&fire);assert(!clock.game.briefing);
     puts("expedition records: all 18 outings, per-kit bests, retries and pause timing ok");
@@ -303,18 +303,18 @@ static void check_field_map(void)
     assert(!map_known(&s.game,10,13));
     s.game.x=tile_center(6);s.game.z=tile_center(10);update(&s);
     assert(s.surveyed[10]&(1u<<6));
-    mosaico_host_input_v1_t e={.type=MOSAICO_HOST_INPUT_CONTROL,.code=MOSAICO_HOST_CONTROL_RESET};
+    raylib_lite_game_input_v1_t e={.type=RAYLIB_LITE_GAME_INPUT_CONTROL,.code=RAYLIB_LITE_GAME_CONTROL_RESET};
     input(&s,&e);update(&s);
     assert(s.game.briefing&&map_known(&s.game,6,10)&&!map_known(&s.game,10,13));
     s.game.briefing=false;s.has_checkpoint=true;s.checkpoint=s.game;
     s.game.x=tile_center(11);s.game.z=tile_center(11);survey_local(&s);
     retry_checkpoint(&s);assert(map_known(&s.game,11,11));
-    e=(mosaico_host_input_v1_t){.type=MOSAICO_HOST_INPUT_ACTION,.code=4,.pressed=true};
+    e=(raylib_lite_game_input_v1_t){.type=RAYLIB_LITE_GAME_INPUT_ACTION,.code=4,.pressed=true};
     input(&s,&e);e.pressed=false;input(&s,&e);assert(s.game.journal);
     uint32_t tick=s.game.tick,elapsed=s.run_ticks;
     e.code=1;e.pressed=true;input(&s,&e);input(&s,&e);update(&s);
     assert(s.game.journal_page==1&&s.game.tick==tick&&s.run_ticks==elapsed&&!s.right);
-    e=(mosaico_host_input_v1_t){.type=MOSAICO_HOST_INPUT_POINTER,.track_id=91,.pressed=true,.x=310,.y=96};
+    e=(raylib_lite_game_input_v1_t){.type=RAYLIB_LITE_GAME_INPUT_POINTER,.track_id=91,.pressed=true,.x=310,.y=96};
     input(&s,&e);input(&s,&e);assert(s.game.journal&&s.game.journal_page==0);
     e.pressed=false;input(&s,&e);e.x=390;e.pressed=true;
     input(&s,&e);assert(s.game.journal&&s.game.journal_page==1);
@@ -430,14 +430,14 @@ int main(void)
     assert(!state.game.failed&&!state.game.record&&state.game.pumping);
     assert(nearby(&state.game,8,6,.1f)&&!state.forward);
     assert(state.game.sfx_seq>sequence);
-    mosaico_host_input_v1_t touch={.type=MOSAICO_HOST_INPUT_POINTER,.track_id=42,.pressed=true,.x=35,.y=415};
+    raylib_lite_game_input_v1_t touch={.type=RAYLIB_LITE_GAME_INPUT_POINTER,.track_id=42,.pressed=true,.x=35,.y=415};
     input(&state,&touch);input(&state,&touch);assert(state.touch_sneak);
     touch.pressed=false;input(&state,&touch);touch.pressed=true;
     input(&state,&touch);assert(!state.touch_sneak);
-    mosaico_host_input_v1_t pause={.type=MOSAICO_HOST_INPUT_CONTROL,.code=MOSAICO_HOST_CONTROL_PAUSE};
+    raylib_lite_game_input_v1_t pause={.type=RAYLIB_LITE_GAME_INPUT_CONTROL,.code=RAYLIB_LITE_GAME_CONTROL_PAUSE};
     unsigned old_plays=plays;input(&state,&pause);update(&state);assert(plays==old_plays);
     assert(stops>=SL_CUES-1);
-    pause.code=MOSAICO_HOST_CONTROL_RESET;input(&state,&pause);
+    pause.code=RAYLIB_LITE_GAME_CONTROL_RESET;input(&state,&pause);
     assert(!state.has_checkpoint&&!state.game.power&&!state.game.paused);
     assert(state.pointer_id==-1&&state.sneak_id==-1);
     shutdown(&state);assert(unloads==SL_CUES-1&&closes==1);

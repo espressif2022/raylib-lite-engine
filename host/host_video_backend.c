@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <string.h>
-#include "mosaico_raylib_port.h"
+#include "raylib_lite_raylib_port.h"
 #include "raylib_lite_video.h"
 
 typedef struct {
@@ -121,7 +121,7 @@ raylib_lite_result_t raylib_lite_host_video_set_target(
     bool reconfigure = !s_host.initialized || s_host.width != width ||
         s_host.height != height || s_host.stride_pixels != stride_pixels;
     if (reconfigure && s_host.initialized) {
-        mosaico_raylib_port_deinit();
+        raylib_lite_raylib_port_deinit();
         s_host.initialized = false;
     }
     s_host.pixels = pixels;
@@ -131,7 +131,7 @@ raylib_lite_result_t raylib_lite_host_video_set_target(
     if (!s_host.initialized) {
         raylib_lite_video_backend_t backend = host_backend();
         raylib_lite_result_t result =
-            mosaico_raylib_port_init_backend(&backend);
+            raylib_lite_raylib_port_init_backend(&backend);
         if (result != RAYLIB_LITE_OK) {
             s_host.pixels = NULL;
             return result;
@@ -143,12 +143,12 @@ raylib_lite_result_t raylib_lite_host_video_set_target(
 
 void raylib_lite_host_video_clear_target(void)
 {
-    if (s_host.initialized) mosaico_raylib_port_discard_frame();
+    if (s_host.initialized) raylib_lite_raylib_port_discard_frame();
     s_host.pixels = NULL;
 }
 
 void raylib_lite_host_video_shutdown(void)
 {
-    if (s_host.initialized) mosaico_raylib_port_deinit();
+    if (s_host.initialized) raylib_lite_raylib_port_deinit();
     memset(&s_host, 0, sizeof(s_host));
 }

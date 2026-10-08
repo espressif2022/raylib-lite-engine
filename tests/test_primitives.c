@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "mosaico_raylib_fast.h"
+#include "raylib_lite_raylib.h"
 #include "raylib_lite_host_video.h"
 
 #define W 480
@@ -38,8 +38,8 @@ int main(void)
            RAYLIB_LITE_OK);
     InitWindow(W,W,"primitive regression");
     BeginDrawing();
-    assert(MosaicoFastGetLastAcquireResult() == RAYLIB_LITE_OK);
-    assert(MosaicoFastGetLastPresentResult() == RAYLIB_LITE_NOT_READY);
+    assert(raylib_lite_raylib_get_last_acquire_result() == RAYLIB_LITE_OK);
+    assert(raylib_lite_raylib_get_last_present_result() == RAYLIB_LITE_NOT_READY);
     for (int kind=0;kind<4;++kind) for (int trial=0;trial<256;++trial) {
         for (int i=0;i<STRIDE*W;++i) pixels[i]=reference[i]=(uint16_t)(i*997U+trial);
         int cx=(trial*37)%600-60,cy=(trial*53)%600-60,r=trial%101;
@@ -72,8 +72,8 @@ int main(void)
                (double)(clock()-start)*1000/CLOCKS_PER_SEC/500);
     }
     EndDrawing();
-    assert(MosaicoFastGetLastPresentResult() == RAYLIB_LITE_OK);
-    assert(fabs(MosaicoFastGetTime() - 1.0 / 30.0) < 0.000001);
+    assert(raylib_lite_raylib_get_last_present_result() == RAYLIB_LITE_OK);
+    assert(fabs(raylib_lite_raylib_get_time() - 1.0 / 30.0) < 0.000001);
     raylib_lite_host_video_clear_target();
     raylib_lite_host_video_shutdown();
     return 0;

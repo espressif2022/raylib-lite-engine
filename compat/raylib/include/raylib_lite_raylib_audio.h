@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: Apache-2.0
+#pragma once
+
+#include <raylib_lite_game_audio.h>
+
+#define InitAudioDevice raylib_lite_game_audio_init
+#define CloseAudioDevice raylib_lite_game_audio_close
+#define IsAudioDeviceReady raylib_lite_game_audio_ready
+#define LoadSound raylib_lite_game_audio_load_sound
+#define UnloadSound raylib_lite_game_audio_unload_sound
+#define PlaySound raylib_lite_game_audio_play_sound
+#define StopSound raylib_lite_game_audio_stop_sound
+#define IsSoundPlaying raylib_lite_game_audio_is_sound_playing
+#define SetSoundVolume raylib_lite_game_audio_set_sound_volume
+#define LoadMusicStream raylib_lite_game_audio_load_music
+#define UnloadMusicStream raylib_lite_game_audio_unload_music
+#define PlayMusicStream raylib_lite_game_audio_play_music
+#define UpdateMusicStream raylib_lite_game_audio_update_music
+#define StopMusicStream raylib_lite_game_audio_stop_music
+#define SetMusicVolume raylib_lite_game_audio_set_music_volume

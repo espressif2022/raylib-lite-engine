@@ -2,7 +2,7 @@
 /* Synchronous full-frame preview: one DMA strip in flight, buffer reuse only
  * after on_color_trans_done. Deliberately independent of game frame queues. */
 #include "render_preview.h"
-#include "mosaico_wall_config.h"
+#include "raylib_lite_wall_config.h"
 #include "bsp/esp_mosaico.h"
 #include "esp_attr.h"
 #include "esp_check.h"
@@ -67,7 +67,7 @@ int render_preview_display_run(void){
  printf("RENDERPREVIEW_BEGIN {\"display_active\":true,\"width\":480,\"height\":480,"
         "\"mode\":%d,\"fixed\":%d,\"bound\":%.6f,\"strip_lines\":%d,"
         "\"present\":\"synchronous_dma\",\"te_sync\":false,\"workload_sha256\":\"%s\"}\n",
-        M2D_WALL_MODE,M2D_WALL_FIXED_PIXELS,(double)M2D_WALL_ERROR_TEXELS,STRIP_LINES,RENDER_BENCH_WORKLOAD_SHA256);
+        RAYLIB_LITE_WALL_MODE,RAYLIB_LITE_WALL_FIXED_PIXELS,(double)RAYLIB_LITE_WALL_ERROR_TEXELS,STRIP_LINES,RENDER_BENCH_WORKLOAD_SHA256);
  for(;;){
   if(touch&&esp_lcd_touch_read_data(touch)==ESP_OK){
    uint16_t x=0,y=0,strength=0;uint8_t count=0;
