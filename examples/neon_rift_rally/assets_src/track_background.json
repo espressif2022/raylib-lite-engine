@@ -1,0 +1,8 @@
+{
+  "image": "track_canyon.png",
+  "columns": 1,
+  "rows": 1,
+  "output_cell": 480,
+  "alpha_mode": "opaque",
+  "frames": [{"name": "track_canyon", "pivot_x": 0, "pivot_y": 0}]
+}

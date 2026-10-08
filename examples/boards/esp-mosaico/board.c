@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "esp_ota_ops.h"
 #include "esp_iris.h"
 #include "iris_ota_support.h"
 #include "iris_display_input.h"
@@ -338,12 +339,14 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
         },
         .audio = NULL,
     };
+#if CONFIG_ESP_MOSAICO_EXAMPLE_IRIS
     err = mosaico_iris_display_input_register(
         p->services.video, &p->input,
         ESP_MOSAICO_GAME_WIDTH, ESP_MOSAICO_GAME_HEIGHT);
     if (err != ESP_OK) {
         goto failed;
     }
+#endif
     return ESP_OK;
 
 failed:
@@ -424,10 +427,12 @@ esp_err_t raylib_lite_example_board_retry_cleanup(raylib_lite_example_board_t *p
     if (err != ESP_OK) {
         return err;
     }
+#if CONFIG_ESP_MOSAICO_EXAMPLE_IRIS
     err = mosaico_iris_display_input_unregister();
     if (err != ESP_OK) {
         return err;
     }
+#endif
     if (p->video) {
         raylib_lite_result_t rr = mosaico_strip_present_close(p->video, timeout_ms);
         if (rr != RAYLIB_LITE_OK) {
@@ -473,6 +478,7 @@ esp_err_t raylib_lite_example_board_destroy(raylib_lite_example_board_t *p,
  * available even if the Game or Board initialization later fails. */
 bool raylib_lite_native_boot(void)
 {
+#if CONFIG_ESP_MOSAICO_EXAMPLE_IRIS
     esp_err_t err = esp_iris_boot_probe();
     if (err != ESP_OK) {
         ESP_LOGE("esp_mosaico_board", "Iris boot probe: %s",
@@ -480,6 +486,7 @@ bool raylib_lite_native_boot(void)
         return false;
     }
     iris_ota_support_start();
+#endif
     return true;
 }
 
@@ -488,9 +495,19 @@ bool raylib_lite_native_boot(void)
  * that point so a broken Game/Board initialization can still roll back. */
 void raylib_lite_native_first_present(void)
 {
+#if CONFIG_ESP_MOSAICO_EXAMPLE_IRIS
     esp_err_t err = esp_iris_mark_healthy();
+#else
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t state;
+    if (!running || esp_ota_get_state_partition(running, &state) != ESP_OK ||
+            state != ESP_OTA_IMG_PENDING_VERIFY) {
+        return;
+    }
+    esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
+#endif
     if (err != ESP_OK) {
-        ESP_LOGW("esp_mosaico_board", "Iris healthy mark: %s",
+        ESP_LOGW("esp_mosaico_board", "Application healthy mark: %s",
                  esp_err_to_name(err));
     }
 }

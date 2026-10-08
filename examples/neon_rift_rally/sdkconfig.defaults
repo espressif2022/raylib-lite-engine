@@ -1,0 +1,2 @@
+# Keep the native game loop on CPU1, matching the proven direct-native demos.
+CONFIG_ESP_MAIN_TASK_AFFINITY_CPU1=y

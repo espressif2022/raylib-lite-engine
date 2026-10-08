@@ -14,6 +14,7 @@ idf_component_register(
         esp-mosaico-bsp
         esp_iris
         esp_mosaico_app_recovery
+        app_update
         esp_system
         heap
         nvs_flash

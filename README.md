@@ -36,7 +36,7 @@ python3 tools/game_cli.py sim examples/sky_hop
 
 Open `http://127.0.0.1:8460/` in a browser. See the [quickstart](docs/quickstart.EN.md) and [game development guide](docs/game-development.EN.md) for creating games and replay tests.
 
-The repository includes six reference games and a render benchmark; see the [example list](examples/README.md). Native ESP-Mosaico games use a shared Board adapter that automatically resolves board dependencies. Build and installation steps are in the [build guide](docs/build-matrix.EN.md).
+The repository includes seven reference games and a render benchmark; see the [example list](examples/README.md). Native ESP-Mosaico games use a shared Board adapter that automatically resolves board dependencies. Build and installation steps are in the [build guide](docs/build-matrix.EN.md).
 
 ## Documentation
 

@@ -30,6 +30,7 @@ python3 tools/game_cli.py list --json --target esp-mosaico
 - `living_worlds`
 - `last_zone_extraction`
 - `tomb_raycast`
+- `neon_rift_rally`
 
 可选择的第二块 Board：[`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md) 使用 `espressif/esp_board_manager`，物理 LCD 为 320×240。Game 保留自己的逻辑分辨率，由 Board adapter 等比缩放并反向映射触摸。此 Board 必须使用包含 GPIO47 与设备初始化修订的 `bmgr_amend` 配置，为每个 Game 独立生成 Board Manager 代码（下方以 `raylib_shooter` 为例）：
 

@@ -16,9 +16,10 @@ idf.py -C examples/raylib_shooter build
 | [living_worlds](living_worlds/README.md) | Panoramic scenes and volume meshes | ✓ | ✓ |
 | [last_zone_extraction](last_zone_extraction/README.md) | DDA wall columns and campaign shooter | ✓ | ✓ |
 | [tomb_raycast](tomb_raycast/README.md) | Portal rooms and INDEX8 textured planes | ✓ | ✓ |
+| [neon_rift_rally](neon_rift_rally/README.md) | Racing, steering, procedural track and feedback | ✓ | ✓ |
 | [render_benchmark](render_benchmark/README.md) | Raster acceptance and optional display preview | Dedicated Host test | Dedicated device project |
 
-The six reference games from `raylib_shooter` through `tomb_raycast` support both Host and ESP-Mosaico. `python3 tools/game_cli.py list --json` reports each game's `host` flag and `boards[]`. ELF game builds, packaging and loading are currently unsupported. The Iris native adapter (`mosaico.py game build --target iris`), Gateway, flashing, and updates are maintained by `esp-mosaico-vibe`. `render_benchmark` uses its own Host/CMake and ESP-IDF entry points, not `game.sim.json`.
+The seven reference games support Host and native ESP-Mosaico builds. `python3 tools/game_cli.py list --json` reports each game's `host` flag and `boards[]`. ELF game builds, packaging and loading are currently unsupported. The Iris native adapter (`mosaico.py game build --target iris`), Gateway, flashing, and updates are maintained by `esp-mosaico-vibe`. `render_benchmark` uses its own Host/CMake and ESP-IDF entry points, not `game.sim.json`.
 
 Shared board-neutral native-example glue lives in [examples_common](common_components/examples_common/README.md): the firmware launcher, abstract Board contract, haptic helper, and Product-ABI bridge. Concrete Board implementation remains under `boards/<board>/`. These are example/application layers rather than Engine public APIs; Registry packaging copies the shared launcher and Board into each maintained game under `shared/`, rewrites local paths, and excludes `render_benchmark` and unfinished `*_dev` directories. See [release preparation](../docs/releasing.md).
 

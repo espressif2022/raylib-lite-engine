@@ -1,0 +1,6 @@
+config ESP_MOSAICO_EXAMPLE_IRIS
+    bool "Enable Iris USB services in the native example"
+    default n
+    help
+        Start Iris USB management, screenshot and remote input services.
+        Iris also redirects stdout/stderr to its log service.
