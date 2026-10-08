@@ -14,6 +14,7 @@
 #include "raylib_lite_game_module.h"
 #include "raylib_lite_game_app.h"
 #include "raylib_lite_native_hooks.h"
+#include "platform_esp_audio.h"
 
 #ifndef RAYLIB_LITE_NATIVE_TARGET_FPS
 #define RAYLIB_LITE_NATIVE_TARGET_FPS 0
@@ -165,14 +166,17 @@ static void game_stop(void *user)
     native_game_t *game = user;
     if (game->state && game->module->shutdown)
         game->module->shutdown(game->state);
-    heap_caps_free(game->state);
-    game->state = NULL;
-    raylib_lite_assets_unmount();
+    /* State and embedded assets remain owned by app_main until the Audio
+     * Worker has stopped. Game shutdown may time out closing its audio. */
 }
 
 static esp_err_t cleanup_board(raylib_lite_example_board_t *board)
 {
     if (!board) return ESP_OK;
+    /* No Board teardown can occur while a codec Worker may still be using
+     * Board Manager or product BSP resources. Retain Board on timeout. */
+    raylib_lite_result_t audio_result = raylib_lite_game_audio_shutdown(3000);
+    if (audio_result != RAYLIB_LITE_OK) return to_esp_result(audio_result);
     esp_err_t error = raylib_lite_example_board_stop(board, 3000);
     if (error != ESP_OK && error != ESP_ERR_INVALID_STATE)
         ESP_LOGW(TAG, "stop board input: %s", esp_err_to_name(error));
@@ -189,22 +193,24 @@ void app_main(void)
         return;
     }
 
+    const raylib_lite_game_module_v1_t *module = raylib_lite_game_module_v1();
+    if (!module || !module->descriptor.game_id || !module->state_size ||
+            !module->descriptor.width || !module->descriptor.height ||
+            !module->initialize || !module->render) {
+        ESP_LOGE(TAG, "game module descriptor is incomplete");
+        return;
+    }
+
     raylib_lite_example_board_config_t board_config = {0};
     raylib_lite_example_game_board_config(&board_config);
+    board_config.logical_width = module->descriptor.width;
+    board_config.logical_height = module->descriptor.height;
     raylib_lite_example_board_t *board = NULL;
     esp_err_t error = raylib_lite_example_board_create(&board_config, &board);
     if (error != ESP_OK) {
         ESP_LOGE(TAG, "create board platform: %s", esp_err_to_name(error));
         if (board)
             (void)raylib_lite_example_board_retry_cleanup(board, 3000);
-        return;
-    }
-
-    const raylib_lite_game_module_v1_t *module = raylib_lite_game_module_v1();
-    if (!module || !module->descriptor.game_id || !module->state_size ||
-            !module->initialize || !module->render) {
-        ESP_LOGE(TAG, "game module descriptor is incomplete");
-        (void)cleanup_board(board);
         return;
     }
 
@@ -239,6 +245,23 @@ void app_main(void)
     };
     error = to_esp_result(raylib_lite_game_app_run(&app));
     if (error != ESP_OK) ESP_LOGE(TAG, "game stopped: %s", esp_err_to_name(error));
+    /* Must finish codec writes before releasing Game asset leases or Board
+     * resources. A timeout intentionally keeps all three owned and retryable. */
+    raylib_lite_result_t audio_result = raylib_lite_game_audio_shutdown(3000);
+    if (audio_result == RAYLIB_LITE_TIMEOUT) {
+        /* A codec write in progress cannot be cancelled. Retry its join once
+         * before failing closed with live assets and Board still retained. */
+        ESP_LOGW(TAG, "audio shutdown timed out; retrying worker join");
+        audio_result = raylib_lite_game_audio_shutdown(3000);
+    }
+    if (audio_result != RAYLIB_LITE_OK) {
+        ESP_LOGE(TAG, "audio shutdown incomplete: %d; retaining Board and Game assets",
+                 (int)audio_result);
+        return;
+    }
+    heap_caps_free(game.state);
+    game.state = NULL;
+    raylib_lite_assets_unmount();
     esp_err_t cleanup = cleanup_board(board);
     if (cleanup != ESP_OK)
         ESP_LOGE(TAG, "board cleanup failed: %s", esp_err_to_name(cleanup));

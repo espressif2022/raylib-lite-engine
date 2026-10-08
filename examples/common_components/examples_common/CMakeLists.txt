@@ -6,6 +6,7 @@ idf_component_register(
         "include"
     REQUIRES
         raylib-lite-engine
+        examples_audio
         esp_timer
         heap
         log)

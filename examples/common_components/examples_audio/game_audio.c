@@ -109,6 +109,23 @@ static void tickets_destroy_all(void)
     }
 }
 
+raylib_lite_result_t raylib_lite_game_audio_shutdown(uint32_t timeout_ms)
+{
+    if (!s_service) return RAYLIB_LITE_OK;
+    raylib_lite_result_t result = platform_esp_audio_service_stop(s_service, timeout_ms);
+    if (result != RAYLIB_LITE_OK) return result;
+
+    /* The Worker is joined. Release the Mixer (which still uses the service
+     * synchronization callbacks) before destroying that service. */
+    raylib_lite_audio_mixer_destroy(s_mixer);
+    s_mixer = NULL;
+    tickets_destroy_all();
+    result = platform_esp_audio_service_destroy(s_service, 0);
+    if (result != RAYLIB_LITE_OK) return result;
+    s_service = NULL;
+    return RAYLIB_LITE_OK;
+}
+
 void raylib_lite_game_audio_init(void)
 {
     if (s_service) return;
@@ -123,13 +140,16 @@ void raylib_lite_game_audio_init(void)
             .unlock = platform_esp_audio_service_unlock,
         },
     };
-    if (raylib_lite_audio_mixer_create(&config, &s_mixer) != RAYLIB_LITE_OK ||
-        platform_esp_audio_service_start(s_service, pull_audio, s_mixer) !=
+    if (raylib_lite_audio_mixer_create(&config, &s_mixer) != RAYLIB_LITE_OK) {
+        (void)raylib_lite_game_audio_shutdown(0);
+        return;
+    }
+    if (platform_esp_audio_service_start(s_service, pull_audio, s_mixer) !=
             RAYLIB_LITE_OK) {
-        raylib_lite_audio_mixer_destroy(s_mixer);
-        s_mixer = NULL;
-        (void)platform_esp_audio_service_destroy(s_service, 0);
-        s_service = NULL;
+        /* A codec start that timed out may still be executing in the Worker.
+         * Never free its pull context until a successful stop/join; a failed
+         * bounded stop retains everything for the Native cleanup retry. */
+        (void)raylib_lite_game_audio_shutdown(AUDIO_STOP_TIMEOUT_MS);
         return;
     }
     /* Keep Raylib Music gain per handle. The mixer bus remains at unity. */
@@ -139,14 +159,7 @@ void raylib_lite_game_audio_init(void)
 
 void raylib_lite_game_audio_close(void)
 {
-    if (!s_service) return;
-    if (platform_esp_audio_service_stop(s_service, AUDIO_STOP_TIMEOUT_MS) !=
-        RAYLIB_LITE_OK) return;
-    raylib_lite_audio_mixer_destroy(s_mixer);
-    s_mixer = NULL;
-    tickets_destroy_all();
-    (void)platform_esp_audio_service_destroy(s_service, 0);
-    s_service = NULL;
+    (void)raylib_lite_game_audio_shutdown(AUDIO_STOP_TIMEOUT_MS);
 }
 
 bool raylib_lite_game_audio_ready(void)

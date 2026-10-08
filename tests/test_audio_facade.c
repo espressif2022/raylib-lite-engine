@@ -12,6 +12,9 @@ static platform_esp_audio_pull_fn fake_pull;
 static void *fake_pull_context;
 static uint8_t sound_file[24];
 static unsigned asset_releases;
+static unsigned fake_destroy_count;
+static unsigned fake_stop_timeout_count;
+static raylib_lite_result_t fake_start_result = RAYLIB_LITE_OK;
 
 raylib_lite_result_t raylib_lite_asset_open(const char *name, raylib_lite_asset_view_t *out)
 {
@@ -39,16 +42,22 @@ raylib_lite_result_t platform_esp_audio_service_start(
     platform_esp_audio_service_t *service, platform_esp_audio_pull_fn pull,
     void *context)
 {
-    service->ready = true;
+    service->ready = fake_start_result == RAYLIB_LITE_OK;
     fake_pull = pull;
     fake_pull_context = context;
-    return RAYLIB_LITE_OK;
+    raylib_lite_result_t result = fake_start_result;
+    fake_start_result = RAYLIB_LITE_OK;
+    return result;
 }
 
 raylib_lite_result_t platform_esp_audio_service_stop(
     platform_esp_audio_service_t *service, uint32_t timeout_ms)
 {
     (void)timeout_ms;
+    if (fake_stop_timeout_count) {
+        --fake_stop_timeout_count;
+        return RAYLIB_LITE_TIMEOUT;
+    }
     service->ready = false;
     return RAYLIB_LITE_OK;
 }
@@ -57,6 +66,7 @@ raylib_lite_result_t platform_esp_audio_service_destroy(
     platform_esp_audio_service_t *service, uint32_t timeout_ms)
 {
     (void)service; (void)timeout_ms;
+    ++fake_destroy_count;
     return RAYLIB_LITE_OK;
 }
 
@@ -131,8 +141,32 @@ int main(void)
     StopMusicStream(second);
     assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
     assert(output[0] == 0 && output[1] == 0);
+    /* A failed Game-level close must not destroy an active Worker's Mixer. */
+    fake_stop_timeout_count = 1;
     CloseAudioDevice();
-    assert(asset_releases == 4);
+    assert(fake_destroy_count == 0 && asset_releases == 2);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(raylib_lite_game_audio_shutdown(3000) == RAYLIB_LITE_OK);
+    assert(fake_destroy_count == 1 && asset_releases == 4);
+    assert(raylib_lite_game_audio_shutdown(3000) == RAYLIB_LITE_OK);
+    assert(fake_destroy_count == 1);
+
+    /* A startup timeout can leave a Worker blocked in codec_start(). Preserve
+     * its callback context across repeated bounded shutdown attempts. */
+    fake_start_result = RAYLIB_LITE_TIMEOUT;
+    fake_stop_timeout_count = 2;
+    raylib_lite_game_audio_init();
+    assert(!IsAudioDeviceReady());
+    assert(fake_destroy_count == 1);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK);
+    assert(raylib_lite_game_audio_shutdown(10) == RAYLIB_LITE_TIMEOUT);
+    assert(fake_destroy_count == 1);
+    assert(raylib_lite_game_audio_shutdown(3000) == RAYLIB_LITE_OK);
+    assert(fake_destroy_count == 2);
+    raylib_lite_game_audio_init();
+    assert(IsAudioDeviceReady());
+    CloseAudioDevice();
+    assert(fake_destroy_count == 3);
     puts("audio facade: ok");
     return 0;
 }

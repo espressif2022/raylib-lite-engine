@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "raylib_lite_example_board.h"
+#include "platform_esp_audio.h"
 
 #include <stdatomic.h>
 #include <string.h>
@@ -417,6 +418,8 @@ esp_err_t raylib_lite_example_board_stop(raylib_lite_example_board_t *p,
 esp_err_t raylib_lite_example_board_retry_cleanup(raylib_lite_example_board_t *p,
                                                uint32_t timeout_ms)
 {
+    raylib_lite_result_t audio_result = raylib_lite_game_audio_shutdown(timeout_ms);
+    if (audio_result != RAYLIB_LITE_OK) return to_esp(audio_result);
     esp_err_t err = raylib_lite_example_board_stop(p, timeout_ms);
     if (err != ESP_OK) {
         return err;

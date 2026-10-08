@@ -8,7 +8,16 @@
 
 #include "esp_heap_caps.h"
 #include "esp_iris.h"
+/* Older ESP-Iris snapshots expose screen/RPC APIs without the shared
+ * profile-IDs header. Match the upstream display_input example's pointer
+ * contract until an ESP-Iris release provides these definitions. */
+#if __has_include("esp_iris_service_profiles.h")
 #include "esp_iris_service_profiles.h"
+#else
+#define ESP_IRIS_POINTER_SERVICE_ID 0x1001U
+#define ESP_IRIS_POINTER_METHOD_ID 1U
+#define ESP_IRIS_POINTER_MESSAGE_SIZE 12U
+#endif
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"

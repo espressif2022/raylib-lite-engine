@@ -33,6 +33,17 @@ The W07 reference matrix is validated on both Host and ESP-Mosaico for:
 - `tomb_raycast`
 - `vertical_dock`
 
+A second selectable Board, [`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md), uses `espressif/esp_board_manager` with a physical 320x240 LCD. Games retain their logical resolution; the Board adapter scales the display and maps touch coordinates back. Every Game must generate its Board Manager configuration with the required `bmgr_amend` profile, which removes the conflicting GPIO47 owner and controls optional device initialization (shown for `raylib_shooter`):
+
+```sh
+AMEND="$PWD/examples/boards/esp32-s3-box-3/bmgr_amend"
+idf.py -C examples/raylib_shooter bmgr -b esp32_s3_box_3 -a "$AMEND"
+idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
+    -D RAYLIB_LITE_BOARD=esp32-s3-box-3 build
+```
+
+BOX-3 selects each Game's `partitions.csv` by default: a 15 MiB factory app partition on the standard 16 MB Flash device. `raylib_shooter` has passed initial real-device rendering and TT21100 touch-direction checks; `neon_rift_rally` has demonstrated ES8311 initialization and non-silent PCM submission. Audible speaker output and other Games still need acceptance. **Selectable does not mean every Game has passed device acceptance.**
+
 ## Native firmware
 
 ESP-Mosaico is the default application-side Board component at [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/). Game manifests do not name a Board. The Application CMake layer selects `RAYLIB_LITE_BOARD=esp-mosaico` by default and adds the shared `examples_common` component plus `examples/boards/<board>` as the selected Board component. Use `-D RAYLIB_LITE_BOARD=<board>` to select another adapter. Game-specific device glue stays at the Game's own `main/native/` boundary; if it needs a new board capability, generalize the example-Board contract/provider instead of adding `boards/<board>/extensions/<game>`. ESP-Mosaico still uses the same two local dependency variables for BSP and utilities. Its retained-Recovery partition contract places the normal Game in `ota_0` and reserves the factory partition for Recovery.

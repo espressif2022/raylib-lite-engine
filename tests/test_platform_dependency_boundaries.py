@@ -1,4 +1,5 @@
 from pathlib import Path
+import csv
 import json
 import re
 import subprocess
@@ -672,11 +673,61 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
 
         board_cmake = (ENGINE / "examples/boards/esp-mosaico/CMakeLists.txt").read_text()
         board_manifest = (ENGINE / "examples/boards/esp-mosaico/idf_component.yml").read_text()
-        self.assertIn("game_audio.c", board_cmake)
+        shared_cmake = (ENGINE / "examples/common_components/examples_audio/CMakeLists.txt").read_text()
+        self.assertIn("game_audio.c", shared_cmake)
+        self.assertIn("platform_esp_audio.c", shared_cmake)
+        self.assertIn("examples_audio", board_cmake)
+        self.assertIn("board_audio_codec.c", board_cmake)
         self.assertNotIn("mosaico_game_audio.c", board_cmake)
+        self.assertNotIn('"game_audio.c"', board_cmake)
+        self.assertNotIn("bsp/esp_mosaico", (ENGINE / "examples/common_components/examples_audio/platform_esp_audio.c").read_text())
         self.assertIn("espressif2022/raylib-lite-engine", board_manifest)
         self.assertNotIn("raylib_lite_audio_decode.c", board_cmake)
         self.assertNotIn("raylib_lite_audio_mixer.c", board_cmake)
+
+        box3 = ENGINE / "examples/boards/esp32-s3-box-3"
+        box3_cmake = (box3 / "CMakeLists.txt").read_text()
+        box3_defaults = (box3 / "sdkconfig.defaults").read_text()
+        self.assertIn("examples_audio", box3_cmake)
+        self.assertIn("box3_audio_codec.c", box3_cmake)
+        self.assertIn("CONFIG_PARTITION_TABLE_CUSTOM=y", box3_defaults)
+        self.assertIn('CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"', box3_defaults)
+        self.assertIn("CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y", box3_defaults)
+        self.assertNotIn("CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y", box3_defaults)
+        # Every native Game selectable with BOX-3 must own the 15 MiB
+        # factory layout. Derive coverage from Game manifests, not a sample.
+        native_games = sorted(path.parent.parent for path in
+            (ENGINE / "examples").glob("*/main/idf_component.yml")
+            if (path.parent.parent / "CMakeLists.txt").is_file()
+            and path.parent.parent.name != "render_benchmark")
+        self.assertTrue(native_games, "no native Game manifests discovered")
+
+        def partition_bytes(raw: str) -> int:
+            value = raw.strip().lower()
+            if value.endswith("k"):
+                return int(value[:-1], 0) * 1024
+            if value.endswith("m"):
+                return int(value[:-1], 0) * 1024 * 1024
+            return int(value, 0)
+
+        for game_dir in native_games:
+            with self.subTest(game=game_dir.name):
+                partition_file = game_dir / "partitions.csv"
+                self.assertTrue(partition_file.is_file(),
+                                f"Missing factory partition table: {partition_file}")
+                with partition_file.open(encoding="utf-8", newline="") as stream:
+                    entries = list(csv.reader(line for line in stream
+                        if line.strip() and not line.lstrip().startswith("#")))
+                factory = [row for row in entries if row[0].strip() == "factory"]
+                self.assertEqual(len(factory), 1, "expected one factory app partition")
+                self.assertGreaterEqual(len(factory[0]), 5)
+                self.assertEqual(factory[0][1].strip(), "app")
+                self.assertEqual(factory[0][2].strip(), "factory")
+                offset = partition_bytes(factory[0][3])
+                size = partition_bytes(factory[0][4])
+                self.assertEqual(offset, 0x10000)
+                self.assertEqual(size, 15 * 1024 * 1024)
+                self.assertLessEqual(offset + size, 16 * 1024 * 1024)
 
         users = set()
         for source_path in (ENGINE / "examples").glob("*/main/*"):
@@ -687,6 +738,23 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
             with self.subTest(path=main.relative_to(ENGINE)):
                 manifest = (main / "idf_component.yml").read_text()
                 self.assertIn("espressif2022/raylib-lite-engine", manifest)
+
+    def test_audio_join_precedes_game_assets_and_board_teardown(self) -> None:
+        native = (ENGINE / "examples/common_components/examples_common/native_module_main.c").read_text()
+        native_shutdown = native[native.index("error = to_esp_result(raylib_lite_game_app_run(&app))"):]
+        self.assertLess(native_shutdown.index("raylib_lite_game_audio_shutdown(3000)"),
+                        native_shutdown.index("heap_caps_free(game.state)"))
+        self.assertLess(native_shutdown.index("raylib_lite_game_audio_shutdown(3000)"),
+                        native_shutdown.index("raylib_lite_assets_unmount()"))
+
+        box3 = (ENGINE / "examples/boards/esp32-s3-box-3/board.c").read_text()
+        board_cleanup = box3.split("esp_err_t raylib_lite_example_board_retry_cleanup", 1)[1]
+        self.assertLess(board_cleanup.index("raylib_lite_game_audio_shutdown(timeout_ms)"),
+                        board_cleanup.index("esp_board_manager_deinit()"))
+        mosaico = (ENGINE / "examples/boards/esp-mosaico/board.c").read_text()
+        mosaico_cleanup = mosaico.split("esp_err_t raylib_lite_example_board_retry_cleanup", 1)[1]
+        self.assertLess(mosaico_cleanup.index("raylib_lite_game_audio_shutdown(timeout_ms)"),
+                        mosaico_cleanup.index("mosaico_iris_display_input_unregister()"))
 
     def test_game_manifests_do_not_own_board_dependencies(self) -> None:
         forbidden = ("esp_display_present", "lvgl/lvgl", "esp-mosaico-bsp", "esp_iris", "esp-mosaico:")

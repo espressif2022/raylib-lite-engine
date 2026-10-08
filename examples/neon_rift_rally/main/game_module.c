@@ -254,7 +254,7 @@ static const char *start_hint(const rally_game_t *game)
 }
 
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-static esp_err_t migrate_record(uint16_t old_version, const void *old_data,
+static raylib_lite_result_t migrate_record(uint16_t old_version, const void *old_data,
                                 size_t old_size, void *new_data, size_t new_size)
 {
     if (!new_data || new_size < sizeof(neon_rift_rally_record_t))
