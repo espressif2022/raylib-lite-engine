@@ -37,11 +37,11 @@ python3 tools/game_cli.py list --json --target esp-mosaico
 ```sh
 AMEND="$PWD/examples/boards/esp32-s3-box-3/bmgr_amend"
 idf.py -C examples/raylib_shooter bmgr -b esp32_s3_box_3 -a "$AMEND"
-idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
+IDF_TARGET=esp32s3 idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
     -D RAYLIB_LITE_BOARD=esp32-s3-box-3 build
 ```
 
-此 Board 使用各 Game 的 `partitions.csv`，默认 16 MB Flash，factory 应用分区为 15 MiB。已在 BOX-3 实机验证 `raylib_shooter` 运行与 TT21100 触摸方向，`neon_rift_rally` 的 ES8311 初始化与非静音 PCM 提交；扬声器听音及其他 Game 仍待逐项验收。**Board 可选择不等于所有 Game 已通过实机验收。**
+此 Board 使用自身的 `examples/boards/esp32-s3-box-3/partitions.csv`，默认 16 MB Flash，factory 应用分区为 15 MiB。已在 BOX-3 实机验证 `raylib_shooter` 运行与 TT21100 触摸方向，`neon_rift_rally` 的 ES8311 初始化与非静音 PCM 提交；扬声器听音及其他 Game 仍待逐项验收。**Board 可选择不等于所有 Game 已通过实机验收。**
 
 ## 原生固件
 

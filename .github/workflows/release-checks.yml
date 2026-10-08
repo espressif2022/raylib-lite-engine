@@ -15,12 +15,13 @@ jobs:
       - name: Assemble, pack and build an isolated consumer
         uses: espressif/esp-idf-ci-action@v1
         with:
-          # Use public IDF development images until a stable 6.2 image exists.
+          # The official latest image tracks master; there is no master image tag.
           # Pin this to the verified release image when 6.2 is released.
-          esp_idf_version: master
+          esp_idf_version: latest
           target: esp32s3
           path: '.'
           command: |
+            set -euo pipefail
             python -m pip install Pillow numpy PyYAML
             python tools/prepare_release.py --output /tmp/raylib-release
             compote component pack --project-dir /tmp/raylib-release/component --name raylib-lite-engine --dest-dir /tmp/raylib-release/archives

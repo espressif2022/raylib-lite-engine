@@ -27,7 +27,7 @@ From the **Raylib Lite Engine repository root**:
 # The Board Manager board name uses underscores; RLE's selector uses hyphens.
 AMEND="$PWD/examples/boards/esp32-s3-box-3/bmgr_amend"
 idf.py -C examples/raylib_shooter bmgr -b esp32_s3_box_3 -a "$AMEND"
-idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
+IDF_TARGET=esp32s3 idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
     -D RAYLIB_LITE_BOARD=esp32-s3-box-3 build
 ```
 
@@ -47,7 +47,7 @@ are enabled on a clean configuration. The amend profile skips SD-card and
 microphone (ADC) initialization; the ES8311 output DAC remains lazy so it is
 initialized only when a Game calls `InitAudioDevice()`. It also removes the
 unused GPIO47 backlight GPIO peripheral, leaving LEDC as the sole pin owner.
-BOX-3 native builds select each Game's `partitions.csv` (15 MiB factory app)
+BOX-3 native builds select this Board's `partitions.csv` (15 MiB factory app)
 rather than ESP-IDF's built-in 1 MiB single-app layout. The standard BOX-3
 Flash size remains 16 MB; atypical 32 MB Octal samples need local Kconfig
 overrides and must not change the committed Board defaults.

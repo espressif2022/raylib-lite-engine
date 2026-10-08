@@ -37,11 +37,11 @@ A second selectable Board, [`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/
 ```sh
 AMEND="$PWD/examples/boards/esp32-s3-box-3/bmgr_amend"
 idf.py -C examples/raylib_shooter bmgr -b esp32_s3_box_3 -a "$AMEND"
-idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
+IDF_TARGET=esp32s3 idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
     -D RAYLIB_LITE_BOARD=esp32-s3-box-3 build
 ```
 
-BOX-3 selects each Game's `partitions.csv` by default: a 15 MiB factory app partition on the standard 16 MB Flash device. `raylib_shooter` has passed initial real-device rendering and TT21100 touch-direction checks; `neon_rift_rally` has demonstrated ES8311 initialization and non-silent PCM submission. Audible speaker output and other Games still need acceptance. **Selectable does not mean every Game has passed device acceptance.**
+BOX-3 selects `examples/boards/esp32-s3-box-3/partitions.csv` by default: a 15 MiB factory app partition on the standard 16 MB Flash device. `raylib_shooter` has passed initial real-device rendering and TT21100 touch-direction checks; `neon_rift_rally` has demonstrated ES8311 initialization and non-silent PCM submission. Audible speaker output and other Games still need acceptance. **Selectable does not mean every Game has passed device acceptance.**
 
 ## Native firmware
 

@@ -106,8 +106,9 @@ def assemble(destination, games=GAMES, root=ROOT):
         copy_files([name for name in names if "/tests/" not in name], f"examples/{game}/", example, root)
         copy_files(names, "examples/common_components/", example / "shared/common_components", root)
         copy_files(names, "examples/boards/", example / "shared/boards", root)
-        board_defaults = example / "shared/boards/esp-mosaico/sdkconfig.defaults"
-        board_defaults.write_text(board_defaults.read_text().replace("../boards/", "shared/boards/"))
+        for board_defaults in (example / "shared/boards").glob("*/sdkconfig.defaults"):
+            board_defaults.write_text(
+                board_defaults.read_text().replace("../boards/", "shared/boards/"))
         # Board owns the partition table; old per-game copies are not authoritative.
         (example / "partitions.csv").unlink(missing_ok=True)
         top = example / "CMakeLists.txt"

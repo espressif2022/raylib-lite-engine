@@ -630,16 +630,10 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn("examples_audio", box3_cmake)
         self.assertIn("box3_audio_codec.c", box3_cmake)
         self.assertIn("CONFIG_PARTITION_TABLE_CUSTOM=y", box3_defaults)
-        self.assertIn('CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"', box3_defaults)
+        self.assertIn('CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../boards/esp32-s3-box-3/partitions.csv"', box3_defaults)
         self.assertIn("CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y", box3_defaults)
         self.assertNotIn("CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y", box3_defaults)
-        # Every native Game selectable with BOX-3 must own the 15 MiB
-        # factory layout. Derive coverage from Game manifests, not a sample.
-        native_games = sorted(path.parent.parent for path in
-            (ENGINE / "examples").glob("*/main/idf_component.yml")
-            if (path.parent.parent / "CMakeLists.txt").is_file()
-            and path.parent.parent.name != "render_benchmark")
-        self.assertTrue(native_games, "no native Game manifests discovered")
+        # Flash layout belongs to the selected Board, independently of Game.
 
         def partition_bytes(raw: str) -> int:
             value = raw.strip().lower()
@@ -649,24 +643,20 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
                 return int(value[:-1], 0) * 1024 * 1024
             return int(value, 0)
 
-        for game_dir in native_games:
-            with self.subTest(game=game_dir.name):
-                partition_file = game_dir / "partitions.csv"
-                self.assertTrue(partition_file.is_file(),
-                                f"Missing factory partition table: {partition_file}")
-                with partition_file.open(encoding="utf-8", newline="") as stream:
-                    entries = list(csv.reader(line for line in stream
-                        if line.strip() and not line.lstrip().startswith("#")))
-                factory = [row for row in entries if row[0].strip() == "factory"]
-                self.assertEqual(len(factory), 1, "expected one factory app partition")
-                self.assertGreaterEqual(len(factory[0]), 5)
-                self.assertEqual(factory[0][1].strip(), "app")
-                self.assertEqual(factory[0][2].strip(), "factory")
-                offset = partition_bytes(factory[0][3])
-                size = partition_bytes(factory[0][4])
-                self.assertEqual(offset, 0x10000)
-                self.assertEqual(size, 15 * 1024 * 1024)
-                self.assertLessEqual(offset + size, 16 * 1024 * 1024)
+        partition_file = box3 / "partitions.csv"
+        with partition_file.open(encoding="utf-8", newline="") as stream:
+            entries = list(csv.reader(line for line in stream
+                if line.strip() and not line.lstrip().startswith("#")))
+        factory = [row for row in entries if row[0].strip() == "factory"]
+        self.assertEqual(len(factory), 1, "expected one factory app partition")
+        self.assertGreaterEqual(len(factory[0]), 5)
+        self.assertEqual(factory[0][1].strip(), "app")
+        self.assertEqual(factory[0][2].strip(), "factory")
+        offset = partition_bytes(factory[0][3])
+        size = partition_bytes(factory[0][4])
+        self.assertEqual(offset, 0x10000)
+        self.assertEqual(size, 15 * 1024 * 1024)
+        self.assertLessEqual(offset + size, 16 * 1024 * 1024)
 
         users = set()
         for source_path in (ENGINE / "examples").glob("*/main/*"):

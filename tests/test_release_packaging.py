@@ -28,6 +28,13 @@ class ReleasePackagingTests(unittest.TestCase):
                 self.assertTrue((example / "shared/common_components/examples_common/native_module_main.c").is_file())
                 self.assertNotIn("../common_components/", (example / "CMakeLists.txt").read_text())
                 self.assertNotIn("override_path", (example / "main/idf_component.yml").read_text())
+                self.assertFalse((example / "partitions.csv").exists())
+                for board in ("esp-mosaico", "esp32-s3-box-3"):
+                    relative = f"shared/boards/{board}/partitions.csv"
+                    self.assertEqual((example / relative).read_bytes(),
+                                     (ROOT / "examples/boards" / board / "partitions.csv").read_bytes())
+                    defaults = (example / "shared/boards" / board / "sdkconfig.defaults").read_text()
+                    self.assertIn(f'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="{relative}"', defaults)
                 assets = json.loads((example / "ASSET_PROVENANCE.json").read_text())["files"]
                 self.assertTrue(assets, game)
             with contextlib.redirect_stdout(io.StringIO()):
