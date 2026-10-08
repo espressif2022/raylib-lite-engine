@@ -33,6 +33,8 @@ W07 已在 Host 与 ESP-Mosaico 两条路径实际验证：
 - `tomb_raycast`
 - `vertical_dock`
 
+可选择的第二块 Board：[`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md) 使用 `espressif/esp_board_manager`，物理 LCD 为 320×240。Game 保留自己的逻辑分辨率，由 Board adapter 等比缩放并反向映射触摸。此 Board 需要为每个示例运行 `idf.py bmgr -b esp32_s3_box_3` 生成配置，使用 `-D RAYLIB_LITE_BOARD=esp32-s3-box-3` 构建。**Board 可选择不等于所有 Game 已通过实机验收。**
+
 ## 原生固件
 
 ESP-Mosaico 是默认 application-side Board component，位于 [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/)。Game manifest 不再写具体 Board；Application CMake 层默认选择 `RAYLIB_LITE_BOARD=esp-mosaico`，并把共享 `examples_common` component 与 `examples/boards/<board>` 所选 Board component 加入构建。使用 `-D RAYLIB_LITE_BOARD=<board>` 可选择其它 Adapter。Game-specific device glue 留在 Game 自己的 `main/native/` 边界；如果它需要新的板级能力，应扩展通用 Board contract/provider，而不是增加 `boards/<board>/extensions/<game>`。ESP-Mosaico 仍对所有标准 Game 统一使用 BSP 与 utils 两个本地依赖变量。它的 retained-Recovery partition contract 保持 normal Game 位于 `ota_0`、factory partition 保留给 Recovery。

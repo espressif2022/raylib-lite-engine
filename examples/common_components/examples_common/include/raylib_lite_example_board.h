@@ -19,6 +19,9 @@ typedef struct {
     uint16_t imu_sample_ms;
     uint16_t drawbuf_lines;
     uint8_t drawbuf_count;
+    /* Game-owned logical surface; Boards may scale it to the physical LCD. */
+    uint16_t logical_width;
+    uint16_t logical_height;
 } raylib_lite_example_board_config_t;
 
 esp_err_t raylib_lite_example_board_create(

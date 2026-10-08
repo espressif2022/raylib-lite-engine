@@ -3,6 +3,8 @@
 **/sdkconfig
 **/sdkconfig.old
 **/dependencies.lock
+# Per-example generated ESP Board Manager configuration.
+examples/*/components/gen_bmgr_codes/
 **/__pycache__/
 **/*.py[cod]
 **/assets/generated/

@@ -189,22 +189,24 @@ void app_main(void)
         return;
     }
 
+    const raylib_lite_game_module_v1_t *module = raylib_lite_game_module_v1();
+    if (!module || !module->descriptor.game_id || !module->state_size ||
+            !module->descriptor.width || !module->descriptor.height ||
+            !module->initialize || !module->render) {
+        ESP_LOGE(TAG, "game module descriptor is incomplete");
+        return;
+    }
+
     raylib_lite_example_board_config_t board_config = {0};
     raylib_lite_example_game_board_config(&board_config);
+    board_config.logical_width = module->descriptor.width;
+    board_config.logical_height = module->descriptor.height;
     raylib_lite_example_board_t *board = NULL;
     esp_err_t error = raylib_lite_example_board_create(&board_config, &board);
     if (error != ESP_OK) {
         ESP_LOGE(TAG, "create board platform: %s", esp_err_to_name(error));
         if (board)
             (void)raylib_lite_example_board_retry_cleanup(board, 3000);
-        return;
-    }
-
-    const raylib_lite_game_module_v1_t *module = raylib_lite_game_module_v1();
-    if (!module || !module->descriptor.game_id || !module->state_size ||
-            !module->initialize || !module->render) {
-        ESP_LOGE(TAG, "game module descriptor is incomplete");
-        (void)cleanup_board(board);
         return;
     }
 

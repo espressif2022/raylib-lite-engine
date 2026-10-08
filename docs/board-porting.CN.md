@@ -2,7 +2,7 @@
 
 [English](board-porting.EN.md) · [构建路径](build-matrix.CN.md)
 
-当前仓库没有第二块板的验收数据；“游戏与通用光栅器无需改动”是移植目标，还不是跨板实证。先在独立构建目录接入新 BSP 与产品组件；Iris/Recovery 产品集成由 `esp-mosaico-vibe` 维护；不要修改共享游戏模型来适配面板或触摸驱动。
+仓库已有 [ESP32-S3-BOX-3 Board Manager Adapter](../examples/boards/esp32-s3-box-3/README.md)，但尚无第二块板的实机验收数据；“游戏与通用光栅器无需改动”仍需要跨板实证。先在独立构建目录接入新 BSP 与产品组件；Iris/Recovery 产品集成由 `esp-mosaico-vibe` 维护；不要修改共享游戏模型来适配面板或触摸驱动。
 
 具体原生示例 Board Adapter 是 `examples/boards/<board>/` 下的应用侧 IDF component。Game manifest 保持 Board-neutral，只依赖 Engine。示例 Application CMake 层统一 include [`examples/common_components/examples_common/project.cmake`](../examples/common_components/examples_common/project.cmake)：`RAYLIB_LITE_BOARD` 默认取 `esp-mosaico`，helper 把共享 `examples_common` component 和所选 Board 加入 `EXTRA_COMPONENT_DIRS`，并加载 Board 的 `sdkconfig.defaults` / 可选 `project.cmake`。使用 `-D RAYLIB_LITE_BOARD=<board>` 即可选择其它 Board。Board-neutral launcher/feedback/contract 由 `examples_common` component 拥有；Game 自己的 device-only adapter 保留在该 Game 的 `main/native/`，仍属于 Game `main` component，且不能 include 具体 Board API。
 
