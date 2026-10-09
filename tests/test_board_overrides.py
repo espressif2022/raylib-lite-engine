@@ -30,6 +30,7 @@ class BoardOverrideTests(unittest.TestCase):
             generated.mkdir(parents=True)
             defaults = generated / "board_manager.defaults"
             defaults.write_text("CONFIG_ESP_BOARD_DEV_DISPLAY_LCD_SUPPORT=y\n")
+            (generated / "gen_board_device_custom.h").write_text("/* custom factories */\n")
             result = self.configure(folder)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(str(defaults), (folder / "defaults.txt").read_text())
@@ -40,3 +41,14 @@ class BoardOverrideTests(unittest.TestCase):
             result = self.configure(folder, folder / "bsp")
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((folder / "components.txt").read_text(), "")
+
+    def test_official_profile_is_rejected_with_regeneration_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            generated = folder / "components/gen_bmgr_codes"
+            generated.mkdir(parents=True)
+            (generated / "board_manager.defaults").write_text("")
+            result = self.configure(folder)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("custom Board Manager profile", result.stderr)
+            self.assertIn("-b esp_mosaico", result.stderr)

@@ -7,6 +7,8 @@
 - ESP-Mosaico and ESP32-S3-BOX-3 examples use per-project Board Manager
   generation; generated board metadata selects the matching application adapter.
 - Neon Rift Rally is included in the assembled Registry examples.
+- Release CI compiles every assembled game on ESP-Mosaico and `raylib_shooter`
+  on ESP32-S3-BOX-3, after generating each Board Manager profile.
 - Prepared the single Engine component for Registry distribution with explicit
   package filters, a minimal offscreen consumer, API contracts and release CI.
 - Registry game examples are assembled with private copies of their shared

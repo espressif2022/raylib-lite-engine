@@ -8,11 +8,11 @@ on:
 permissions:
   contents: read
 jobs:
-  package-and-build:
+  package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Assemble, pack and build an isolated consumer
+      - name: Assemble and pack an isolated component
         uses: espressif/esp-idf-ci-action@v1
         with:
           # ESP-IDF 6.2 has no release image tag yet. Device evidence is recorded
@@ -27,10 +27,6 @@ jobs:
             compote component pack --project-dir /tmp/raylib-release/component --name raylib-lite-engine --dest-dir /tmp/raylib-release/archives
             python tools/check_release.py --stage /tmp/raylib-release > /tmp/raylib-release/package-check.json
             cat /tmp/raylib-release/package-check.json
-            python tools/prepare_release_consumer.py --archive /tmp/raylib-release/archives/raylib-lite-engine_$(cat VERSION).tgz --example minimal --output /tmp/raylib-consumer
-            idf.py -C /tmp/raylib-consumer -B /tmp/raylib-consumer-build -DIDF_TARGET=esp32s3 build
-            python tools/prepare_release_consumer.py --archive /tmp/raylib-release/archives/raylib-lite-engine_$(cat VERSION).tgz --example last_zone_extraction --output /tmp/raylib-s31-consumer
-            IDF_TARGET=esp32s31 idf.py --preview -C /tmp/raylib-s31-consumer -B /tmp/raylib-s31-build -DIDF_TARGET=esp32s31 build
             mkdir -p dist
             cp /tmp/raylib-release/archives/*.tgz dist/
             cp /tmp/raylib-release/release-manifest.json dist/
@@ -40,9 +36,82 @@ jobs:
           name: registry-release-candidate
           path: dist/
 
+  consumer-build:
+    name: Build ${{ matrix.example }} (${{ matrix.board }})
+    needs: package
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - example: minimal
+            chip: esp32s3
+            board: none
+          - example: sky_hop
+            chip: esp32s31
+            board: esp-mosaico
+          - example: tower_defense
+            chip: esp32s31
+            board: esp-mosaico
+          - example: raylib_shooter
+            chip: esp32s31
+            board: esp-mosaico
+          - example: living_worlds
+            chip: esp32s31
+            board: esp-mosaico
+          - example: last_zone_extraction
+            chip: esp32s31
+            board: esp-mosaico
+          - example: tomb_raycast
+            chip: esp32s31
+            board: esp-mosaico
+          - example: neon_rift_rally
+            chip: esp32s31
+            board: esp-mosaico
+          - example: raylib_shooter
+            chip: esp32s3
+            board: esp32-s3-box-3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: registry-release-candidate
+          path: release-artifacts
+      - name: Build the assembled example
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: latest
+          # The image target stays esp32s3. ESP32-S31 builds select the preview
+          # toolchain inside the command; this image has no separate S31 tag.
+          target: esp32s3
+          path: '.'
+          command: |
+            set -euo pipefail
+            EXAMPLE='${{ matrix.example }}'
+            BOARD='${{ matrix.board }}'
+            CHIP='${{ matrix.chip }}'
+            python -m pip install Pillow numpy PyYAML
+            if [ "$BOARD" != none ]; then
+              python -m pip install esp-bmgr-assist
+            fi
+            ARCHIVE="release-artifacts/raylib-lite-engine_$(cat VERSION).tgz"
+            test -f "$ARCHIVE"
+            python tools/prepare_release_consumer.py --archive "$ARCHIVE" --example "$EXAMPLE" --output /tmp/raylib-consumer
+            cd /tmp/raylib-consumer
+            if [ "$BOARD" = esp-mosaico ]; then
+              IDF_TARGET="$CHIP" idf.py --preview set-target "$CHIP"
+              IDF_TARGET="$CHIP" idf.py --preview bmgr -c ./shared/boards/esp-mosaico/bmgr -b esp_mosaico
+              IDF_TARGET="$CHIP" idf.py --preview -B /tmp/raylib-consumer-build -DIDF_TARGET="$CHIP" build
+            elif [ "$BOARD" = esp32-s3-box-3 ]; then
+              IDF_TARGET="$CHIP" idf.py bmgr -c ./shared/boards -b esp32_s3_box_3 -a "$PWD/shared/boards/esp32-s3-box-3/bmgr_amend"
+              IDF_TARGET="$CHIP" idf.py -B /tmp/raylib-consumer-build -DIDF_TARGET="$CHIP" build
+            else
+              idf.py -B /tmp/raylib-consumer-build -DIDF_TARGET="$CHIP" build
+            fi
+
   upload_components:
     name: Upload assembled component to Espressif Component Service
-    needs: package-and-build
+    needs: [package, consumer-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

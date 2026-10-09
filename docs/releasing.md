@@ -62,17 +62,33 @@ idf.py -C /tmp/raylib-minimal-consumer -B /tmp/raylib-minimal-build \
   -DIDF_TARGET=esp32s3 build
 ```
 
-The release workflow also builds `--example last_zone_extraction` with
-`idf.py --preview` and `-DIDF_TARGET=esp32s31`. Repeat that locally when
-checking a candidate outside CI.
 This copies one assembled example alone and unpacks the Engine into
 `components/espressif2022__raylib-lite-engine`. The helper removes **only** the
 Engine Registry dependencies in this test project, so the unpublished local
 package is used. BSP dependencies keep their pins. This substitution must
 never appear in published examples.
-Build the minimal consumer and an assembled Board game with separate build dirs.
-After publication, also verify a clean Registry dependency download with no local
-components or overrides.
+Use a separate build directory for each Board. After publication, also verify
+a clean Registry dependency download with no local components or overrides.
+
+The release workflow builds every assembled game on ESP-Mosaico. From the
+consumer directory that is:
+
+```sh
+idf.py --preview set-target esp32s31
+idf.py --preview bmgr -c ./shared/boards/esp-mosaico/bmgr -b esp_mosaico
+idf.py --preview -B /tmp/raylib-consumer-build -DIDF_TARGET=esp32s31 build
+```
+
+It also builds assembled `raylib_shooter` on ESP32-S3-BOX-3. Living Worlds stays
+off that Board. From the same kind of consumer directory:
+
+```sh
+IDF_TARGET=esp32s3 idf.py bmgr -c ./shared/boards -b esp32_s3_box_3 \
+  -a "$PWD/shared/boards/esp32-s3-box-3/bmgr_amend"
+IDF_TARGET=esp32s3 idf.py -B /tmp/raylib-box3-build -DIDF_TARGET=esp32s3 build
+```
+
+Repeat a changed game locally when checking a candidate outside CI.
 
 ## Release version and upload
 
@@ -95,8 +111,11 @@ The changelog records the namespace migration from historical `mosaico_*` APIs.
    release; it is not the publishing trigger.
 
 The release workflow assembles and checks artifacts on PRs, pushes to `main`
-and manual runs. Its package job builds the minimal consumer for `esp32s3` and
-the assembled `last_zone_extraction` consumer for `esp32s31`. The CI image is
+and manual runs. After packaging, it compiles `minimal` for `esp32s3`, every
+assembled game for `esp32s31` after generating the ESP-Mosaico Board Manager
+profile, and assembled `raylib_shooter` for `esp32s3` after generating the
+ESP32-S3-BOX-3 profile. Living Worlds is not built for BOX-3. These are compile
+checks, not device acceptance. The CI image is
 `latest` until ESP-IDF 6.2 publishes a release image tag. Only a push to `main`
 enables the dependent `upload_components`
 job. It verifies the checked archive SHA-256, unpacks it and uploads the assembled
