@@ -8,5 +8,5 @@ dependencies:
   esp-mosaico-bsp:
     git: https://github.com/espressif2022/esp-mosaico-bsp.git
     path: components/esp-mosaico-bsp
-    version: "b869aa354c3a7ca8b5391bac2b6943bd676dcc22"
+    version: "bba7bd82262e5f5d127bc9ccf8eed16de2a8945b"
   espressif/esp_display_present: "==1.0.2"
