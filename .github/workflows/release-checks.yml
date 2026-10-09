@@ -99,7 +99,6 @@ jobs:
             python tools/prepare_release_consumer.py --archive "$ARCHIVE" --example "$EXAMPLE" --output /tmp/raylib-consumer
             cd /tmp/raylib-consumer
             if [ "$BOARD" = esp-mosaico ]; then
-              IDF_TARGET="$CHIP" idf.py --preview set-target "$CHIP"
               IDF_TARGET="$CHIP" idf.py --preview bmgr -c ./shared/boards/esp-mosaico/bmgr -b esp_mosaico
               IDF_TARGET="$CHIP" idf.py --preview -B /tmp/raylib-consumer-build -DIDF_TARGET="$CHIP" build
             elif [ "$BOARD" = esp32-s3-box-3 ]; then

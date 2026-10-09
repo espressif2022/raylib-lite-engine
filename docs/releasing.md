@@ -74,9 +74,8 @@ The release workflow builds every assembled game on ESP-Mosaico. From the
 consumer directory that is:
 
 ```sh
-idf.py --preview set-target esp32s31
-idf.py --preview bmgr -c ./shared/boards/esp-mosaico/bmgr -b esp_mosaico
-idf.py --preview -B /tmp/raylib-consumer-build -DIDF_TARGET=esp32s31 build
+IDF_TARGET=esp32s31 idf.py --preview bmgr -c ./shared/boards/esp-mosaico/bmgr -b esp_mosaico
+IDF_TARGET=esp32s31 idf.py --preview -B /tmp/raylib-consumer-build -DIDF_TARGET=esp32s31 build
 ```
 
 It also builds assembled `raylib_shooter` on ESP32-S3-BOX-3. Living Worlds stays
