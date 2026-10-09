@@ -134,8 +134,8 @@ def assemble(destination, games=GAMES, root=ROOT):
             "## ESP32-S3-BOX-3\n\n"
             "Generate the Board Manager profile for this example, then build in a separate directory:\n\n"
             "```sh\npython3 -m pip install esp-bmgr-assist\n"
-            'IDF_TARGET=esp32s3 idf.py bmgr -b esp32_s3_box_3 -a "$PWD/shared/boards/esp32-s3-box-3/bmgr_amend"\n'
-            "IDF_TARGET=esp32s3 idf.py -B build-box3 -DIDF_TARGET=esp32s3 -DRAYLIB_LITE_BOARD=esp32-s3-box-3 build\n```\n\n"
+            'IDF_TARGET=esp32s3 idf.py bmgr -c ./shared/boards -b esp32_s3_box_3 -a "$PWD/shared/boards/esp32-s3-box-3/bmgr_amend"\n'
+            "IDF_TARGET=esp32s3 idf.py -B build-box3 -DIDF_TARGET=esp32s3 build\n```\n\n"
             "BOX-3 uses its own standalone partition table and does not install Mosaico Iris/Recovery.\n\n"
         ) if game != "living_worlds" else (
             "Living Worlds currently requires S31 hardware JPEG decoding; BOX-3 needs a software fallback.\n\n"
@@ -144,8 +144,8 @@ def assemble(destination, games=GAMES, root=ROOT):
             f"# {game}\n\nStandalone native example.\n\n"
             "This directory includes its own shared launcher and Board. The Engine\n"
             "is resolved from the Component Registry; no sibling checkout is needed.\n\n"
-            "```sh\npython3 -m pip install Pillow numpy\nidf.py --preview set-target esp32s31\nidf.py --preview build\n```\n\n"
-            "The Board downloads its pinned BSP dependency. This build\n"
+            "```sh\npython3 -m pip install Pillow numpy\nidf.py --preview set-target esp32s31\nidf.py bmgr -c ./shared/boards/esp-mosaico/bmgr -b esp_mosaico\nidf.py --preview build\n```\n\n"
+            "The Board hardware is generated from its Board Manager profile. This build\n"
             "produces a standalone native game application.\n"
             "Use Vibe to build a separate Iris installation bundle.\n\n"
             + box3_instructions +

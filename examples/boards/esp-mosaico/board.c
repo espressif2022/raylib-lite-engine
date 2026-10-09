@@ -4,14 +4,15 @@
 
 #include <stdatomic.h>
 #include <string.h>
-#include "bsp/esp_mosaico.h"
+#include "esp_board_manager_includes.h"
+#include "mosaico_hardware.h"
 #include "esp_display_present_config.h"
 #include "esp_lcd_touch.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#include "mosaico_strip_present.h"
+#include "mosaico_video.h"
 #include "raylib_lite_action.h"
 #include "nvs_flash.h"
 
@@ -26,18 +27,19 @@ struct raylib_lite_example_board {
     raylib_lite_input_event_t events[INPUT_CAPACITY];
     esp_lcd_touch_handle_t touch;
     esp_display_presenter_t *presenter;
-    void *video;
+    mosaico_video_t *video;
     SemaphoreHandle_t mutex;
     SemaphoreHandle_t touch_done;
     SemaphoreHandle_t imu_done;
     TaskHandle_t touch_task;
     TaskHandle_t imu_task;
     atomic_bool sampling;
-    bool cleanup_pending;
+    bool bmgr_initialized;
+    void *imu;
 };
 
 static struct raylib_lite_example_board s_board;
-static bool s_consumed;
+static bool s_claimed;
 
 static esp_err_t to_esp(raylib_lite_result_t result)
 {
@@ -62,16 +64,12 @@ static esp_err_t to_esp(raylib_lite_result_t result)
 
 esp_err_t raylib_lite_example_board_haptic_init(void)
 {
-    esp_err_t error = bsp_motor_init();
-    if (error != ESP_OK) return error;
-    return bsp_motor_set(false);
+    return mosaico_hardware_haptic_set(0);
 }
 
 esp_err_t raylib_lite_example_board_haptic_set(uint8_t strength)
 {
-    if (strength > 100) return ESP_ERR_INVALID_ARG;
-    if (strength == 0) return bsp_motor_set(false);
-    return bsp_motor_set_strength(strength);
+    return mosaico_hardware_haptic_set(strength);
 }
 
 static void lock_queue(void *ctx)
@@ -101,101 +99,124 @@ static void sleep_us(void *ctx, uint64_t us)
     vTaskDelay(ticks ? ticks : 1);
 }
 
-static void push(struct raylib_lite_example_board *p,
-                 const raylib_lite_input_event_t *event)
+static bool mosaico_touch_valid(int32_t x, int32_t y)
 {
-    (void)raylib_lite_input_push(&p->input, event);
+    return x >= 0 && x < ESP_MOSAICO_GAME_WIDTH &&
+           y >= 0 && y < ESP_MOSAICO_GAME_HEIGHT;
 }
 
-static void touch_worker(void *ctx)
+static bool push_event(struct raylib_lite_example_board *board,
+                       const raylib_lite_input_event_t *event)
 {
-    struct raylib_lite_example_board *p = ctx;
-    uint8_t max = p->config.touch_points ? p->config.touch_points : 1;
-    if (max > RAYLIB_LITE_ACTION_CONTACT_CAPACITY) {
+    return raylib_lite_input_push(&board->input, event) == RAYLIB_LITE_OK;
+}
+
+/* Retry unqueued release events on the next poll rather than losing them
+ * permanently when the bounded Game input queue fills. */
+static void touch_worker(void *arg)
+{
+    struct raylib_lite_example_board *board = arg;
+    uint8_t max = board->config.touch_points ? board->config.touch_points : 1;
+    if (max > RAYLIB_LITE_ACTION_CONTACT_CAPACITY)
         max = RAYLIB_LITE_ACTION_CONTACT_CAPACITY;
-    }
 
-    raylib_lite_input_contact_t old[RAYLIB_LITE_ACTION_CONTACT_CAPACITY] = {0};
     bool was_pressed = false;
-    int last_x = 0;
-    int last_y = 0;
+    int32_t last_x = 0, last_y = 0;
+    raylib_lite_input_contact_t old[RAYLIB_LITE_ACTION_CONTACT_CAPACITY] = {0};
 
-    while (atomic_load_explicit(&p->sampling, memory_order_acquire)) {
+    while (atomic_load_explicit(&board->sampling, memory_order_acquire)) {
         esp_lcd_touch_point_data_t points[RAYLIB_LITE_ACTION_CONTACT_CAPACITY] = {0};
         uint8_t count = 0;
-        uint64_t now = now_us(NULL);
-
-        if (esp_lcd_touch_read_data(p->touch) == ESP_OK &&
-                esp_lcd_touch_get_data(p->touch, points, &count, max) == ESP_OK) {
-            if (count > max) {
-                count = max;
-            }
+        if (esp_lcd_touch_read_data(board->touch) == ESP_OK &&
+                esp_lcd_touch_get_data(board->touch, points, &count, max) == ESP_OK) {
+            if (count > max) count = max;
+            uint64_t stamp = now_us(NULL);
             if (max == 1) {
-                bool pressed = count != 0;
+                bool pressed = count > 0;
+                int32_t x = last_x, y = last_y;
                 if (pressed) {
-                    last_x = points[0].x;
-                    last_y = points[0].y;
-                }
-                if (pressed || was_pressed) {
-                    raylib_lite_input_event_t e = {
-                        .type = RAYLIB_LITE_INPUT_POINTER,
-                        .x = last_x,
-                        .y = last_y,
-                        .pressed = pressed,
-                        .timestamp_us = now,
-                    };
-                    push(p, &e);
-                }
-                was_pressed = pressed;
-            } else {
-                for (uint8_t i = 0; i < count; i++) {
-                    raylib_lite_input_event_t e = {
-                        .type = RAYLIB_LITE_INPUT_TOUCH,
-                        .x = points[i].x,
-                        .y = points[i].y,
-                        .value = points[i].track_id,
-                        .pressed = true,
-                        .timestamp_us = now,
-                    };
-                    push(p, &e);
-                }
-                for (size_t i = 0; i < RAYLIB_LITE_ACTION_CONTACT_CAPACITY; i++) {
-                    if (!old[i].active) {
-                        continue;
+                    int32_t px = points[0].x, py = points[0].y;
+                    if (mosaico_touch_valid(px, py)) {
+                        x = px;
+                        y = py;
+                    } else {
+                        pressed = false;
                     }
+                }
+                if ((pressed && (!was_pressed || x != last_x || y != last_y)) ||
+                        (!pressed && was_pressed)) {
+                    raylib_lite_input_event_t event = {
+                        .type = RAYLIB_LITE_INPUT_POINTER,
+                        .x = x, .y = y, .pressed = pressed,
+                        .timestamp_us = stamp,
+                    };
+                    if (push_event(board, &event)) {
+                        was_pressed = pressed;
+                        last_x = x;
+                        last_y = y;
+                    }
+                }
+            } else {
+                /* Release absent contacts first; retained old[] entries retry
+                 * when the queue cannot accept an important release edge. */
+                for (size_t i = 0; i < RAYLIB_LITE_ACTION_CONTACT_CAPACITY; i++) {
+                    if (!old[i].active) continue;
                     bool found = false;
                     for (uint8_t j = 0; j < count; j++) {
-                        if (points[j].track_id == old[i].track_id) {
+                        int32_t px = points[j].x, py = points[j].y;
+                        if (points[j].track_id == old[i].track_id &&
+                                mosaico_touch_valid(px, py)) {
                             found = true;
                             break;
                         }
                     }
                     if (!found) {
-                        raylib_lite_input_event_t e = {
+                        raylib_lite_input_event_t event = {
                             .type = RAYLIB_LITE_INPUT_TOUCH,
-                            .x = old[i].x,
-                            .y = old[i].y,
-                            .value = old[i].track_id,
-                            .pressed = false,
-                            .timestamp_us = now,
+                            .x = old[i].x, .y = old[i].y,
+                            .value = old[i].track_id, .pressed = false,
+                            .timestamp_us = stamp,
                         };
-                        push(p, &e);
+                        if (push_event(board, &event)) old[i].active = false;
                     }
                 }
-                memset(old, 0, sizeof(old));
-                for (uint8_t i = 0; i < count; i++) {
-                    old[i] = (raylib_lite_input_contact_t){
-                        .track_id = points[i].track_id,
-                        .x = points[i].x,
-                        .y = points[i].y,
-                        .active = true,
+                for (uint8_t j = 0; j < count; j++) {
+                    int32_t x = points[j].x, y = points[j].y;
+                    if (!mosaico_touch_valid(x, y)) continue;
+                    int slot = -1;
+                    for (size_t i = 0; i < RAYLIB_LITE_ACTION_CONTACT_CAPACITY; i++) {
+                        if (old[i].active && old[i].track_id == points[j].track_id) {
+                            slot = (int)i;
+                            break;
+                        }
+                    }
+                    if (slot >= 0 && old[slot].x == x && old[slot].y == y) continue;
+                    if (slot < 0) {
+                        for (size_t i = 0; i < RAYLIB_LITE_ACTION_CONTACT_CAPACITY; i++) {
+                            if (!old[i].active) {
+                                slot = (int)i;
+                                break;
+                            }
+                        }
+                    }
+                    if (slot < 0) continue;
+                    raylib_lite_input_event_t event = {
+                        .type = RAYLIB_LITE_INPUT_TOUCH,
+                        .x = x, .y = y, .value = points[j].track_id,
+                        .pressed = true, .timestamp_us = stamp,
                     };
+                    if (push_event(board, &event)) {
+                        old[slot] = (raylib_lite_input_contact_t) {
+                            .track_id = points[j].track_id,
+                            .x = x, .y = y, .active = true,
+                        };
+                    }
                 }
             }
         }
         vTaskDelay(pdMS_TO_TICKS(12));
     }
-    xSemaphoreGive(p->touch_done);
+    xSemaphoreGive(board->touch_done);
     vTaskDelete(NULL);
 }
 
@@ -213,7 +234,7 @@ static void imu_worker(void *ctx)
         float x = 0;
         float y = 0;
         float z = 0;
-        if (bsp_imu_get_accel(&x, &y, &z) == ESP_OK) {
+        if (mosaico_hardware_imu_read(p->imu, &x, &y, &z) == ESP_OK) {
             raylib_lite_input_event_t e = {
                 .type = RAYLIB_LITE_INPUT_IMU,
                 .x = (int32_t)(x * 1000),
@@ -221,7 +242,7 @@ static void imu_worker(void *ctx)
                 .value = (int32_t)(z * 1000),
                 .timestamp_us = now_us(NULL),
             };
-            push(p, &e);
+            (void)push_event(p, &e);
         }
         xTaskDelayUntil(&wake, period);
     }
@@ -236,34 +257,44 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
         return ESP_ERR_INVALID_ARG;
     }
     *out = NULL;
-    if (s_consumed) {
+    if (c->logical_width != ESP_MOSAICO_GAME_WIDTH ||
+            c->logical_height != ESP_MOSAICO_GAME_HEIGHT) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    if (s_claimed) {
         return ESP_ERR_INVALID_STATE;
     }
-    s_consumed = true;
+    s_claimed = true;
 
     struct raylib_lite_example_board *p = &s_board;
     memset(p, 0, sizeof(*p));
     p->config = *c;
     atomic_init(&p->sampling, false);
-    p->cleanup_pending = true;
     *out = p;
 
     esp_err_t err = nvs_flash_init();
     if (err != ESP_OK) {
         goto failed;
     }
-    if ((err = bsp_power_init()) != ESP_OK ||
-            (err = bsp_power_set_vcc_3v3(true)) != ESP_OK) {
+    if ((err = mosaico_hardware_prepare()) != ESP_OK) goto failed;
+    if ((err = esp_board_manager_init()) != ESP_OK) goto failed;
+    p->bmgr_initialized = true;
+    void *power = NULL;
+    if ((err = esp_board_manager_get_device_handle("board_power", &power)) != ESP_OK || !power) {
+        if (err == ESP_OK) err = ESP_ERR_INVALID_STATE;
         goto failed;
     }
-
-    bsp_display_config_t dc = BSP_DISPLAY_DEFAULT_CONFIG();
-    dc.enable_touch = false;
-    esp_lcd_panel_handle_t panel = NULL;
-    if ((err = bsp_display_new(&dc, &panel)) != ESP_OK ||
-            (err = bsp_touch_new(BSP_DISPLAY_ROTATE_0, &p->touch)) != ESP_OK) {
+    dev_display_lcd_handles_t *lcd = NULL;
+    dev_lcd_touch_handles_t *touch = NULL;
+    if ((err = esp_board_manager_get_device_handle("display_lcd", (void **)&lcd)) != ESP_OK ||
+            (err = esp_board_manager_get_device_handle("lcd_touch", (void **)&touch)) != ESP_OK) {
         goto failed;
     }
+    if (!lcd || !lcd->panel_handle || !lcd->io_handle || !touch || !touch->touch_handle) {
+        err = ESP_ERR_INVALID_STATE;
+        goto failed;
+    }
+    p->touch = touch->touch_handle;
     esp_display_presenter_config_t present_config = {
         .width = ESP_MOSAICO_GAME_WIDTH,
         .height = ESP_MOSAICO_GAME_HEIGHT,
@@ -271,8 +302,8 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
         .max_damage_areas = 1,
         .target = {
             .hw = {
-                .panel = panel,
-                .io = bsp_display_get_panel_io(),
+                .panel = lcd->panel_handle,
+                .io = lcd->io_handle,
                 .panel_type = ESP_DISPLAY_PRESENT_PANEL_IO,
                 .input_pixel_format = ESP_DISPLAY_PRESENT_PIXEL_FORMAT_RGB565,
                 .rotation = ESP_DISPLAY_PRESENT_ROTATE_0,
@@ -292,16 +323,15 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
         goto failed;
     }
 
-    /* Initialize display transport before other board peripherals. */
+    /* Optional IMU upload starts only after display transport is ready. */
     if (c->enable_imu) {
-        bsp_imu_config_t ic = BSP_IMU_CONFIG_DEFAULT();
-        if ((err = bsp_imu_init()) != ESP_OK ||
-                (err = bsp_imu_start(&ic)) != ESP_OK) {
+        if ((err = esp_board_manager_init_device_by_name("imu_sensor")) != ESP_OK ||
+                (err = esp_board_manager_get_device_handle("imu_sensor", &p->imu)) != ESP_OK) {
             goto failed;
         }
     }
 
-    raylib_lite_result_t rr = mosaico_strip_present_open(
+    raylib_lite_result_t rr = mosaico_video_open(
         p->presenter, ESP_MOSAICO_GAME_WIDTH, ESP_MOSAICO_GAME_HEIGHT, &p->video);
     if (rr != RAYLIB_LITE_OK) {
         err = to_esp(rr);
@@ -328,7 +358,7 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
     }
 
     p->services = (raylib_lite_platform_t){
-        .video = mosaico_strip_present_backend(p->video),
+        .video = mosaico_video_backend(p->video),
         .clock = {
             .monotonic_us = now_us,
             .sleep_for_us = sleep_us,
@@ -338,15 +368,10 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
     return ESP_OK;
 
 failed:
-    /* BSP panel/touch/IMU/power have no symmetric teardown. Preserve the
-     * handle when presenter work prevents cleanup so callers can retry. */
     {
         esp_err_t cleanup = raylib_lite_example_board_retry_cleanup(p, 3000);
-        if (cleanup == ESP_ERR_TIMEOUT) {
-            return cleanup;
-        }
-        *out = NULL;
-        return err;
+        if (cleanup == ESP_OK) *out = NULL;
+        return cleanup == ESP_OK ? err : cleanup;
     }
 }
 
@@ -363,7 +388,8 @@ raylib_lite_input_queue_t *raylib_lite_example_board_input(raylib_lite_example_b
 
 esp_err_t raylib_lite_example_board_start_input(raylib_lite_example_board_t *p)
 {
-    if (!p || atomic_load(&p->sampling)) {
+    if (!p || p != &s_board || !s_claimed || !p->input.initialized ||
+            p->touch_task || p->imu_task || atomic_load(&p->sampling)) {
         return ESP_ERR_INVALID_STATE;
     }
     atomic_store(&p->sampling, true);
@@ -409,6 +435,7 @@ esp_err_t raylib_lite_example_board_stop(raylib_lite_example_board_t *p,
 esp_err_t raylib_lite_example_board_retry_cleanup(raylib_lite_example_board_t *p,
                                                uint32_t timeout_ms)
 {
+    if (!p || p != &s_board) return ESP_ERR_INVALID_ARG;
     raylib_lite_result_t audio_result = raylib_lite_game_audio_shutdown(timeout_ms);
     if (audio_result != RAYLIB_LITE_OK) return to_esp(audio_result);
     esp_err_t err = raylib_lite_example_board_stop(p, timeout_ms);
@@ -416,7 +443,7 @@ esp_err_t raylib_lite_example_board_retry_cleanup(raylib_lite_example_board_t *p
         return err;
     }
     if (p->video) {
-        raylib_lite_result_t rr = mosaico_strip_present_close(p->video, timeout_ms);
+        raylib_lite_result_t rr = mosaico_video_close(p->video, timeout_ms);
         if (rr != RAYLIB_LITE_OK) {
             return to_esp(rr);
         }
@@ -427,6 +454,15 @@ esp_err_t raylib_lite_example_board_retry_cleanup(raylib_lite_example_board_t *p
         if (err != ESP_OK) return err;
         p->presenter = NULL;
     }
+    if (p->bmgr_initialized) {
+        err = esp_board_manager_deinit();
+        if (err != ESP_OK) return err;
+        p->bmgr_initialized = false;
+        p->touch = NULL;
+        p->imu = NULL;
+    }
+    err = mosaico_hardware_release();
+    if (err != ESP_OK) return err;
     if (p->input.initialized) {
         raylib_lite_input_queue_deinit(&p->input);
     }
@@ -442,7 +478,7 @@ esp_err_t raylib_lite_example_board_retry_cleanup(raylib_lite_example_board_t *p
         vSemaphoreDelete(p->imu_done);
         p->imu_done = NULL;
     }
-    p->cleanup_pending = false;
+    s_claimed = false;
     return ESP_OK;
 }
 

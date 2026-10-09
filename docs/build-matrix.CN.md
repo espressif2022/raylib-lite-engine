@@ -9,6 +9,8 @@ Raylib Lite Engine 当前支持 PC Host 和原生 ESP-IDF Board 固件；不支�
 | PC Host | `python3 tools/game_cli.py test examples/<game>` | C 编译器、Pillow | 玩法、确定性回放、RGB565 输出 |
 | ESP-IDF Board 固件 | `idf.py -C examples/<game> build` | ESP-IDF，以及 Game/Board manifest 声明的 Board/BSP 依赖 | 同一 Game source 与 Board application 接入 |
 
+默认的 [ESP-Mosaico Board](../examples/boards/esp-mosaico/README.md) 也使用 ESP Board Manager。每个 Game 从 `examples/<game>` 目录执行 `idf.py bmgr -c ../boards/esp-mosaico/bmgr -b esp_mosaico`；生成文件位于该 Game 的 `components/gen_bmgr_codes/`，并由 Git 忽略。原有异步 present 条带路径保留。
+
 ## Game × Board 模型
 
 Game 只拥有可移植 model/view/module source。其 `main/idf_component.yml` 声明 `espressif2022/raylib-lite-engine: ^0.1.0`；仅仓库内联调时，额外用 `override_path` 把这一版本依赖指向当前 checkout。Game 的 Application CMake 层选择应用侧 Board component，并与 `examples_common` 一起注册。Game 顶层 CMake 不 include Engine 仓库 helper，也不通过 `EXTRA_COMPONENT_DIRS` 发现 Engine。
@@ -32,20 +34,19 @@ python3 tools/game_cli.py list --json --target esp-mosaico
 - `tomb_raycast`
 - `neon_rift_rally`
 
-可选择的第二块 Board：[`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md) 使用 `espressif/esp_board_manager`，物理 LCD 为 320×240。Game 保留自己的逻辑分辨率，由 Board adapter 等比缩放并反向映射触摸。此 Board 必须使用包含 GPIO47 与设备初始化修订的 `bmgr_amend` 配置，为每个 Game 独立生成 Board Manager 代码（下方以 `raylib_shooter` 为例）：
+可选择的第二块 Board：[`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md) 使用 `espressif/esp_board_manager`，物理 LCD 为 320×240。Game 保留自己的逻辑分辨率，由 Board adapter 等比缩放并反向映射触摸。此 Board 必须使用包含 GPIO47 与设备初始化修订的 `bmgr_amend` 配置，为每个 Game 独立生成 Board Manager 代码。从仓库根目录进入 Game 目录后执行（下方以 `raylib_shooter` 为例）：
 
 ```sh
-AMEND="$PWD/examples/boards/esp32-s3-box-3/bmgr_amend"
-idf.py -C examples/raylib_shooter bmgr -b esp32_s3_box_3 -a "$AMEND"
-IDF_TARGET=esp32s3 idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
-    -D RAYLIB_LITE_BOARD=esp32-s3-box-3 build
+cd examples/raylib_shooter
+idf.py bmgr -c ../boards -b esp32_s3_box_3 -a ../boards/esp32-s3-box-3/bmgr_amend
+IDF_TARGET=esp32s3 idf.py -B /tmp/rle-box3-shooter build
 ```
 
 此 Board 使用自身的 `examples/boards/esp32-s3-box-3/partitions.csv`，默认 16 MB Flash，factory 应用分区为 15 MiB。已在 BOX-3 实机验证 `raylib_shooter` 运行与 TT21100 触摸方向，`neon_rift_rally` 的 ES8311 初始化与非静音 PCM 提交；扬声器听音及其他 Game 仍待逐项验收。**Board 可选择不等于所有 Game 已通过实机验收。**
 
 ## 原生固件
 
-原生例程由 Application CMake 选择 `RAYLIB_LITE_BOARD`，默认是 `esp-mosaico`。
+原生例程由 Application CMake 根据 Board Manager 生成的 metadata 自动选择对应的 Board adapter；尚未运行 BMGR 时默认是 `esp-mosaico`。
 Board 负责显示、输入和音频；普通例程使用独立 factory 应用分区，不依赖 Iris 或 Recovery。
 
 ```sh

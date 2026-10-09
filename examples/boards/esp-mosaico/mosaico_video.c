@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "mosaico_strip_present.h"
+#include "mosaico_video.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -28,7 +28,7 @@ typedef enum {
     FRAME_LATEST,
 } frame_state_t;
 
-typedef struct {
+struct mosaico_video {
     esp_display_presenter_t *presenter;
 #ifdef ESP_PLATFORM
     async_color_convert_handle_t copy_dma;
@@ -51,9 +51,9 @@ typedef struct {
     TaskHandle_t worker;
     esp_err_t worker_error;
     bool closing;
-} strip_video_t;
+};
 
-static uint32_t in_flight_locked(const strip_video_t *video)
+static uint32_t in_flight_locked(const mosaico_video_t *video)
 {
     uint32_t count = 0;
     for (unsigned i = 0; i < FRAME_COUNT; ++i) {
@@ -65,11 +65,11 @@ static uint32_t in_flight_locked(const strip_video_t *video)
     return count;
 }
 
-static esp_err_t submit_strips(strip_video_t *video, const uint16_t *pixels);
+static esp_err_t submit_strips(mosaico_video_t *video, const uint16_t *pixels);
 
 static void strip_worker(void *arg)
 {
-    strip_video_t *video = arg;
+    mosaico_video_t *video = arg;
     for (;;) {
         xSemaphoreTake(video->ready, portMAX_DELAY);
         xSemaphoreTake(video->mutex, portMAX_DELAY);
@@ -104,7 +104,7 @@ static void strip_worker(void *arg)
             raylib_lite_runtime_stats_record_display_failure(in_flight);
 #ifdef ESP_PLATFORM
         if (err == ESP_OK && ++video->completed_frames % 300 == 0) {
-            ESP_LOGI("strip_present",
+            ESP_LOGI("video_present",
                      "worker core=%d priority=%u frames=%lu dma_copies=%lu cpu_copies=%lu submit=%luus",
                      xPortGetCoreID(), (unsigned)uxTaskPriorityGet(NULL),
                      (unsigned long)video->completed_frames,
@@ -132,14 +132,14 @@ static raylib_lite_result_t map_err(esp_err_t err)
     }
 }
 
-raylib_lite_result_t mosaico_strip_present_open(
+raylib_lite_result_t mosaico_video_open(
     esp_display_presenter_t *presenter, uint16_t width, uint16_t height,
-    void **out_video)
+    mosaico_video_t **out_video)
 {
     if (!presenter || !width || !height || !out_video)
         return RAYLIB_LITE_INVALID_ARGUMENT;
     *out_video = NULL;
-    strip_video_t *video = calloc(1, sizeof(*video));
+    mosaico_video_t *video = calloc(1, sizeof(*video));
     if (!video) return RAYLIB_LITE_NO_MEMORY;
     video->drawing = video->pending = video->latest = -1;
     size_t frame_bytes = (size_t)width * height * sizeof(uint16_t);
@@ -165,11 +165,11 @@ raylib_lite_result_t mosaico_strip_present_open(
     }
     video->presenter = presenter;
 #ifdef ESP_PLATFORM
-    ESP_LOGI("strip_present", "producer core=%d priority=%u",
+    ESP_LOGI("video_present", "producer core=%d priority=%u",
              xPortGetCoreID(), (unsigned)uxTaskPriorityGet(NULL));
 
 #if MOSAICO_STRIP_FORCE_CPU_COPY
-    ESP_LOGW("strip_present", "diagnostic CPU-only strip copy enabled");
+    ESP_LOGW("video_present", "diagnostic CPU-only strip copy enabled");
 #else
     const async_color_convert_config_t copy_config = {
         .backlog = 1, .dma_burst_size = 16,
@@ -177,9 +177,9 @@ raylib_lite_result_t mosaico_strip_present_open(
     esp_err_t dma_err = esp_async_color_convert_install_dma2d(
         &copy_config, &video->copy_dma);
     if (dma_err == ESP_OK)
-        ESP_LOGI("strip_present", "DMA2D strip copy enabled");
+        ESP_LOGI("video_present", "DMA2D strip copy enabled");
     else
-        ESP_LOGW("strip_present", "DMA2D unavailable (%s); CPU fallback",
+        ESP_LOGW("video_present", "DMA2D unavailable (%s); CPU fallback",
                  esp_err_to_name(dma_err));
 #endif
 #endif
@@ -209,9 +209,9 @@ raylib_lite_result_t mosaico_strip_present_open(
     return RAYLIB_LITE_OK;
 }
 
-static raylib_lite_result_t strip_get_info(void *ctx, raylib_lite_video_info_t *out)
+static raylib_lite_result_t video_get_info(void *ctx, raylib_lite_video_info_t *out)
 {
-    strip_video_t *video = ctx;
+    mosaico_video_t *video = ctx;
     if (!video || !out) return RAYLIB_LITE_INVALID_ARGUMENT;
     *out = (raylib_lite_video_info_t){
         .width = video->width,
@@ -222,9 +222,9 @@ static raylib_lite_result_t strip_get_info(void *ctx, raylib_lite_video_info_t *
     return RAYLIB_LITE_OK;
 }
 
-static raylib_lite_result_t strip_acquire(void *ctx, raylib_lite_frame_t *out)
+static raylib_lite_result_t video_acquire(void *ctx, raylib_lite_frame_t *out)
 {
-    strip_video_t *video = ctx;
+    mosaico_video_t *video = ctx;
     if (!video || !out) return RAYLIB_LITE_INVALID_ARGUMENT;
     memset(out, 0, sizeof(*out));
     xSemaphoreTake(video->mutex, portMAX_DELAY);
@@ -252,7 +252,7 @@ static raylib_lite_result_t strip_acquire(void *ctx, raylib_lite_frame_t *out)
     return RAYLIB_LITE_OK;
 }
 
-static bool frame_matches(const strip_video_t *video, const raylib_lite_frame_t *frame)
+static bool frame_matches(const mosaico_video_t *video, const raylib_lite_frame_t *frame)
 {
     return video->drawing >= 0 && frame &&
            frame->pixels == video->frames[video->drawing] &&
@@ -260,9 +260,9 @@ static bool frame_matches(const strip_video_t *video, const raylib_lite_frame_t 
            frame->height == video->height && frame->stride_pixels == video->width;
 }
 
-static raylib_lite_result_t strip_present(void *ctx, raylib_lite_frame_t *frame)
+static raylib_lite_result_t video_present(void *ctx, raylib_lite_frame_t *frame)
 {
-    strip_video_t *video = ctx;
+    mosaico_video_t *video = ctx;
     if (!video) return RAYLIB_LITE_INVALID_ARGUMENT;
     xSemaphoreTake(video->mutex, portMAX_DELAY);
     if (!frame_matches(video, frame)) {
@@ -294,7 +294,7 @@ static raylib_lite_result_t strip_present(void *ctx, raylib_lite_frame_t *frame)
     return RAYLIB_LITE_OK;
 }
 
-static esp_err_t submit_strips(strip_video_t *video, const uint16_t *pixels)
+static esp_err_t submit_strips(mosaico_video_t *video, const uint16_t *pixels)
 {
 
     size_t area_count = 0;
@@ -354,7 +354,7 @@ static esp_err_t submit_strips(strip_video_t *video, const uint16_t *pixels)
             if (copied) video->dma_copies++;
             if (!copied) {
                 video->copy_dma_failed = true;
-                ESP_LOGW("strip_present", "DMA2D copy failed (%s); CPU fallback",
+                ESP_LOGW("video_present", "DMA2D copy failed (%s); CPU fallback",
                          esp_err_to_name(copy_err));
             }
         }
@@ -388,9 +388,9 @@ static esp_err_t submit_strips(strip_video_t *video, const uint16_t *pixels)
     return err;
 }
 
-static void strip_discard(void *ctx, raylib_lite_frame_t *frame)
+static void video_discard(void *ctx, raylib_lite_frame_t *frame)
 {
-    strip_video_t *video = ctx;
+    mosaico_video_t *video = ctx;
     if (video) {
         xSemaphoreTake(video->mutex, portMAX_DELAY);
         if (video->drawing >= 0) video->states[video->drawing] = FRAME_FREE;
@@ -400,10 +400,10 @@ static void strip_discard(void *ctx, raylib_lite_frame_t *frame)
     if (frame) memset(frame, 0, sizeof(*frame));
 }
 
-static raylib_lite_result_t strip_copy_latest(
+static raylib_lite_result_t video_copy_latest(
     void *ctx, uint16_t *out_pixels, size_t pixel_capacity)
 {
-    strip_video_t *video = ctx;
+    mosaico_video_t *video = ctx;
     if (!video || !out_pixels) return RAYLIB_LITE_INVALID_ARGUMENT;
     size_t pixels = (size_t)video->width * video->height;
     if (pixel_capacity < pixels) return RAYLIB_LITE_INVALID_ARGUMENT;
@@ -418,9 +418,9 @@ static raylib_lite_result_t strip_copy_latest(
     return RAYLIB_LITE_OK;
 }
 
-static raylib_lite_result_t strip_flush(void *ctx, uint32_t timeout_ms)
+static raylib_lite_result_t video_flush(void *ctx, uint32_t timeout_ms)
 {
-    strip_video_t *video = ctx;
+    mosaico_video_t *video = ctx;
     if (!video) return RAYLIB_LITE_INVALID_ARGUMENT;
     TickType_t ticks = pdMS_TO_TICKS(timeout_ms ? timeout_ms : 1);
     if (!ticks) ticks = 1;
@@ -445,9 +445,9 @@ static raylib_lite_result_t strip_flush(void *ctx, uint32_t timeout_ms)
                                                   timeout_ms ? timeout_ms : 1));
 }
 
-static uint32_t strip_in_flight(void *ctx)
+static uint32_t video_in_flight(void *ctx)
 {
-    strip_video_t *video = ctx;
+    mosaico_video_t *video = ctx;
     if (!video) return 0;
     xSemaphoreTake(video->mutex, portMAX_DELAY);
     uint32_t count = in_flight_locked(video);
@@ -455,25 +455,24 @@ static uint32_t strip_in_flight(void *ctx)
     return count;
 }
 
-raylib_lite_video_backend_t mosaico_strip_present_backend(void *video)
+raylib_lite_video_backend_t mosaico_video_backend(mosaico_video_t *video)
 {
     return (raylib_lite_video_backend_t){
         .context = video,
-        .get_info = strip_get_info,
-        .acquire = strip_acquire,
-        .present = strip_present,
-        .discard = strip_discard,
-        .flush = strip_flush,
-        .copy_latest = strip_copy_latest,
-        .in_flight = strip_in_flight,
+        .get_info = video_get_info,
+        .acquire = video_acquire,
+        .present = video_present,
+        .discard = video_discard,
+        .flush = video_flush,
+        .copy_latest = video_copy_latest,
+        .in_flight = video_in_flight,
     };
 }
 
-raylib_lite_result_t mosaico_strip_present_close(void *ctx, uint32_t timeout_ms)
+raylib_lite_result_t mosaico_video_close(mosaico_video_t *video, uint32_t timeout_ms)
 {
-    strip_video_t *video = ctx;
     if (!video) return RAYLIB_LITE_INVALID_ARGUMENT;
-    raylib_lite_result_t result = strip_flush(video, timeout_ms);
+    raylib_lite_result_t result = video_flush(video, timeout_ms);
     if (result != RAYLIB_LITE_OK) return result;
     xSemaphoreTake(video->mutex, portMAX_DELAY);
     video->closing = true;

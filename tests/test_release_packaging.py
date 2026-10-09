@@ -26,6 +26,9 @@ class ReleasePackagingTests(unittest.TestCase):
             for game in GAMES:
                 example = stage / "examples" / game
                 self.assertTrue((example / "shared/boards/esp-mosaico/board.c").is_file())
+                self.assertTrue((example / "shared/boards/esp-mosaico/bmgr/esp_mosaico/board_info.yaml").is_file())
+                self.assertIn("bmgr -c ./shared/boards/esp-mosaico/bmgr -b esp_mosaico",
+                              (example / "README.md").read_text())
                 self.assertTrue((example / "shared/common_components/examples_common/native_module_main.c").is_file())
                 self.assertNotIn("../common_components/", (example / "CMakeLists.txt").read_text())
                 self.assertNotIn("override_path", (example / "main/idf_component.yml").read_text())

@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "mosaico_strip_present.h"
+#include "mosaico_video.h"
 #include "raylib_lite_runtime_stats.h"
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
@@ -187,10 +187,10 @@ int main(void)
     pthread_mutex_init(&fake.gate, NULL);
     pthread_cond_init(&fake.entered, NULL);
     fake.block_submit = 1;
-    void *video = NULL;
-    assert(mosaico_strip_present_open((esp_display_presenter_t *)&fake, 4, 5,
+    mosaico_video_t *video = NULL;
+    assert(mosaico_video_open((esp_display_presenter_t *)&fake, 4, 5,
                                       &video) == RAYLIB_LITE_OK);
-    raylib_lite_video_backend_t b = mosaico_strip_present_backend(video);
+    raylib_lite_video_backend_t b = mosaico_video_backend(video);
     raylib_lite_video_info_t info;
     assert(b.get_info(b.context, &info) == RAYLIB_LITE_OK);
     assert(info.width == 4 && info.height == 5 && info.stride_pixels == 4);
@@ -274,14 +274,14 @@ int main(void)
     pthread_mutex_lock(&fake.gate);
     while (!fake.in_submit) pthread_cond_wait(&fake.entered, &fake.gate);
     pthread_mutex_unlock(&fake.gate);
-    assert(mosaico_strip_present_close(video, 10) == RAYLIB_LITE_TIMEOUT);
+    assert(mosaico_video_close(video, 10) == RAYLIB_LITE_TIMEOUT);
     pthread_mutex_lock(&fake.gate);
     fake.block_submit = 0;
     pthread_cond_signal(&fake.entered);
     pthread_mutex_unlock(&fake.gate);
-    assert(mosaico_strip_present_close(video, 1000) == RAYLIB_LITE_OK);
+    assert(mosaico_video_close(video, 1000) == RAYLIB_LITE_OK);
     pthread_cond_destroy(&fake.entered);
     pthread_mutex_destroy(&fake.gate);
-    puts("mosaico strip present: ok");
+    puts("mosaico video: ok");
     return 0;
 }

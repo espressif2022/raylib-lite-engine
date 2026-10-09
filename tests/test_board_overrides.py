@@ -9,9 +9,10 @@ BOARD = ROOT / "examples/boards/esp-mosaico/project.cmake"
 class BoardOverrideTests(unittest.TestCase):
     def configure(self, folder, bsp=None):
         script = folder / "configure.cmake"
-        text = f'set(RAYLIB_LITE_BSP_DIR "{bsp or ""}")\n'
+        text = f'set(CMAKE_SOURCE_DIR "{folder}")\n'
         text += f'include("{BOARD}")\n'
         text += f'file(WRITE "{folder}/components.txt" "${{EXTRA_COMPONENT_DIRS}}")\n'
+        text += f'file(WRITE "{folder}/defaults.txt" "${{SDKCONFIG_DEFAULTS}}")\n'
         script.write_text(text)
         return subprocess.run(["cmake", "-P", str(script)], capture_output=True, text=True)
 
@@ -22,16 +23,20 @@ class BoardOverrideTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((folder / "components.txt").read_text(), "")
 
-    def test_local_bsp_does_not_register_product_splash(self):
+    def test_project_generated_profile_is_accepted_and_defaults_are_loaded(self):
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
-            for name in ["esp-mosaico-bsp", "mosaico_boot_splash"]:
-                p = folder / "bsp/components" / name
-                p.mkdir(parents=True)
-                (p / "CMakeLists.txt").write_text("# component\n")
-                (p / "idf_component.yml").write_text('version: "0.1.0"\n')
+            generated = folder / "components/gen_bmgr_codes"
+            generated.mkdir(parents=True)
+            defaults = generated / "board_manager.defaults"
+            defaults.write_text("CONFIG_ESP_BOARD_DEV_DISPLAY_LCD_SUPPORT=y\n")
+            result = self.configure(folder)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(str(defaults), (folder / "defaults.txt").read_text())
+
+    def test_local_bsp_environment_does_not_register_another_hardware_owner(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
             result = self.configure(folder, folder / "bsp")
             self.assertEqual(result.returncode, 0, result.stderr)
-            components = (folder / "components.txt").read_text().split(";")
-            self.assertIn(str(folder / "bsp/components/esp-mosaico-bsp"), components)
-            self.assertNotIn(str(folder / "bsp/components/mosaico_boot_splash"), components)
+            self.assertEqual((folder / "components.txt").read_text(), "")

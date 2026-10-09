@@ -1,4 +1,4 @@
-"""Inject rejected and delayed LCD transfers into the real BOX-3 presenter."""
+"""Inject presenter submission failures and delayed quiescence into BOX-3 video."""
 from pathlib import Path
 import shutil
 import subprocess

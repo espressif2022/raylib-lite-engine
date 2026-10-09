@@ -1,31 +1,10 @@
-# Optional local BSP checkout for native example development.
-if(NOT RAYLIB_LITE_BSP_DIR AND DEFINED ENV{RAYLIB_LITE_BSP_DIR})
-    set(RAYLIB_LITE_BSP_DIR "$ENV{RAYLIB_LITE_BSP_DIR}")
-endif()
-function(_raylib_lite_add_local_component root component)
-    if(EXISTS "${root}/CMakeLists.txt" AND EXISTS "${root}/idf_component.yml")
-        get_filename_component(_local_name "${root}" NAME)
-        if(NOT _local_name STREQUAL component)
-            message(FATAL_ERROR "Expected local component ${component}, got ${root}")
-        endif()
-        list(APPEND EXTRA_COMPONENT_DIRS "${root}")
-        set(EXTRA_COMPONENT_DIRS "${EXTRA_COMPONENT_DIRS}" PARENT_SCOPE)
-        return()
-    endif()
-    if(EXISTS "${root}/${component}/CMakeLists.txt")
-        list(APPEND EXTRA_COMPONENT_DIRS "${root}/${component}")
-        set(EXTRA_COMPONENT_DIRS "${EXTRA_COMPONENT_DIRS}" PARENT_SCOPE)
-        return()
-    endif()
-    message(FATAL_ERROR
-        "Local component ${component} was not found under ${root}")
-endfunction()
-
-if(RAYLIB_LITE_BSP_DIR)
-    get_filename_component(_raylib_lite_bsp "${RAYLIB_LITE_BSP_DIR}" ABSOLUTE)
-    if(EXISTS "${_raylib_lite_bsp}/components/esp-mosaico-bsp/CMakeLists.txt")
-        set(_raylib_lite_bsp "${_raylib_lite_bsp}/components")
-    endif()
-    _raylib_lite_add_local_component("${_raylib_lite_bsp}" "esp-mosaico-bsp")
-    list(REMOVE_DUPLICATES EXTRA_COMPONENT_DIRS)
+# ESP Board Manager generates these defaults next to the selected application's
+# CMakeLists.txt when `idf.py bmgr` creates components/gen_bmgr_codes.
+set(_mosaico_board_manager_defaults
+    "${CMAKE_SOURCE_DIR}/components/gen_bmgr_codes/board_manager.defaults")
+if(EXISTS "${_mosaico_board_manager_defaults}")
+    list(APPEND SDKCONFIG_DEFAULTS "${_mosaico_board_manager_defaults}")
+else()
+    message(STATUS
+        "ESP-Mosaico: run 'idf.py bmgr -c <boards-dir> -b esp_mosaico' before building")
 endif()

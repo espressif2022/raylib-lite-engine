@@ -3,10 +3,14 @@
 This application-side Board component uses Espressif **ESP Board Manager** and
 the official `esp32_s3_box_3` profile from `espressif/esp_boards`. It does not
 duplicate the panel GPIO, touch controller selection, or LCD bus configuration.
+The package keeps its amend and defaults at this directory's root and its
+Raylib Lite IDF adapter directly in this Board directory, matching the
+`esp-mosaico` package layout.
 
 The Game's logical RGB565 surface is scaled proportionally with black bars to the
 physical 320x240 SPI LCD. Touch coordinates are mapped back to the Game's logical
-surface. The adapter implements LCD transfer completion, input events, monotonic
+surface. The adapter uses `esp_display_present` 1.0.2 for DMA buffers, LCD transfer
+completion and retryable teardown. It implements input events, monotonic
 clock, and cleanup. BOX-3 also provides ES8311 speaker playback through the
 Board Manager `audio_dac` device using the shared native Game Audio Mixer
 (24 kHz, mono, S16 PCM). IMU and haptic output remain unavailable; no
@@ -21,14 +25,13 @@ once in the activated ESP-IDF Python environment:
 pip install esp-bmgr-assist
 ```
 
-From the **Raylib Lite Engine repository root**:
+From the repository root, enter each Game project directory (shown for `raylib_shooter`):
 
 ```sh
 # The Board Manager board name uses underscores; RLE's selector uses hyphens.
-AMEND="$PWD/examples/boards/esp32-s3-box-3/bmgr_amend"
-idf.py -C examples/raylib_shooter bmgr -b esp32_s3_box_3 -a "$AMEND"
-IDF_TARGET=esp32s3 idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
-    -D RAYLIB_LITE_BOARD=esp32-s3-box-3 build
+cd examples/raylib_shooter
+idf.py bmgr -c ../boards -b esp32_s3_box_3 -a ../boards/esp32-s3-box-3/bmgr_amend
+IDF_TARGET=esp32s3 idf.py -B /tmp/rle-box3-shooter build
 ```
 
 If `esp-bmgr-assist` is unavailable, download the component first through
@@ -38,7 +41,9 @@ ESP-IDF Component Manager and set `IDF_EXTRA_ACTIONS_PATH` to the downloaded
 `examples/<game>/components/gen_bmgr_codes/` and are intentionally ignored by
 Git; generate the board configuration **for each Game project** before building.
 
-Use a fresh `-B` build directory after generating a board profile. An existing
+Board Manager's generated metadata automatically selects the matching
+application adapter. Use a fresh `-B` build directory after switching between
+different chip targets. An existing
 `sdkconfig` retains previous Kconfig feature selections and can mask updated
 `board_manager.defaults`; clean or regenerate the old build configuration
 when switching boards. This Board's `project.cmake` adds the generated
@@ -52,19 +57,26 @@ rather than ESP-IDF's built-in 1 MiB single-app layout. The standard BOX-3
 Flash size remains 16 MB; atypical 32 MB Octal samples need local Kconfig
 overrides and must not change the committed Board defaults.
 
-When switching the **same Game project** back to ESP-Mosaico, run
-`idf.py -C examples/raylib_shooter bmgr -x` with the Board Manager action
-available before selecting `RAYLIB_LITE_BOARD=esp-mosaico` in a fresh build
-directory. This removes the BOX-3-generated component and defaults, which would
-otherwise be discovered by the standard ESP-IDF project component scan.
+When switching the **same Game project** back to ESP-Mosaico, run this from
+that Game project directory, regenerate the Board Manager component from its
+profile, then use a fresh build directory:
+
+```sh
+idf.py bmgr -c ../boards/esp-mosaico/bmgr -b esp_mosaico
+IDF_TARGET=esp32s31 idf.py --preview \
+    -B /tmp/rle-mosaico-shooter build
+```
+
+The `bmgr` command replaces the Game's generated component for the selected
+Board. Mosaico's hardware profile is in `examples/boards/esp-mosaico`.
 
 This example builds standalone native firmware. Device validation covers
 display, input, audio and cleanup separately from compilation.
 
 ## Current limitations
 
-- The SPI presenter uses a full logical framebuffer and 8-row physical strip
-  transfers; a successful presentation waits for LCD DMA transfer completion,
+- The video adapter uses a full logical framebuffer and presenter-owned
+  double-buffered 8-row physical strips; a successful presentation waits for LCD DMA transfer completion,
   not for an independent display scan-out signal. Measure board FPS on hardware.
 - RGB565 panel and TT21100 X-axis touch orientation passed an initial BOX-3
   visual/input acceptance; verify additional panel variants independently.

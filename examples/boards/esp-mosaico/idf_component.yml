@@ -1,12 +1,13 @@
 version: "0.1.0"
-description: ESP-Mosaico application-side Board adapter for Raylib Lite Engine examples
+description: ESP-Mosaico Board Manager adapter for Raylib Lite native examples
 license: Apache-2.0
 
 dependencies:
   idf: ">=6.2"
   espressif2022/raylib-lite-engine: "^0.1.0"
-  esp-mosaico-bsp:
-    git: https://github.com/espressif2022/esp-mosaico-bsp.git
-    path: components/esp-mosaico-bsp
-    version: "bba7bd82262e5f5d127bc9ccf8eed16de2a8945b"
+  espressif/esp_board_manager: "^0.7.1"
   espressif/esp_display_present: "==1.0.2"
+  espressif/esp_codec_dev: "^2.0.0-beta1"
+  espressif/esp_lcd_co5300: "^2.2"
+  espressif/esp_lcd_touch_cst9220: "^0.1"
+  espressif2022/bmi270: "^1.1.0~2"

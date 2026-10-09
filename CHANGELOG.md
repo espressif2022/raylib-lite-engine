@@ -4,16 +4,15 @@
 
 - ESP-Mosaico examples start Iris by default and mark the application healthy
   after the first accepted frame, so `mosaico.py install` can finish.
-- `RAYLIB_LITE_BSP_DIR` and `RAYLIB_LITE_UTILS_DIR` select a local vibe BSP and
-  utils checkout without changing the packaged Git pins.
+- ESP-Mosaico and ESP32-S3-BOX-3 examples use per-project Board Manager
+  generation; generated board metadata selects the matching application adapter.
 - Neon Rift Rally is included in the assembled Registry examples.
 - Prepared the single Engine component for Registry distribution with explicit
   package filters, a minimal offscreen consumer, API contracts and release CI.
 - Registry game examples are assembled with private copies of their shared
   launcher and Board; downloaded examples require no sibling source directory.
-- Kept BSP, Iris USB and Recovery application services in the example Board;
-  the Engine itself does not depend on these product components. Board dependencies
-  resolve from pinned Git revisions without mandatory environment exports.
+- Kept Iris USB and Recovery application services outside the example Board;
+  the Engine itself does not depend on these product components.
 - Native games use the Board partition table; vibe generates a retained Recovery
   layout and installs normal games into `ota_0`. Recovery provisioning remains separate.
 - Imported Sky Hop, Tower Defense, Raylib Shooter, Living Worlds, Last Zone,

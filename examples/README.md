@@ -2,7 +2,7 @@
 
 Reference games for Raylib Lite Engine. Start with `python3 tools/game_cli.py create <name>` or copy a nearby game. See the [build-path guide](../docs/build-matrix.EN.md) for target-specific requirements.
 
-Each top-level game directory keeps board-neutral gameplay source. `main/idf_component.yml` depends on the Engine but does not name a Board. The example Application CMake layer defaults `RAYLIB_LITE_BOARD` to [`esp-mosaico`](boards/esp-mosaico/) and can select another adapter under `boards/<board>` with `-D RAYLIB_LITE_BOARD=<board>`. The ESP-Mosaico Board resolves BSP dependencies from pinned Git revisions; no manual path exports are required. With the supported ESP-IDF environment active, build from the repository root:
+Each top-level game directory keeps board-neutral gameplay source. `main/idf_component.yml` depends on the Engine and Board Manager. The example Application CMake layer maps Board Manager's generated metadata to the matching adapter in a package under `boards/<board-id>`; before BMGR has run it defaults to the [`esp_mosaico`](boards/esp-mosaico/) package and its nested `esp-mosaico` component. ESP-Mosaico hardware is generated from the in-repository BMGR profile; no BSP path export is required. With the supported ESP-IDF environment active, build from the repository root:
 
 ```sh
 IDF_TARGET=esp32s31 idf.py --preview -C examples/raylib_shooter -B /tmp/rle-shooter-s31 -DIDF_TARGET=esp32s31 build
@@ -30,7 +30,7 @@ python3 tools/game_cli.py sim examples/<name>
 python3 tools/game_cli.py sim examples/<name> --headless --frames 300
 ```
 
-The browser preview is `http://127.0.0.1:8460/`; use `--listen 0.0.0.0` for LAN. Native builds select the in-repository Board through `RAYLIB_LITE_BOARD`; the Board fetches its pinned dependencies automatically; local checkout overrides are optional development settings described in the [Board guide](boards/esp-mosaico/README.md). Product firmware owns production board policy and Iris workflows. See the [English documentation index](../docs/README.md) and [Host simulator reference (简体中文)](../host/README.md).
+The browser preview is `http://127.0.0.1:8460/`; use `--listen 0.0.0.0` for LAN. Native builds select the in-repository Board adapter through Board Manager; the Board fetches its pinned dependencies automatically; local checkout overrides are optional development settings described in the [Board guide](boards/esp-mosaico/README.md). Product firmware owns production board policy and Iris workflows. See the [English documentation index](../docs/README.md) and [Host simulator reference (简体中文)](../host/README.md).
 
 ## ESP32-S3-BOX-3
 

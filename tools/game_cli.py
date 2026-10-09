@@ -28,9 +28,14 @@ def available_boards() -> list[str]:
     root = ENGINE_ROOT / "examples/boards"
     if not root.is_dir():
         return []
-    return [path.name for path in sorted(root.iterdir())
-            if path.is_dir() and (path / "CMakeLists.txt").is_file()
-            and (path / "idf_component.yml").is_file()]
+    boards = []
+    for path in sorted(root.iterdir()):
+        if not path.is_dir():
+            continue
+        if (path / "CMakeLists.txt").is_file() and (path / "idf_component.yml").is_file():
+            boards.append(path.name)
+            continue
+    return boards
 
 
 def _inside_any(value: str, *roots: Path) -> Path:

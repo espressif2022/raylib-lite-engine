@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /* SPI LCD presenter for a virtual Game surface with centered letterboxing.
- * This first Board adapter uses synchronous, DMA-complete strip submission.
+ * esp_display_present owns DMA buffers, callbacks and transfer fencing.
  * A successful present therefore means the panel transfer has completed. */
 #include "box3_video.h"
 #include "box3_viewport.h"
@@ -9,8 +9,7 @@
 #include <string.h>
 #include "esp_heap_caps.h"
 #include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
+#include "esp_display_present.h"
 
 #define BOX3_LCD_WIDTH 320U
 #define BOX3_LCD_HEIGHT 240U
@@ -28,37 +27,17 @@ struct box3_video {
     uint16_t view_width;
     uint16_t view_height;
     uint16_t *frame;
-    uint16_t *strip;
-    SemaphoreHandle_t transfer_done;
-    bool swap_bytes;
+    esp_display_presenter_t *presenter;
     bool acquired;
-    bool transfer_pending;
     bool failed;
 };
 
-static bool on_color_done(
-    esp_lcd_panel_io_handle_t io,
-    esp_lcd_panel_io_event_data_t *event,
-    void *user_ctx)
+static raylib_lite_result_t result_from_esp(esp_err_t err)
 {
-    (void)io;
-    (void)event;
-    box3_video_t *video = user_ctx;
-    BaseType_t woken = pdFALSE;
-    xSemaphoreGiveFromISR(video->transfer_done, &woken);
-    return woken == pdTRUE;
-}
-
-static raylib_lite_result_t transfer_wait(box3_video_t *video, uint32_t timeout_ms)
-{
-    if (!video->transfer_pending) return RAYLIB_LITE_OK;
-    TickType_t ticks = timeout_ms == RAYLIB_LITE_WAIT_FOREVER
-        ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
-    if (timeout_ms != 0 && ticks == 0) ticks = 1;
-    if (xSemaphoreTake(video->transfer_done, ticks) != pdTRUE)
-        return RAYLIB_LITE_TIMEOUT;
-    video->transfer_pending = false;
-    return RAYLIB_LITE_OK;
+    if (err == ESP_OK) return RAYLIB_LITE_OK;
+    if (err == ESP_ERR_TIMEOUT) return RAYLIB_LITE_TIMEOUT;
+    if (err == ESP_ERR_NO_MEM) return RAYLIB_LITE_NO_MEMORY;
+    return RAYLIB_LITE_PLATFORM_ERROR;
 }
 
 static raylib_lite_result_t get_info(void *ctx, raylib_lite_video_info_t *out)
@@ -92,7 +71,7 @@ static raylib_lite_result_t acquire(void *ctx, raylib_lite_frame_t *out)
     return RAYLIB_LITE_OK;
 }
 
-static void fill_strip(box3_video_t *video, uint16_t top, uint16_t count)
+static void fill_strip(box3_video_t *video, uint16_t *pixels, uint16_t top, uint16_t count)
 {
     const box3_viewport_t view = {
         .logical_width = video->logical_width,
@@ -104,8 +83,8 @@ static void fill_strip(box3_video_t *video, uint16_t top, uint16_t count)
         .view_width = video->view_width,
         .view_height = video->view_height,
     };
-    box3_fill_strip_pixels(&view, video->frame, video->strip,
-                           top, count, video->swap_bytes);
+    box3_fill_strip_pixels(&view, video->frame, pixels,
+                           top, count, false);
 }
 
 static raylib_lite_result_t present(void *ctx, raylib_lite_frame_t *frame)
@@ -122,30 +101,52 @@ static raylib_lite_result_t present(void *ctx, raylib_lite_frame_t *frame)
     if (!valid) return RAYLIB_LITE_INVALID_STATE;
     if (video->failed) return RAYLIB_LITE_PLATFORM_ERROR;
 
-    for (uint16_t y = 0; y < BOX3_LCD_HEIGHT; y += BOX3_STRIP_ROWS) {
-        uint16_t rows = BOX3_LCD_HEIGHT - y;
-        if (rows > BOX3_STRIP_ROWS) rows = BOX3_STRIP_ROWS;
-        fill_strip(video, y, rows);
-        /* The DMA buffer must not be touched until the completion callback. */
-        video->transfer_pending = true;
-        esp_err_t err = esp_lcd_panel_draw_bitmap(
-            video->panel, 0, y, BOX3_LCD_WIDTH, y + rows, video->strip);
-        if (err != ESP_OK) {
-            /* The BOX-3 ILI9341 driver returns draw errors only while
-             * setting the address window, before queuing color DMA. There
-             * is no completion callback to wait for in this error case. */
-            video->transfer_pending = false;
-            video->failed = true;
-            return RAYLIB_LITE_PLATFORM_ERROR;
+    size_t areas = 0;
+    bool full = false;
+    esp_err_t err = esp_display_presenter_begin_next_frame(
+        video->presenter, NULL, NULL, 0, &areas, &full);
+    if (err != ESP_OK) goto failed;
+    for (uint16_t y = 0; y < BOX3_LCD_HEIGHT;) {
+        esp_display_presenter_buffer_t lease = {0};
+        err = esp_display_presenter_acquire_buffer(video->presenter, &lease);
+        if (err != ESP_OK) goto cancel;
+        const size_t stride = BOX3_LCD_WIDTH * sizeof(uint16_t);
+        size_t rows = 0;
+        size_t remaining = BOX3_LCD_HEIGHT - y;
+        if (!lease.lease_id || !lease.surface.pixels || !lease.resolve_rows ||
+                lease.capacity_bytes < stride) {
+            err = ESP_FAIL;
+            goto cancel;
         }
-        raylib_lite_result_t result = transfer_wait(video, 1500);
-        if (result != RAYLIB_LITE_OK) {
-            video->failed = true;
-            ESP_LOGE("box3_video", "LCD transfer timed out");
-            return result;
+        err = lease.resolve_rows(lease.resolve_rows_ctx, lease.lease_id,
+                                  stride, remaining, &rows);
+        if (err != ESP_OK) goto cancel;
+        if (!rows || rows > remaining || rows > lease.capacity_bytes / stride) {
+            err = ESP_FAIL;
+            goto cancel;
         }
+        fill_strip(video, lease.surface.pixels, y, (uint16_t)rows);
+        const esp_display_present_area_t area = {
+            .x1 = 0, .y1 = y, .x2 = BOX3_LCD_WIDTH - 1,
+            .y2 = y + rows - 1,
+        };
+        err = esp_display_presenter_submit_buffer(video->presenter, &lease, &area, stride);
+        if (err != ESP_OK) goto cancel;
+        y += (uint16_t)rows;
     }
+    const esp_display_presenter_submit_t done = {
+        .coverage = ESP_DISPLAY_PRESENT_COVERAGE_FULL,
+    };
+    err = esp_display_presenter_commit_frame(video->presenter, &done);
+    if (err != ESP_OK) goto cancel;
+    err = esp_display_presenter_quiesce(video->presenter, 1500);
+    if (err != ESP_OK) goto failed;
     return RAYLIB_LITE_OK;
+cancel:
+    esp_display_presenter_cancel_frame(video->presenter);
+failed:
+    video->failed = true;
+    return result_from_esp(err);
 }
 
 static void discard(void *ctx, raylib_lite_frame_t *frame)
@@ -160,7 +161,7 @@ static raylib_lite_result_t flush(void *ctx, uint32_t timeout_ms)
     box3_video_t *video = ctx;
     if (!video) return RAYLIB_LITE_INVALID_ARGUMENT;
     if (video->acquired) return RAYLIB_LITE_INVALID_STATE;
-    return transfer_wait(video, timeout_ms);
+    return result_from_esp(esp_display_presenter_quiesce(video->presenter, timeout_ms));
 }
 
 raylib_lite_result_t box3_video_open(
@@ -170,7 +171,7 @@ raylib_lite_result_t box3_video_open(
     if (!panel || !io || !width || !height || !out)
         return RAYLIB_LITE_INVALID_ARGUMENT;
     *out = NULL;
-    /* SPI completion ISR dereferences this context; keep it in internal RAM. */
+    /* Keep control state in internal RAM; the presenter owns ISR state. */
     box3_video_t *video = heap_caps_calloc(
         1, sizeof(*video), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (!video) return RAYLIB_LITE_NO_MEMORY;
@@ -178,7 +179,6 @@ raylib_lite_result_t box3_video_open(
     video->io = io;
     video->logical_width = width;
     video->logical_height = height;
-    video->swap_bytes = swap_bytes;
     box3_viewport_t viewport;
     if (!box3_viewport_init(&viewport, width, height,
                             BOX3_LCD_WIDTH, BOX3_LCD_HEIGHT)) {
@@ -191,26 +191,32 @@ raylib_lite_result_t box3_video_open(
     video->view_y = viewport.view_y;
     video->frame = heap_caps_malloc((size_t)width * height * sizeof(uint16_t),
                                     MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    video->strip = heap_caps_malloc(BOX3_LCD_WIDTH * BOX3_STRIP_ROWS *
-                                    sizeof(uint16_t),
-                                    MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
-    video->transfer_done = xSemaphoreCreateBinary();
-    if (!video->frame || !video->strip || !video->transfer_done) {
-        heap_caps_free(video->frame);
-        heap_caps_free(video->strip);
-        if (video->transfer_done) vSemaphoreDelete(video->transfer_done);
+    if (!video->frame) {
         heap_caps_free(video);
         return RAYLIB_LITE_NO_MEMORY;
     }
-
-    esp_lcd_panel_io_callbacks_t callbacks = {.on_color_trans_done = on_color_done};
-    esp_err_t err = esp_lcd_panel_io_register_event_callbacks(io, &callbacks, video);
+    const esp_display_presenter_config_t config = {
+        .width = BOX3_LCD_WIDTH, .height = BOX3_LCD_HEIGHT,
+        .pixel_format = ESP_DISPLAY_PRESENT_PIXEL_FORMAT_RGB565,
+        .max_damage_areas = 1, .transfer_timeout_ms = 1500,
+        .target = {
+            .hw = {
+                .panel = panel, .io = io,
+                .panel_type = ESP_DISPLAY_PRESENT_PANEL_IO,
+                .input_pixel_format = ESP_DISPLAY_PRESENT_PIXEL_FORMAT_RGB565,
+                .rotation = ESP_DISPLAY_PRESENT_ROTATE_0,
+                .swap_bytes = swap_bytes, .te_enabled = false,
+                .te_sync = ESP_DISPLAY_PRESENT_TE_SYNC_DISABLED(),
+            },
+            .fb = {.mode = ESP_DISPLAY_PRESENT_MODE_NONE},
+            .drawbuf = {.lines = BOX3_STRIP_ROWS, .buffers = 2, .in_psram = false},
+        },
+    };
+    esp_err_t err = esp_display_presenter_create(&config, &video->presenter);
     if (err != ESP_OK) {
         heap_caps_free(video->frame);
-        heap_caps_free(video->strip);
-        vSemaphoreDelete(video->transfer_done);
         heap_caps_free(video);
-        return RAYLIB_LITE_PLATFORM_ERROR;
+        return result_from_esp(err);
     }
     ESP_LOGI("box3_video", "Game %ux%u to LCD 320x240, viewport (%u,%u) %ux%u",
              width, height, video->view_x, video->view_y,
@@ -253,17 +259,13 @@ bool box3_video_map_touch(const box3_video_t *video, int32_t *x, int32_t *y)
 raylib_lite_result_t box3_video_close(box3_video_t *video, uint32_t timeout_ms)
 {
     if (!video) return RAYLIB_LITE_INVALID_ARGUMENT;
-    /* Retain the callback context and DMA buffer on timeout. Caller may retry. */
+    /* Presenter retains DMA storage on timeout; keep the Board alive for retry. */
     video->acquired = false;
-    raylib_lite_result_t result = transfer_wait(video, timeout_ms);
-    if (result != RAYLIB_LITE_OK) return result;
-    esp_lcd_panel_io_callbacks_t callbacks = {0};
-    esp_err_t err = esp_lcd_panel_io_register_event_callbacks(
-        video->io, &callbacks, NULL);
-    if (err != ESP_OK) return RAYLIB_LITE_PLATFORM_ERROR;
+    esp_err_t err = esp_display_presenter_quiesce(video->presenter, timeout_ms);
+    if (err != ESP_OK) return result_from_esp(err);
+    err = esp_display_presenter_delete(video->presenter);
+    if (err != ESP_OK) return result_from_esp(err);
     heap_caps_free(video->frame);
-    heap_caps_free(video->strip);
-    vSemaphoreDelete(video->transfer_done);
     heap_caps_free(video);
     return RAYLIB_LITE_OK;
 }

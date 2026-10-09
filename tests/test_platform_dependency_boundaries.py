@@ -479,37 +479,41 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
 
     def test_native_examples_select_board_adapter(self) -> None:
         board = ENGINE / "examples/boards/esp-mosaico"
+        board_component = board
         self.assertFalse((ENGINE / "examples/common").exists())
         self.assertFalse((ENGINE / "ports/esp_mosaico").exists())
         self.assertFalse((board / "board.cmake").exists())
-        for name in ("CMakeLists.txt", "idf_component.yml", "project.cmake", "board.c",
+        for name in ("board_info.yaml", "board_devices.yaml",
+                     "board_peripherals.yaml", "project.cmake",
                      "partitions.csv", "sdkconfig.defaults"):
             with self.subTest(path=name):
-                self.assertTrue((board / name).is_file())
+                self.assertTrue((board / ("bmgr/esp_mosaico" if name.endswith(".yaml") else "") / name).is_file())
+        for name in ("CMakeLists.txt", "idf_component.yml", "board.c"):
+            with self.subTest(component_path=name):
+                self.assertTrue((board_component / name).is_file())
         self.assertFalse((board / "esp_mosaico_iris.c").exists())
         self.assertFalse((board / "esp_mosaico_iris.h").exists())
 
-        board_manifest = (board / "idf_component.yml").read_text()
+        board_manifest = (board_component / "idf_component.yml").read_text()
         self.assertIn('version: "0.1.0"', board_manifest)
         self.assertIn('espressif2022/raylib-lite-engine: "^0.1.0"', board_manifest)
-        self.assertIn("esp-mosaico-bsp:", board_manifest)
-        self.assertIn("git: https://github.com/espressif2022/esp-mosaico-bsp.git", board_manifest)
-        self.assertIn("path: components/esp-mosaico-bsp", board_manifest)
+        self.assertIn("espressif/esp_board_manager:", board_manifest)
+        self.assertNotIn("esp-mosaico-bsp", board_manifest)
         self.assertNotIn("esp_iris:", board_manifest)
         self.assertNotIn("esp-mosaico-utils", board_manifest)
         project = (board / "project.cmake").read_text()
         self.assertNotIn("FetchContent", project)
-        board_component = (board / "CMakeLists.txt").read_text()
-        self.assertNotIn("esp_iris", board_component)
-        self.assertNotIn("esp_mosaico_app_recovery", board_component)
-        self.assertNotIn("esp_mosaico_iris.c", board_component)
-        self.assertNotIn('"../../common"', board_component)
-        self.assertIn("examples_common", board_component)
-        self.assertIn("raylib-lite-engine", board_component)
-        self.assertNotIn("native_module_main.c", board_component)
-        self.assertNotIn("native_feedback.c", board_component)
-        self.assertNotIn("support/native", board_component)
-        self.assertNotIn("RAYLIB_LITE_ENGINE_ROOT", board_component)
+        board_cmake = (board_component / "CMakeLists.txt").read_text()
+        self.assertNotIn("esp_iris", board_cmake)
+        self.assertNotIn("esp_mosaico_app_recovery", board_cmake)
+        self.assertNotIn("esp_mosaico_iris.c", board_cmake)
+        self.assertNotIn('"../../common"', board_cmake)
+        self.assertIn("examples_common", board_cmake)
+        self.assertIn("raylib-lite-engine", board_cmake)
+        self.assertNotIn("native_module_main.c", board_cmake)
+        self.assertNotIn("native_feedback.c", board_cmake)
+        self.assertNotIn("support/native", board_cmake)
+        self.assertNotIn("RAYLIB_LITE_ENGINE_ROOT", board_cmake)
 
         common_component = ENGINE / "examples/common_components/examples_common"
         self.assertTrue((common_component / "CMakeLists.txt").is_file())
@@ -519,17 +523,21 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn('"include"', common_cmake)
         self.assertIn("raylib-lite-engine", common_cmake)
         selector = (common_component / "project.cmake").read_text()
-        self.assertIn('set(RAYLIB_LITE_BOARD "esp-mosaico" CACHE STRING', selector)
-        self.assertIn('"${_raylib_lite_boards_root}/${RAYLIB_LITE_BOARD}"', selector)
+        self.assertIn("gen_board_metadata.yaml", selector)
+        self.assertIn('string(REPLACE "_" "-"', selector)
+        self.assertIn('set(RAYLIB_LITE_BOARD "${_raylib_lite_selected_board}" CACHE STRING', selector)
+        self.assertIn("${_raylib_lite_boards_root}/${_raylib_lite_selected_board}", selector)
+        self.assertNotIn("components/${_raylib_lite_selected_board}", selector)
+        self.assertIn("RAYLIB_LITE_BOARD_PACKAGE_DIR", selector)
         self.assertIn('"${CMAKE_CURRENT_LIST_DIR}"', selector)
         self.assertIn('"${RAYLIB_LITE_BOARD_DIR}"', selector)
         self.assertNotIn("extensions/${RAYLIB_LITE_GAME_NAME}", selector)
-        self.assertIn("Unknown RAYLIB_LITE_BOARD", selector)
+        self.assertIn("was not found under", selector)
         self.assertIn("sdkconfig.defaults", selector)
         self.assertIn("project.cmake", selector)
 
         board_project = (board / "project.cmake").read_text()
-        self.assertIn("RAYLIB_LITE_BSP_DIR", board_project)
+        self.assertIn("gen_bmgr_codes", board_project)
         self.assertNotIn("RAYLIB_LITE_UTILS_DIR", board_project)
 
         for root in (ENGINE / "examples").iterdir():
@@ -579,7 +587,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn("game_audio.c", shared_cmake)
         self.assertIn("platform_esp_audio.c", shared_cmake)
         self.assertIn("examples_audio", board_cmake)
-        self.assertIn("board_audio_codec.c", board_cmake)
+        self.assertIn("mosaico_audio_codec.c", board_cmake)
         self.assertNotIn("mosaico_game_audio.c", board_cmake)
         self.assertNotIn('"game_audio.c"', board_cmake)
         self.assertNotIn("bsp/esp_mosaico", (ENGINE / "examples/common_components/examples_audio/platform_esp_audio.c").read_text())
@@ -588,7 +596,8 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertNotIn("raylib_lite_audio_mixer.c", board_cmake)
 
         box3 = ENGINE / "examples/boards/esp32-s3-box-3"
-        box3_cmake = (box3 / "CMakeLists.txt").read_text()
+        box3_component = box3
+        box3_cmake = (box3_component / "CMakeLists.txt").read_text()
         box3_defaults = (box3 / "sdkconfig.defaults").read_text()
         self.assertIn("examples_audio", box3_cmake)
         self.assertIn("box3_audio_codec.c", box3_cmake)
@@ -646,7 +655,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         mosaico = (ENGINE / "examples/boards/esp-mosaico/board.c").read_text()
         mosaico_cleanup = mosaico.split("esp_err_t raylib_lite_example_board_retry_cleanup", 1)[1]
         self.assertLess(mosaico_cleanup.index("raylib_lite_game_audio_shutdown(timeout_ms)"),
-                        mosaico_cleanup.index("mosaico_strip_present_close(p->video, timeout_ms)"))
+                        mosaico_cleanup.index("mosaico_video_close(p->video, timeout_ms)"))
 
     def test_game_manifests_do_not_own_board_dependencies(self) -> None:
         forbidden = ("esp_display_present", "lvgl/lvgl", "esp-mosaico-bsp", "esp_iris", "esp-mosaico:")
