@@ -19,7 +19,9 @@ component/
       main/, assets_src/
       shared/common_components/examples_common/
       shared/boards/esp-mosaico/
-    ...                        # six maintained games
+    neon_rift_rally/           # seventh maintained game
+    ...                        # sky_hop, tower_defense, raylib_shooter,
+                               # living_worlds, last_zone_extraction, tomb_raycast
 release-manifest.json          # outside component; all file hashes and provenance
 ```
 
@@ -60,7 +62,9 @@ idf.py -C /tmp/raylib-minimal-consumer -B /tmp/raylib-minimal-build \
   -DIDF_TARGET=esp32s3 build
 ```
 
-Repeat with `--example last_zone_extraction` and `idf.py --preview` for S31.
+The release workflow also builds `--example last_zone_extraction` with
+`idf.py --preview` and `-DIDF_TARGET=esp32s31`. Repeat that locally when
+checking a candidate outside CI.
 This copies one assembled example alone and unpacks the Engine into
 `components/espressif2022__raylib-lite-engine`. The helper removes **only** the
 Engine Registry dependencies in this test project, so the unpublished local
@@ -91,7 +95,10 @@ The changelog records the namespace migration from historical `mosaico_*` APIs.
    release; it is not the publishing trigger.
 
 The release workflow assembles and checks artifacts on PRs, pushes to `main`
-and manual runs. Only a push to `main` enables the dependent `upload_components`
+and manual runs. Its package job builds the minimal consumer for `esp32s3` and
+the assembled `last_zone_extraction` consumer for `esp32s31`. The CI image is
+`latest` until ESP-IDF 6.2 publishes a release image tag. Only a push to `main`
+enables the dependent `upload_components`
 job. It verifies the checked archive SHA-256, unpacks it and uploads the assembled
 component through `espressif/upload-components-ci-action@v1` to namespace
 `espressif2022`. PRs, version tags and manual runs do not upload. Direct pushes
@@ -113,8 +120,9 @@ See [official component publishing](https://docs.espressif.com/projects/idf-comp
 Record chip, board, IDF revision, build commands, startup/input/present/shutdown
 results and unexercised paths. Host timing is not device FPS. Current verified
 Board path is ESP-Mosaico/ESP32-S31 with IDF revision
-`7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe`; portability to other chips is subject
-to focused IDF builds. The minimal consumer has no display/audio/input device
+`7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe`. That revision is device evidence.
+The release workflow image is `latest`, not that commit, until a 6.2 release
+image exists. Portability to other chips is subject to focused IDF builds. The minimal consumer has no display/audio/input device
 claims. Consult the per-release evidence rather than inferring support from
 `idf >=6.2` alone.
 

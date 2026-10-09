@@ -87,7 +87,7 @@ Build from the repository root:
 idf.py --preview -C examples/neon_rift_rally -B /tmp/neon-rift-rally-native -DIDF_TARGET=esp32s31 build
 ```
 
-Deployment uses the [Board workflow](../boards/esp-mosaico/README.md). Iris USB services and log redirection are disabled by default; the console uses UART0. The current example supports Host and native firmware.
+Deployment uses the [Board workflow](../boards/esp-mosaico/README.md). Iris USB is enabled by default so a Recovery-first install can observe a healthy application. The current example supports Host and native firmware.
 
 ## Interface contract for the gameplay/view implementation
 

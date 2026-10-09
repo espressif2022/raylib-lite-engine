@@ -47,3 +47,9 @@ Use [build paths](build-matrix.EN.md) for device integration. Native examples bu
 Run `python3 tools/check_markdown_links.py` and `git diff --check`. Select focused checks from [AGENTS.md](../AGENTS.md); portable C/public-header/Host/CLI changes also require `python3 -m unittest discover -s tests -v` before a commit or PR.
 
 Compile affected portable gameplay code with `-Wall -Wextra -Werror`. Run relevant Host tests, fixed-input replay, and device checks. Record which build path and checks actually passed; do not claim acceptance for a path that was not run.
+
+## Independent game projects
+
+`python3 tools/game_cli.py create /path/to/my_game --template sky-hop` creates a game outside the Engine repository. It carries `shared/common_components` and `shared/boards`, and renames resource files, generators and references together. Its manifest selects the current Engine checkout for source development. Run Host with that checkout's `game_cli.py sim /path/to/my_game`.
+
+Vibe provides `game create my_game` for a blank canvas, or a maintained game template. `game build /path/to/my_game --target iris` uses the workspace BSP and the same utils checkout for Iris/Recovery, producing an ota_0 installation bundle. Published examples resolve Engine through Registry and carry their own shared directories.

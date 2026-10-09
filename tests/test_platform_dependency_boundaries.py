@@ -393,7 +393,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
     def test_reference_examples_have_host_and_direct_entries(self) -> None:
         for directory in (
             "raylib_shooter", "tower_defense", "sky_hop", "living_worlds",
-            "last_zone_extraction", "tomb_raycast",
+            "last_zone_extraction", "tomb_raycast", "neon_rift_rally",
         ):
             root = ENGINE / "examples" / directory
             with self.subTest(example=directory):
@@ -405,7 +405,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
     def test_required_game_matrix_uses_same_module_source_for_host_and_board(self) -> None:
         required = (
             "raylib_shooter", "tower_defense", "sky_hop", "living_worlds",
-            "last_zone_extraction", "tomb_raycast",
+            "last_zone_extraction", "tomb_raycast", "neon_rift_rally",
         )
         for directory in required:
             root = ENGINE / "examples" / directory
@@ -539,6 +539,9 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
 
         board_project = (board / "project.cmake").read_text()
         self.assertIn('ESP_IRIS_BUILD_PROFILE "usb"', board_project)
+        self.assertIn("RAYLIB_LITE_BSP_DIR", board_project)
+        self.assertIn("RAYLIB_LITE_UTILS_DIR", board_project)
+        self.assertIn("FETCHCONTENT_SOURCE_DIR_RAYLIB_LITE_MOSAICO_UTILS", board_project)
 
         for root in (ENGINE / "examples").iterdir():
             manifest_path = root / "main/idf_component.yml"
@@ -556,6 +559,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
                 self.assertNotIn("raylib_lite_native_project.cmake", top)
 
         defaults = (board / "sdkconfig.defaults").read_text()
+        self.assertIn("CONFIG_ESP_MOSAICO_EXAMPLE_IRIS=y", defaults)
         self.assertIn("CONFIG_ESP_IRIS_TRANSPORT_USB=y", defaults)
         self.assertIn("# CONFIG_ESP_IRIS_OTA is not set", defaults)
         self.assertIn("CONFIG_ESP_IRIS_OTA_DEFAULT_VIA_RECOVERY=y", defaults)

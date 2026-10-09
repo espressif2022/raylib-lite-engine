@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- ESP-Mosaico examples start Iris by default and mark the application healthy
+  after the first accepted frame, so `mosaico.py install` can finish.
+- `RAYLIB_LITE_BSP_DIR` and `RAYLIB_LITE_UTILS_DIR` select a local vibe BSP and
+  utils checkout without changing the packaged Git pins.
+- Neon Rift Rally is included in the assembled Registry examples.
 - Prepared the single Engine component for Registry distribution with explicit
   package filters, a minimal offscreen consumer, API contracts and release CI.
 - Registry game examples are assembled with private copies of their shared

@@ -157,9 +157,12 @@ def engine_games() -> list[dict[str, object]]:
     for project in sorted((ENGINE_ROOT / "examples").iterdir()):
         manifest_path = project / "game.sim.json"
         host = False
+        declared_boards = None
         if manifest_path.is_file():
             try:
-                host = json.loads(manifest_path.read_text(encoding="utf-8")).get("schema") == SIM_SCHEMA
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                host = manifest.get("schema") == SIM_SCHEMA
+                declared_boards = manifest.get("native_boards")
             except json.JSONDecodeError:
                 host = False
         top = project / "CMakeLists.txt"
@@ -174,6 +177,8 @@ def engine_games() -> list[dict[str, object]]:
                   "common_components/examples_common/project.cmake" in top_source and
                   "${RAYLIB_LITE_BOARD}" in main_source)
         game_boards = list(boards) if native else []
+        if declared_boards is not None:
+            game_boards = [board for board in game_boards if board in declared_boards]
         if host or game_boards:
             games.append({"name": project.name, "path": str(project),
                           "host": host, "boards": game_boards})
@@ -202,7 +207,7 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
     raw = Path(arguments.destination)
     try:
         if raw.is_absolute() or len(raw.parts) > 1:
-            destination = _inside_any(str(raw), repository, ENGINE_ROOT)
+            destination = raw.expanduser().resolve() if raw.is_absolute() else (repository / raw).resolve()
         else:
             destination = (ENGINE_ROOT / "examples" / raw).resolve()
             destination.relative_to(ENGINE_ROOT.resolve())
@@ -225,9 +230,23 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
         "build", "build-*", "managed_components", "dependencies.lock",
         "sdkconfig", "assets", ".codex-runs", "pc"
     ))
+    # A new game is a standalone application; do not rely on sibling examples.
+    shared = destination / "shared"
+    for directory in ("common_components", "boards"):
+        shutil.copytree(ENGINE_ROOT / "examples" / directory, shared / directory,
+                        ignore=shutil.ignore_patterns("build", "build-*", "managed_components", "__pycache__"))
+    top = destination / "CMakeLists.txt"
+    if top.is_file():
+        top.write_text(top.read_text().replace("../common_components/", "shared/common_components/"))
+    for defaults in (shared / "boards").glob("*/sdkconfig.defaults"):
+        defaults.write_text(defaults.read_text().replace("../boards/", "shared/boards/"))
+    manifest = destination / "main/idf_component.yml"
+    if manifest.is_file():
+        import re
+        manifest.write_text(re.sub(r"override_path:.*", "override_path: " + json.dumps(str(ENGINE_ROOT)), manifest.read_text()))
     for path in destination.rglob("*"):
         if not path.is_file() or path.suffix.lower() not in {
-            ".c", ".h", ".md", ".json", ".txt", ".cmake", ".yml", ".yaml", ".in"
+            ".c", ".h", ".md", ".json", ".txt", ".cmake", ".yml", ".yaml", ".in", ".py"
         }:
             continue
         try:
@@ -235,6 +254,9 @@ def _create(parser: argparse.ArgumentParser, arguments: argparse.Namespace,
         except UnicodeDecodeError:
             continue
         path.write_text(text.replace(source_name, name), encoding="utf-8")
+    for path in sorted(destination.rglob("*"), key=lambda value: len(value.parts), reverse=True):
+        if source_name in path.name:
+            path.rename(path.with_name(path.name.replace(source_name, name)))
     if arguments.json:
         _emit_json("succeeded", command="create", project=str(destination),
                    template=arguments.template)

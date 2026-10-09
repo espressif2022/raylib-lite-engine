@@ -5,6 +5,7 @@ import io
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -36,7 +37,13 @@ class ReleasePackagingTests(unittest.TestCase):
                     defaults = (example / "shared/boards" / board / "sdkconfig.defaults").read_text()
                     self.assertIn(f'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="{relative}"', defaults)
                 assets = json.loads((example / "ASSET_PROVENANCE.json").read_text())["files"]
-                self.assertTrue(assets, game)
+                media_suffixes = {".png", ".jpg", ".jpeg", ".wav", ".ttf", ".otf"}
+                shipped_media = [path for path in example.rglob("*")
+                                 if path.is_file() and path.suffix.lower() in media_suffixes]
+                if shipped_media:
+                    self.assertTrue(assets, game)
+                else:
+                    self.assertEqual(assets, [], game)
             with contextlib.redirect_stdout(io.StringIO()):
                 check(release)
             (stage / "examples/sky_hop/main/CMakeLists.txt").write_text('include("${CMAKE_CURRENT_LIST_DIR}/../../outside.cmake")')
@@ -62,6 +69,19 @@ class ReleasePackagingTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Unsafe archive"):
                 prepare(archive, "minimal", root / "consumer")
             self.assertFalse((root / "escaped").exists())
+
+    def test_native_asset_helper_links_a_game_without_assets(self):
+        with tempfile.TemporaryDirectory() as folder:
+            project = Path(folder)
+            (project / "game").mkdir()
+            (project / "main.c").write_text("void raylib_lite_register_native_assets(void); int main(void) { raylib_lite_register_native_assets(); return 0; }\n")
+            (project / "CMakeLists.txt").write_text(
+                'cmake_minimum_required(VERSION 3.16)\nproject(empty_game C)\n'
+                'add_executable(empty_game main.c)\nset(COMPONENT_LIB empty_game)\n'
+                f'include("{ROOT.as_posix()}/tools/cmake/raylib_lite_native_assets.cmake")\n'
+                'raylib_lite_native_embed_assets("${CMAKE_CURRENT_SOURCE_DIR}/game")\n')
+            subprocess.run(["cmake", "-S", str(project), "-B", str(project / "build")], check=True, capture_output=True)
+            subprocess.run(["cmake", "--build", str(project / "build")], check=True, capture_output=True)
 
     def test_existing_output_and_source_are_preserved(self):
         with tempfile.TemporaryDirectory() as folder:

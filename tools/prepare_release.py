@@ -12,7 +12,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 GAMES = ("sky_hop", "tower_defense", "raylib_shooter", "living_worlds",
-         "last_zone_extraction", "tomb_raycast")
+         "last_zone_extraction", "tomb_raycast", "neon_rift_rally")
 CORE_FILES = {"CMakeLists.txt", "Kconfig", "idf_component.yml", "LICENSE", "VERSION",
               "README.md", "README.EN.md", "README.CN.md", "API.md", "CHANGELOG.md",
               "THIRD_PARTY_NOTICES.md"}
@@ -130,14 +130,25 @@ def assemble(destination, games=GAMES, root=ROOT):
         }, indent=2) + "\n")
         # Keep local images and gameplay instructions; repo-only Host commands
         # and cross-repository links belong to the source documentation.
+        box3_instructions = (
+            "## ESP32-S3-BOX-3\n\n"
+            "Generate the Board Manager profile for this example, then build in a separate directory:\n\n"
+            "```sh\npython3 -m pip install esp-bmgr-assist\n"
+            'IDF_TARGET=esp32s3 idf.py bmgr -b esp32_s3_box_3 -a "$PWD/shared/boards/esp32-s3-box-3/bmgr_amend"\n'
+            "IDF_TARGET=esp32s3 idf.py -B build-box3 -DIDF_TARGET=esp32s3 -DRAYLIB_LITE_BOARD=esp32-s3-box-3 build\n```\n\n"
+            "BOX-3 uses its own standalone partition table and does not install Mosaico Iris/Recovery.\n\n"
+        ) if game != "living_worlds" else (
+            "Living Worlds currently requires S31 hardware JPEG decoding; BOX-3 needs a software fallback.\n\n"
+        )
         (example / "README.md").write_text(
-            f"# {game}\n\nStandalone ESP-Mosaico native example.\n\n"
+            f"# {game}\n\nStandalone native example.\n\n"
             "This directory includes its own shared launcher and Board. The Engine\n"
             "is resolved from the Component Registry; no sibling checkout is needed.\n\n"
             "```sh\npython3 -m pip install Pillow numpy\nidf.py --preview set-target esp32s31\nidf.py --preview build\n```\n\n"
             "The Board downloads pinned BSP and Iris/Recovery dependencies. This build\n"
             "produces the game application; provisioning Recovery is a separate operation.\n"
             "Use the consuming vibe workspace for Recovery-first installation.\n\n"
+            + box3_instructions +
             f"[Gameplay and Host instructions](https://github.com/espressif2022/raylib-lite-engine/tree/main/examples/{game})\n\n"
             "See ASSET_PROVENANCE.json for the supplied asset inventory and LICENSE\n"
             "for the example's license. External Board dependencies retain their own licenses.\n")

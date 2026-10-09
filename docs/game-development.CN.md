@@ -47,3 +47,9 @@ python3 tools/game_cli.py test examples/<name> --frames 300 --json
 运行 `python3 tools/check_markdown_links.py` 和 `git diff --check`，按 [AGENTS.md](../AGENTS.md) 选择专项检查；修改可移植 C、公共头文件、Host 或 CLI 后，commit/PR 前还需运行 `python3 -m unittest discover -s tests -v`。
 
 用 `-Wall -Wextra -Werror` 编译改动涉及的可移植模型；运行相关 Host 测试、固定输入回放和必要的设备检查。记录实际使用的构建路径与通过的检查，不把未运行的路径写成已验收。
+
+## 独立游戏工程
+
+`python3 tools/game_cli.py create /path/to/my_game --template sky-hop` 可在引擎仓库外创建游戏。生成工程自带 `shared/common_components` 和 `shared/boards`；资源文件、生成脚本与引用一同按新游戏名更新。源码联调时 manifest 指向当前 Engine checkout。Host 运行使用同一个 Engine checkout 的 `game_cli.py sim /path/to/my_game`。
+
+Vibe 中可用 `game create my_game` 创建空白画布，或选择维护例程模板。`game build /path/to/my_game --target iris` 使用工作区的 BSP 与同一份 utils 中的 Iris/Recovery，生成安装到 `ota_0` 的包。发布例程的 Engine 依赖由 Registry 解析；不需要手动复制仓库级公共目录。

@@ -1,5 +1,6 @@
 {
   "schema": "raylib-lite-game-sim/v1",
+  "native_boards": ["esp-mosaico"],
   "sources": [
     "main/game_module.c",
     "main/living_worlds_session.c",

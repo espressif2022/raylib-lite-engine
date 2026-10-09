@@ -5,7 +5,7 @@ Reference games for Raylib Lite Engine. Start with `python3 tools/game_cli.py cr
 Each top-level game directory keeps board-neutral gameplay source. `main/idf_component.yml` depends on the Engine but does not name a Board. The example Application CMake layer defaults `RAYLIB_LITE_BOARD` to [`esp-mosaico`](boards/esp-mosaico/) and can select another adapter under `boards/<board>` with `-D RAYLIB_LITE_BOARD=<board>`. The ESP-Mosaico Board resolves BSP and Iris dependencies from pinned Git revisions; no manual path exports are required. With the supported ESP-IDF environment active, build from the repository root:
 
 ```sh
-idf.py -C examples/raylib_shooter build
+IDF_TARGET=esp32s31 idf.py --preview -C examples/raylib_shooter -B /tmp/rle-shooter-s31 -DIDF_TARGET=esp32s31 build
 ```
 
 | Example | Use it for | Host | ESP-Mosaico Board |
@@ -31,3 +31,14 @@ python3 tools/game_cli.py sim examples/<name> --headless --frames 300
 ```
 
 The browser preview is `http://127.0.0.1:8460/`; use `--listen 0.0.0.0` for LAN. Native builds select the in-repository Board through `RAYLIB_LITE_BOARD`; the Board fetches its pinned dependencies automatically; local checkout overrides are optional development settings described in the [Board guide](boards/esp-mosaico/README.md). Product firmware owns production board policy and Iris workflows. See the [English documentation index](../docs/README.md) and [Host simulator reference (简体中文)](../host/README.md).
+
+## ESP32-S3-BOX-3
+
+The [BOX-3 Board guide](boards/esp32-s3-box-3/README.md) describes per-project
+Board Manager generation and native builds. The adapter is selectable for the
+six CPU-rendered games above; device acceptance remains per game. Living Worlds
+currently needs S31 hardware JPEG decoding and declares only `esp-mosaico` in
+its `game.sim.json` `native_boards` field. The CLI honors that restriction.
+Published games contain both adapters under `shared/boards`; BOX-3 generation
+uses `shared/boards/esp32-s3-box-3/bmgr_amend` from the downloaded example root.
+BOX-3 does not use the ESP-Mosaico Iris/Recovery layout.

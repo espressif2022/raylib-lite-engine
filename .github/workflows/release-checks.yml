@@ -15,8 +15,8 @@ jobs:
       - name: Assemble, pack and build an isolated consumer
         uses: espressif/esp-idf-ci-action@v1
         with:
-          # The official latest image tracks master; there is no master image tag.
-          # Pin this to the verified release image when 6.2 is released.
+          # ESP-IDF 6.2 has no release image tag yet. Device evidence is recorded
+          # separately in docs/releasing.md; this job uses the current latest image.
           esp_idf_version: latest
           target: esp32s3
           path: '.'
@@ -29,6 +29,8 @@ jobs:
             cat /tmp/raylib-release/package-check.json
             python tools/prepare_release_consumer.py --archive /tmp/raylib-release/archives/raylib-lite-engine_$(cat VERSION).tgz --example minimal --output /tmp/raylib-consumer
             idf.py -C /tmp/raylib-consumer -B /tmp/raylib-consumer-build -DIDF_TARGET=esp32s3 build
+            python tools/prepare_release_consumer.py --archive /tmp/raylib-release/archives/raylib-lite-engine_$(cat VERSION).tgz --example last_zone_extraction --output /tmp/raylib-s31-consumer
+            IDF_TARGET=esp32s31 idf.py --preview -C /tmp/raylib-s31-consumer -B /tmp/raylib-s31-build -DIDF_TARGET=esp32s31 build
             mkdir -p dist
             cp /tmp/raylib-release/archives/*.tgz dist/
             cp /tmp/raylib-release/release-manifest.json dist/
