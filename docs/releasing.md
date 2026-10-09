@@ -114,8 +114,9 @@ and manual runs. After packaging, it compiles `minimal` for `esp32s3`, every
 assembled game for `esp32s31` after generating the ESP-Mosaico Board Manager
 profile, and assembled `raylib_shooter` for `esp32s3` after generating the
 ESP32-S3-BOX-3 profile. Living Worlds is not built for BOX-3. These are compile
-checks, not device acceptance. The CI image is
-`latest` until ESP-IDF 6.2 publishes a release image tag. Only a push to `main`
+checks, not device acceptance. Each of the nine consumer configurations builds
+with both `latest` and `v6.1` (18 builds). Packaging uses `latest`; upload waits
+for the complete consumer matrix. Only a push to `main`
 enables the dependent `upload_components`
 job. It verifies the checked archive SHA-256, unpacks it and uploads the assembled
 component through `espressif/upload-components-ci-action@v1` to namespace

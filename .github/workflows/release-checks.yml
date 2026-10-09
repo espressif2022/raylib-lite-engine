@@ -37,13 +37,14 @@ jobs:
           path: dist/
 
   consumer-build:
-    name: Build ${{ matrix.example }} (${{ matrix.board }})
+    name: Build ${{ matrix.build.example }} (${{ matrix.build.board }}, IDF ${{ matrix.idf_version }})
     needs: package
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
+        idf_version: [latest, v6.1]
+        build:
           - example: minimal
             chip: esp32s3
             board: none
@@ -80,16 +81,16 @@ jobs:
       - name: Build the assembled example
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: latest
+          esp_idf_version: ${{ matrix.idf_version }}
           # The image target stays esp32s3. ESP32-S31 builds select the preview
           # toolchain inside the command; this image has no separate S31 tag.
           target: esp32s3
           path: '.'
           command: |
             set -euo pipefail
-            EXAMPLE='${{ matrix.example }}'
-            BOARD='${{ matrix.board }}'
-            CHIP='${{ matrix.chip }}'
+            EXAMPLE='${{ matrix.build.example }}'
+            BOARD='${{ matrix.build.board }}'
+            CHIP='${{ matrix.build.chip }}'
             python -m pip install Pillow numpy PyYAML
             if [ "$BOARD" != none ]; then
               python -m pip install esp-bmgr-assist

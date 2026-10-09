@@ -3,7 +3,7 @@ description: ESP-Mosaico Board Manager adapter for Raylib Lite native examples
 license: Apache-2.0
 
 dependencies:
-  idf: ">=6.2"
+  idf: ">=6.1"
   espressif2022/raylib-lite-engine: "^0.1.0"
   espressif/esp_board_manager: "^0.7.1"
   espressif/esp_display_present: "==1.0.2"
