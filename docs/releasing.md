@@ -68,7 +68,7 @@ checking a candidate outside CI.
 This copies one assembled example alone and unpacks the Engine into
 `components/espressif2022__raylib-lite-engine`. The helper removes **only** the
 Engine Registry dependencies in this test project, so the unpublished local
-package is used. BSP/Iris dependencies keep their pins. This substitution must
+package is used. BSP dependencies keep their pins. This substitution must
 never appear in published examples.
 Build the minimal consumer and an assembled Board game with separate build dirs.
 After publication, also verify a clean Registry dependency download with no local

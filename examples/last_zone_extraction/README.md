@@ -58,12 +58,6 @@ python3 tools/game_cli.py sim examples/last_zone_extraction --headless --frames 
 
 本目录可作为 ESP-IDF native 工程构建；直接烧录会替换当前启动器固件。
 
-## ESP-Mosaico native dependencies / 真机构建依赖
+## Native build
 
-Standard ESP-Mosaico native Game builds automatically download pinned Git dependencies:
-
-```sh
-idf.py -C examples/last_zone_extraction build
-```
-
-No BSP or utilities environment exports are required. The selected Board fetches BSP, ESP-Iris, and the upstream Recovery component at fixed revisions. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.
+See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.

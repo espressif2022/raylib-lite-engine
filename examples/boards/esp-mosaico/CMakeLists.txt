@@ -1,7 +1,6 @@
 idf_component_register(
     SRCS
         "board.c"
-        "iris_display_input.c"
         "mosaico_strip_present.c"
         "board_audio_codec.c"
     PRIV_INCLUDE_DIRS
@@ -12,9 +11,6 @@ idf_component_register(
         raylib-lite-engine
         esp_display_present
         esp-mosaico-bsp
-        esp_iris
-        esp_mosaico_app_recovery
-        app_update
         esp_system
         heap
         nvs_flash

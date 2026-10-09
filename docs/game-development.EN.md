@@ -23,7 +23,12 @@ List Host sources in `game.sim.json` at the game project root:
 }
 ```
 
-`game_module.c` is the shared Game source for Host and Board builds. It includes `raylib_lite_game_module_contract.h` by include path rather than repository-relative path. The application-layer bridge retains historical Product ABI mapping under `MOSAICO_GAME_ELF`, which does not provide current ELF support; Host headers do not import the product Runtime ABI. Portable models and views do not depend on ESP-IDF, BSP, or FreeRTOS. Before compiling, the Host runner executes `assets_src/prepare_*.py` and `generate_*.py`, then packs assets if `assets_src/game_assets.json` exists. The Host manifest needs only `schema` and `sources`; the module's Host ABI descriptor supplies its tick rate.
+
+`main/game_module.c` is the shared Host/native entry with state, input, update
+and render callbacks. Keep models and views portable; isolate device-specific
+implementations in `main/native/` and use generic Board or Engine interfaces.
+Host runs asset preparation/generation scripts and packs `game_assets.json`.
+The module descriptor supplies the tick rate; `game.sim.json` lists shared sources.
 
 ## 2. Validate on Host
 

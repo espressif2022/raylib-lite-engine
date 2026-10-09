@@ -87,7 +87,7 @@ Build from the repository root:
 idf.py --preview -C examples/neon_rift_rally -B /tmp/neon-rift-rally-native -DIDF_TARGET=esp32s31 build
 ```
 
-Deployment uses the [Board workflow](../boards/esp-mosaico/README.md). Iris USB is enabled by default so a Recovery-first install can observe a healthy application. The current example supports Host and native firmware.
+The example supports Host and standalone native firmware. See the [build guide](../../docs/build-matrix.EN.md) for Board selection and Vibe integration.
 
 ## Interface contract for the gameplay/view implementation
 
@@ -130,7 +130,6 @@ fixed-state quality comparison, phase measurements and renderer optimizations.
 The [steering tuning report](performance/steering-tuning.md) records the IMU
 pulse, repeated swing and return-to-center checks.
 
-## ESP-Mosaico native dependencies / 真机构建依赖
+## Native build
 
-Standard ESP-Mosaico native Game builds automatically download pinned Git dependencies.
-No BSP or utilities environment exports are required. See the [Board guide](../boards/esp-mosaico/README.md).
+See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.

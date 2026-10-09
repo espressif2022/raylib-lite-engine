@@ -71,5 +71,15 @@ function's specific ownership and return behavior.
 
 BSP, display DMA, JPEG acceleration, haptics, Iris and Recovery are application
 or example Board policy. Installing this component alone does not create USB
-services, provision Recovery or authorize flashing. The minimal offscreen
+services or provision Recovery. The minimal offscreen
 example exercises installation without these product dependencies.
+
+## Native application services
+
+The shared example launcher can explicitly select an application service provider
+through `RAYLIB_LITE_NATIVE_SERVICE_COMPONENT`. Its neutral contract is
+[`raylib_lite_native_services.h`](include/raylib_lite/raylib_lite_native_services.h).
+Boot runs before Board creation, attach borrows the Board video/input interfaces,
+and first-present runs after frame submission/flush and input startup. Detach must
+finish before the Board is destroyed; failure retains resources. A selected provider
+is a required link dependency. Ordinary native examples select no provider.

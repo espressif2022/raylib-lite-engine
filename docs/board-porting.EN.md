@@ -2,7 +2,7 @@
 
 [简体中文](board-porting.CN.md) · [Build paths](build-matrix.EN.md)
 
-The repository includes an [ESP32-S3-BOX-3 Board Manager adapter](../examples/boards/esp32-s3-box-3/README.md) with initial device acceptance: `raylib_shooter` boots and runs with corrected TT21100 X-axis touch orientation; `neon_rift_rally` boots and confirms ES8311 24 kHz mono audio initialization and non-silent PCM writes. Audible speaker output still requires a listening check; other Games are not yet accepted individually. The game models and generic rasterizer remain board-independent; display scaling and performance changes are deferred. `esp-mosaico-vibe` owns Iris/Recovery product integration. Keep panel/touch adaptation out of shared gameplay.
+The repository includes an [ESP32-S3-BOX-3 Board Manager adapter](../examples/boards/esp32-s3-box-3/README.md) with initial device acceptance: `raylib_shooter` boots and runs with corrected TT21100 X-axis touch orientation; `neon_rift_rally` boots and confirms ES8311 24 kHz mono audio initialization and non-silent PCM writes. Audible speaker output still requires a listening check; other Games are not yet accepted individually. The game models and generic rasterizer remain board-independent; `esp-mosaico-vibe` owns Iris/Recovery product integration. Keep panel/touch adaptation out of shared gameplay.
 
 A concrete native-example Board adapter is an application-side IDF component under `examples/boards/<board>/`. Game manifests stay Board-neutral and depend only on the Engine. The example Application CMake layer includes [`examples/common_components/examples_common/project.cmake`](../examples/common_components/examples_common/project.cmake), which defaults `RAYLIB_LITE_BOARD` to `esp-mosaico`, adds the shared `examples_common` component plus the selected Board to `EXTRA_COMPONENT_DIRS`, and applies the Board's `sdkconfig.defaults` / optional `project.cmake`. Select another Board with `-D RAYLIB_LITE_BOARD=<board>`. Board-neutral launcher/feedback/contracts are owned by the `examples_common` component; a Game may keep device-only adapters under its own `main/native/`, where they remain owned by the Game `main` component and must not include a concrete Board API.
 
@@ -22,4 +22,4 @@ See the [API contract](../API.md) for exact lifecycle rules. After a successful 
 
 When driver callbacks and the game task access the input queue concurrently, provide both queue lock and unlock callbacks. Keep ISR work outside task-context Engine APIs. Define overflow and disconnect recovery so held actions cannot remain stuck.
 
-The reference ESP-Mosaico Board includes Iris/Recovery deployment policy. A new Board must choose its own partition table and deployment flow; importing the Engine does not require that product profile.
+The Board supplies hardware services. Product USB management and updates belong in application service components.

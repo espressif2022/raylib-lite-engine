@@ -373,9 +373,9 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         module_source = module_header.read_text(encoding="utf-8")
         self.assertNotIn("raylib_lite_host_", module_source)
         self.assertNotIn("RAYLIB_LITE_HOST_", module_source)
-        self.assertIn("#if defined(MOSAICO_GAME_ELF)", source)
-        self.assertIn('#include "mosaico_runtime_v1.h"', source)
-        self.assertIn("raylib_lite_game_module_v1_t", source)
+        self.assertNotIn("MOSAICO_GAME_ELF", source)
+        self.assertNotIn("mosaico_runtime_v1.h", source)
+        self.assertIn("raylib_lite_game_module.h", source)
         for module in (ENGINE / "examples").glob("*/main/game_module.c"):
             text = module.read_text(encoding="utf-8")
             with self.subTest(path=module.relative_to(ENGINE)):
@@ -483,7 +483,6 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertFalse((ENGINE / "ports/esp_mosaico").exists())
         self.assertFalse((board / "board.cmake").exists())
         for name in ("CMakeLists.txt", "idf_component.yml", "project.cmake", "board.c",
-                     "iris_display_input.c", "iris_display_input.h",
                      "partitions.csv", "sdkconfig.defaults"):
             with self.subTest(path=name):
                 self.assertTrue((board / name).is_file())
@@ -496,21 +495,13 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn("esp-mosaico-bsp:", board_manifest)
         self.assertIn("git: https://github.com/espressif2022/esp-mosaico-bsp.git", board_manifest)
         self.assertIn("path: components/esp-mosaico-bsp", board_manifest)
-        self.assertIn("esp_iris:", board_manifest)
-        self.assertIn("git: https://github.com/espressif2022/esp-mosaico-utils.git", board_manifest)
-        self.assertIn("path: ESP-Iris/components/esp_iris", board_manifest)
-        self.assertNotIn("override_path:", board_manifest)
+        self.assertNotIn("esp_iris:", board_manifest)
+        self.assertNotIn("esp-mosaico-utils", board_manifest)
         project = (board / "project.cmake").read_text()
-        self.assertIn("FetchContent_Declare(raylib_lite_mosaico_utils", project)
-        self.assertIn("esp-mosaico-recovery/components/esp_mosaico_app_recovery", project)
-        self.assertIn('list(APPEND EXTRA_COMPONENT_DIRS "${_raylib_lite_recovery_dir}")', project)
-        # Iris and Recovery must use the same upstream contract revision.
-        iris_revision = re.search(r'path: ESP-Iris/components/esp_iris\s+version: "([0-9a-f]{40})"', board_manifest).group(1)
-        self.assertIn(f"GIT_TAG {iris_revision}", project)
-
+        self.assertNotIn("FetchContent", project)
         board_component = (board / "CMakeLists.txt").read_text()
-        self.assertIn('"iris_display_input.c"', board_component)
-        self.assertIn("esp_mosaico_app_recovery", board_component)
+        self.assertNotIn("esp_iris", board_component)
+        self.assertNotIn("esp_mosaico_app_recovery", board_component)
         self.assertNotIn("esp_mosaico_iris.c", board_component)
         self.assertNotIn('"../../common"', board_component)
         self.assertIn("examples_common", board_component)
@@ -538,10 +529,8 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn("project.cmake", selector)
 
         board_project = (board / "project.cmake").read_text()
-        self.assertIn('ESP_IRIS_BUILD_PROFILE "usb"', board_project)
         self.assertIn("RAYLIB_LITE_BSP_DIR", board_project)
-        self.assertIn("RAYLIB_LITE_UTILS_DIR", board_project)
-        self.assertIn("FETCHCONTENT_SOURCE_DIR_RAYLIB_LITE_MOSAICO_UTILS", board_project)
+        self.assertNotIn("RAYLIB_LITE_UTILS_DIR", board_project)
 
         for root in (ENGINE / "examples").iterdir():
             manifest_path = root / "main/idf_component.yml"
@@ -559,43 +548,13 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
                 self.assertNotIn("raylib_lite_native_project.cmake", top)
 
         defaults = (board / "sdkconfig.defaults").read_text()
-        self.assertIn("CONFIG_ESP_MOSAICO_EXAMPLE_IRIS=y", defaults)
-        self.assertIn("CONFIG_ESP_IRIS_TRANSPORT_USB=y", defaults)
-        self.assertIn("# CONFIG_ESP_IRIS_OTA is not set", defaults)
-        self.assertIn("CONFIG_ESP_IRIS_OTA_DEFAULT_VIA_RECOVERY=y", defaults)
-        self.assertIn("CONFIG_ESP_IRIS_SYSTEM_INVENTORY=y", defaults)
-        self.assertIn("CONFIG_ESP_IRIS_FIRMWARE_ROLE=1", defaults)
-        self.assertIn('CONFIG_ESP_IRIS_PRODUCT_CONTRACT="esp-mosaico/v1"', defaults)
-        self.assertIn('CONFIG_ESP_IRIS_LAYOUT_ID="mosaico-retained-recovery-2m-v1"', defaults)
-        self.assertIn("CONFIG_ESP_IRIS_RECOVERY_ABI=1", defaults)
-
+        self.assertNotIn("ESP_IRIS", defaults)
         partitions = (board / "partitions.csv").read_text()
-        for token in ("sysmeta", "factory", "coredump", "ota_0"):
-            self.assertIn(token, partitions)
-        self.assertNotIn("ota_1", partitions)
-
-        board_source = (board / "board.c").read_text()
-        self.assertIn("esp_iris_boot_probe", board_source)
-        self.assertIn("iris_ota_support_start", board_source)
-        self.assertIn("esp_iris_mark_healthy", board_source)
-        self.assertIn("mosaico_iris_display_input_register", board_source)
-        self.assertIn("mosaico_iris_display_input_unregister", board_source)
-        self.assertIn("raylib_lite_native_boot", board_source)
-        self.assertIn("raylib_lite_native_first_present", board_source)
-
-        iris_source = (board / "iris_display_input.c").read_text()
-        self.assertIn("esp_iris_screen_register", iris_source)
-        self.assertIn("ESP_IRIS_POINTER_SERVICE_ID", iris_source)
-        for forbidden in (
-            "OTA_STATE_METHOD_ID", "OTA_ACCEPT_METHOD_ID",
-            "ENTER_RECOVERY_METHOD", "esp_iris_system_inventory_register",
-            "esp_iris_platform_mark_healthy", "esp_iris_start()",
-            "esp_iris_stop()",
-        ):
-            self.assertNotIn(forbidden, iris_source)
-
-        self.assertFalse((board / "components/esp_mosaico_app_recovery").exists())
-        self.assertFalse((board / "components/esp_iris").exists())
+        self.assertIn("factory", partitions)
+        self.assertNotIn("ota_0", partitions)
+        for path in board.glob("*"):
+            if path.suffix in {".c", ".h", ".yml", ".cmake"}:
+                self.assertNotIn("esp_iris", path.read_text())
 
     def test_shared_example_glue_does_not_include_concrete_bsp(self) -> None:
         forbidden = re.compile(r'#\s*include\s*[<"](?:bsp/|esp_mosaico)')
@@ -687,7 +646,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         mosaico = (ENGINE / "examples/boards/esp-mosaico/board.c").read_text()
         mosaico_cleanup = mosaico.split("esp_err_t raylib_lite_example_board_retry_cleanup", 1)[1]
         self.assertLess(mosaico_cleanup.index("raylib_lite_game_audio_shutdown(timeout_ms)"),
-                        mosaico_cleanup.index("mosaico_iris_display_input_unregister()"))
+                        mosaico_cleanup.index("mosaico_strip_present_close(p->video, timeout_ms)"))
 
     def test_game_manifests_do_not_own_board_dependencies(self) -> None:
         forbidden = ("esp_display_present", "lvgl/lvgl", "esp-mosaico-bsp", "esp_iris", "esp-mosaico:")
@@ -725,7 +684,7 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
                 self.assertIsNone(product.search(cmake.read_text()))
         launcher = ENGINE / "examples/common_components/examples_common/native_module_main.c"
         text = launcher.read_text()
-        for call in ("raylib_lite_native_boot()", "raylib_lite_native_first_present()"):
+        for call in ("s_services->boot()", "s_services->first_present()", "s_services->attach(", "s_services->detach()") :
             with self.subTest(path=launcher.relative_to(ENGINE), call=call):
                 self.assertIn(call, text)
 

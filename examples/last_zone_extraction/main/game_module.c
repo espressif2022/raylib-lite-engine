@@ -7,10 +7,10 @@
 #include <stdlib.h>
 #include "raylib_lite_clock.h"
 #include "raylib_lite_2d.h"
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 #include "last_zone_feedback.h"
 #endif
-#if !defined(RAYLIB_LITE_GAME_NATIVE) && !defined(MOSAICO_GAME_ELF)
+#if !defined(RAYLIB_LITE_GAME_NATIVE) && 1
 #include "host_asset_runtime.h"
 #endif
 #include "raylib_lite_raylib.h"
@@ -33,7 +33,7 @@ typedef struct {
     uint8_t warmup_frames;
     bool deploy_ready;
     bool block_until_up;
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     last_zone_feedback_t feedback;
 #endif
     uint64_t fps_window_us;
@@ -75,23 +75,7 @@ static void clear_tracks(last_zone_module_t *state)
     last_zone_set_fire_held(&state->game, false);
 }
 
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
-#if defined(MOSAICO_GAME_ELF)
-static void report_missing_asset(const char *path)
-{
-    if (!raylib_lite_product_runtime || !raylib_lite_product_runtime->log || !raylib_lite_product_runtime->log->message) return;
-    char message[96];
-    snprintf(message, sizeof(message), "missing asset: %s", path);
-    raylib_lite_product_runtime->log->message(2, "last_zone_audio", message);
-}
-static const last_zone_feedback_backend_t s_feedback_backend = {
-    .init = raylib_lite_product_haptic_init,
-    .pulse = raylib_lite_product_haptic_pulse,
-    .pattern = raylib_lite_product_haptic_pattern,
-    .stop = raylib_lite_product_haptic_stop,
-    .missing_asset = report_missing_asset,
-};
-#else
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 static void report_missing_asset(const char *path)
 {
     fprintf(stderr, "last_zone_audio: failed to load %s\n", path);
@@ -104,16 +88,13 @@ static const last_zone_feedback_backend_t s_feedback_backend = {
     .missing_asset = report_missing_asset,
 };
 #endif
-#endif
 
 static int initialize(void *value
-#if !defined(MOSAICO_GAME_ELF)
                       , const char *asset_root
-#endif
 )
 {
     last_zone_module_t *state = value;
-#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_host_assets_set_root(asset_root);
 #elif defined(RAYLIB_LITE_GAME_NATIVE)
     (void)asset_root;
@@ -132,7 +113,7 @@ static int initialize(void *value
         return -1;
     last_zone_reset(&state->game);
     clear_tracks(state);
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     state->contact_mask = 0;
     state->warmup_frames = 2;
     state->deploy_ready = false;
@@ -151,7 +132,7 @@ static int initialize(void *value
     InitWindow(480, 480, "Last Zone: Extraction");
     SetTargetFPS(30);
 #endif
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     last_zone_feedback_init(&state->feedback, &state->game, &s_feedback_backend);
 #endif
     return 0;
@@ -161,7 +142,7 @@ static void shutdown(void *value)
 {
     last_zone_module_t *state = value;
     if (!state) return;
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     last_zone_feedback_close(&state->feedback);
 #endif
     raylib_lite_atlas_unload(state->enemies);
@@ -173,7 +154,7 @@ static void shutdown(void *value)
     raylib_lite_atlas_unload(state->props);
 }
 
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 static void note_contact(last_zone_module_t *state, const raylib_lite_game_input_v1_t *event)
 {
     if (event->type != RAYLIB_LITE_GAME_INPUT_POINTER) return;
@@ -201,14 +182,14 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESET) {
             last_zone_reset(&state->game);
             clear_tracks(state);
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
             state->block_until_up = false;
             last_zone_feedback_reset(&state->feedback, &state->game);
 #endif
         }
         return;
     }
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     note_contact(state, event);
     if (!state->deploy_ready) {
         clear_tracks(state);
@@ -257,7 +238,7 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
             /* A release can arrive on a different track id than the press.
              * Once nothing is touching, drop every capture so a mismatched
              * id cannot leave the stick deflected. */
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
             bool none = state->contact_mask == 0;
 #else
             bool none = false;
@@ -301,7 +282,7 @@ static void update(void *value)
 {
     last_zone_module_t *state = value;
     if (!state || state->paused) return;
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     if (state->warmup_frames) state->warmup_frames--;
     if (!state->deploy_ready && state->warmup_frames == 0 && state->contact_mask == 0)
         state->deploy_ready = true;
@@ -320,7 +301,7 @@ static void update(void *value)
         strafe = (state->strafe_right ? walk : 0.0f) - (state->strafe_left ? walk : 0.0f);
     /* Device yaw comes from look drag; Host also supports keyboard turning. */
     last_zone_set_motion(&state->game, forward, strafe,
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
                          0.0f);
 #else
                          (state->right ? 1.0f : 0.0f) -
@@ -330,7 +311,7 @@ static void update(void *value)
     last_zone_set_fire_held(&state->game, state->fire || state->fire_track >= 0);
     if (state->look_track < 0) last_zone_settle_look(&state->game);
     last_zone_update(&state->game);
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     last_zone_feedback_events(&state->feedback, &state->game);
 #endif
 }
@@ -375,16 +356,6 @@ static uint32_t state_hash(const void *value)
 
 static int state_json(const void *value, char *output, size_t capacity)
 {
-#if defined(MOSAICO_GAME_ELF)
-    const last_zone_game_t *g = &((const last_zone_module_t *)value)->game;
-    static const char *phases[] = {"start", "playing", "won", "dead"};
-    const char *phase = g->phase <= LAST_ZONE_PHASE_DEAD ? phases[g->phase] : "playing";
-    return snprintf(output, capacity,
-        "{\"phase\":\"%s\",\"x\":%d,\"y\":%d,\"hp\":%u,\"ammo\":%u,"
-        "\"tick\":%lu,\"state_hash\":\"%08lx\"}",
-        phase, (int)(g->x * 100.0f), (int)(g->y * 100.0f), g->hp, g->ammo,
-        (unsigned long)g->tick, (unsigned long)last_zone_state_hash(g));
-#else
     const last_zone_game_t *g = &((const last_zone_module_t *)value)->game;
     int target = -1;
     float target_distance = 1e9f;
@@ -435,16 +406,11 @@ static int state_json(const void *value, char *output, size_t capacity)
         (unsigned)view.raycast_us, (unsigned)view.grade_us,
         (unsigned)view.submit_us, (unsigned)view.total_us,
         (unsigned)view.rays_cast, (unsigned)view.refined_columns);
-#endif
 }
 
 static const raylib_lite_game_module_v1_t s_module = {
     .descriptor = {
-#if defined(MOSAICO_GAME_ELF)
                    RAYLIB_LITE_GAME_MODULE_ABI,
-#else
-                   RAYLIB_LITE_GAME_MODULE_ABI,
-#endif
                    "last_zone_extraction",
                    "Last Zone: Extraction", 480, 480, 30, 2},
     .state_size = sizeof(last_zone_module_t),
@@ -453,16 +419,7 @@ static const raylib_lite_game_module_v1_t s_module = {
     .state_json = state_json,
 };
 
-#if defined(MOSAICO_GAME_ELF)
-RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
-raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
-{
-    if (runtime) raylib_lite_product_runtime = runtime;
-    return &s_module;
-}
-#else
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {
     return &s_module;
 }
-#endif

@@ -48,6 +48,6 @@ For lifecycle, framebuffer ownership and queue concurrency requirements, see the
 
 ## Configuration and lifecycle
 
-The component-root `Kconfig` uses `RAYLIB_LITE_*` Engine configuration names. Board-specific ESP-Mosaico options use the `ESP_MOSAICO_*` namespace. Shared native-example launcher/Board/feedback/Product-ABI glue is owned by the application-side `examples/common_components/examples_common` IDF component and is excluded from Engine implementation sources. Release assembly bundles a separate copy inside each native game example; it is not an Engine public API.
+The component-root `Kconfig` uses `RAYLIB_LITE_*` Engine configuration names. Board-specific ESP-Mosaico options use the `ESP_MOSAICO_*` namespace. Shared native-example launcher/Board/feedback/game-module glue is owned by the application-side `examples/common_components/examples_common` IDF component and is excluded from Engine implementation sources. Release assembly bundles a separate copy inside each native game example; it is not an Engine public API.
 
 Runtime asset services consume a read-only mmap partition, a resident image alias, a bounded read backing, or explicitly registered memory. Host simulation reads generated assets and does not mount device flash.

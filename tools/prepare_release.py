@@ -145,9 +145,9 @@ def assemble(destination, games=GAMES, root=ROOT):
             "This directory includes its own shared launcher and Board. The Engine\n"
             "is resolved from the Component Registry; no sibling checkout is needed.\n\n"
             "```sh\npython3 -m pip install Pillow numpy\nidf.py --preview set-target esp32s31\nidf.py --preview build\n```\n\n"
-            "The Board downloads pinned BSP and Iris/Recovery dependencies. This build\n"
-            "produces the game application; provisioning Recovery is a separate operation.\n"
-            "Use the consuming vibe workspace for Recovery-first installation.\n\n"
+            "The Board downloads its pinned BSP dependency. This build\n"
+            "produces a standalone native game application.\n"
+            "Use Vibe to build a separate Iris installation bundle.\n\n"
             + box3_instructions +
             f"[Gameplay and Host instructions](https://github.com/espressif2022/raylib-lite-engine/tree/main/examples/{game})\n\n"
             "See ASSET_PROVENANCE.json for the supplied asset inventory and LICENSE\n"

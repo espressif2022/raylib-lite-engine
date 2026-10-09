@@ -36,17 +36,11 @@ python3 tools/game_cli.py sim examples/tomb_raycast
 python3 tools/game_cli.py sim examples/tomb_raycast --headless --frames 8
 ```
 
-目录根部也是可独立构建的 ESP-IDF native 工程。`main/idf_component.yml` 声明 Engine，Application CMake 选择 Board；仓库内用 `override_path` 联调，外部工程使用发布版 Engine 依赖。Board 自动获取固定版本依赖，无需手动设置 BSP/Iris override。设备 provisioning/update 仍走 retained Recovery，不直接烧 normal Game 覆盖 Recovery。
+目录根部提供仓库内 ESP-IDF native 工程，需要相邻共享目录。`main/idf_component.yml` 声明 Engine，Application CMake 选择 Board；仓库内用 `override_path` 联调，外部工程使用发布版 Engine 依赖。Board 自动获取 BSP 依赖；Vibe 构建包装层负责 Iris 安装支持。
 native 画面上的 FPS 显示实际送屏帧率，首次统计完成前显示 `FPS: --`。
 
 历史对照见[历史真机记录](HISTORICAL_PERFORMANCE.md)。当前支持 Host 和 native，不支持 ELF 游戏构建、打包或加载。
 
-## ESP-Mosaico native dependencies / 真机构建依赖
+## Native build
 
-Standard ESP-Mosaico native Game builds automatically download pinned Git dependencies:
-
-```sh
-idf.py -C examples/tomb_raycast -B /tmp/tomb-raycast-native -DIDF_TARGET=esp32s31 build
-```
-
-No BSP or utilities environment exports are required. The selected Board fetches BSP, ESP-Iris, and the upstream Recovery component at fixed revisions. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.
+See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.

@@ -38,6 +38,8 @@ python3 tools/game_cli.py sim examples/sky_hop
 
 仓库提供七个参考游戏和一个渲染基准工程，见[示例列表（English）](examples/README.md)。ESP-Mosaico 原生游戏使用共享 Board 适配层，自动获取板级依赖；构建和安装步骤见[构建指南](docs/build-matrix.CN.md)。
 
+当前 Host 覆盖游戏模块、绘制、输入回放和特效；尚未链接场景、UI、存档和音频模块。
+
 ## 文档
 
 - [开发文档索引](docs/README.CN.md)：资源、输入、音频、绘制和板卡移植。

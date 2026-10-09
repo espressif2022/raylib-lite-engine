@@ -10,3 +10,11 @@
 - `include/raylib_lite_game_module_contract.h`: example/application bridge used by shared Game sources; historical Product ELF ABI mapping stays outside the Engine component and is not a currently supported build path.
 
 Concrete Board implementations remain under `examples/boards/<board>/`. Game-specific device-only implementation stays inside that Game's `main/` component, for example `main/native/`; there is no Board×Game extension layer.
+
+## Optional application services
+
+`RAYLIB_LITE_NATIVE_SERVICE_COMPONENT` selects one service provider at configure
+time. The shared launcher calls its boot, attach, first-present and detach methods;
+ordinary examples select none. The [neutral service contract](../../../include/raylib_lite/raylib_lite_native_services.h)
+contains only Engine types. Product providers own USB/update protocols and must
+finish unregistering callbacks before the launcher releases Board resources.

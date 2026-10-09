@@ -36,7 +36,6 @@ Host 显示实现通过 `raylib_lite_video_backend_t` 接入通用 framebuffer p
 | `render` | 绘制一帧；Host bridge 把它写成调用方提供的 RGB565 缓冲 |
 | `state_json` | 输出回放检查所需的状态 JSON |
 
-`state_hash` 也在模块结构里。当前 Host runner 读取描述符、状态 JSON 和画面，不靠哈希代替这些检查。产品 ELF Runtime ABI 不在 Host 头中；`raylib_lite_game_module_contract.h` 里的 `MOSAICO_GAME_ELF` 分支会引用本仓库没有的产品头，不能当作支持的构建。
 
 启动时 `run_game.py` 会：
 

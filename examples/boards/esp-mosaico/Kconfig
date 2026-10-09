@@ -1,8 +1,0 @@
-config ESP_MOSAICO_EXAMPLE_IRIS
-    bool "Enable Iris USB services in the native example"
-    default y
-    help
-        Start Iris before the first frame and report healthy after that frame
-        is accepted. mosaico.py install waits for this. Iris also redirects
-        stdout/stderr to its log service. Turn this off only for a UART
-        console; the running game then cannot complete an Iris install.

@@ -24,7 +24,7 @@ set(_runtime_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/input/raylib_lite_action.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_debug.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_game_app.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_native_hooks.c")
+)
 set(_asset_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/assets/raylib_lite_assets.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/raylib_lite_assets_mmap.c")

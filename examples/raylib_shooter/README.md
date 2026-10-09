@@ -25,12 +25,6 @@ The fast compatibility layer currently accelerates `InitWindow`,
 measurement and `TextFormat`. Extend that layer for additional Raylib calls;
 unsupported APIs must not silently fall back to the slow `rlsw` path.
 
-## ESP-Mosaico native dependencies / 真机构建依赖
+## Native build
 
-Standard ESP-Mosaico native Game builds automatically download pinned Git dependencies:
-
-```sh
-idf.py -C examples/raylib_shooter build
-```
-
-No BSP or utilities environment exports are required. The selected Board fetches BSP, ESP-Iris, and the upstream Recovery component at fixed revisions. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.
+See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.

@@ -58,10 +58,8 @@ available before selecting `RAYLIB_LITE_BOARD=esp-mosaico` in a fresh build
 directory. This removes the BOX-3-generated component and defaults, which would
 otherwise be discovered by the standard ESP-IDF project component scan.
 
-This is a native firmware build workflow; compiling alone does not authorize
-flashing or prove speaker output, sustained FPS, or all supported Games.
-Unlike ESP-Mosaico, BOX-3 has no retained-Recovery/Iris provisioning policy in
-this example.
+This example builds standalone native firmware. Device validation covers
+display, input, audio and cleanup separately from compilation.
 
 ## Current limitations
 

@@ -1,21 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "raylib_lite_game_module_contract.h"
 #include <stdio.h>
-#if defined(MOSAICO_GAME_ELF)
-#else
 #if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
-#endif
 #endif
 #include "raylib_lite_raylib.h"
 #include "platform_game.h"
 #include "sky_hop_view.h"
 
-#if defined(MOSAICO_GAME_ELF)
 #define SKY_HOP_ABI RAYLIB_LITE_GAME_MODULE_ABI
-#else
-#define SKY_HOP_ABI RAYLIB_LITE_GAME_MODULE_ABI
-#endif
 
 typedef struct {
     platform_game_t game;
@@ -40,13 +33,11 @@ static sky_hop_view_t view_of(sky_hop_module_state_t *state)
 }
 
 static int initialize(void *value
-#if !defined(MOSAICO_GAME_ELF)
                       , const char *asset_root
-#endif
 )
 {
     sky_hop_module_state_t *state = value;
-#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_host_assets_set_root(asset_root);
 #endif
     state->atlas = raylib_lite_atlas_load("tower.atlas");
@@ -147,16 +138,7 @@ static const raylib_lite_game_module_v1_t s_module = {
     .state_json = state_json,
 };
 
-#if defined(MOSAICO_GAME_ELF)
-RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
-raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
-{
-    raylib_lite_product_runtime = runtime;
-    return &s_module;
-}
-#else
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {
     return &s_module;
 }
-#endif

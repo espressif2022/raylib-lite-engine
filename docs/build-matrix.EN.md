@@ -13,7 +13,7 @@ Raylib Lite Engine currently supports PC Host and native ESP-IDF Board builds. E
 
 A game owns portable model/view/module source. Its `main/idf_component.yml` declares `espressif2022/raylib-lite-engine: ^0.1.0`; in this repository only, `override_path` points that versioned dependency at the current checkout. The Game's Application CMake layer selects the application-side Board component and registers it together with `examples_common`. No top-level Game CMake file includes an Engine-repository helper or discovers the Engine through `EXTRA_COMPONENT_DIRS`.
 
-`game.sim.json` and the Board build compile the same `main/game_module.c`. Board-neutral shared example glue is owned by the [`examples/common_components/examples_common`](../examples/common_components/examples_common/) IDF component: the generic native launcher, abstract Board contract, haptic helper, and shared Product-ABI bridge. Concrete Board code remains under `examples/boards/<board>/`. A Game may isolate device-only implementation in its own `main/native/` directory; that code remains owned by the Game `main` component and may use board-neutral ESP-IDF / Engine services plus the example-Board contract, but it must not include a concrete Board API. Living Worlds keeps its ESP-IDF JPEG decoder in `examples/living_worlds/main/native/` while the generic native asset helper owns embedding; Host and native continue to use the same `game_module.c`. These remain example/application layers rather than Engine public APIs.
+`game.sim.json` and the Board build compile the same `main/game_module.c`. Board-neutral shared example glue is owned by the [`examples/common_components/examples_common`](../examples/common_components/examples_common/) IDF component: the generic native launcher, abstract Board contract, haptic helper, and shared game-module bridge. Concrete Board code remains under `examples/boards/<board>/`. A Game may isolate device-only implementation in its own `main/native/` directory; that code remains owned by the Game `main` component and may use board-neutral ESP-IDF / Engine services plus the example-Board contract, but it must not include a concrete Board API. Living Worlds keeps its ESP-IDF JPEG decoder in `examples/living_worlds/main/native/` while the generic native asset helper owns embedding; Host and native continue to use the same `game_module.c`. These remain example/application layers rather than Engine public APIs.
 
 Discover support with:
 
@@ -45,18 +45,23 @@ BOX-3 selects `examples/boards/esp32-s3-box-3/partitions.csv` by default: a 15 M
 
 ## Native firmware
 
-ESP-Mosaico is the default application-side Board component at [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/). Game manifests do not name a Board. The Application CMake layer selects `RAYLIB_LITE_BOARD=esp-mosaico` by default and adds the shared `examples_common` component plus `examples/boards/<board>` as the selected Board component. Use `-D RAYLIB_LITE_BOARD=<board>` to select another adapter. Game-specific device glue stays at the Game's own `main/native/` boundary; if it needs a new board capability, generalize the example-Board contract/provider instead of adding `boards/<board>/extensions/<game>`. ESP-Mosaico automatically fetches pinned BSP and utilities Git dependencies; no dependency environment exports are required. Its retained-Recovery partition contract places the normal Game in `ota_0` and reserves the factory partition for Recovery.
+Application CMake selects `RAYLIB_LITE_BOARD`, defaulting to `esp-mosaico`.
+The Board supplies display, input and audio. Ordinary examples use a standalone
+factory application and do not depend on Iris or Recovery.
 
 ```sh
-idf.py -C examples/sky_hop -B /tmp/sky-hop-native build
-# Another Board:
-# idf.py -C examples/sky_hop -B /tmp/sky-hop-other -D RAYLIB_LITE_BOARD=<board> build
+idf.py --preview -C examples/sky_hop -B /tmp/sky-hop-native -DIDF_TARGET=esp32s31 build
 ```
 
-Use separate build directories per target. Building a normal Game is not device provisioning: first establish retained Recovery with `esp-mosaico-recovery` (`mosaico.py recover`), then use `mosaico.py install --project <example>` to enter Recovery and install/update the normal Game over USB. Do not use the normal Game's `idf.py flash` to replace the reviewed Recovery bootloader/partition contract. The Engine exposes no native build/install wrapper and does not own the Recovery/Gateway implementation or production board policy.
+Use separate build directories for each Board and application profile. Raw
+repository examples require adjacent shared directories; assembled Registry
+examples are independent projects.
 
-## Historical module bridge
+## Vibe Iris applications
 
-The shared example contract retains a `MOSAICO_GAME_ELF` branch for historical Product ABI mapping. This is not a supported build entry or evidence of compatibility with an external SDK or lobby firmware. Use Host or native builds for the current examples.
+Vibe builds the same game source with required utils Iris application services
+and product partitions. Health is confirmed after the first frame; retained
+factory Recovery installs the game into `ota_0`. Vibe owns build/install
+instructions and device provisioning.
 
 The dedicated [render_benchmark example](../examples/render_benchmark/README.md) keeps its own minimal Host/device acceptance path.

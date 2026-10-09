@@ -13,7 +13,7 @@ Raylib Lite Engine 当前支持 PC Host 和原生 ESP-IDF Board 固件；不支�
 
 Game 只拥有可移植 model/view/module source。其 `main/idf_component.yml` 声明 `espressif2022/raylib-lite-engine: ^0.1.0`；仅仓库内联调时，额外用 `override_path` 把这一版本依赖指向当前 checkout。Game 的 Application CMake 层选择应用侧 Board component，并与 `examples_common` 一起注册。Game 顶层 CMake 不 include Engine 仓库 helper，也不通过 `EXTRA_COMPONENT_DIRS` 发现 Engine。
 
-Host 的 `game.sim.json` 和 Board build 编译同一个 `main/game_module.c`。Board-neutral 的共享示例 glue 由 [`examples/common_components/examples_common`](../examples/common_components/examples_common/) IDF component 拥有：generic native launcher、抽象 Board contract、haptic helper 和共享 Product ABI bridge；具体 Board 代码只放在 `examples/boards/<board>/`。Game 若需要仅设备侧使用的实现，可隔离在自身的 `main/native/` 目录；它仍由 Game `main` component 编译，可以使用板卡无关的 ESP-IDF / Engine 服务和 example-Board contract，但不能包含具体 Board API。Living Worlds 的 ESP-IDF JPEG decode 位于 `examples/living_worlds/main/native/`，资源仍由通用 native asset helper 嵌入；Host/native 继续共用同一个 `game_module.c`。这些都属于 example/Application 层而不是 Engine public API。
+Host 的 `game.sim.json` 和 Board build 编译同一个 `main/game_module.c`。Board-neutral 的共享示例 glue 由 [`examples/common_components/examples_common`](../examples/common_components/examples_common/) IDF component 拥有：generic native launcher、抽象 Board contract、haptic helper 和共享游戏模块契约；具体 Board 代码只放在 `examples/boards/<board>/`。Game 若需要仅设备侧使用的实现，可隔离在自身的 `main/native/` 目录；它仍由 Game `main` component 编译，可以使用板卡无关的 ESP-IDF / Engine 服务和 example-Board contract，但不能包含具体 Board API。Living Worlds 的 ESP-IDF JPEG decode 位于 `examples/living_worlds/main/native/`，资源仍由通用 native asset helper 嵌入；Host/native 继续共用同一个 `game_module.c`。这些都属于 example/Application 层而不是 Engine public API。
 
 查询支持矩阵：
 
@@ -45,18 +45,19 @@ IDF_TARGET=esp32s3 idf.py -C examples/raylib_shooter -B /tmp/rle-box3-shooter \
 
 ## 原生固件
 
-ESP-Mosaico 是默认 application-side Board component，位于 [`examples/boards/esp-mosaico`](../examples/boards/esp-mosaico/)。Game manifest 不再写具体 Board；Application CMake 层默认选择 `RAYLIB_LITE_BOARD=esp-mosaico`，并把共享 `examples_common` component 与 `examples/boards/<board>` 所选 Board component 加入构建。使用 `-D RAYLIB_LITE_BOARD=<board>` 可选择其它 Adapter。Game-specific device glue 留在 Game 自己的 `main/native/` 边界；如果它需要新的板级能力，应扩展通用 Board contract/provider，而不是增加 `boards/<board>/extensions/<game>`。ESP-Mosaico 自动获取固定版本的 BSP 与 utils Git 依赖，无需手动设置依赖环境变量。它的 retained-Recovery partition contract 保持 normal Game 位于 `ota_0`、factory partition 保留给 Recovery。
+原生例程由 Application CMake 选择 `RAYLIB_LITE_BOARD`，默认是 `esp-mosaico`。
+Board 负责显示、输入和音频；普通例程使用独立 factory 应用分区，不依赖 Iris 或 Recovery。
 
 ```sh
-idf.py -C examples/sky_hop -B /tmp/sky-hop-native build
-# 其它 Board：
-# idf.py -C examples/sky_hop -B /tmp/sky-hop-other -D RAYLIB_LITE_BOARD=<board> build
+idf.py --preview -C examples/sky_hop -B /tmp/sky-hop-native -DIDF_TARGET=esp32s31 build
 ```
 
-不同目标使用独立 build 目录。构建 normal Game 不等于设备 provisioning：ESP-Mosaico 设备应先通过 `esp-mosaico-recovery` 的 `mosaico.py recover` 建立 retained Recovery，再通过 `mosaico.py install --project <example>` 进入 Recovery 并经 USB 安装/更新 normal Game。不要用 normal Game 的 `idf.py flash` 覆盖 reviewed Recovery bootloader/partition contract。Engine 不提供 native build/install CLI wrapper，也不拥有 Recovery/Gateway 实现或生产 Board policy。
+每块板与每种工程使用独立构建目录。仓库内例程需要相邻共享目录；组件发布工具组装后的例程可独立构建。
 
-## 历史模块桥接接口
+## Vibe Iris 工程
 
-共享例程契约保留了 `MOSAICO_GAME_ELF` 条件分支，用于历史 Product ABI 映射。这不是当前支持的构建入口，也不代表与外部 SDK 或大厅固件兼容。当前例程请使用 Host 或 native 构建。
+Vibe 使用同一游戏源码，并在构建包装层强制加入 utils 的 Iris 应用服务和产品分区。
+首帧成功后确认健康，更新由保留的 factory Recovery 执行，游戏安装到 `ota_0`。
+构建与安装步骤以 Vibe 的文档为准；Engine 普通例程不承担设备 provisioning。
 
 专用 [render_benchmark 示例](../examples/render_benchmark/README.md) 保持独立的 Host/device 验收路径。

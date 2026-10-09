@@ -34,18 +34,11 @@ python3 tools/game_cli.py sim examples/living_worlds
 python3 tools/game_cli.py sim examples/living_worlds --headless --frames 300
 ```
 
-本目录也是独立 ESP-IDF native 工程。`main/idf_component.yml` 只声明版本化 Engine 依赖，Application CMake 选择通用 Board component；Living Worlds 的 device-only JPEG adapter 隔离在 `main/native/`，仍属于 Game `main` component，且不依赖具体 Board API。仓库内通过 `override_path` 联调 Engine；ESP-Mosaico Board 自动获取固定 Git revision 的 BSP、ESP-Iris 和 Recovery 依赖，无需手动 export。设备安装与更新由 `esp-mosaico-vibe` 的 Recovery-first 流程维护，Host 仿真不需要板级依赖。
+本目录提供仓库内 ESP-IDF native 工程，需要相邻共享目录。`main/idf_component.yml` 只声明版本化 Engine 依赖，Application CMake 选择通用 Board component；Living Worlds 的 device-only JPEG adapter 隔离在 `main/native/`，仍属于 Game `main` component，且不依赖具体 Board API。仓库内通过 `override_path` 联调 Engine；ESP-Mosaico Board 自动获取固定 Git revision 的 BSP 依赖。设备安装与更新由 `esp-mosaico-vibe` 的 Recovery-first 流程维护，Host 仿真不需要板级依赖。
 
-该工程只构建游戏应用，不生成 factory Recovery 固件。设备部署需先由 Vibe 工具配置或更新 Recovery，再通过 USB 安装游戏到 `ota_0`；具体操作见下方 Board 指南。
 当前支持 Host 和 native ESP-IDF 固件，不支持 ELF 游戏构建、打包或加载。
 历史测量见[历史真机记录](HISTORICAL_PERFORMANCE.md)和[性能实验日志](PERFORMANCE.md)；它们不是当前版本的性能验收值。
 
-## ESP-Mosaico native dependencies / 真机构建依赖
+## Native build
 
-Standard ESP-Mosaico native Game builds automatically download pinned Git dependencies:
-
-```sh
-idf.py -C examples/living_worlds -B /tmp/living-worlds-native -DIDF_TARGET=esp32s31 build
-```
-
-No BSP or utilities environment exports are required. The selected Board fetches BSP, ESP-Iris, and the upstream Recovery component at fixed revisions. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.
+See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.

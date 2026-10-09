@@ -3,22 +3,15 @@
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>
-#if defined(MOSAICO_GAME_ELF)
-#else
 #if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
-#endif
 #endif
 #include "raylib_lite_2d.h"
 #include "raylib_lite_raylib.h"
 #include "shooter_game.h"
 #include "shooter_view.h"
 
-#if defined(MOSAICO_GAME_ELF)
 #define RAYLIB_SHOOTER_ABI RAYLIB_LITE_GAME_MODULE_ABI
-#else
-#define RAYLIB_SHOOTER_ABI RAYLIB_LITE_GAME_MODULE_ABI
-#endif
 
 typedef struct {
     shooter_game_t game;
@@ -28,13 +21,11 @@ typedef struct {
 } shooter_module_state_t;
 
 static int initialize(void *value
-#if !defined(MOSAICO_GAME_ELF)
                       , const char *asset_root
-#endif
 )
 {
     shooter_module_state_t *state=value;
-#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_host_assets_set_root(asset_root);
 #endif
     state->atlas=raylib_lite_atlas_load("shooter.atlas");
@@ -123,14 +114,5 @@ static const raylib_lite_game_module_v1_t s_module={
     .state_hash=state_hash,.state_json=state_json,
 };
 
-#if defined(MOSAICO_GAME_ELF)
-RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
-raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
-{
-    raylib_lite_product_runtime = runtime;
-    return &s_module;
-}
-#else
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 { return &s_module; }
-#endif

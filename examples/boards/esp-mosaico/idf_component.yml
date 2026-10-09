@@ -9,8 +9,4 @@ dependencies:
     git: https://github.com/espressif2022/esp-mosaico-bsp.git
     path: components/esp-mosaico-bsp
     version: "75984766e64e156bc8046f90fd2e0ac0c41a24e2"
-  esp_iris:
-    git: https://github.com/espressif2022/esp-mosaico-utils.git
-    path: ESP-Iris/components/esp_iris
-    version: "e9509a4cd6323d64bd0d2a7c432c96654de7a633"
   espressif/esp_display_present: "==1.0.2"

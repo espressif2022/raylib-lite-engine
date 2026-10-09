@@ -2,7 +2,7 @@
 
 Reference games for Raylib Lite Engine. Start with `python3 tools/game_cli.py create <name>` or copy a nearby game. See the [build-path guide](../docs/build-matrix.EN.md) for target-specific requirements.
 
-Each top-level game directory keeps board-neutral gameplay source. `main/idf_component.yml` depends on the Engine but does not name a Board. The example Application CMake layer defaults `RAYLIB_LITE_BOARD` to [`esp-mosaico`](boards/esp-mosaico/) and can select another adapter under `boards/<board>` with `-D RAYLIB_LITE_BOARD=<board>`. The ESP-Mosaico Board resolves BSP and Iris dependencies from pinned Git revisions; no manual path exports are required. With the supported ESP-IDF environment active, build from the repository root:
+Each top-level game directory keeps board-neutral gameplay source. `main/idf_component.yml` depends on the Engine but does not name a Board. The example Application CMake layer defaults `RAYLIB_LITE_BOARD` to [`esp-mosaico`](boards/esp-mosaico/) and can select another adapter under `boards/<board>` with `-D RAYLIB_LITE_BOARD=<board>`. The ESP-Mosaico Board resolves BSP dependencies from pinned Git revisions; no manual path exports are required. With the supported ESP-IDF environment active, build from the repository root:
 
 ```sh
 IDF_TARGET=esp32s31 idf.py --preview -C examples/raylib_shooter -B /tmp/rle-shooter-s31 -DIDF_TARGET=esp32s31 build
@@ -21,7 +21,7 @@ IDF_TARGET=esp32s31 idf.py --preview -C examples/raylib_shooter -B /tmp/rle-shoo
 
 The seven reference games support Host and native ESP-Mosaico builds. `python3 tools/game_cli.py list --json` reports each game's `host` flag and `boards[]`. ELF game builds, packaging and loading are currently unsupported. The Iris native adapter (`mosaico.py game build --target iris`), Gateway, flashing, and updates are maintained by `esp-mosaico-vibe`. `render_benchmark` uses its own Host/CMake and ESP-IDF entry points, not `game.sim.json`.
 
-Shared board-neutral native-example glue lives in [examples_common](common_components/examples_common/README.md): the firmware launcher, abstract Board contract, haptic helper, and Product-ABI bridge. Concrete Board implementation remains under `boards/<board>/`. These are example/application layers rather than Engine public APIs; Registry packaging copies the shared launcher and Board into each maintained game under `shared/`, rewrites local paths, and excludes `render_benchmark` and unfinished `*_dev` directories. See [release preparation](../docs/releasing.md).
+Shared board-neutral native-example glue lives in [examples_common](common_components/examples_common/README.md): the firmware launcher, abstract Board contract, haptic helper, and game-module bridge. Concrete Board implementation remains under `boards/<board>/`. These are example/application layers rather than Engine public APIs; Registry packaging copies the shared launcher and Board into each maintained game under `shared/`, rewrites local paths, and excludes `render_benchmark` and unfinished `*_dev` directories. See [release preparation](../docs/releasing.md).
 
 From the engine root, a game with `game.sim.json` can run in the Host simulator:
 

@@ -2,7 +2,7 @@
 
 [English](board-porting.EN.md) · [构建路径](build-matrix.CN.md)
 
-仓库已有 [ESP32-S3-BOX-3 Board Manager Adapter](../examples/boards/esp32-s3-box-3/README.md)，并完成初步实机验证：`raylib_shooter` 能启动并运行，TT21100 X 轴触摸方向正确；`neon_rift_rally` 通过 ES8311 24 kHz 单声道 PCM 初始化、非静音数据写入与游戏运行验证。音频仍需人工试听，其他 Game 尚未逐一验收。Game 与通用光栅器保持板卡无关；显示缩放及性能优化暂不包括在本阶段内。Iris/Recovery 产品集成由 `esp-mosaico-vibe` 维护；不要修改共享游戏模型来适配面板或触摸驱动。
+仓库已有 [ESP32-S3-BOX-3 Board Manager Adapter](../examples/boards/esp32-s3-box-3/README.md)，并完成初步实机验证：`raylib_shooter` 能启动并运行，TT21100 X 轴触摸方向正确；`neon_rift_rally` 通过 ES8311 24 kHz 单声道 PCM 初始化、非静音数据写入与游戏运行验证。音频仍需人工试听，其他 Game 尚未逐一验收。Game 与通用光栅器保持板卡无关；Iris/Recovery 产品集成由 `esp-mosaico-vibe` 维护；不要修改共享游戏模型来适配面板或触摸驱动。
 
 具体原生示例 Board Adapter 是 `examples/boards/<board>/` 下的应用侧 IDF component。Game manifest 保持 Board-neutral，只依赖 Engine。示例 Application CMake 层统一 include [`examples/common_components/examples_common/project.cmake`](../examples/common_components/examples_common/project.cmake)：`RAYLIB_LITE_BOARD` 默认取 `esp-mosaico`，helper 把共享 `examples_common` component 和所选 Board 加入 `EXTRA_COMPONENT_DIRS`，并加载 Board 的 `sdkconfig.defaults` / 可选 `project.cmake`。使用 `-D RAYLIB_LITE_BOARD=<board>` 即可选择其它 Board。Board-neutral launcher/feedback/contract 由 `examples_common` component 拥有；Game 自己的 device-only adapter 保留在该 Game 的 `main/native/`，仍属于 Game `main` component，且不能 include 具体 Board API。
 
@@ -22,4 +22,4 @@
 
 驱动回调和游戏任务并发访问输入队列时，必须同时提供队列 lock/unlock 回调。不要在 ISR 中调用仅支持任务上下文的 Engine API。定义队列溢出和断连恢复，避免动作保持按下。
 
-参考 ESP-Mosaico Board 包含 Iris/Recovery 部署策略。新增 Board 自行选择分区表与部署流程；依赖 Engine 不要求采用这一产品配置。
+Board 只负责硬件服务；产品的 USB 管理和更新由应用服务组件接入。

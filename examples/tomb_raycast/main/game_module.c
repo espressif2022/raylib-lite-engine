@@ -3,11 +3,8 @@
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>
-#if defined(MOSAICO_GAME_ELF)
-#else
 #if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
-#endif
 #endif
 #include "raylib_lite_raylib.h"
 #if defined(RAYLIB_LITE_GAME_NATIVE)
@@ -17,11 +14,7 @@
 #include "tomb_game.h"
 #include "tomb_view.h"
 
-#if defined(MOSAICO_GAME_ELF)
 #define TOMB_RAYCAST_ABI RAYLIB_LITE_GAME_MODULE_ABI
-#else
-#define TOMB_RAYCAST_ABI RAYLIB_LITE_GAME_MODULE_ABI
-#endif
 
 typedef struct {
     tomb_game_t game;
@@ -61,13 +54,11 @@ static void clear_tracks(tomb_module_t *state)
 }
 
 static int initialize(void *value
-#if !defined(MOSAICO_GAME_ELF)
                       , const char *asset_root
-#endif
 )
 {
     tomb_module_t *state=value;
-#if !defined(MOSAICO_GAME_ELF) && !defined(RAYLIB_LITE_GAME_NATIVE)
+#if !defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_host_assets_set_root(asset_root);
 #endif
     state->textures=raylib_lite_wall_atlas_load("textures.wall");
@@ -211,15 +202,6 @@ static int state_json(const void *value, char *output, size_t capacity)
     const tomb_game_t *g=&((const tomb_module_t *)value)->game;
     static const char *names[]={"entrance","corridor","hall","crypt","pool"};
     const char *room=g->room<5?names[g->room]:"tomb";
-#if defined(MOSAICO_GAME_ELF)
-    return snprintf(output,capacity,
-        "{\"x100\":%d,\"y100\":%d,\"z100\":%d,\"yaw100\":%d,"
-        "\"room\":\"%s\",\"cam_room\":%u,\"grounded\":%s,"
-        "\"tick\":%lu,\"state_hash\":\"%08lx\"}",
-        (int)(g->x*100.0f),(int)(g->y*100.0f),(int)(g->z*100.0f),(int)(g->yaw*100.0f),
-        room,(unsigned)g->camera_room,g->grounded?"true":"false",
-        (unsigned long)g->tick,(unsigned long)tomb_state_hash(g));
-#else
     return snprintf(output,capacity,
         "{\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"yaw\":%.2f,\"camera_yaw\":%.2f,"
         "\"camera_pitch\":%.2f,\"room\":\"%s\",\"cam_room\":%u,"
@@ -227,7 +209,6 @@ static int state_json(const void *value, char *output, size_t capacity)
         g->x,g->y,g->z,g->yaw,g->camera_yaw,g->camera_pitch,room,(unsigned)g->camera_room,
         g->grounded?"true":"false",g->speed,(unsigned long)g->tick,
         (unsigned long)tomb_state_hash(g));
-#endif
 }
 
 static const raylib_lite_game_module_v1_t s_module={
@@ -235,13 +216,4 @@ static const raylib_lite_game_module_v1_t s_module={
     .state_size=sizeof(tomb_module_t),.initialize=initialize,.shutdown=shutdown,
     .input=input,.update=update,.render=render,.state_hash=state_hash,.state_json=state_json};
 
-#if defined(MOSAICO_GAME_ELF)
-RAYLIB_LITE_GAME_MODULE_EXPORT const raylib_lite_game_module_v1_t *
-raylib_lite_game_module_v1(const raylib_lite_product_runtime_v1_t *runtime)
-{
-    raylib_lite_product_runtime=runtime;
-    return &s_module;
-}
-#else
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void){return &s_module;}
-#endif
