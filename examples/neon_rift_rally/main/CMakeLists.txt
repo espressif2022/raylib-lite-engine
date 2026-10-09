@@ -1,11 +1,18 @@
-idf_component_get_property(RAYLIB_LITE_ENGINE_ROOT
-    raylib-lite-engine COMPONENT_DIR)
 file(GLOB example_sources "${CMAKE_CURRENT_LIST_DIR}/*.c")
 
 idf_component_register(
     SRCS ${example_sources}
     INCLUDE_DIRS "."
     REQUIRES examples_common ${RAYLIB_LITE_BOARD} esp_timer)
+
+# Resolve the Engine after component registration.
+if(TARGET idf::espressif2022__raylib-lite-engine)
+    idf_component_get_property(RAYLIB_LITE_ENGINE_ROOT
+        espressif2022__raylib-lite-engine COMPONENT_DIR)
+else()
+    idf_component_get_property(RAYLIB_LITE_ENGINE_ROOT
+        raylib-lite-engine COMPONENT_DIR)
+endif()
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
     RAYLIB_LITE_GAME_NATIVE=1)

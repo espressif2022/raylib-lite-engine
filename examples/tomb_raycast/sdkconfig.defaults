@@ -1,2 +1,0 @@
-# Match the proven Tomb native game-loop placement without changing other examples.
-CONFIG_ESP_MAIN_TASK_AFFINITY_CPU1=y

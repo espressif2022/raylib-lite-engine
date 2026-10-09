@@ -27,10 +27,10 @@ static const float s_checkpoints[RALLY_CHECKPOINT_COUNT - 1U] = {
 };
 
 static const float s_opponent_speeds[RALLY_OPPONENT_COUNT] = {
-    33.2f, 31.4f, 29.8f,
+    33.2f, 31.4f, 29.8f, 32.4f, 30.6f, 28.9f,
 };
 static const float s_opponent_lanes[RALLY_OPPONENT_COUNT] = {
-    -2.15f, 0.0f, 2.15f,
+    -3.5f, -2.1f, -0.7f, 0.7f, 2.1f, 3.5f,
 };
 
 static float clampf(float value, float lo, float hi)
@@ -82,7 +82,7 @@ static void emit(rally_game_t *game, uint32_t flags)
     game->event_flags |= flags;
 }
 
-static void track_center(float progress, float *x, float *y, float *z,
+static void track_center(unsigned course_id, float progress, float *x, float *y, float *z,
                          float *tx, float *ty, float *tz, float *bank)
 {
     const float wrapped = wrap_progress(progress);
@@ -91,12 +91,24 @@ static void track_center(float progress, float *x, float *y, float *z,
 
     /* An intentionally non-circular course: the two sine harmonics produce a
      * broad hairpin and an S bend while remaining cheap to sample. */
-    *x = 38.0f * sinf(u) + 9.0f * sinf(2.0f * u);
-    *z = 56.0f * cosf(u) + 8.0f * sinf(3.0f * u);
+    float dx, dz;
+    if (course_id % 3U == 1U) {
+        *x = 54.0f * sinf(u) + 5.0f * sinf(2.0f * u);
+        *z = 70.0f * cosf(u) + 6.0f * sinf(3.0f * u);
+        dx = (54.0f * cosf(u) + 10.0f * cosf(2.0f * u)) * du;
+        dz = (-70.0f * sinf(u) + 18.0f * cosf(3.0f * u)) * du;
+    } else if (course_id % 3U == 2U) {
+        *x = 32.0f * sinf(u) + 18.0f * sinf(3.0f * u);
+        *z = 45.0f * cosf(u) + 14.0f * sinf(4.0f * u);
+        dx = (32.0f * cosf(u) + 54.0f * cosf(3.0f * u)) * du;
+        dz = (-45.0f * sinf(u) + 56.0f * cosf(4.0f * u)) * du;
+    } else {
+        *x = 38.0f * sinf(u) + 9.0f * sinf(2.0f * u);
+        *z = 56.0f * cosf(u) + 8.0f * sinf(3.0f * u);
+        dx = (38.0f * cosf(u) + 18.0f * cosf(2.0f * u)) * du;
+        dz = (-56.0f * sinf(u) + 24.0f * cosf(3.0f * u)) * du;
+    }
     *y = track_height(wrapped);
-
-    float dx = (38.0f * cosf(u) + 18.0f * cosf(2.0f * u)) * du;
-    float dz = (-56.0f * sinf(u) + 24.0f * cosf(3.0f * u)) * du;
     float dy = track_height_derivative(wrapped);
     float length = sqrtf(dx * dx + dy * dy + dz * dz);
     if (length < 0.0001f) length = 1.0f;
@@ -127,11 +139,12 @@ float rally_checkpoint_distance(unsigned checkpoint)
     return RALLY_TRACK_LENGTH;
 }
 
-bool rally_track_sample(float progress, float lateral, rally_track_pose_t *out)
+bool rally_track_sample_course(unsigned course_id, float progress, float lateral,
+                               rally_track_pose_t *out)
 {
     if (!out) return false;
     float cx, cy, cz, tx, ty, tz, bank;
-    track_center(progress, &cx, &cy, &cz, &tx, &ty, &tz, &bank);
+    track_center(course_id, progress, &cx, &cy, &cz, &tx, &ty, &tz, &bank);
     /* Right is horizontal, which makes local lateral motion independent from
      * pitch on a hill and avoids roll accumulating in gameplay coordinates. */
     const float right_x = -tz;
@@ -147,6 +160,11 @@ bool rally_track_sample(float progress, float lateral, rally_track_pose_t *out)
     out->bank = bank;
     out->width = RALLY_TRACK_WIDTH;
     return true;
+}
+
+bool rally_track_sample(float progress, float lateral, rally_track_pose_t *out)
+{
+    return rally_track_sample_course(0U, progress, lateral, out);
 }
 
 bool rally_track_segment_sample(float progress, rally_track_segment_t *out)
@@ -207,8 +225,8 @@ static float scenery_unit(uint32_t seed)
     return (float)(seed & 0xffffu) / 65535.0f;
 }
 
-bool rally_track_scenery(unsigned segment, unsigned slot,
-                         rally_track_scenery_t *out)
+bool rally_track_scenery_course(unsigned course_id, unsigned segment, unsigned slot,
+                                rally_track_scenery_t *out)
 {
     if (!out || slot >= RALLY_TRACK_SCENERY_SLOTS) return false;
     const unsigned wrapped_segment = segment % RALLY_TRACK_SEGMENT_COUNT;
@@ -226,7 +244,7 @@ bool rally_track_scenery(unsigned segment, unsigned slot,
                                   (0.18f + scenery_unit(seed >> 16) * 0.64f) *
                                   RALLY_TRACK_SEGMENT_LENGTH;
     rally_track_pose_t pose;
-    rally_track_sample(anchor_progress, (float)side * offset, &pose);
+    rally_track_sample_course(course_id, anchor_progress, (float)side * offset, &pose);
     out->segment = (uint16_t)wrapped_segment;
     out->slot = (uint8_t)slot;
     out->kind = (uint8_t)(1u + ((seed >> 20) % 5u));
@@ -239,6 +257,12 @@ bool rally_track_scenery(unsigned segment, unsigned slot,
     out->scale = 0.72f + scenery_unit(seed >> 3) * 0.92f;
     out->seed = seed;
     return true;
+}
+
+bool rally_track_scenery(unsigned segment, unsigned slot,
+                         rally_track_scenery_t *out)
+{
+    return rally_track_scenery_course(0U, segment, slot, out);
 }
 
 static bool in_launch_zone(float progress)
@@ -334,6 +358,8 @@ static void update_opponents(rally_game_t *game)
         opponent->lane = s_opponent_lanes[i] +
                          0.7f * sinf(opponent->phase +
                                     (float)game->tick * (0.021f + i * 0.004f));
+        opponent->lateral += (opponent->lane - opponent->lateral) *
+                             fminf(1.0f, 2.0f * RALLY_DT);
         opponent->progress += opponent->speed * RALLY_DT;
         if (opponent->progress >= RALLY_TRACK_LENGTH) {
             opponent->progress -= RALLY_TRACK_LENGTH;
@@ -452,7 +478,7 @@ void rally_reset(rally_game_t *game)
     game->position = RALLY_OPPONENT_COUNT + 1U;
     game->phase = RALLY_PHASE_COUNTDOWN;
     for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
-        game->opponents[i].progress = 18.0f * (float)(i + 1U);
+        game->opponents[i].progress = 9.0f * (float)(i + 1U);
         game->opponents[i].lateral = s_opponent_lanes[i];
         game->opponents[i].lane = s_opponent_lanes[i];
         game->opponents[i].phase = 0.8f * (float)i;
@@ -568,21 +594,39 @@ void rally_update(rally_game_t *game)
     game->speed = clampf(game->speed, 0.0f,
                          RALLY_MAX_SPEED + (game->nitro_active ? 13.0f : 0.0f));
 
-    /* Kart steering is deliberately strongest at low speed, then fades as
-     * velocity rises.  The low-speed term still needs a little forward speed
-     * so a parked car cannot slide sideways without throttle. */
+    /* Fine control around center, bounded lateral speed and faster release.
+     * Motion and camera consume the same command, so a raw input step cannot
+     * snap the camera independently of the motorcycle's response. */
     const float speed_ratio = clampf(game->speed / RALLY_MAX_SPEED, 0.0f, 1.0f);
     const float speed_steer = 1.08f - 0.52f * speed_ratio;
     const float low_speed_turn = game->speed > 0.5f
                                      ? (1.0f - speed_ratio) * 2.2f
                                      : 0.0f;
-    const float drift_steer = game->drifting ? 1.16f : 1.0f;
-    float target_lateral_velocity = game->input.steer *
-                                    (game->speed * 0.56f * speed_steer +
-                                     low_speed_turn) * drift_steer;
+    float wanted_steering = game->input.steer *
+                            (.40f + .60f * fabsf(game->input.steer));
+    float steering_rate = fabsf(wanted_steering) < fabsf(game->steering) ||
+                          wanted_steering * game->steering < 0.0f ? 8.0f : 3.0f;
+    game->steering += clampf(wanted_steering-game->steering,
+                             -steering_rate*dt, steering_rate*dt);
+    const float drift_steer = game->drifting ? 1.10f : 1.0f;
+    float steering_limit = (game->speed * .30f * speed_steer +
+                            low_speed_turn * .65f) * drift_steer;
+    float target_lateral_velocity = game->steering * steering_limit;
+    /* A fast motorcycle carries momentum through a bend.  The road does not
+     * automatically steer it: without counter-steering, curvature pushes it
+     * toward the outside edge.  Compare tangents in the local right axis so
+     * the sign stays correct around the closed track. */
+    rally_track_pose_t bend, ahead;
+    rally_track_sample_course(game->course_id, game->progress, 0.0f, &bend);
+    rally_track_sample_course(game->course_id, game->progress + 6.0f, 0.0f, &ahead);
+    float turn_right = bend.right_x * ahead.tangent_x +
+                       bend.right_z * ahead.tangent_z;
+    float outward_velocity = turn_right * speed_ratio * speed_ratio * 55.0f;
+    target_lateral_velocity -= clampf(outward_velocity,
+                                      -steering_limit*.55f, steering_limit*.55f);
     if (game->collision_ticks) target_lateral_velocity *= 0.45f;
-    const float steering_response = (game->drifting ? 3.6f :
-                                     10.0f - 3.0f * speed_ratio) * dt;
+    const float steering_response = (game->drifting ? 5.0f :
+                                     fabsf(game->input.steer)<.06f ? 16.0f : 12.0f) * dt;
     game->lateral_velocity += (target_lateral_velocity - game->lateral_velocity) *
                               clampf(steering_response, 0.0f, 1.0f);
     game->lateral += game->lateral_velocity * dt;
@@ -594,9 +638,9 @@ void rally_update(rally_game_t *game)
         game->drift_meter = clampf(game->drift_meter - 24.0f * dt, 0.0f, 100.0f);
     }
     game->lateral = clampf(game->lateral, -RALLY_MAX_LATERAL, RALLY_MAX_LATERAL);
-    game->heading_error += (game->input.steer *
-                            (game->drifting ? 0.36f : 0.22f) * speed_steer -
-                            game->heading_error) * (5.0f - speed_ratio * 1.5f) * dt;
+    game->heading_error += (game->steering *
+                            (game->drifting ? .24f : .14f) * speed_steer -
+                            game->heading_error) * (game->drifting ? 5.0f : 8.0f) * dt;
 
     const bool now_offtrack = fabsf(game->lateral) > RALLY_TRACK_WIDTH * 0.5f;
     if (now_offtrack && !game->offtrack) emit(game, RALLY_EVENT_OFFTRACK);
@@ -690,6 +734,7 @@ uint32_t rally_state_hash(const rally_game_t *game)
     hash = hash_float(hash, game->lateral_velocity);
     hash = hash_float(hash, game->speed);
     hash = hash_float(hash, game->heading_error);
+    hash = hash_float(hash, game->steering);
     hash = hash_float(hash, game->height);
     hash = hash_float(hash, game->vertical_speed);
     hash = hash_float(hash, game->air_time);
@@ -698,6 +743,7 @@ uint32_t rally_state_hash(const rally_game_t *game)
     hash = hash_float(hash, game->impact_speed);
     hash = hash_float(hash, game->drift_boost_speed);
     hash = hash_float(hash, game->risk_meter);
+    hash = hash_mix(hash, game->course_id);
     hash = hash_mix(hash, game->tick);
     hash = hash_mix(hash, game->laps_completed);
     hash = hash_mix(hash, game->next_checkpoint);

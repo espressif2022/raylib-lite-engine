@@ -13,7 +13,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install Host dependency
-        run: python3 -m pip install Pillow
+        run: python3 -m pip install Pillow numpy PyYAML
       - name: Check maintained Markdown links
         run: python3 tools/check_markdown_links.py
       - name: Check whitespace

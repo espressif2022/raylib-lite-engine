@@ -92,7 +92,7 @@ int main(void)
     raylib_lite_audio_format_t format = RAYLIB_LITE_AUDIO_FORMAT_DEFAULT();
     assert(backend.start && backend.stop && backend.write);
 
-#if defined(TEST_BOX3)
+#if defined(TEST_BOX3) || defined(TEST_MOSAICO)
     clear_counters();
     assert(backend.start(NULL, &format) == RAYLIB_LITE_OK);
     fail_close = 1;
@@ -137,33 +137,6 @@ int main(void)
     assert(board_initialized);
     assert(backend.stop(NULL, 50) == RAYLIB_LITE_OK);
     assert(codec_close_calls == 0 && board_deinit_calls == 1);
-#elif defined(TEST_MOSAICO)
-    clear_counters();
-    assert(backend.start(NULL, &format) == RAYLIB_LITE_OK);
-    fail_close = 1;
-    assert(backend.stop(NULL, 50) == RAYLIB_LITE_PLATFORM_ERROR);
-    assert(codec_close_calls == 1 && codec_opened);
-    assert(backend.start(NULL, &format) == RAYLIB_LITE_INVALID_STATE);
-    assert(backend.stop(NULL, 50) == RAYLIB_LITE_OK);
-    assert(codec_close_calls == 2 && !codec_opened);
-    assert(backend.stop(NULL, 50) == RAYLIB_LITE_OK);
-
-    clear_counters();
-    fail_volume = 1;
-    assert(backend.start(NULL, &format) == RAYLIB_LITE_PLATFORM_ERROR);
-    assert(codec_opened && codec_close_calls == 0);
-    fail_close = 1;
-    assert(backend.stop(NULL, 50) == RAYLIB_LITE_PLATFORM_ERROR);
-    assert(codec_opened);
-    assert(backend.stop(NULL, 50) == RAYLIB_LITE_OK);
-    assert(!codec_opened && codec_close_calls == 2);
-
-    clear_counters();
-    fail_open = 1;
-    assert(backend.start(NULL, &format) == RAYLIB_LITE_NOT_READY);
-    assert(codec_close_calls == 0);
-    assert(backend.stop(NULL, 50) == RAYLIB_LITE_OK);
-    assert(codec_close_calls == 1);
 #else
 #error "Choose TEST_BOX3 or TEST_MOSAICO"
 #endif

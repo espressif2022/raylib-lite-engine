@@ -21,7 +21,7 @@
 #define RALLY_TRACK_SCENERY_SLOTS 2U
 #define RALLY_CHECKPOINT_COUNT 4U
 #define RALLY_TARGET_LAPS 3U
-#define RALLY_OPPONENT_COUNT 3U
+#define RALLY_OPPONENT_COUNT 6U
 #define RALLY_TRACK_WIDTH 10.0f
 #define RALLY_MAX_LATERAL 6.25f
 #define RALLY_MAX_SPEED 38.0f
@@ -123,11 +123,13 @@ typedef struct {
 
 typedef struct {
     /* Track-local motion state.  progress wraps at RALLY_TRACK_LENGTH. */
+    uint8_t course_id;
     float progress;
     float lateral;
     float lateral_velocity;
     float speed;
     float heading_error;
+    float steering; /* shaped, rate-limited command shared by motion and camera */
 
     /* Height is relative to the sampled track surface, not world y. */
     float height;
@@ -199,8 +201,12 @@ float rally_track_segment_length(void);
 unsigned rally_track_segment_count(void);
 float rally_checkpoint_distance(unsigned checkpoint);
 bool rally_track_sample(float progress, float lateral, rally_track_pose_t *out);
+bool rally_track_sample_course(unsigned course_id, float progress, float lateral,
+                               rally_track_pose_t *out);
 bool rally_track_segment_sample(float progress, rally_track_segment_t *out);
 bool rally_track_scenery(unsigned segment, unsigned slot,
                          rally_track_scenery_t *out);
+bool rally_track_scenery_course(unsigned course_id, unsigned segment, unsigned slot,
+                                rally_track_scenery_t *out);
 
 uint32_t rally_state_hash(const rally_game_t *game);

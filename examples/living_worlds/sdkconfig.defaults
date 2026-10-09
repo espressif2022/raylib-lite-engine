@@ -1,3 +1,0 @@
-# Keep native gameplay on CPU1 and the display worker on CPU0, matching the
-# original GSP firmware's task placement for on-device FPS comparisons.
-CONFIG_ESP_MAIN_TASK_AFFINITY_CPU1=y

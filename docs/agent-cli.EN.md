@@ -30,8 +30,8 @@ Examples:
 python3 tools/game_cli.py list --json --target esp-mosaico
 python3 tools/game_cli.py sim examples/raylib_shooter --headless --frames 30 --json
 python3 tools/game_cli.py test examples/raylib_shooter --frames 300 --json
-python3 tools/game_cli.py replay examples/vertical_dock \
-  examples/vertical_dock/scenarios/power-on.json --frames 300 --json
+python3 tools/game_cli.py replay examples/tower_defense \
+  examples/tower_defense/scenarios/start.json --frames 300 --json
 python3 tools/game_cli.py assets examples/raylib_shooter --dry-run --json
 python3 tools/game_cli.py benchmark list
 ```
@@ -42,4 +42,4 @@ Native firmware uses ESP-IDF directly, for example:
 idf.py -C examples/raylib_shooter build
 ```
 
-ELF module building belongs to the external Module SDK. Device selection, flashing, installation, Gateway sessions, Recovery, and updates belong to the product tooling. A Host or build result is not device acceptance. The seven W07 reference games validated on both Host and ESP-Mosaico are listed in [build-matrix.EN.md](build-matrix.EN.md); `list` reports declared support for additional examples without fabricating device acceptance.
+ELF game builds, packaging and loading are currently unsupported. Device selection, flashing, installation, Gateway sessions, Recovery, and updates belong to the product tooling. A Host or build result is not device acceptance. The seven reference games with Host tests and native ESP-Mosaico build checks are listed in [build-matrix.EN.md](build-matrix.EN.md); `list` reports declared support for additional examples without fabricating device acceptance.

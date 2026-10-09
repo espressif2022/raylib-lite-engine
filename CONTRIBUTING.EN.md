@@ -1,6 +1,6 @@
 # Contributing to Raylib Lite Engine
 
-[简体中文](CONTRIBUTING.CN.md) · [Documentation](docs/README.EN.md)
+[简体中文](CONTRIBUTING.CN.md) · [Documentation](docs/README.md)
 
 Start with the [quickstart](docs/quickstart.EN.md), then choose the affected build path from the [matrix](docs/build-matrix.EN.md). Keep gameplay models and shared views portable; concrete native-example board services belong under `examples/boards/<board>/`, and game sources depend only on the shared example-board contract. Product-specific integration remains external. Use existing public APIs from the [capability catalog](docs/engine-capabilities.EN.md) before adding a game-local helper.
 

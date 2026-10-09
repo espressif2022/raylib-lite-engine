@@ -41,14 +41,6 @@ python3 tools/game_cli.py sim examples/sky_hop --headless --frames 300
 性能比较应固定输入、场景、构建和板卡配置，并保留原始日志；
 通用方法见[可复用设计方法](../../docs/reference-designs.CN.md)。
 
-## ESP-Mosaico native dependencies / 真机构建依赖
+## Native build
 
-All standard ESP-Mosaico native Game builds use the same local dependency setup:
-
-```sh
-export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
-export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
-idf.py -C examples/sky_hop build
-```
-
-`MOSAICO_UTILS_ROOT` supplies both ESP-Iris and the upstream normal-application Recovery component. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.
+See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.

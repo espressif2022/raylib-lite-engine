@@ -60,8 +60,21 @@ else()
         if(NOT MOSAICO_BSP_COMPONENT_DIR AND DEFINED ENV{MOSAICO_BSP_COMPONENT_DIR})
             set(MOSAICO_BSP_COMPONENT_DIR "$ENV{MOSAICO_BSP_COMPONENT_DIR}")
         endif()
+        if(NOT MOSAICO_BSP_COMPONENT_DIR)
+            include(FetchContent)
+            FetchContent_Declare(render_bench_mosaico_bsp
+                GIT_REPOSITORY https://github.com/espressif2022/esp-mosaico-bsp.git
+                GIT_TAG 75984766e64e156bc8046f90fd2e0ac0c41a24e2
+                GIT_SUBMODULES "")
+            FetchContent_GetProperties(render_bench_mosaico_bsp)
+            if(NOT render_bench_mosaico_bsp_POPULATED)
+                FetchContent_Populate(render_bench_mosaico_bsp)
+            endif()
+            set(MOSAICO_BSP_COMPONENT_DIR
+                "${render_bench_mosaico_bsp_SOURCE_DIR}/components/esp-mosaico-bsp")
+        endif()
         if(NOT EXISTS "${MOSAICO_BSP_COMPONENT_DIR}/CMakeLists.txt")
-            message(FATAL_ERROR "Display requires -DMOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/component")
+            message(FATAL_ERROR "Invalid MOSAICO_BSP_COMPONENT_DIR=${MOSAICO_BSP_COMPONENT_DIR}")
         endif()
         list(APPEND EXTRA_COMPONENT_DIRS "${MOSAICO_BSP_COMPONENT_DIR}")
         list(APPEND COMPONENTS esp-mosaico-bsp)

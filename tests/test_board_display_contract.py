@@ -6,7 +6,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 BOARD = ROOT / "examples" / "boards" / "esp-mosaico"
 SOURCE = BOARD / "board.c"
-STRIP = BOARD / "mosaico_strip_present.c"
+VIDEO = BOARD / "mosaico_video.c"
 HEADER = (ROOT / "examples" / "common_components" / "examples_common" /
           "include" / "raylib_lite_example_board.h")
 
@@ -15,7 +15,7 @@ class BoardDisplayContractTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.source = SOURCE.read_text(encoding="utf-8")
-        cls.strip = STRIP.read_text(encoding="utf-8")
+        cls.video = VIDEO.read_text(encoding="utf-8")
         cls.header = HEADER.read_text(encoding="utf-8")
 
     def test_board_uses_rgb565_presenter_and_byte_swap(self):
@@ -43,23 +43,23 @@ class BoardDisplayContractTest(unittest.TestCase):
             "esp_display_presenter_commit_frame",
         ):
             with self.subTest(fragment=fragment):
-                self.assertIn(fragment, self.strip)
-        self.assertIn("mosaico_strip_present_backend(p->video)", self.source)
+                self.assertIn(fragment, self.video)
+        self.assertIn("mosaico_video_backend(p->video)", self.source)
         self.assertNotIn("esp_gsp", self.source)
         self.assertNotIn("mosaico_full_present", self.source)
 
     def test_latest_snapshot_is_coherent(self):
-        self.assertIn(".copy_latest = strip_copy_latest", self.strip)
-        self.assertIn("memcpy(out_pixels, video->frames[video->latest]", self.strip)
-        self.assertIn("video->states[index] = FRAME_LATEST", self.strip)
-        self.assertIn("SemaphoreHandle_t mutex", self.strip)
-        self.assertIn("xTaskCreatePinnedToCore(strip_worker", self.strip)
+        self.assertIn(".copy_latest = video_copy_latest", self.video)
+        self.assertIn("memcpy(out_pixels, video->frames[video->latest]", self.video)
+        self.assertIn("video->states[index] = FRAME_LATEST", self.video)
+        self.assertIn("SemaphoreHandle_t mutex", self.video)
+        self.assertIn("xTaskCreatePinnedToCore(strip_worker", self.video)
         self.assertIn("uint8_t drawbuf_count;", self.header)
         self.assertNotIn("gsp_bundle", self.header)
         self.assertNotIn("canvas_bind", self.header)
 
     def test_cleanup_keeps_video_and_presenter_retryable(self):
-        close = self.source.index("mosaico_strip_present_close(p->video")
+        close = self.source.index("mosaico_video_close(p->video")
         failure = self.source.index("if (rr != RAYLIB_LITE_OK)", close)
         ret = self.source.index("return to_esp(rr);", failure)
         clear_video = self.source.index("p->video = NULL;", ret)

@@ -6,6 +6,7 @@
 // so they remain directly testable by the Host runner and reusable by a
 // product launcher.
 #include <stdbool.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -25,10 +26,7 @@
 #endif
 
 #define NEON_RIFT_COURSE_COUNT 3U
-/* Temporary device policy: keep the event-to-feedback seam and all audio
- * cues alive, but do not initialize or drive the vibration motor. Flip this
- * one switch when haptics are cleared for re-enablement. */
-#define NEON_RIFT_HAPTICS_ENABLED 0
+#define NEON_RIFT_HAPTICS_ENABLED 1
 
 typedef struct {
     const char *id;
@@ -39,14 +37,15 @@ typedef struct {
 
 static const neon_rift_course_t COURSES[NEON_RIFT_COURSE_COUNT] = {
     {"neon_loop", "Neon Loop", "NEON GRID", 0.0f},
-    {"sunset_sprint", "Sunset Sprint", "SUNSET EMBER", 620.0f},
-    {"polar_rift", "Polar Rift", "AURORA ICE", 1240.0f},
+    {"sunset_sprint", "Sunset Sprint", "SUNSET EMBER", 0.0f},
+    {"polar_rift", "Polar Rift", "AURORA ICE", 0.0f},
 };
 
 typedef struct {
     rally_game_t game;
     raylib_lite_atlas_t rally_art;
     raylib_lite_atlas_t track_background;
+    raylib_lite_atlas_t motorcycle_art;
     bool paused;
     bool steer_left;
     bool steer_right;
@@ -56,16 +55,24 @@ typedef struct {
     bool drift;
     int32_t steer_track;
     int32_t nitro_track;
+    int32_t course_select_track;
     float touch_steer;
+    float touch_origin_x;
     bool touch_throttle;
     bool touch_nitro;
+    float imu_roll;
+    float imu_center_roll;
+    float imu_steer;
+    uint8_t imu_age_ticks;
+    bool imu_calibrated;
     uint32_t lap_start_tick;
     uint32_t last_lap_ticks;
     uint32_t best_lap_ticks;
     uint32_t best_race_ticks;
     uint8_t course_id;
+    uint32_t last_feedback_serial;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-    Sound sounds[8];
+    Sound sounds[9];
     Music engine;
     raylib_lite_save_t save;
     bool save_ready;
@@ -85,9 +92,10 @@ typedef struct {
 #endif
 
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-static const char *const SFX_PATHS[8] = {
+static const char *const SFX_PATHS[9] = {
     "boost.sound", "drift.sound", "jump.sound", "land.sound",
-    "checkpoint.sound", "lap.sound", "finish.sound", "offtrack.sound"
+    "checkpoint.sound", "lap.sound", "finish.sound", "offtrack.sound",
+    "collision.sound"
 };
 
 static void feedback_pulse(int strength, int duration_ms)
@@ -106,8 +114,8 @@ static void feedback_pattern(int first_strength, int first_duration_ms,
 {
 #if NEON_RIFT_HAPTICS_ENABLED
     raylib_lite_native_feedback_pattern(first_strength, first_duration_ms,
-                                    second_strength, second_duration_ms,
-                                    gap_ms);
+                                    second_strength, gap_ms,
+                                    second_duration_ms);
 #else
     (void)first_strength;
     (void)first_duration_ms;
@@ -117,11 +125,18 @@ static void feedback_pattern(int first_strength, int first_duration_ms,
 #endif
 }
 
+static void feedback_stop(void)
+{
+#if NEON_RIFT_HAPTICS_ENABLED
+    raylib_lite_native_feedback_stop();
+#endif
+}
+
 static void feedback_init(neon_rift_rally_module_t *state)
 {
     InitAudioDevice();
     if (IsAudioDeviceReady()) {
-        for (unsigned i = 0; i < 8; ++i) state->sounds[i] = LoadSound(SFX_PATHS[i]);
+        for (unsigned i = 0; i < 9; ++i) state->sounds[i] = LoadSound(SFX_PATHS[i]);
         state->engine = LoadMusicStream("engine.sound");
         SetMusicVolume(state->engine, .26f);
         PlayMusicStream(state->engine);
@@ -133,11 +148,13 @@ static void feedback_init(neon_rift_rally_module_t *state)
 
 static void play_cue(neon_rift_rally_module_t *state, unsigned cue)
 {
-    if (cue < 8 && state->sounds[cue].frameCount) PlaySound(state->sounds[cue]);
+    if (cue < 9 && state->sounds[cue].frameCount) PlaySound(state->sounds[cue]);
 }
 
 static void feedback_events(neon_rift_rally_module_t *state)
 {
+    if (state->game.event_serial == state->last_feedback_serial) return;
+    state->last_feedback_serial = state->game.event_serial;
     uint32_t events = rally_events(&state->game);
     if (events & RALLY_EVENT_NITRO) {
         play_cue(state, 0); feedback_pattern(42, 24, 26, 16, 18);
@@ -163,14 +180,14 @@ static void feedback_events(neon_rift_rally_module_t *state)
     if (events & RALLY_EVENT_OFFTRACK) {
         play_cue(state, 7); feedback_pattern(58, 45, 30, 24, 34);
     }
-    if (events & RALLY_EVENT_COLLISION) {
-        play_cue(state, 3); feedback_pattern(100, 55, 82, 28, 46);
-    }
     if (events & RALLY_EVENT_NEAR_MISS) {
         play_cue(state, 4); feedback_pulse(34, 18);
     }
     if (events & RALLY_EVENT_START) {
         play_cue(state, 0); feedback_pattern(28, 25, 44, 20, 24);
+    }
+    if (events & RALLY_EVENT_COLLISION) {
+        play_cue(state, 8); feedback_pattern(100, 55, 82, 28, 46);
     }
     if (events & RALLY_EVENT_FAIL) {
         play_cue(state, 7); feedback_pattern(100, 90, 76, 70, 90);
@@ -190,13 +207,18 @@ static void clear_touch(neon_rift_rally_module_t *state)
     state->steer_track = -1;
     state->nitro_track = -1;
     state->touch_steer = 0.0f;
+    state->touch_origin_x = 0.0f;
     state->touch_throttle = false;
     state->touch_nitro = false;
 }
 
 static void reset_run(neon_rift_rally_module_t *state)
 {
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    feedback_stop();
+#endif
     rally_reset(&state->game);
+    state->game.course_id = state->course_id;
     state->game.progress = COURSES[state->course_id].start_progress;
     state->paused = false;
     state->steer_left = state->steer_right = false;
@@ -204,6 +226,13 @@ static void reset_run(neon_rift_rally_module_t *state)
     state->lap_start_tick = 0;
     state->last_lap_ticks = 0;
     clear_touch(state);
+    state->course_select_track = -1;
+    state->imu_roll = 0.0f;
+    state->imu_center_roll = 0.0f;
+    state->imu_steer = 0.0f;
+    state->imu_age_ticks = UINT8_MAX;
+    state->imu_calibrated = false;
+    state->last_feedback_serial = 0;
 }
 
 static void select_course(neon_rift_rally_module_t *state, int direction)
@@ -255,7 +284,7 @@ static const char *start_hint(const rally_game_t *game)
 
 #if defined(RAYLIB_LITE_GAME_NATIVE)
 static raylib_lite_result_t migrate_record(uint16_t old_version, const void *old_data,
-                                size_t old_size, void *new_data, size_t new_size)
+                                           size_t old_size, void *new_data, size_t new_size)
 {
     if (!new_data || new_size < sizeof(neon_rift_rally_record_t))
         return RAYLIB_LITE_INVALID_ARGUMENT;
@@ -311,16 +340,16 @@ static void save_record(neon_rift_rally_module_t *state, bool force)
 
 static void update_touch_steer(neon_rift_rally_module_t *state, int x, int y)
 {
-    /* The left half is a floating steering pad; a lower-right touch is the
-       nitro button. A left pad held in the upper half also accelerates. */
-    const float dx = ((float)x - 116.0f) / 76.0f;
-    const float dy = ((float)y - 395.0f) / 58.0f;
-    state->touch_steer = clamp_unit(dx);
+    /* Neutral follows the initial contact. Resting a thumb on the pad must
+     * not apply full lock simply because it landed near the screen edge. */
+    float dx = (float)x - state->touch_origin_x;
+    state->touch_steer = fabsf(dx) <= 10.0f ? 0.0f :
+        clamp_unit((dx - copysignf(10.0f, dx)) / 84.0f);
     /* A steering touch always requests throttle. Requiring the player to
        discover a narrow upward-drag threshold made the native game appear
        frozen; vertical displacement is retained only for future braking. */
     state->touch_throttle = true;
-    (void)dy;
+    (void)y;
 }
 
 static int initialize(void *value, const char *asset_root)
@@ -338,7 +367,9 @@ static int initialize(void *value, const char *asset_root)
 #endif
     state->rally_art = raylib_lite_atlas_load("rally.atlas");
     state->track_background = raylib_lite_atlas_load("track_background.atlas");
-    return state->rally_art.texture.id && state->track_background.texture.id ? 0 : -1;
+    state->motorcycle_art = raylib_lite_atlas_load("motorcycle.atlas");
+    return state->rally_art.texture.id && state->track_background.texture.id &&
+           state->motorcycle_art.texture.id ? 0 : -1;
 }
 
 static void shutdown(void *value)
@@ -347,15 +378,14 @@ static void shutdown(void *value)
     if (state) {
         raylib_lite_atlas_unload(state->rally_art);
         raylib_lite_atlas_unload(state->track_background);
+        raylib_lite_atlas_unload(state->motorcycle_art);
     }
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-#if NEON_RIFT_HAPTICS_ENABLED
-    raylib_lite_native_feedback_stop();
-#endif
+    feedback_stop();
     if (state && IsAudioDeviceReady()) {
         StopMusicStream(state->engine);
         UnloadMusicStream(state->engine);
-        for (unsigned i = 0; i < 8; ++i)
+        for (unsigned i = 0; i < 9; ++i)
             if (state->sounds[i].frameCount) UnloadSound(state->sounds[i]);
         CloseAudioDevice();
     }
@@ -371,7 +401,12 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
     if (!state || !event) return;
 
     if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
-        if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) state->paused = true;
+        if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) {
+            state->paused = true;
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+            feedback_stop();
+#endif
+        }
         else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESUME) state->paused = false;
         else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESET) {
             reset_run(state);
@@ -389,7 +424,12 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         else if (event->code == 5) state->brake = event->pressed;
         else if (event->code == 6) state->nitro = event->pressed;
         else if (event->code == 7) state->drift = event->pressed;
-        else if (event->code == 3 && event->pressed) state->paused = !state->paused;
+        else if (event->code == 3 && event->pressed) {
+            state->paused = !state->paused;
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+            if (state->paused) feedback_stop();
+#endif
+        }
         else if (event->code == 4 && event->pressed) reset_run(state);
         else if (event->pressed && event->code == 8 &&
                  state->game.phase == RALLY_PHASE_COUNTDOWN)
@@ -400,11 +440,40 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         return;
     }
 
+    if (event->type == RAYLIB_LITE_GAME_INPUT_IMU) {
+        if (!isfinite(event->value_x) || !isfinite(event->value_y) ||
+            !isfinite(event->value_z)) return;
+        float gravity = sqrtf(event->value_x*event->value_x +
+                              event->value_y*event->value_y +
+                              event->value_z*event->value_z);
+        /* Board input is acceleration in g. A sharp translation or impact
+         * is not a steering gesture; use the gravity vector's roll angle. */
+        if (gravity < .65f || gravity > 1.45f) return;
+        state->imu_roll = atan2f(event->value_x,
+                              hypotf(event->value_y,event->value_z));
+        state->imu_age_ticks = 0;
+        if (!state->imu_calibrated) {
+            state->imu_center_roll = state->imu_roll;
+            state->imu_calibrated = true;
+        } else if (state->game.phase == RALLY_PHASE_COUNTDOWN) {
+            /* The board's level pose is sampled during the countdown. */
+            state->imu_center_roll +=
+                (state->imu_roll - state->imu_center_roll) * .04f;
+        }
+        return;
+    }
+
     if (event->type != RAYLIB_LITE_GAME_INPUT_POINTER) return;
+    if (!event->pressed && event->track_id == state->course_select_track)
+        state->course_select_track = -1;
     if (event->pressed && state->game.phase == RALLY_PHASE_COUNTDOWN &&
-        event->y < 100) {
-        if (event->x < 160) select_course(state, -1);
-        else if (event->x >= 320) select_course(state, 1);
+        event->y >= 70 && event->y <= 230 &&
+        (event->x < 160 || event->x >= 320)) {
+        if (state->course_select_track != event->track_id) {
+            int direction = event->x < 160 ? -1 : 1;
+            select_course(state, direction);
+            state->course_select_track = event->track_id;
+        }
         return;
     }
     if (event->pressed && (state->game.phase == RALLY_PHASE_FINISHED ||
@@ -430,6 +499,7 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         state->touch_nitro = event->x >= 300 && event->y >= 310;
     else if (event->x < 260 && state->steer_track < 0) {
         state->steer_track = event->track_id;
+        state->touch_origin_x = (float)event->x;
         update_touch_steer(state, event->x, event->y);
     } else if (state->nitro_track < 0 && event->x >= 300 && event->y >= 310) {
         state->nitro_track = event->track_id;
@@ -441,7 +511,16 @@ static void update(void *value)
 {
     neon_rift_rally_module_t *state = value;
     if (!state || state->paused) return;
-    float steer = state->touch_steer;
+    if (state->imu_age_ticks < UINT8_MAX) ++state->imu_age_ticks;
+    float tilt = 0.0f;
+    if (state->imu_calibrated && state->imu_age_ticks <= 12U) {
+        float delta = state->imu_roll - state->imu_center_roll;
+        if (fabsf(delta) > .10f)
+            tilt = clamp_unit((delta - copysignf(.10f, delta)) / .50f);
+    }
+    float imu_response = fabsf(tilt) < fabsf(state->imu_steer) ? .65f : .30f;
+    state->imu_steer += (tilt - state->imu_steer) * imu_response;
+    float steer = state->steer_track >= 0 ? state->touch_steer : state->imu_steer;
     if (state->steer_left || state->steer_right)
         steer = (state->steer_right ? 1.0f : 0.0f) -
                 (state->steer_left ? 1.0f : 0.0f);
@@ -481,7 +560,8 @@ static int render(void *value)
     /* Keep the renderer ABI stable while making realtime projection the only
        scene source; the scenic atlas is no longer a game asset. */
     return rally_view_render(&state->game, state->rally_art,
-                             state->track_background);
+                             state->track_background, state->motorcycle_art,
+                             state->course_id);
 }
 
 static uint32_t state_hash(const void *value)
@@ -502,6 +582,7 @@ static int state_json(const void *value, char *output, size_t capacity)
         "{\"phase\":\"%s\",\"course_id\":%u,\"course\":\"%s\","
         "\"course_name\":\"%s\",\"theme\":\"%s\",\"start_hint\":\"%s\","
         "\"progress\":%.2f,\"lateral\":%.2f,"
+        "\"lateral_velocity\":%.3f,\"steering\":%.3f,\"heading_error\":%.4f,"
         "\"speed\":%.2f,\"lap\":%u,\"checkpoint\":%u,\"nitro\":%.2f,"
         "\"position\":%u,\"integrity\":%u,\"score\":%lu,\"combo\":%u,"
         "\"rating\":\"%s\",\"trophy\":\"%s\","
@@ -511,7 +592,8 @@ static int state_json(const void *value, char *output, size_t capacity)
         phase, (unsigned)state->course_id, COURSES[state->course_id].id,
         COURSES[state->course_id].name, COURSES[state->course_id].theme,
         start_hint(game),
-        game->progress, game->lateral, game->speed,
+        game->progress, game->lateral, game->lateral_velocity,
+        game->steering, game->heading_error, game->speed,
         (unsigned)(game->laps_completed + 1U), (unsigned)game->next_checkpoint,
         game->nitro, (unsigned)game->position, (unsigned)game->integrity,
         (unsigned long)game->score, (unsigned)game->combo,

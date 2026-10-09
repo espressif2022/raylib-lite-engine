@@ -1,11 +1,24 @@
 # Tests
 
-Example-backed suites live next to the raster regressions:
+Root `tests/` covers Engine behavior, independent pixel oracles, Host/tool integration, Board contracts and release packaging. Game-specific suites live in `examples/<game>/tests/` alongside their C harnesses. `tests/test_examples.py` loads those suites into the same repository command:
 
 ```sh
-python3 -m unittest tests.test_platform_game tests.test_game_cli tests.test_host_runner \
-    tests.test_living_worlds tests.test_last_zone_model tests.test_tomb_raycast -v
+python3 -m unittest discover -s tests -v
 ```
+
+Run only the maintained example suites:
+
+```sh
+python3 -m unittest tests.test_examples -v
+```
+
+Run one game's local suite:
+
+```sh
+python3 -m unittest discover -s examples/living_worlds/tests -v
+```
+
+Keep checks for observable behavior and public/dependency contracts. Avoid tests that only assert historical files were deleted, README wording, private helper names or a particular algorithm's constants. A `.py` wrapper often compiles and executes its paired `.c` harness; these files are complementary.
 
 `test_host_runner` compiles the shared Host simulator and needs Pillow. Device
 flash is not covered here. Packing an atlas with

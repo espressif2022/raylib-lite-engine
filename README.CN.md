@@ -1,18 +1,21 @@
 # Raylib Lite Engine
 
-[English](README.EN.md) · [文档索引](docs/README.CN.md)
+[English](README.md) · [开发文档](docs/README.CN.md)
 
-Raylib Lite Engine 是面向嵌入式 RGB565 显示的轻量 Raylib 兼容游戏运行时，提供固定步长更新、软件光栅、资源打包和 PC Host 仿真。它不是 raylib 官方项目，也不代表 raylib 官方背书。
+面向 ESP-IDF 的轻量游戏运行时与 RGB565 软件渲染引擎，提供固定步长更新、输入处理、资源加载、音频混合，以及场景和 UI 工具。游戏可在 PC Host 上开发和回放，再构建为设备原生固件。
 
-引擎维护共享游戏代码、Host 后端和 ESP-IDF 集成；示例或产品固件负责选择板卡并提供设备服务。Engine 公共 API 已统一为 `raylib_lite_*` 命名；Raylib-shaped 源码兼容层只位于 `compat/raylib/`，neutral Engine header 不再暴露 ESP-IDF 或 Raylib 类型。
+## 主要功能
 
-## 从哪里开始
+- RGB565 软件绘制：精灵、文字、瓦片地图、纹理三角形与四边形、光线投射墙面。
+- 固定步长游戏循环、输入队列和触摸动作映射。
+- 图集、地图、PCM / IMA-ADPCM 音频资源打包。
+- 场景栈、UI、补间、粒子和版本化存档。
+- Host 浏览器预览、固定输入回放与自动化测试。
+- Raylib 风格兼容接口，以及独立的 `raylib_lite_*` API。
 
-1. 新建游戏：按[快速入门](docs/quickstart.CN.md)看到第一个 Host 画面，再按[游戏开发指南](docs/game-development.CN.md)组织共享源码。
-2. 选择路径：查看[示例支持矩阵（English）](examples/README.md)和[构建路径](docs/build-matrix.CN.md)。引擎说明 Host、通用原生固件与 ELF 接入；Iris/Gateway 的产品流程由 `esp-mosaico-vibe` 维护。
-3. 设计输入、反馈、资产或绘制：查看[可复用设计方法](docs/reference-designs.CN.md)及其中链接的公共接口。
+## 安装
 
-ESP-IDF 工程通过消费组件的 `idf_component.yml` 依赖发布版 Raylib Lite Engine：
+组件发布后，在应用的 `main/idf_component.yml` 中添加：
 
 ```yaml
 dependencies:
@@ -20,27 +23,30 @@ dependencies:
   espressif2022/raylib-lite-engine: "^0.1.0"
 ```
 
-仓库内示例保持同一个版本契约，只额外使用 `override_path: ../../..` 指向当前 checkout 做联调。外部 Game 不需要 include Engine 仓库中的 CMake helper，也不应通过 `EXTRA_COMPONENT_DIRS` 注入 Engine 根目录；组件位置由 IDF Component Manager 解析。
+从[最小例程（English）](release/minimal/README.md)开始接入自己的应用，接口说明见[API 契约（English）](API.md)。
 
-在仓库根目录运行已有示例的 Host 仿真：
+## 运行示例
+
+在仓库根目录运行 Host 预览：
 
 ```sh
-python3 -m pip install Pillow
+python3 -m pip install Pillow numpy
 python3 tools/game_cli.py sim examples/sky_hop
 ```
 
-浏览器预览地址为 `http://127.0.0.1:8460/`。原生示例的 `main/idf_component.yml` 保持 Board-neutral，只依赖 Engine；具体 Board 由示例工程的 Application CMake 层选择。`RAYLIB_LITE_BOARD` 默认是 `esp-mosaico`，也可用 `-D RAYLIB_LITE_BOARD=<board>` 选择 `examples/boards/<board>` 下的其它 Adapter。ESP-Mosaico 的 BSP 与 ESP-Iris 路径继续由其 Board component 的本地依赖配置解析。ESP-Mosaico normal Game 默认提供 Iris USB 管理、截图和远程 pointer，但固件更新采用 Recovery-first：保留的 factory Recovery 负责 USB OTA writer，并把 normal Game 安装到 `ota_0`。Recovery/Gateway 实现仍由 `esp-mosaico-utils` 维护；设备 ELF 游戏由外部 SDK 构建、打包和安装。
+浏览器打开 `http://127.0.0.1:8460/`。新建游戏及回放测试见[快速入门](docs/quickstart.CN.md)和[游戏开发指南](docs/game-development.CN.md)。
 
-## 仓库目录
+仓库提供七个参考游戏和一个渲染基准工程，见[示例列表（English）](examples/README.md)。ESP-Mosaico 原生游戏使用共享 Board 适配层，自动获取板级依赖；构建和安装步骤见[构建指南](docs/build-matrix.CN.md)。
 
-- `src/`：引擎内部模块与 IDF backend；`include/raylib_lite/` 保存公共头文件。
-- `tools/`：开发与构建辅助工具；其中 `tools/cmake/` 放置 native asset embedding 等 CMake helper。
-- `examples/boards/`：具体开发板的示例/应用侧 Adapter；`esp-mosaico/` 是参考实现。
-- `examples/`：参考游戏、专用渲染测试、共享原生示例代码和 Board Adapter。
-- `host/`：Host ABI、RGB565 浏览器预览与固定输入回放。
-- `tools/`：游戏 CLI、资源打包与性能分析工具。
-- `docs/`：中英文开发、构建和可复用设计指南。
+当前 Host 覆盖游戏模块、绘制、输入回放和特效；尚未链接场景、UI、存档和音频模块。
 
-## 版本与许可
+## 文档
 
-初期 `0.x` 版本使用 neutral `raylib_lite_*` Engine API；Host ABI 与二进制资源格式分别带版本号，并拒绝不兼容输入。源码除另有标注外采用 Apache-2.0 许可，见 [LICENSE](LICENSE)；外部依赖见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。参与开发见[贡献指南](CONTRIBUTING.CN.md)。
+- [开发文档索引](docs/README.CN.md)：资源、输入、音频、绘制和板卡移植。
+- [组件发布（English）](docs/releasing.md)：组装可独立使用的例程并发布组件。
+- [更新记录](CHANGELOG.md)。
+- [贡献指南](CONTRIBUTING.CN.md)。
+
+## 许可
+
+源码采用 [Apache-2.0](LICENSE) 许可；外部依赖见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，例程素材来源见[素材记录](release/asset_provenance.json)。

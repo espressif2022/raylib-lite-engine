@@ -1,36 +1,49 @@
 # Neon Rift Rally
 
-`Neon Rift Rally` is a third-person panoramic hover-racing game for the
+`Neon Rift Rally` is a third-person neon motorcycle racing game for the
 Mosaico Raylib Lite engine. It combines a procedural curved track and layered
-panorama with a compact formal craft atlas, three deterministic rivals,
+panorama with three rider poses, six deterministic rivals,
 ranking, collision/near-miss scoring, integrity, three-lap results, persistent
 records, synthesized audio, and event-driven haptics.
 
-《Neon Rift Rally》是第三人称全景悬浮赛车。第一阶段采用程序化赛道、霓虹地平线、
-悬浮车、检查门和三圈计时，不依赖贴图资产，先建立 Host/真机共用的 3D 全景与光栅
-性能基线，再逐步加入赛道主题、音效和幽灵车。
+《Neon Rift Rally》是第三人称霓虹摩托竞速游戏。赛道、车道线和路边物件按游戏进度
+投影；骑手按转向切换左倾、直行、右倾姿态。碰撞会减速、扣耐久，并触发画面、音效和
+事件反馈。Host 与真机共用游戏模型和视图源码。
 
 ## Controls / 操作
 
 - Host keyboard: `A`/`D` steer, `W` throttle, `S` brake, `Space` nitro,
   `Shift` drift.
-- Touch: drag from the lower-left steering pad; push upward to accelerate. A
-  second finger can hold the lower-right nitro area at the same time.
+- Native board: acceleration is automatic. Tilt the board left/right to steer;
+  keep it level during the opening countdown so the IMU can calibrate. A
+  deliberate tilt beyond the deadzone changes lanes. A left-side touch drag
+  overrides tilt steering; a second finger can hold the lower-right nitro
+  area. Host pointer steering also requests throttle.
+- IMU steering uses the calibrated gravity-vector roll angle, with an
+  approximately 6-degree deadzone and finer response near center. Return the
+  board to its calibrated pose to release steering. Obvious acceleration
+  spikes are rejected; sustained steering still moves toward the road edge.
+- Touch steering starts neutral at the initial contact. Drag horizontally
+  from that point; resting a finger on the left edge does not apply full lock.
 - `P` pauses/resumes in the Host shell. `Enter`/action `4` restarts the run;
   tapping the finished race also starts a fresh run. The runner reset control
   performs the same restart and clears transient touch state.
-- During the countdown, action `8`/`9` (or a tap in the upper-left/upper-right
-  corners) selects the previous/next course. Selection resets the countdown.
+- During the countdown, action `8`/`9` (or a tap beside the course name on
+  the left/right) selects the previous/next course. Selection resets the countdown.
 
 The three course cards are `Neon Loop / NEON GRID`, `Sunset Sprint / SUNSET
-EMBER`, and `Polar Rift / AURORA ICE`. They share the deterministic track
-model but start at different sections of the closed panoramic route, so each
-has a distinct visual opening and independent best records.
+EMBER`, and `Polar Rift / AURORA ICE`. Each uses a distinct closed route and
+color palette, with independent best records.
 
 The module uses action codes `0`, `1`, `2`, `5`, `6`, and `7` for left, right,
 throttle, brake, nitro, and drift; action `3` toggles pause and action `4`
 restarts. Replays can therefore describe the same controls without knowing the
 rendering implementation.
+
+The shared IMU input uses the Board adapter's X-axis acceleration. The game
+filters a 0.12 g deadzone and recenters when samples stop; touch and action
+steering take priority. Check the physical left/right sign on the target board
+before accepting this control as device-ready.
 
 Each completed lap records its fixed-step duration. Host metadata exposes
 `last_lap_ticks`, `best_lap_ticks`, and `best_race_ticks` for replay/evaluation;
@@ -61,21 +74,20 @@ model and Host pointer checks with `tests/run_host_tests.sh`.
 ## Native project / 真机工程
 
 The example root is a direct ESP-IDF project using the same native structure as
-Last Zone and Tomb Raycast. Configure the Mosaico component and BSP paths if
-they are not adjacent to this checkout, then run `idf.py build` from this
-directory. `main/CMakeLists.txt` embeds the generated assets directory. The
+Last Zone and Tomb Raycast. The selected Board automatically fetches pinned dependencies. Run
+`idf.py build` from this directory with the supported ESP-IDF environment active. `main/CMakeLists.txt` embeds the generated assets directory. The
 current firmware embeds nine compact `.sound` resources. Semantic events
 map to cues and haptics as follows: nitro, drift, jump, landing, checkpoint,
 lap, finish, and off-track. Missing audio assets are tolerated at runtime, so
 the model and event serial remain usable on products without audio.
 
-Build and flash:
+Build from the repository root:
 
-```bash
-source /home/xx/work/mosaico/esp-idf-pinned/export.sh
-idf.py -B build build
-idf.py -B build -p /dev/ttyACM0 flash
+```sh
+idf.py --preview -C examples/neon_rift_rally -B /tmp/neon-rift-rally-native -DIDF_TARGET=esp32s31 build
 ```
+
+The example supports Host and standalone native firmware. See the [build guide](../../docs/build-matrix.EN.md) for Board selection and Vibe integration.
 
 ## Interface contract for the gameplay/view implementation
 
@@ -97,15 +109,27 @@ track function, so collision and perspective geometry cannot drift apart.
 
 For repeatable device measurements, record the firmware hash, display
 configuration, fixed input sequence, and raw logs alongside each result.
+The current build has no board FPS capture, so Host render time is not a device
+frame-rate result. After an authorized flash, replay the same steering, nitro,
+collision, and course-selection sequence on the target board. Capture startup,
+input, present, shutdown, and a 60-second frame log with:
 
-## ESP-Mosaico native dependencies / 真机构建依赖
-
-All standard ESP-Mosaico native Game builds use the same local dependency setup:
-
-```sh
-export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
-export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
-idf.py -C examples/neon_rift_rally build
+```bash
+python3 tools/capture_game_perf.py artifacts/neon-rift-rally/raw.log \
+  --port <UART_SERIAL_PORT> --seconds 60
+python3 tools/analyze_game_perf.py --label neon-rift-rally \
+  artifacts/neon-rift-rally/raw.log
 ```
 
-`MOSAICO_UTILS_ROOT` supplies both ESP-Iris and the upstream normal-application Recovery component. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.
+Check the full-frame distribution and dropped presents against the 30 Hz
+33.3 ms frame budget, then inspect the same moments on the display. Record
+rendering, waiting for buffers, and presentation separately.
+
+The [Host profiling report](performance/host-optimization.md) records the
+fixed-state quality comparison, phase measurements and renderer optimizations.
+The [steering tuning report](performance/steering-tuning.md) records the IMU
+pulse, repeated swing and return-to-center checks.
+
+## Native build
+
+See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.

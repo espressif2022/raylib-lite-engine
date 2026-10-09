@@ -2,6 +2,13 @@
 function(raylib_lite_native_embed_assets example_root)
     cmake_parse_arguments(ARG "" "" "EXCLUDE;EXTRA_FILES" ${ARGN})
     set(original_source_dir "${example_root}/assets_src")
+    # The shared launcher also supports games without an asset directory.
+    if(NOT EXISTS "${original_source_dir}")
+        set(register_c "${CMAKE_CURRENT_BINARY_DIR}/register_native_assets.c")
+        file(WRITE "${register_c}" "void raylib_lite_register_native_assets(void) {}\n")
+        target_sources(${COMPONENT_LIB} PRIVATE "${register_c}")
+        return()
+    endif()
     set(stage_root "${CMAKE_CURRENT_BINARY_DIR}/native_example")
     set(source_dir "${stage_root}/assets_src")
     set(output_dir "${CMAKE_CURRENT_BINARY_DIR}/native_assets")

@@ -44,8 +44,10 @@ Raylib Lite Engine is one ESP-IDF component: `raylib-lite-engine`. Public neutra
 - Handles returned by an owning module must be closed/unloaded before the owner shuts down.
 - Calls are task-context APIs unless explicitly documented otherwise; they are not ISR-safe by default.
 
+For lifecycle, framebuffer ownership and queue concurrency requirements, see the [public API contract](../API.md).
+
 ## Configuration and lifecycle
 
-The component-root `Kconfig` uses `RAYLIB_LITE_*` Engine configuration names. Board-specific ESP-Mosaico options use the `ESP_MOSAICO_*` namespace. Shared native-example launcher/Board/feedback/Product-ABI glue is owned by the application-side `examples/common_components/examples_common` IDF component and is intentionally excluded from the published Engine component.
+The component-root `Kconfig` uses `RAYLIB_LITE_*` Engine configuration names. Board-specific ESP-Mosaico options use the `ESP_MOSAICO_*` namespace. Shared native-example launcher/Board/feedback/game-module glue is owned by the application-side `examples/common_components/examples_common` IDF component and is excluded from Engine implementation sources. Release assembly bundles a separate copy inside each native game example; it is not an Engine public API.
 
 Runtime asset services consume a read-only mmap partition, a resident image alias, a bounded read backing, or explicitly registered memory. Host simulation reads generated assets and does not mount device flash.

@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "living_worlds_view.h"
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
 #include "living_worlds_scene_audio.h"
 #endif
 
@@ -17,7 +17,7 @@ typedef struct {
 typedef struct {
     living_world_t world;
     living_worlds_atlases_t atlases;
-#if defined(MOSAICO_GAME_ELF) || defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
     living_worlds_scene_audio_t audio;
     bool audio_started;
 #endif

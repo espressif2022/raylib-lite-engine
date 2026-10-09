@@ -17,7 +17,7 @@ CLI = ENGINE / "tools/game_cli.py"
 CLI_SCHEMA = "raylib-lite-game-cli/v1"
 REQUIRED_MATRIX = (
     "raylib_shooter", "tower_defense", "sky_hop", "living_worlds",
-    "last_zone_extraction", "tomb_raycast", "vertical_dock",
+    "last_zone_extraction", "tomb_raycast", "neon_rift_rally",
 )
 
 
@@ -74,6 +74,14 @@ class GameCliTests(unittest.TestCase):
                 self.assertIn("esp-mosaico", games[name]["boards"])
                 self.assertEqual(Path(games[name]["path"]), ENGINE / "examples" / name)
 
+    def test_box3_listing_excludes_s31_only_jpeg_game(self) -> None:
+        payload = json.loads(subprocess.check_output([
+            sys.executable, str(CLI), "list", "--json", "--target", "esp32-s3-box-3",
+        ], cwd=ENGINE))
+        games = {game["name"] for game in payload["games"]}
+        self.assertIn("sky_hop", games)
+        self.assertNotIn("living_worlds", games)
+
     def test_create_accepts_listed_games_and_rejects_unknown_templates(self) -> None:
         for template in ("sky-hop", "sky_hop"):
             payload = json.loads(subprocess.check_output([
@@ -90,6 +98,16 @@ class GameCliTests(unittest.TestCase):
         self.assertEqual(invalid.returncode, 2)
         self.assertIn("unknown template", invalid.stderr)
 
+    def test_external_creation_is_self_contained_and_runs_host(self) -> None:
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            game = Path(directory) / "new_sky_game"
+            subprocess.check_output([sys.executable, str(CLI), "create", str(game), "--template", "sky-hop", "--json"], cwd=ENGINE)
+            self.assertTrue((game / "shared/boards/esp-mosaico/partitions.csv").is_file())
+            self.assertIn("shared/common_components/", (game / "CMakeLists.txt").read_text())
+            payload = json.loads(subprocess.check_output([sys.executable, str(CLI), "sim", str(game), "--headless", "--frames", "3", "--json"], cwd=ENGINE))
+            self.assertEqual(payload["result"]["frames"], 3)
+
     def test_finite_test_and_replay_commands_use_host_runner(self) -> None:
         tested = json.loads(subprocess.check_output([
             sys.executable, str(CLI), "test", "examples/raylib_shooter",
@@ -100,8 +118,8 @@ class GameCliTests(unittest.TestCase):
         self.assertEqual(tested["result"]["frames"], 3)
 
         replayed = json.loads(subprocess.check_output([
-            sys.executable, str(CLI), "replay", "examples/vertical_dock",
-            "examples/vertical_dock/scenarios/power-on.json",
+            sys.executable, str(CLI), "replay", "examples/tower_defense",
+            "examples/tower_defense/scenarios/start.json",
             "--frames", "3", "--json",
         ], cwd=ENGINE))
         self.assertEqual(replayed["command"], "replay")

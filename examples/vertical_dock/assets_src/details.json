@@ -1,8 +1,0 @@
-{
-  "image": "details.png",
-  "columns": 1,
-  "rows": 1,
-  "output_cell": 512,
-  "alpha_mode": "opaque",
-  "frames": [{"name": "dock_details", "pivot_x": 0, "pivot_y": 0}]
-}

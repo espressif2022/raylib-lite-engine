@@ -22,7 +22,7 @@ for index, box in enumerate(CROPS):
         item = item.crop(alpha_box)
     scale = min((CELL - 8) / item.width, (CELL - 8) / item.height)
     size = (max(1, int(item.width * scale)), max(1, int(item.height * scale)))
-    item = item.resize(size, Image.Resampling.LANCZOS)
+    item = item.resize(size, getattr(Image, "Resampling", Image).LANCZOS)
     x = (index % 4) * CELL + (CELL - size[0]) // 2
     y = (index // 4) * CELL + (CELL - size[1]) // 2
     sheet.alpha_composite(item, (x, y))
@@ -38,7 +38,7 @@ for index, filename in enumerate(("roadside_rock_source.png",
         item = item.crop(alpha_box)
     scale = min((CELL - 8) / item.width, (CELL - 8) / item.height)
     size = (max(1, int(item.width * scale)), max(1, int(item.height * scale)))
-    item = item.resize(size, Image.Resampling.LANCZOS)
+    item = item.resize(size, getattr(Image, "Resampling", Image).LANCZOS)
     x = (index % 4) * CELL + (CELL - size[0]) // 2
     y = (index // 4) * CELL + (CELL - size[1]) // 2
     sheet.alpha_composite(item, (x, y))

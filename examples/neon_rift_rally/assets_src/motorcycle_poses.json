@@ -1,0 +1,12 @@
+{
+  "image": "motorcycle_poses_source.png",
+  "columns": 3,
+  "rows": 1,
+  "output_cell": 96,
+  "alpha_mode": "binary",
+  "frames": [
+    {"name": "motorcycle_left"},
+    {"name": "motorcycle_straight"},
+    {"name": "motorcycle_right"}
+  ]
+}

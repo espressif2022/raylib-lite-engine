@@ -18,8 +18,10 @@ class BoardAudioCodecTests(unittest.TestCase):
             self.skipTest("C compiler not installed")
         with tempfile.TemporaryDirectory(prefix="rle_board_codec_") as directory:
             for board, macro, source in (
-                ("ESP-Mosaico", "TEST_MOSAICO", "esp-mosaico/board_audio_codec.c"),
-                ("ESP32-S3-BOX-3", "TEST_BOX3", "esp32-s3-box-3/box3_audio_codec.c"),
+                ("ESP-Mosaico", "TEST_MOSAICO",
+                 "esp-mosaico/mosaico_audio_codec.c"),
+                ("ESP32-S3-BOX-3", "TEST_BOX3",
+                 "esp32-s3-box-3/box3_audio_codec.c"),
             ):
                 with self.subTest(board=board):
                     output = Path(directory) / macro.lower()

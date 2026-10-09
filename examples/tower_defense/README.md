@@ -1,6 +1,6 @@
 # Circuit Keep 塔防游戏
 
-这是 Mosaico 游戏平台的资源化验收项目，使用 480×480 RGB565 快速渲染后端，目标 30 FPS。
+塔防参考游戏，使用 480×480 RGB565 画面。
 地图来自 Tiled `.tmj`，角色和塔来自统一 RGB565+A8 Atlas，短音效采用 PCM16，循环
 背景音乐采用 IMA-ADPCM。设备和 Host 使用相同的资源文件、游戏模型和 C 像素渲染核心。
 
@@ -30,14 +30,6 @@ python3 tools/game_cli.py sim examples/tower_defense --headless \
 非 headless 预览地址为 `http://127.0.0.1:8460/`；局域网预览可加
 `--listen 0.0.0.0`。
 
-## ESP-Mosaico native dependencies / 真机构建依赖
+## Native build
 
-All standard ESP-Mosaico native Game builds use the same local dependency setup:
-
-```sh
-export MOSAICO_BSP_COMPONENT_DIR=/path/to/esp-mosaico-bsp/components/esp-mosaico-bsp
-export MOSAICO_UTILS_ROOT=/path/to/esp-mosaico-utils
-idf.py -C examples/tower_defense build
-```
-
-`MOSAICO_UTILS_ROOT` supplies both ESP-Iris and the upstream normal-application Recovery component. See [`examples/boards/esp-mosaico`](../boards/esp-mosaico/README.md) for the Board contract and Recovery-first device workflow.
+See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.

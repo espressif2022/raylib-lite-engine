@@ -2,6 +2,8 @@
 
 [English](quickstart.EN.md) · [完整开发指南](game-development.CN.md)
 
+下列命令需要完整仓库；Registry 组件不包含 Host runner 或 game CLI。独立 native 例程用法见[开发环境与例程来源](game-development.CN.md#开发环境与例程来源)。
+
 准备 Python 3、C 编译器与 Pillow。在 Raylib Lite Engine 仓库根目录运行：
 
 ```sh
@@ -18,4 +20,4 @@ python3 tools/game_cli.py sim examples/hello_game
 python3 tools/game_cli.py sim examples/hello_game --headless --frames 30
 ```
 
-之后修改 `examples/hello_game/main/` 中的共享模型与视图，再按[开发指南](game-development.CN.md)做固定输入回放。[构建路径](build-matrix.CN.md)说明通用原生固件和 ELF 接入；Iris 产品路径由 `esp-mosaico-vibe` 说明；Host 能运行不代表这些设备路径已验收。Native/ELF 构建、安装和发布分别属于 ESP-IDF、外部 Module SDK 或产品工具；`game_cli.py` 只负责 create/sim/test/replay/assets/benchmark 等 Engine 开发工作流。
+之后修改 `examples/hello_game/main/` 中的共享模型与视图，再按[开发指南](game-development.CN.md)做固定输入回放。[构建路径](build-matrix.CN.md)说明原生 ESP-IDF 固件；Iris 产品路径由 `esp-mosaico-vibe` 说明；Host 能运行不代表这些设备路径已验收。当前不支持 ELF 游戏接入。Native 使用 ESP-IDF 构建，安装和发布使用产品/发布工具；`game_cli.py` 只负责 create/sim/test/replay/assets/benchmark 等 Engine 开发工作流。

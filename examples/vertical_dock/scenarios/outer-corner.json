@@ -1,6 +1,0 @@
-{"events":[
-  {"frame":0,"type":"action","code":2,"pressed":true},
-  {"frame":35,"type":"action","code":2,"pressed":false},
-  {"frame":35,"type":"action","code":0,"pressed":true},
-  {"frame":53,"type":"action","code":0,"pressed":false}
-]}

@@ -50,3 +50,6 @@ save("checkpoint.wav", .25, chord((660, 990), .25))
 save("lap.wav", .55, chord((440, 660, 880), .55))
 save("finish.wav", 1.15, chord((523.25, 659.25, 783.99, 1046.5), 1.15))
 save("offtrack.wav", .34, sweep(190, 72, .34, 5.5))
+save("collision.wav", .18,
+     lambda t, i, n: .48 * rng.uniform(-1, 1) * math.exp(-t * 19.0) +
+     .22 * math.sin(2 * math.pi * (95 - 260 * t) * t) * math.exp(-t * 12.0))
