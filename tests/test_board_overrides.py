@@ -22,7 +22,7 @@ class BoardOverrideTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((folder / "components.txt").read_text(), "")
 
-    def test_local_bsp_and_adjacent_splash(self):
+    def test_local_bsp_does_not_register_product_splash(self):
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
             for name in ["esp-mosaico-bsp", "mosaico_boot_splash"]:
@@ -34,4 +34,4 @@ class BoardOverrideTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             components = (folder / "components.txt").read_text().split(";")
             self.assertIn(str(folder / "bsp/components/esp-mosaico-bsp"), components)
-            self.assertIn(str(folder / "bsp/components/mosaico_boot_splash"), components)
+            self.assertNotIn(str(folder / "bsp/components/mosaico_boot_splash"), components)

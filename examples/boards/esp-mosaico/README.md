@@ -16,9 +16,8 @@ The default partition table contains a standalone factory game. The example
 prints logs to UART0. A product wrapper can supply another partition table.
 
 For local BSP development, pass `-DRAYLIB_LITE_BSP_DIR=/absolute/path/to/esp-mosaico-bsp`.
-The BSP root or its `components/esp-mosaico-bsp` directory is accepted. The
-adjacent boot splash component is selected when present. Use a separate build
-directory when switching dependencies.
+The BSP root or its `components/esp-mosaico-bsp` directory is accepted.
+Use a separate build directory when switching dependencies.
 
 ## Vibe integration
 
