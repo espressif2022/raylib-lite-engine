@@ -49,12 +49,35 @@ ctest --test-dir /tmp/render-preview-host --output-on-failure
 最后的数字为场景编号 0–8。预览图是运行时生成物，例如可输出到 `artifacts/render-benchmark/preview/near.png`；仓库不提交这类本地 benchmark 产物。
 Host 图中耗时为 0，因为它是静态快照，没有假填设备性能。
 
-## 两个 suite
+## 三个 suite
 
 | suite | 内容 | 验收 |
 |---|---|---|
 | `wall` | 9 个墙面场景；旧实现、逐像素、固定分段、自适应误差分段 | 复用独立 UV oracle；审计/计时分开 |
 | `core` | 12 项：copy、fill、shade、RGB565/INDEX8 墙柱、行列布局、span、quad、MTX2、直接正弦与递推 | 独立逐像素/数学参考，guard 检查 |
+| `stack` | 13 项：游戏通过 raylib 兼容层调用的绘制路径，见下表 | 整帧（含 stride 填充）逐像素对照独立标量 oracle |
+
+`stack` 走真实的 `BeginDrawing`/`EndDrawing` 与视频端口，后端是指向 RAM 帧的最小实现，不含送屏。
+帧为 240×240、stride 247，背景是非均匀图案，半透明结果能暴露重复混合。每项预热 8 次，记录 7 个批次，每批 32 次调用，
+计时在一对 `BeginDrawing`/`EndDrawing` 之内，只含绘制。
+
+| 用例 | 场景 | oracle 要点 |
+|---|---|---|
+| `clear_background` | 整帧清屏 | 全帧单色 |
+| `rect_opaque` / `rect_alpha` | 24 个矩形，不透明 / alpha 128 | 半开区间，重叠处按绘制顺序混合 |
+| `gradient_v` | 220×220 竖直渐变 | 逐行整数插值 |
+| `circle_alpha` | 12 个圆 | `dx²+dy²≤r²` |
+| `triangle_fan_alpha` | 16 扇区三角扇 | 整数顶点左上规则，共享边只混合一次 |
+| `rect_pro_alpha` | 6 个旋转矩形 | 两个三角形，左上规则 |
+| `rounded_rect_alpha` | 6 个圆角矩形 | 十字矩形与四角圆的并集，限制在矩形内，只混合一次 |
+| `poly_alpha` | 3–8 边形 | 中心扇形三角形，左上规则 |
+| `line_thick` | 16 条 6 px 圆端粗线 | 像素中心到线段距离 ≤ 3 |
+| `texture_opaque` | 9 次 64×64 贴图 | 逐像素拷贝 |
+| `texture_scale2x` | 2 次 2 倍放大 | 最近邻 `(x-x0)/2` |
+| `texture_alpha` | 9 次半透明贴图 | 贴图混合约定（打包 RGB565，`>>8`） |
+
+旋转矩形和多边形的顶点由 oracle 用 double 计算，初始化时检查每个顶点离整数至少 0.001，否则以 `STACKBENCH_SETUP` 失败退出；
+这样设备上浮点乘加融合或 libm 差异不会让 oracle 与实现截断到不同整数。当前未覆盖：文字、相机、裁剪、瓦片地图（需打包资源）。
 
 `core` 使用 128×128、135 像素 stride，每个像素内核写 64×64 区域；
 数学测试是 256 点。每项预热后记录 7 个批次，每批 32 次调用。
@@ -68,6 +91,7 @@ MTX2 当前只有正确性与自身耗时，未建立同图 RGB565 压缩质量/
 ```sh
 python3 tools/render_benchmark.py list
 python3 tools/render_benchmark.py host --suite core --output artifacts/render-benchmark/core-001
+python3 tools/render_benchmark.py host --suite stack --output artifacts/render-benchmark/stack-001
 python3 tools/render_benchmark.py host --suite wall --variant adaptive025 \
   --output artifacts/render-benchmark/wall-001
 ```
@@ -108,6 +132,9 @@ python3 tools/render_benchmark.py collect core-0.log core-1.log core-2.log \
   --output core-report.json
 ```
 
+`stack` 的构建与采集方式相同，把 `-DRENDER_BENCH_SUITE=core` 换成 `stack`、构建目录换成 `/tmp/render-s31-stack`。
+比较兼容层的新旧实现时，两组都用同一份 `stack_bench.c`（工作负载哈希必须一致），按 `--dimension implementation` 对比。
+
 墙面审计、计时要分别构建：
 
 ```sh
@@ -137,7 +164,7 @@ CPU/PSRAM 频率、执行核、IDF 版本、应用 ELF 哈希和内存低水位�
 python3 tools/render_benchmark.py plan --output artifacts/render-benchmark/s31-plan-001
 ```
 
-生成 22 个离屏构建项及单独的上屏 `previews` 项。离屏项含参数数组、烧录/monitor 命令与采集次数。
+生成 23 个离屏构建项及单独的上屏 `previews` 项。离屏项含参数数组、烧录/monitor 命令与采集次数。
 `PORT` 要替换成实际串口。计划不会自动烧板。
 
 1. **正确性筛选**：墙面先跑 exact 与候选 audit。像素/UV 失败就停止该候选性能晋级。

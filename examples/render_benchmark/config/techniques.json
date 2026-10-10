@@ -245,24 +245,30 @@
       "id": "primitive_alpha",
       "title": "矩形、圆、椭圆等图形原语的 alpha 混合",
       "status": "host_tested",
-      "suite": "2d",
+      "suite": "stack",
       "variants": [
         "opaque",
         "alpha_0_255",
         "clip",
-        "stride"
+        "stride",
+        "top_left_triangles",
+        "single_blend_rounded"
       ],
       "source": "src/renderer/raylib_lite_raylib_impl.c",
-      "gate": "Host 1024 个标量参考用例已有；尚未纳入专用板端同输入性能/上屏验收"
+      "gate": "stack suite 经兼容层与视频端口跑同输入标量 oracle（Host 已通过）；板端多轮计时尚未采集"
     },
     {
       "id": "sprites_alpha",
       "title": "Atlas、缩放、透明与精灵",
-      "status": "integration_pending",
-      "suite": "2d",
-      "variants": [],
+      "status": "host_tested",
+      "suite": "stack",
+      "variants": [
+        "opaque_copy",
+        "nearest_scale2x",
+        "tint_alpha"
+      ],
       "source": "src/renderer/raylib_lite_renderer.c",
-      "gate": "复用现有host oracle，再建立同输入板端suite"
+      "gate": "stack suite 覆盖不透明、2 倍最近邻与半透明贴图（Host 已通过）；Atlas 与带 alpha 通道纹理、板端计时待补"
     },
     {
       "id": "numeric",
