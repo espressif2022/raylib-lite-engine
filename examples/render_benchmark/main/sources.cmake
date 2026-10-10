@@ -28,6 +28,7 @@ elseif(RENDER_BENCH_SUITE STREQUAL "wall")
 elseif(RENDER_BENCH_SUITE STREQUAL "stack")
     list(APPEND BENCH_SOURCES "${CMAKE_CURRENT_LIST_DIR}/stack_bench.c"
         "${ENGINE_ROOT}/src/renderer/raylib_lite_raylib_impl.c"
+        "${ENGINE_ROOT}/src/renderer/raylib_lite_tilemap.c"
         "${ENGINE_ROOT}/src/runtime/raylib_lite_raylib_port.c")
     list(APPEND BENCH_DEFINITIONS RENDER_BENCH_STACK=1)
 else()

@@ -74,7 +74,7 @@ class RenderExampleTests(unittest.TestCase):
                 with self.assertRaises(ValueError):bench.read_log(malformed)
             changed=copy.deepcopy(report);changed['config']['workload_sha256']='e'*64
             with self.assertRaises(ValueError):bench.compare(report,changed,'implementation')
-            self.assertEqual(len(bench.compare(report,copy.deepcopy(report),'implementation')),13)
+            self.assertEqual(len(bench.compare(report,copy.deepcopy(report),'implementation')),17)
 
 
 if __name__=='__main__':unittest.main()

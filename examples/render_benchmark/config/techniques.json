@@ -255,7 +255,7 @@
         "single_blend_rounded"
       ],
       "source": "src/renderer/raylib_lite_raylib_impl.c",
-      "gate": "stack suite 经兼容层与视频端口跑同输入标量 oracle（Host 已通过）；板端多轮计时尚未采集"
+      "gate": "stack suite 覆盖图元、5x7 文字、缩放相机和矩形裁剪（Host 已通过）；板端多轮计时尚未采集"
     },
     {
       "id": "sprites_alpha",
@@ -268,7 +268,20 @@
         "tint_alpha"
       ],
       "source": "src/renderer/raylib_lite_renderer.c",
-      "gate": "stack suite 覆盖不透明、2 倍最近邻与半透明贴图（Host 已通过）；Atlas 与带 alpha 通道纹理、板端计时待补"
+      "gate": "stack suite 覆盖不透明、2 倍最近邻与半透明贴图（Host 已通过）；带 alpha 通道纹理与图集帧查找、板端计时待补"
+    },
+    {
+      "id": "tilemap_layer",
+      "title": "瓦片层绘制与视口裁剪",
+      "status": "host_tested",
+      "suite": "stack",
+      "variants": [
+        "viewport_cull",
+        "empty_tile",
+        "ram_asset"
+      ],
+      "source": "src/renderer/raylib_lite_tilemap.c",
+      "gate": "stack suite 用内存中的地图和贴图集逐像素验收可见瓦片（Host 已通过）；板端计时待采集"
     },
     {
       "id": "numeric",
