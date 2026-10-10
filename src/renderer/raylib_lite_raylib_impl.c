@@ -21,7 +21,11 @@ static bool s_window_should_close;
 static int s_screen_width;
 static int s_screen_height;
 static int s_target_fps = 30;
-static uint64_t s_presented_frames;
+static uint32_t s_logic_hz;
+static uint64_t s_logic_ticks;
+static uint64_t s_fps_window_start_us;
+static uint32_t s_fps_window_frames;
+static int s_measured_fps;
 static raylib_lite_result_t s_last_acquire = RAYLIB_LITE_NOT_READY;
 static raylib_lite_result_t s_last_present = RAYLIB_LITE_NOT_READY;
 static bool s_scissor_active;
@@ -164,7 +168,10 @@ void raylib_lite_raylib_init_window(int width, int height, const char *title)
     s_screen_height = height > 0 ? height : 0;
     s_window_ready = true;
     s_window_should_close = false;
-    s_presented_frames = 0;
+    s_logic_ticks = 0;
+    s_fps_window_start_us = 0;
+    s_fps_window_frames = 0;
+    s_measured_fps = 0;
     s_last_acquire = RAYLIB_LITE_NOT_READY;
     s_last_present = RAYLIB_LITE_NOT_READY;
     memset(s_key_down, 0, sizeof(s_key_down));
@@ -188,10 +195,38 @@ int raylib_lite_raylib_get_screen_height(void) { return s_screen_height; }
 int raylib_lite_raylib_get_render_width(void) { return s_screen_width; }
 int raylib_lite_raylib_get_render_height(void) { return s_screen_height; }
 void raylib_lite_raylib_set_target_fps(int fps) { if (fps > 0) s_target_fps = fps; }
-float raylib_lite_raylib_get_frame_time(void) { return 1.0f / (float)s_target_fps; }
+int raylib_lite_raylib_get_target_fps(void) { return s_target_fps; }
+
+void raylib_lite_raylib_attach_runtime(uint32_t logic_hz) { s_logic_hz = logic_hz; }
+void raylib_lite_raylib_detach_runtime(void) { s_logic_hz = 0; }
+
+static uint32_t tick_hz(void)
+{ return s_logic_hz ? s_logic_hz : (uint32_t)s_target_fps; }
+
+/* Game time advances per logic tick, never per presented frame, so replays
+ * stay deterministic when the display drops or rejects frames. */
+float raylib_lite_raylib_get_frame_time(void) { return 1.0f / (float)tick_hz(); }
 double raylib_lite_raylib_get_time(void)
-{ return (double)s_presented_frames / (double)s_target_fps; }
-int raylib_lite_raylib_get_fps(void) { return s_target_fps; }
+{ return (double)s_logic_ticks / (double)tick_hz(); }
+int raylib_lite_raylib_get_fps(void) { return s_measured_fps; }
+
+static void note_presented_frame(void)
+{
+    uint64_t now = raylib_lite_raylib_port_now_us();
+    if (!now) return;
+    if (!s_fps_window_start_us) {
+        s_fps_window_start_us = now;
+        return;
+    }
+    ++s_fps_window_frames;
+    uint64_t elapsed = now - s_fps_window_start_us;
+    if (elapsed >= 1000000U) {
+        s_measured_fps = (int)((s_fps_window_frames * 1000000ULL +
+                                elapsed / 2U) / elapsed);
+        s_fps_window_start_us = now;
+        s_fps_window_frames = 0;
+    }
+}
 
 static bool valid_key(int key)
 { return key >= 0 && key < RAYLIB_LITE_RAYLIB_KEY_COUNT; }
@@ -316,6 +351,12 @@ void raylib_lite_raylib_consume_input_edges(void)
     }
 }
 
+void raylib_lite_raylib_end_logic_tick(void)
+{
+    ++s_logic_ticks;
+    raylib_lite_raylib_consume_input_edges();
+}
+
 void raylib_lite_raylib_end_drawing(void)
 {
     if (s_pixels) {
@@ -327,8 +368,10 @@ void raylib_lite_raylib_end_drawing(void)
     raylib_lite_renderer_set_target(NULL, 0, 0, 0);
     s_camera_active = false;
     s_scissor_active = false;
-    if (s_last_present == RAYLIB_LITE_OK) ++s_presented_frames;
-    raylib_lite_raylib_consume_input_edges();
+    if (s_last_present == RAYLIB_LITE_OK) note_presented_frame();
+    /* An attached runtime ends ticks itself; a render-only pass must not
+     * drop edges that the next logic tick has not observed yet. */
+    if (!s_logic_hz) raylib_lite_raylib_end_logic_tick();
 }
 
 void raylib_lite_raylib_begin_scissor_mode(int x, int y, int width, int height)
@@ -660,13 +703,50 @@ void raylib_lite_raylib_draw_rectangle_rounded(Rectangle r,float roundness,int s
     (void)segments;
     float radius=rounded_radius(r,roundness);
     if(radius<1){raylib_lite_raylib_draw_rectangle_rec(r,color);return;}
-    int rad=(int)ceilf(radius);
-    raylib_lite_raylib_draw_rectangle((int)r.x+rad,(int)r.y,(int)r.width-2*rad,(int)r.height,color);
-    raylib_lite_raylib_draw_rectangle((int)r.x,(int)r.y+rad,(int)r.width,(int)r.height-2*rad,color);
-    raylib_lite_raylib_draw_circle((int)r.x+rad,(int)r.y+rad,radius,color);
-    raylib_lite_raylib_draw_circle((int)(r.x+r.width)-rad-1,(int)r.y+rad,radius,color);
-    raylib_lite_raylib_draw_circle((int)r.x+rad,(int)(r.y+r.height)-rad-1,radius,color);
-    raylib_lite_raylib_draw_circle((int)(r.x+r.width)-rad-1,(int)(r.y+r.height)-rad-1,radius,color);
+    if(!color.a)return;
+    int x=(int)r.x,y=(int)r.y,width=(int)r.width,height=(int)r.height;
+    if(s_camera_active){
+        Vector2 p=active_to_screen((Vector2){(float)x,(float)y});
+        x=(int)p.x;y=(int)p.y;
+        width=(int)(width*s_camera.zoom);height=(int)(height*s_camera.zoom);
+        radius*=s_camera.zoom;
+    }
+    /* One span per row, so translucent fills blend each pixel once. The
+     * covered set is two cross rectangles plus four corner circles, clipped
+     * to the rectangle (corner circles can overshoot when a side is ~2*radius). */
+    int rad=(int)ceilf(radius),cr=(int)radius,rr=cr*cr;
+    int left_cx=x+rad,right_cx=x+width-rad-1;
+    int top_cy=y+rad,bottom_cy=y+height-rad-1;
+    span_paint_t paint=span_paint(color);
+    for(int row=y;row<y+height;++row){
+        int lo[4],hi[4],count=0,span=-1;
+        if(height>2*rad&&row>=y+rad&&row<y+height-rad){lo[0]=x;hi[0]=x+width;count=1;}
+        else{
+            if(width>2*rad){lo[count]=x+rad;hi[count++]=x+width-rad;}
+            const int centers[2]={top_cy,bottom_cy};
+            for(int i=0;i<2;++i){
+                int dy=row-centers[i];
+                if(dy>=-cr&&dy<=cr){
+                    int s=(int)sqrtf((float)(rr-dy*dy));
+                    if(s>span)span=s;
+                }
+            }
+            if(span>=0){
+                lo[count]=left_cx-span;hi[count++]=left_cx+span+1;
+                lo[count]=right_cx-span;hi[count++]=right_cx+span+1;
+            }
+        }
+        for(int i=1;i<count;++i)for(int j=i;j>0&&lo[j]<lo[j-1];--j){
+            int t=lo[j];lo[j]=lo[j-1];lo[j-1]=t;t=hi[j];hi[j]=hi[j-1];hi[j-1]=t;
+        }
+        for(int i=0;i<count;){
+            int first=lo[i],last=hi[i++];
+            while(i<count&&lo[i]<=last){if(hi[i]>last)last=hi[i];++i;}
+            if(first<x)first=x;
+            if(last>x+width)last=x+width;
+            if(first<last)fill_span(row,first,last,&paint);
+        }
+    }
 }
 
 void raylib_lite_raylib_draw_rectangle_rounded_lines(Rectangle r,float roundness,int segments,
@@ -737,9 +817,10 @@ void raylib_lite_raylib_draw_triangle(Vector2 av, Vector2 bv, Vector2 cv, Color 
     int64_t area=edge(ax,ay,bx,by,cx,cy);
     if(!area||!color.a||minx>maxx||miny>maxy)return;
     span_paint_t paint=span_paint(color);
-    /* Intersect the three inclusive integer half-planes directly. This is
-     * exactly the legacy edge test at integer pixel coordinates, including
-     * shared edges and either winding, without scanning each row's box. */
+    /* Intersect the three integer half-planes directly, either winding.
+     * Top-left rule: pixels on a left or top edge are inside, pixels on a
+     * right or bottom edge are not, so triangles sharing an edge (fans,
+     * strips, polygons, DrawRectanglePro) cover each pixel exactly once. */
     int winding=area>0?1:-1;
     int vx[3]={ax,bx,cx},vy[3]={ay,by,cy};
     int64_t slope[3],value[3],step[3];
@@ -748,6 +829,7 @@ void raylib_lite_raylib_draw_triangle(Vector2 av, Vector2 bv, Vector2 cv, Color 
         slope[i]=((int64_t)vy[j]-vy[i])*winding;
         step[i]=-((int64_t)vx[j]-vx[i])*winding;
         value[i]=edge(vx[i],vy[i],vx[j],vy[j],0,miny)*winding;
+        if(!(slope[i]>0||(slope[i]==0&&step[i]>0)))value[i]-=1;
     }
     for(int y=miny;y<=maxy;++y){
         int64_t first=minx,last=maxx;
@@ -816,76 +898,120 @@ void raylib_lite_raylib_draw_poly_lines(Vector2 center,int sides,float radius,
                               float rotation,Color color)
 { raylib_lite_raylib_draw_poly_lines_ex(center,sides,radius,rotation,1,color); }
 
-static const uint8_t DIGITS[10][7] = {
-    {14,17,19,21,25,17,14},{4,12,4,4,4,4,14},{14,17,1,2,4,8,31},
-    {30,1,1,14,1,1,30},{2,6,10,18,31,2,2},{31,16,16,30,1,1,30},
-    {14,16,16,30,17,17,14},{31,1,2,4,8,8,8},{14,17,17,14,17,17,14},
-    {14,17,17,15,1,1,14}
-};
-static const uint8_t LETTERS[26][7] = {
-    {14,17,17,31,17,17,17},{30,17,17,30,17,17,30},{14,17,16,16,16,17,14},
-    {30,17,17,17,17,17,30},{31,16,16,30,16,16,31},{31,16,16,30,16,16,16},
-    {14,17,16,23,17,17,15},{17,17,17,31,17,17,17},{14,4,4,4,4,4,14},
-    {7,2,2,2,18,18,12},{17,18,20,24,20,18,17},{16,16,16,16,16,16,31},
-    {17,27,21,21,17,17,17},{17,25,21,19,17,17,17},{14,17,17,17,17,17,14},
-    {30,17,17,30,16,16,16},{14,17,17,17,21,18,13},{30,17,17,30,20,18,17},
-    {15,16,16,14,1,1,30},{31,4,4,4,4,4,4},{17,17,17,17,17,17,14},
-    {17,17,17,17,17,10,4},{17,17,17,21,21,21,10},{17,17,10,4,10,17,17},
-    {17,17,10,4,4,4,4},{31,1,2,4,8,16,31}
-};
+#include "raylib_lite_default_font.h"
 
-static const uint8_t *glyph(char ch)
+/* Decode UTF-8 without reading past NUL; unsupported codepoints use '?'. */
+static unsigned text_codepoint(const char **text)
 {
-    static const uint8_t slash[7]={1,2,2,4,8,8,16};
-    static const uint8_t dash[7]={0,0,0,31,0,0,0};
-    static const uint8_t colon[7]={0,4,4,0,4,4,0};
-    static const uint8_t dot[7]={0,0,0,0,0,6,6};
-    if(ch>='0'&&ch<='9') return DIGITS[ch-'0'];
-    if(ch>='A'&&ch<='Z') return LETTERS[ch-'A'];
-    if(ch>='a'&&ch<='z') return LETTERS[ch-'a'];
-    if(ch=='/') return slash;
-    if(ch=='-') return dash;
-    if(ch==':') return colon;
-    if(ch=='.') return dot;
-    return NULL;
+    const unsigned char *p=(const unsigned char *)*text;
+    unsigned cp=*p++, count=0, minimum=0;
+    if(cp>=0xc2&&cp<=0xdf){cp&=31;count=1;minimum=0x80;}
+    else if(cp>=0xe0&&cp<=0xef){cp&=15;count=2;minimum=0x800;}
+    else if(cp>=0xf0&&cp<=0xf4){cp&=7;count=3;minimum=0x10000;}
+    else if(cp>=0x80){++*text;return '?';}
+    for(unsigned i=0;i<count;++i){
+        if((*p&0xc0)!=0x80){++*text;return '?';}
+        cp=(cp<<6)|(*p++&63);
+    }
+    if(count&&(cp<minimum||cp>0x10ffff||(cp>=0xd800&&cp<=0xdfff))){
+        ++*text;return '?';
+    }
+    *text=(const char *)p;
+    return cp;
 }
+
+static unsigned text_glyph(unsigned cp)
+{ return cp>=32&&cp<=255?cp-32:'?'-32; }
 
 void raylib_lite_raylib_draw_text(const char *text, int x, int y, int font_size,
                          Color color)
 {
-    if(!text) return;
-    bool restore_camera=s_camera_active;
-    if(s_camera_active){Vector2 p=active_to_screen((Vector2){(float)x,(float)y});x=(int)p.x;y=(int)p.y;font_size=(int)(font_size*s_camera.zoom);s_camera_active=false;}
-    int scale=font_size/8; if(scale<1)scale=1;
-    for(;*text;++text,x+=6*scale){
-        const uint8_t *rows=glyph(*text); if(!rows) continue;
-        for(int yy=0;yy<7;++yy){
-            int xx=0;
-            while(xx<5){
-                while(xx<5&&!(rows[yy]&(1U<<(4-xx))))++xx;
-                int start=xx;
-                while(xx<5&&(rows[yy]&(1U<<(4-xx))))++xx;
-                if(start<xx)raylib_lite_raylib_draw_rectangle(x+start*scale,y+yy*scale,
-                    (xx-start)*scale,scale,color);
+    if(!text||!color.a)return;
+    if(font_size<10)font_size=10;
+    double scale=font_size/10.0, spacing=font_size/10;
+    double base_x=x,base_y=y,offset_x=0,offset_y=0;
+    if(s_camera_active){
+        Vector2 p=active_to_screen((Vector2){base_x,base_y});
+        base_x=p.x;base_y=p.y;scale*=s_camera.zoom;spacing*=s_camera.zoom;
+    }
+    if(scale<=0)return;
+    span_paint_t paint=span_paint(color);
+    while(*text){
+        unsigned cp=text_codepoint(&text),g=text_glyph(cp);
+        if(cp=='\n'){offset_x=0;offset_y+=font_size+2;continue;}
+        double left=base_x+offset_x,top=base_y+offset_y*(s_camera_active?s_camera.zoom:1);
+        int width=compat_font_width[g];
+        int top_tenths=(int)lround(top*10);
+        float inverse_scale=(float)(1.0/scale);
+        if(cp!=' '&&cp!='\t'){
+            int x0=(int)ceil(left-.5-1e-9),x1=(int)ceil(left+width*scale-.5-1e-9);
+            int y0=(int)ceil(top-.5-1e-9),y1=(int)ceil(top+10*scale-.5-1e-9);
+            /* Clip before sampling; a large off-screen glyph costs no work. */
+            if(x0<0)x0=0;
+            if(x1>s_screen_width)x1=s_screen_width;
+            if(y0<0)y0=0;
+            if(y1>s_screen_height)y1=s_screen_height;
+            if(s_scissor_active){
+                if(x0<s_scissor_x0)x0=s_scissor_x0;
+                if(x1>s_scissor_x1)x1=s_scissor_x1;
+                if(y0<s_scissor_y0)y0=s_scissor_y0;
+                if(y1>s_scissor_y1)y1=s_scissor_y1;
+            }
+            if(x0>=x1||y0>=y1){offset_x+=width*scale+spacing;continue;}
+            for(int row=y0;row<y1;++row){
+                int sy=s_camera_active?(int)((row+.5f-(float)top)*inverse_scale):
+                    ((2*row+1)*5-top_tenths)/font_size;
+                int first=-1;
+                if((unsigned)sy>=10)continue;
+                /* Scan at most nine source bits, then scale whole runs.
+                 * Avoid a division for every destination pixel. */
+                for(int col=0;col<=width;++col){
+                    bool ink=col<width&&(compat_font_rows[g][sy]&(1U<<col));
+                    if(ink&&first<0)first=col;
+                    if(!ink&&first>=0){
+                        int start=(int)ceil(left+first*scale-.5-1e-9);
+                        int end=(int)ceil(left+col*scale-.5-1e-9);
+                        if(start<x0)start=x0;
+                        if(end>x1)end=x1;
+                        fill_span(row,start,end,&paint);first=-1;
+                    }
+                }
             }
         }
+        offset_x+=width*scale+spacing;
     }
-    s_camera_active=restore_camera;
 }
 
 int raylib_lite_raylib_measure_text(const char *text, int font_size)
 {
-    if(!text||!*text) return 0;
-    int scale=font_size/8; if(scale<1)scale=1;
-    return (int)strlen(text)*6*scale-scale;
+    if(!text||!*text)return 0;
+    if(font_size<10)font_size=10;
+    int width=0,max_width=0,count=0,max_count=0;
+    while(*text){
+        unsigned cp=text_codepoint(&text);++count;
+        if(cp=='\n'){
+            if(width>max_width)max_width=width;
+            width=0;count=0;
+        }else width+=compat_font_width[text_glyph(cp)];
+        if(count>max_count)max_count=count;
+    }
+    if(width>max_width)max_width=width;
+    return (int)(max_width*(font_size/10.0f)+(max_count-1)*(font_size/10));
 }
 
 const char *raylib_lite_raylib_text_format_v(const char *format, va_list args)
 {
-    static char buffers[2][64];
+    /* MAX_TEXTFORMAT_BUFFERS and MAX_TEXT_BUFFER_LENGTH from third_party/raylib config.h. */
+    static char buffers[4][512];
     static unsigned index;
-    char *out = buffers[index++ & 1U];
-    vsnprintf(out, sizeof(buffers[0]), format ? format : "", args);
+    char *out = buffers[index];
+    memset(out, 0, sizeof(buffers[0]));
+    if(format){
+        int required=vsnprintf(out, sizeof(buffers[0]), format, args);
+        if(required >= (int)sizeof(buffers[0]))
+            memcpy(out+sizeof(buffers[0])-4, "...", 4);
+        index=(index+1)&3U;
+    }
     return out;
 }
 
@@ -898,6 +1024,8 @@ const char *raylib_lite_raylib_text_format(const char *format, ...)
     return out;
 }
 
+/* Collision and color helpers must return exactly what raylib 6.0
+ * rshapes.c/rtextures.c return, including edge and rounding behaviour. */
 bool raylib_lite_raylib_check_collision_recs(Rectangle a, Rectangle b)
 {
     return a.x < b.x+b.width && a.x+a.width > b.x &&
@@ -912,15 +1040,16 @@ bool raylib_lite_raylib_check_collision_circles(Vector2 a,float ar,Vector2 b,flo
 
 bool raylib_lite_raylib_check_collision_point_rec(Vector2 p,Rectangle r)
 {
-    return p.x>=r.x && p.x<=r.x+r.width && p.y>=r.y && p.y<=r.y+r.height;
+    return p.x>=r.x && p.x<r.x+r.width && p.y>=r.y && p.y<r.y+r.height;
 }
 
 bool raylib_lite_raylib_check_collision_circle_rec(Vector2 center,float radius,Rectangle r)
 {
-    float x=fmaxf(r.x,fminf(center.x,r.x+r.width));
-    float y=fmaxf(r.y,fminf(center.y,r.y+r.height));
-    float dx=center.x-x,dy=center.y-y;
-    return dx*dx+dy*dy<=radius*radius;
+    float hw=r.width/2.0f,hh=r.height/2.0f;
+    float dx=fabsf(center.x-(r.x+hw)),dy=fabsf(center.y-(r.y+hh));
+    if(dx>hw+radius||dy>hh+radius)return false;
+    if(dx<=hw||dy<=hh)return true;
+    return (dx-hw)*(dx-hw)+(dy-hh)*(dy-hh)<=radius*radius;
 }
 
 bool raylib_lite_raylib_check_collision_point_circle(Vector2 point,Vector2 center,float radius)
@@ -931,12 +1060,11 @@ bool raylib_lite_raylib_check_collision_point_circle(Vector2 point,Vector2 cente
 
 bool raylib_lite_raylib_check_collision_point_triangle(Vector2 p,Vector2 a,Vector2 b,Vector2 c)
 {
-    float d1=(p.x-b.x)*(a.y-b.y)-(a.x-b.x)*(p.y-b.y);
-    float d2=(p.x-c.x)*(b.y-c.y)-(b.x-c.x)*(p.y-c.y);
-    float d3=(p.x-a.x)*(c.y-a.y)-(c.x-a.x)*(p.y-a.y);
-    bool negative=d1<0||d2<0||d3<0;
-    bool positive=d1>0||d2>0||d3>0;
-    return !(negative&&positive);
+    float denominator=(b.y-c.y)*(a.x-c.x)+(c.x-b.x)*(a.y-c.y);
+    float alpha=((b.y-c.y)*(p.x-c.x)+(c.x-b.x)*(p.y-c.y))/denominator;
+    float beta=((c.y-a.y)*(p.x-c.x)+(a.x-c.x)*(p.y-c.y))/denominator;
+    float gamma=1.0f-alpha-beta;
+    return alpha>0&&beta>0&&gamma>0;
 }
 
 Rectangle raylib_lite_raylib_get_collision_rec(Rectangle a,Rectangle b)
@@ -948,14 +1076,11 @@ Rectangle raylib_lite_raylib_get_collision_rec(Rectangle a,Rectangle b)
     return(Rectangle){x,y,right-x,bottom-y};
 }
 
-static uint8_t clamp_byte(float value)
-{ return(uint8_t)(value<0?0:value>255?255:value+.5f); }
-
 Color raylib_lite_raylib_color_alpha(Color color,float alpha)
 {
     if (alpha < 0) alpha = 0;
-    if (alpha > 1) alpha = 1;
-    color.a=clamp_byte(alpha*255);
+    else if (alpha > 1) alpha = 1;
+    color.a=(uint8_t)(255.0f*alpha);
     return color;
 }
 
@@ -970,11 +1095,17 @@ Color raylib_lite_raylib_color_tint(Color color,Color tint)
 
 Color raylib_lite_raylib_color_brightness(Color color,float factor)
 {
-    if (factor < -1) factor = -1;
     if (factor > 1) factor = 1;
-    float add=factor*255;
-    color.r=clamp_byte(color.r+add);
-    color.g=clamp_byte(color.g+add);
-    color.b=clamp_byte(color.b+add);
+    else if (factor < -1) factor = -1;
+    float r=color.r,g=color.g,b=color.b;
+    if (factor < 0) {
+        factor += 1.0f;
+        r*=factor; g*=factor; b*=factor;
+    } else {
+        r+=(255-r)*factor; g+=(255-g)*factor; b+=(255-b)*factor;
+    }
+    color.r=(uint8_t)r;
+    color.g=(uint8_t)g;
+    color.b=(uint8_t)b;
     return color;
 }

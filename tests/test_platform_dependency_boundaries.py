@@ -19,9 +19,10 @@ ESP_IMPLEMENTATIONS = {
     "src/renderer/raster_log.c",
     "src/renderer/raster_esp_config.h",
     "src/idf/clock_esp.c",
+    "src/idf/raylib_lite_rcore_posix.c",
 }
 ESP_BENCHMARK_SOURCES = {
-    "benchmark_main.c", "core_bench.c", "render_preview.c",
+    "benchmark_main.c", "core_bench.c", "stack_bench.c", "render_preview.c",
     "render_display_esp.c",
 }
 
@@ -120,7 +121,7 @@ class PlatformDependencyBoundaryTests(unittest.TestCase):
             self.assertIn(token, root_manifest)
 
         for cmake in (ENGINE / "examples").glob("*/main/CMakeLists.txt"):
-            if cmake.parent.parent.name == "render_benchmark":
+            if cmake.parent.parent.name in {"render_benchmark", "frame_compare"}:
                 continue
             source = cmake.read_text(encoding="utf-8")
             manifest = cmake.parent / "idf_component.yml"
@@ -286,7 +287,12 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn("Texture2D", legacy)
         self.assertIn("to_renderer_texture", adapter)
         self.assertIn("raylib_lite_renderer_raylib.c", cmake)
-        self.assertIn("REQUIRES raylib", cmake)
+        # Upstream raylib is built in-component with the Raylib Lite rcore
+        # platform; a second raylib component would duplicate its symbols.
+        self.assertIn("src/rcore/raylib_lite_rcore.c", cmake)
+        self.assertNotRegex(cmake, r"REQUIRES[^)]*\braylib\b(?!-)")
+        self.assertNotIn("georgik/raylib",
+                         (ENGINE / "idf_component.yml").read_text(encoding="utf-8"))
         # The IDF component builds the ESP wrapper, which includes the portable
         # core together with the strong ESP raster logger. Building the core as
         # a second archive member would let the weak debug fallback win.
@@ -304,12 +310,19 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
     def test_s31_rgb565_acceleration_is_arch_scoped(self) -> None:
         renderer = ENGINE / "src/renderer"
         cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
-        arch = ENGINE / "src/arch/esp32s31/raylib_lite_rgb565_pie.S"
-        self.assertTrue(arch.is_file())
+        s31 = ENGINE / "src/arch/esp32s31/raylib_lite_rgb565_pie.S"
+        s3 = ENGINE / "src/arch/esp32s3/raylib_lite_rgb565_pie.S"
+        bench = (ENGINE / "examples/render_benchmark/main/sources.cmake").read_text(
+            encoding="utf-8")
+        self.assertTrue(s31.is_file())
+        self.assertTrue(s3.is_file())
         self.assertFalse((renderer / "raylib_lite_rgb565_pie.S").exists())
         self.assertIn('src/renderer/raylib_lite_rgb565.c', cmake)
         self.assertIn('src/arch/esp32s31/raylib_lite_rgb565_pie.S', cmake)
         self.assertIn('IDF_TARGET STREQUAL "esp32s31"', cmake)
+        self.assertNotIn('src/arch/esp32s3/raylib_lite_rgb565_pie.S', cmake)
+        self.assertIn('src/arch/esp32s3/raylib_lite_rgb565_pie.S', bench)
+        self.assertIn('IDF_TARGET STREQUAL "esp32s3"', bench)
 
     def test_product_app_integrations_are_external(self) -> None:
         examples = (("raylib_shooter", "shooter"),
@@ -333,7 +346,9 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
                 if source_path.suffix in {".c", ".h"}:
                     if source_path.name == "main.c" or (
                             main.parent.name == "render_benchmark" and
-                            source_path.name in ESP_BENCHMARK_SOURCES):
+                            source_path.name in ESP_BENCHMARK_SOURCES) or (
+                            main.parent.name == "frame_compare" and
+                            source_path.name == "app_main.c"):
                         continue
                     with self.subTest(path=source_path.relative_to(ENGINE)):
                         self.assertIsNone(forbidden.search(source_path.read_text()))

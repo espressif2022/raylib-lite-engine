@@ -19,13 +19,18 @@ EXAMPLE = ROOT/'examples/render_benchmark'
 CORE_CASES = ('copy_rgb565','fill_rgb565','shade_rgb565','columns_rgb565',
               'columns_index8_row','columns_index8_column','span_rgb565',
               'quad_rgb565','quad_index8','span_mtx2','sin_direct','sin_recurrence')
+STACK_CASES = ('clear_background','rect_opaque','rect_alpha','gradient_v','circle_alpha',
+               'triangle_fan_alpha','rect_pro_alpha','rounded_rect_alpha','poly_alpha',
+               'line_thick','texture_opaque','texture_scale2x','texture_alpha',
+               'text_bitmap','camera2d_zoom','scissor_rect','tilemap_layer')
+STACK_PIXELS = 240*240
 
 
 def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def read_log(text):
-    records = {key: [] for key in ('RENDERBENCH_BEGIN','RENDERBENCH_DEVICE','RENDERBENCH_END','COREBENCH')}
+    records = {key: [] for key in ('RENDERBENCH_BEGIN','RENDERBENCH_DEVICE','RENDERBENCH_END','COREBENCH','STACKBENCH')}
     if any(x in text for x in ("Guru Meditation", "panic'ed", 'abort() was called')):
         raise ValueError('device failure in capture')
     for line in text.splitlines():
@@ -62,6 +67,13 @@ def read_log(text):
                     raise ValueError('math oracle failed')
             elif row['pixels']!=4096 or row['errors']!=0:
                 raise ValueError('pixel oracle failed')
+            if len(row['times_us'])!=7:raise ValueError('incomplete timing batch')
+            percentile(row['times_us'],.95)
+    elif begin['suite']=='stack':
+        rows=records['STACKBENCH']
+        if [r['case'] for r in rows]!=list(STACK_CASES):raise ValueError('incomplete stack matrix')
+        for row in rows:
+            if row['pixels']!=STACK_PIXELS or row['errors']!=0:raise ValueError('pixel oracle failed')
             if len(row['times_us'])!=7:raise ValueError('incomplete timing batch')
             percentile(row['times_us'],.95)
     else:raise ValueError('unknown suite')
@@ -112,6 +124,32 @@ def summarize(logs,audit_log=None):
             'log_sha256':{str(p):sha(p) for p in paths}}
 
 
+def print_human(result):
+    """Readable summary. The JSON report remains the collected record."""
+    accepted=result['measurement_accepted']
+    device=result.get('device') or {}
+    where=device.get('chip','Host')
+    print(f"渲染基准 {result['config']['suite']}（{where}，{result['rounds']} 轮）："
+          f"{'计时稳定，可以对比' if accepted else '计时不稳定，不能当作性能结论'}")
+    print("耗时是单次调用的时间，不是帧率。")
+    def show(us):
+        return f"{us/1000:8.2f} ms" if us>=1000 else f"{us:8.1f} us"
+    print(f"{'用例':<22}{'中位':>12}{'P95':>12}{'波动':>8}  检查")
+    for name,row in result['cases'].items():
+        if 'errors' in row: check=f"像素错误 {row['errors']}"
+        elif 'max_error' in row: check=f"最大误差 {row['max_error']:.3g}"
+        else: check='画质见审计'
+        print(f"{name:<22}{show(row['p50_us']):>12}{show(row['p95_us']):>12}"
+              f"{row['relative_range']*100:7.1f}%  {check}")
+    memory=result.get('memory_observations') or []
+    if memory and 'internal_min_free' in memory[-1]:
+        last=memory[-1]
+        print(f"内存水位：内部 RAM 最低剩余 {last['internal_min_free']/1024:.1f} KB，"
+              f"PSRAM 最低剩余 {last['psram_min_free']/1024/1024:.1f} MB，"
+              f"任务栈剩余 {last['task_stack_free_bytes']} 字节。")
+        print("水位从启动算起，包含启动过程，不是本次绘制单独占用的峰值。")
+
+
 def compare(base,new,dimension):
     if base['schema']!=new['schema']:raise ValueError('report schema mismatch')
     excluded={'perspective':{'mode','fixed','bound'},'lut':{'lut_storage'},'pie':{'pie'},'implementation':set()}[dimension]
@@ -151,7 +189,7 @@ def plan(output):
             entries.append({'name':name,'build':command,'captures':1 if audit else 3,
                 'flash_monitor':['idf.py','-C',str(EXAMPLE),'-B',str(build),'-p','PORT','flash','monitor']})
     for name,suite,options in (
-        ('core-scalar','core',[]),('core-pie','core',['-DRENDER_BENCH_PIE=ON']),
+        ('core-scalar','core',[]),('core-pie','core',['-DRENDER_BENCH_PIE=ON']),('stack-scalar','stack',[]),
         ('adaptive025-lut-internal-audit','wall',['-DRAYLIB_LITE_WALL_AUDIT=ON','-DRENDER_BENCH_LUT_INTERNAL=ON']),
         ('adaptive025-lut-internal-timing','wall',['-DRENDER_BENCH_LUT_INTERNAL=ON'])):
         build=output/name
@@ -171,7 +209,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='action',required=True)
     sub.add_parser('list')
     q=sub.add_parser('plan');q.add_argument('--output',type=Path,required=True)
-    q=sub.add_parser('host');q.add_argument('--suite',choices=('core','wall'),default='core')
+    q=sub.add_parser('host');q.add_argument('--suite',choices=('core','wall','stack'),default='core')
     q.add_argument('--variant',choices=VARIANTS,default='adaptive025')
     q.add_argument('--rounds',type=int,default=3);q.add_argument('--output',type=Path,required=True)
     q=sub.add_parser('collect');q.add_argument('logs',nargs='+',type=Path)
@@ -186,6 +224,7 @@ def main():
         result=summarize(args.logs,args.audit_log)
         if args.baseline:result['comparison']=compare(json.loads(args.baseline.read_text()),result,args.dimension)
         with args.output.open('x') as stream:json.dump(result,stream,indent=2,allow_nan=False);stream.write('\n')
+        print_human(result)
         return 0 if result['measurement_accepted'] else 2
     if args.rounds<3:p.error('at least 3 rounds required')
     run_lock = None
@@ -199,7 +238,8 @@ def main():
     files=set(EXAMPLE.rglob('*'))
     files.update((ROOT/'src/renderer').rglob('*'))
     files.update((ROOT/'include/raylib_lite').glob('*.h'))
-    files.update((ROOT/'include/raylib_lite').glob('*.h'))
+    files.update((ROOT/'compat/raylib/include').glob('*.h'))
+    files.add(ROOT/'src/runtime/raylib_lite_raylib_port.c')
     files.add(ROOT/'host/include/raylib.h');files.add(Path(__file__).resolve());files.add(ROOT/'tools/wall_benchmark.py')
     files={x for x in files if x.is_file() and x.suffix in ('.c','.h','.S','.cmake','.txt','.json','.py') and not any(part.startswith('build') or part in ('managed_components','.git','__pycache__') for part in x.relative_to(ROOT).parts)}
     manifest={str(f.relative_to(ROOT)):sha(f) for f in sorted(files)}
@@ -225,6 +265,7 @@ def main():
         'compiler':subprocess.check_output(['cc','--version'],text=True),
         'affinity':sorted(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else None}
     (out/'report.json').write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
+    print_human(result)
     print(json.dumps({'report':str(out/'report.json'),'measurement_accepted':result['measurement_accepted'],
                      'cases':len(result['cases']),'device':False}))
     if run_lock is not None:run_lock.close()

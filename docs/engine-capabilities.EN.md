@@ -33,7 +33,8 @@ Raylib Lite Engine is one ESP-IDF component: `raylib-lite-engine`. Public neutra
 | `src/save` | version/CRC/migration/debounce core | NVS calls |
 | `src/scene`, `src/ui`, `src/fx` | reusable scene stack, retained UI, tweens/particles | game-specific policy |
 | `src/idf` | ESP clock, mmap-assets and NVS adapters | portable Engine policy |
-| `src/arch/esp32s31` | S31-specific RGB565 acceleration | Board/BSP behavior |
+| `src/arch/esp32s31` | S31 RGB565 PIE copy and fill, enabled in the engine | Board/BSP behavior |
+| `src/arch/esp32s3` | S3 RGB565 PIE copy and fill, render benchmark only | Board/BSP behavior |
 
 ## Public API rules
 

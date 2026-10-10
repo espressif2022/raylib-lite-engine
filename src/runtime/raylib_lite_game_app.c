@@ -91,7 +91,7 @@ static void update(void *context)
     uint32_t elapsed = (uint32_t)(finished - started);
     runtime->update_us += elapsed;
     raylib_lite_runtime_stats_record_logic(finished, 0, elapsed);
-    raylib_lite_raylib_consume_input_edges();
+    raylib_lite_raylib_end_logic_tick();
 }
 
 static void render(void *context)
@@ -136,7 +136,7 @@ static void render(void *context)
 static uint32_t render_fps(void *context)
 {
     app_runtime_t *runtime = context;
-    int fps = raylib_lite_raylib_get_fps();
+    int fps = raylib_lite_raylib_get_target_fps();
     return fps > 0 ? (uint32_t)fps : runtime->app->target_fps;
 }
 
@@ -169,6 +169,7 @@ raylib_lite_result_t raylib_lite_game_app_run(
     raylib_lite_raylib_init_window((int)width, (int)height,
                app->window_title ? app->window_title : "Raylib Lite");
     raylib_lite_raylib_set_target_fps((int)app->target_fps);
+    raylib_lite_raylib_attach_runtime(app->logic_hz);
     if (app->on_start) {
         /* Once entered, on_start owns a matching on_stop even when startup
          * reports failure after partially acquiring application resources. */
@@ -213,6 +214,7 @@ raylib_lite_result_t raylib_lite_game_app_run(
 
 shutdown_port:
     if (started && app->on_stop) app->on_stop(app->user);
+    raylib_lite_raylib_detach_runtime();
     raylib_lite_raylib_close_window();
     raylib_lite_raylib_port_deinit();
     return result;
