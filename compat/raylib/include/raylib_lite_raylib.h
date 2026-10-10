@@ -4,7 +4,9 @@
 /* Explicit Raylib-name compatibility facade for Raylib Lite Engine.
  * The implementation API remains raylib_lite_raylib_* during the migration; this
  * header alone maps supported upstream Raylib names onto that implementation.
- * Unsupported Raylib APIs remain unresolved instead of pulling rlgl/OpenGL. */
+ * Unsupported Raylib APIs remain unresolved instead of pulling rlgl/OpenGL.
+ * This mapping list is frozen: every name must have a status row in
+ * docs/raylib-compat.CN.md, and new Raylib capabilities come from upstream. */
 #include "raylib_lite_raylib_impl.h"
 
 #define InitWindow raylib_lite_raylib_init_window

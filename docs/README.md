@@ -17,6 +17,7 @@ First use: follow the [quickstart](quickstart.EN.md) to create a game and see it
 | Reference | Purpose |
 | --- | --- |
 | [Public API contract](../API.md) | Lifecycle, ownership, input and backend contracts |
+| [Raylib compatibility direction and status (Chinese)](raylib-compat.CN.md) | Equivalence status of each Raylib-name mapping, freeze rule and upstream migration plan |
 | [Component release](releasing.md) | Assemble independent examples, validate packages and publish from main |
 | [Asset provenance](../release/asset_provenance.json) | Maintained example media origins |
 | [Examples](../examples/README.md) | Example and build-support matrix |
