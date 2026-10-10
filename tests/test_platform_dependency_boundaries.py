@@ -19,6 +19,7 @@ ESP_IMPLEMENTATIONS = {
     "src/renderer/raster_log.c",
     "src/renderer/raster_esp_config.h",
     "src/idf/clock_esp.c",
+    "src/idf/raylib_lite_rcore_posix.c",
 }
 ESP_BENCHMARK_SOURCES = {
     "benchmark_main.c", "core_bench.c", "render_preview.c",
@@ -286,7 +287,12 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         self.assertIn("Texture2D", legacy)
         self.assertIn("to_renderer_texture", adapter)
         self.assertIn("raylib_lite_renderer_raylib.c", cmake)
-        self.assertIn("REQUIRES raylib", cmake)
+        # Upstream raylib is built in-component with the Raylib Lite rcore
+        # platform; a second raylib component would duplicate its symbols.
+        self.assertIn("src/rcore/raylib_lite_rcore.c", cmake)
+        self.assertNotRegex(cmake, r"REQUIRES[^)]*\braylib\b(?!-)")
+        self.assertNotIn("georgik/raylib",
+                         (ENGINE / "idf_component.yml").read_text(encoding="utf-8"))
         # The IDF component builds the ESP wrapper, which includes the portable
         # core together with the strong ESP raster logger. Building the core as
         # a second archive member would let the weak debug fallback win.

@@ -4,7 +4,7 @@ The root [LICENSE](LICENSE) applies to this repository's Apache-2.0-marked sourc
 
 | Dependency | How it is used | Where to check the resolved license and notice |
 | --- | --- | --- |
-| raylib and the `georgik/raylib` ESP component | Native example compatibility and rendering APIs | Root `idf_component.yml`; the resolved component's license and raylib's upstream `LICENSE` |
+| raylib 6.0 (zlib/libpng), vendored in `third_party/raylib/src` with its `rlsw`, `stb_image`, `stb_image_resize2`, `qoi` and `rprand` headers | Upstream raylib API and software renderer for native games; compatibility types | [third_party/raylib/LICENSE](third_party/raylib/LICENSE) and each header's own notice. Sources are unmodified copies from `georgik/raylib` 6.0.0~2 (raylib commit `5276634372de7bb46e6a93376db15dc4384bd2f2`, whose `rlsw.h` restores `swGetColorBuffer`); `config.h` is this repository's |
 | ESP-IDF and Espressif managed components, including `esp_mmap_assets` and `esp_display_present` | Device builds | The product's dependency lock and each resolved component's license/notice |
 | Pillow | Host preview and asset conversion | Installed Python package metadata and upstream license |
 | Board BSP and product Iris/Recovery | Optional device integrations | Their separate repositories and resolved revisions |
