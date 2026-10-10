@@ -45,6 +45,8 @@ void raylib_lite_raylib_port_set_clock(const raylib_lite_clock_t *clock)
     s_port.clock = clock ? *clock : (raylib_lite_clock_t){0};
 }
 
+uint64_t raylib_lite_raylib_port_now_us(void) { return port_now_us(); }
+
 static void clear_frame(raylib_lite_frame_t *frame)
 {
     memset(frame, 0, sizeof(*frame));

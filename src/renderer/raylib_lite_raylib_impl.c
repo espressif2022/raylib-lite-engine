@@ -21,7 +21,11 @@ static bool s_window_should_close;
 static int s_screen_width;
 static int s_screen_height;
 static int s_target_fps = 30;
-static uint64_t s_presented_frames;
+static uint32_t s_logic_hz;
+static uint64_t s_logic_ticks;
+static uint64_t s_fps_window_start_us;
+static uint32_t s_fps_window_frames;
+static int s_measured_fps;
 static raylib_lite_result_t s_last_acquire = RAYLIB_LITE_NOT_READY;
 static raylib_lite_result_t s_last_present = RAYLIB_LITE_NOT_READY;
 static bool s_scissor_active;
@@ -164,7 +168,10 @@ void raylib_lite_raylib_init_window(int width, int height, const char *title)
     s_screen_height = height > 0 ? height : 0;
     s_window_ready = true;
     s_window_should_close = false;
-    s_presented_frames = 0;
+    s_logic_ticks = 0;
+    s_fps_window_start_us = 0;
+    s_fps_window_frames = 0;
+    s_measured_fps = 0;
     s_last_acquire = RAYLIB_LITE_NOT_READY;
     s_last_present = RAYLIB_LITE_NOT_READY;
     memset(s_key_down, 0, sizeof(s_key_down));
@@ -188,10 +195,38 @@ int raylib_lite_raylib_get_screen_height(void) { return s_screen_height; }
 int raylib_lite_raylib_get_render_width(void) { return s_screen_width; }
 int raylib_lite_raylib_get_render_height(void) { return s_screen_height; }
 void raylib_lite_raylib_set_target_fps(int fps) { if (fps > 0) s_target_fps = fps; }
-float raylib_lite_raylib_get_frame_time(void) { return 1.0f / (float)s_target_fps; }
+int raylib_lite_raylib_get_target_fps(void) { return s_target_fps; }
+
+void raylib_lite_raylib_attach_runtime(uint32_t logic_hz) { s_logic_hz = logic_hz; }
+void raylib_lite_raylib_detach_runtime(void) { s_logic_hz = 0; }
+
+static uint32_t tick_hz(void)
+{ return s_logic_hz ? s_logic_hz : (uint32_t)s_target_fps; }
+
+/* Game time advances per logic tick, never per presented frame, so replays
+ * stay deterministic when the display drops or rejects frames. */
+float raylib_lite_raylib_get_frame_time(void) { return 1.0f / (float)tick_hz(); }
 double raylib_lite_raylib_get_time(void)
-{ return (double)s_presented_frames / (double)s_target_fps; }
-int raylib_lite_raylib_get_fps(void) { return s_target_fps; }
+{ return (double)s_logic_ticks / (double)tick_hz(); }
+int raylib_lite_raylib_get_fps(void) { return s_measured_fps; }
+
+static void note_presented_frame(void)
+{
+    uint64_t now = raylib_lite_raylib_port_now_us();
+    if (!now) return;
+    if (!s_fps_window_start_us) {
+        s_fps_window_start_us = now;
+        return;
+    }
+    ++s_fps_window_frames;
+    uint64_t elapsed = now - s_fps_window_start_us;
+    if (elapsed >= 1000000U) {
+        s_measured_fps = (int)((s_fps_window_frames * 1000000ULL +
+                                elapsed / 2U) / elapsed);
+        s_fps_window_start_us = now;
+        s_fps_window_frames = 0;
+    }
+}
 
 static bool valid_key(int key)
 { return key >= 0 && key < RAYLIB_LITE_RAYLIB_KEY_COUNT; }
@@ -316,6 +351,12 @@ void raylib_lite_raylib_consume_input_edges(void)
     }
 }
 
+void raylib_lite_raylib_end_logic_tick(void)
+{
+    ++s_logic_ticks;
+    raylib_lite_raylib_consume_input_edges();
+}
+
 void raylib_lite_raylib_end_drawing(void)
 {
     if (s_pixels) {
@@ -327,8 +368,10 @@ void raylib_lite_raylib_end_drawing(void)
     raylib_lite_renderer_set_target(NULL, 0, 0, 0);
     s_camera_active = false;
     s_scissor_active = false;
-    if (s_last_present == RAYLIB_LITE_OK) ++s_presented_frames;
-    raylib_lite_raylib_consume_input_edges();
+    if (s_last_present == RAYLIB_LITE_OK) note_presented_frame();
+    /* An attached runtime ends ticks itself; a render-only pass must not
+     * drop edges that the next logic tick has not observed yet. */
+    if (!s_logic_hz) raylib_lite_raylib_end_logic_tick();
 }
 
 void raylib_lite_raylib_begin_scissor_mode(int x, int y, int width, int height)
@@ -898,6 +941,8 @@ const char *raylib_lite_raylib_text_format(const char *format, ...)
     return out;
 }
 
+/* Collision and color helpers must return exactly what raylib 6.0
+ * rshapes.c/rtextures.c return, including edge and rounding behaviour. */
 bool raylib_lite_raylib_check_collision_recs(Rectangle a, Rectangle b)
 {
     return a.x < b.x+b.width && a.x+a.width > b.x &&
@@ -912,15 +957,16 @@ bool raylib_lite_raylib_check_collision_circles(Vector2 a,float ar,Vector2 b,flo
 
 bool raylib_lite_raylib_check_collision_point_rec(Vector2 p,Rectangle r)
 {
-    return p.x>=r.x && p.x<=r.x+r.width && p.y>=r.y && p.y<=r.y+r.height;
+    return p.x>=r.x && p.x<r.x+r.width && p.y>=r.y && p.y<r.y+r.height;
 }
 
 bool raylib_lite_raylib_check_collision_circle_rec(Vector2 center,float radius,Rectangle r)
 {
-    float x=fmaxf(r.x,fminf(center.x,r.x+r.width));
-    float y=fmaxf(r.y,fminf(center.y,r.y+r.height));
-    float dx=center.x-x,dy=center.y-y;
-    return dx*dx+dy*dy<=radius*radius;
+    float hw=r.width/2.0f,hh=r.height/2.0f;
+    float dx=fabsf(center.x-(r.x+hw)),dy=fabsf(center.y-(r.y+hh));
+    if(dx>hw+radius||dy>hh+radius)return false;
+    if(dx<=hw||dy<=hh)return true;
+    return (dx-hw)*(dx-hw)+(dy-hh)*(dy-hh)<=radius*radius;
 }
 
 bool raylib_lite_raylib_check_collision_point_circle(Vector2 point,Vector2 center,float radius)
@@ -931,12 +977,11 @@ bool raylib_lite_raylib_check_collision_point_circle(Vector2 point,Vector2 cente
 
 bool raylib_lite_raylib_check_collision_point_triangle(Vector2 p,Vector2 a,Vector2 b,Vector2 c)
 {
-    float d1=(p.x-b.x)*(a.y-b.y)-(a.x-b.x)*(p.y-b.y);
-    float d2=(p.x-c.x)*(b.y-c.y)-(b.x-c.x)*(p.y-c.y);
-    float d3=(p.x-a.x)*(c.y-a.y)-(c.x-a.x)*(p.y-a.y);
-    bool negative=d1<0||d2<0||d3<0;
-    bool positive=d1>0||d2>0||d3>0;
-    return !(negative&&positive);
+    float denominator=(b.y-c.y)*(a.x-c.x)+(c.x-b.x)*(a.y-c.y);
+    float alpha=((b.y-c.y)*(p.x-c.x)+(c.x-b.x)*(p.y-c.y))/denominator;
+    float beta=((c.y-a.y)*(p.x-c.x)+(a.x-c.x)*(p.y-c.y))/denominator;
+    float gamma=1.0f-alpha-beta;
+    return alpha>0&&beta>0&&gamma>0;
 }
 
 Rectangle raylib_lite_raylib_get_collision_rec(Rectangle a,Rectangle b)
@@ -948,14 +993,11 @@ Rectangle raylib_lite_raylib_get_collision_rec(Rectangle a,Rectangle b)
     return(Rectangle){x,y,right-x,bottom-y};
 }
 
-static uint8_t clamp_byte(float value)
-{ return(uint8_t)(value<0?0:value>255?255:value+.5f); }
-
 Color raylib_lite_raylib_color_alpha(Color color,float alpha)
 {
     if (alpha < 0) alpha = 0;
-    if (alpha > 1) alpha = 1;
-    color.a=clamp_byte(alpha*255);
+    else if (alpha > 1) alpha = 1;
+    color.a=(uint8_t)(255.0f*alpha);
     return color;
 }
 
@@ -970,11 +1012,17 @@ Color raylib_lite_raylib_color_tint(Color color,Color tint)
 
 Color raylib_lite_raylib_color_brightness(Color color,float factor)
 {
-    if (factor < -1) factor = -1;
     if (factor > 1) factor = 1;
-    float add=factor*255;
-    color.r=clamp_byte(color.r+add);
-    color.g=clamp_byte(color.g+add);
-    color.b=clamp_byte(color.b+add);
+    else if (factor < -1) factor = -1;
+    float r=color.r,g=color.g,b=color.b;
+    if (factor < 0) {
+        factor += 1.0f;
+        r*=factor; g*=factor; b*=factor;
+    } else {
+        r+=(255-r)*factor; g+=(255-g)*factor; b+=(255-b)*factor;
+    }
+    color.r=(uint8_t)r;
+    color.g=(uint8_t)g;
+    color.b=(uint8_t)b;
     return color;
 }

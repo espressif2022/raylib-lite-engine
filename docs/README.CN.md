@@ -17,6 +17,7 @@
 | 资料 | 用途 |
 | --- | --- |
 | [公开 API 契约（English）](../API.md) | 生命周期、所有权、输入与后端契约 |
+| [Raylib 兼容层方向与状态](raylib-compat.CN.md) | 每个 raylib 名字映射的等价程度、冻结规则与上游迁移计划 |
 | [组件发布流程（English）](releasing.md) | 独立例程组装、包校验与 main 自动发布 |
 | [素材来源记录](../release/asset_provenance.json) | 维护例程的媒体来源 |
 | [示例索引（English）](../examples/README.md) | 示例与构建支持矩阵 |
