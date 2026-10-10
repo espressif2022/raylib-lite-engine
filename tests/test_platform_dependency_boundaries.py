@@ -22,7 +22,7 @@ ESP_IMPLEMENTATIONS = {
     "src/idf/raylib_lite_rcore_posix.c",
 }
 ESP_BENCHMARK_SOURCES = {
-    "benchmark_main.c", "core_bench.c", "render_preview.c",
+    "benchmark_main.c", "core_bench.c", "stack_bench.c", "render_preview.c",
     "render_display_esp.c",
 }
 

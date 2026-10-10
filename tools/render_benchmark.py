@@ -19,13 +19,17 @@ EXAMPLE = ROOT/'examples/render_benchmark'
 CORE_CASES = ('copy_rgb565','fill_rgb565','shade_rgb565','columns_rgb565',
               'columns_index8_row','columns_index8_column','span_rgb565',
               'quad_rgb565','quad_index8','span_mtx2','sin_direct','sin_recurrence')
+STACK_CASES = ('clear_background','rect_opaque','rect_alpha','gradient_v','circle_alpha',
+               'triangle_fan_alpha','rect_pro_alpha','rounded_rect_alpha','poly_alpha',
+               'line_thick','texture_opaque','texture_scale2x','texture_alpha')
+STACK_PIXELS = 240*240
 
 
 def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def read_log(text):
-    records = {key: [] for key in ('RENDERBENCH_BEGIN','RENDERBENCH_DEVICE','RENDERBENCH_END','COREBENCH')}
+    records = {key: [] for key in ('RENDERBENCH_BEGIN','RENDERBENCH_DEVICE','RENDERBENCH_END','COREBENCH','STACKBENCH')}
     if any(x in text for x in ("Guru Meditation", "panic'ed", 'abort() was called')):
         raise ValueError('device failure in capture')
     for line in text.splitlines():
@@ -62,6 +66,13 @@ def read_log(text):
                     raise ValueError('math oracle failed')
             elif row['pixels']!=4096 or row['errors']!=0:
                 raise ValueError('pixel oracle failed')
+            if len(row['times_us'])!=7:raise ValueError('incomplete timing batch')
+            percentile(row['times_us'],.95)
+    elif begin['suite']=='stack':
+        rows=records['STACKBENCH']
+        if [r['case'] for r in rows]!=list(STACK_CASES):raise ValueError('incomplete stack matrix')
+        for row in rows:
+            if row['pixels']!=STACK_PIXELS or row['errors']!=0:raise ValueError('pixel oracle failed')
             if len(row['times_us'])!=7:raise ValueError('incomplete timing batch')
             percentile(row['times_us'],.95)
     else:raise ValueError('unknown suite')
@@ -151,7 +162,7 @@ def plan(output):
             entries.append({'name':name,'build':command,'captures':1 if audit else 3,
                 'flash_monitor':['idf.py','-C',str(EXAMPLE),'-B',str(build),'-p','PORT','flash','monitor']})
     for name,suite,options in (
-        ('core-scalar','core',[]),('core-pie','core',['-DRENDER_BENCH_PIE=ON']),
+        ('core-scalar','core',[]),('core-pie','core',['-DRENDER_BENCH_PIE=ON']),('stack-scalar','stack',[]),
         ('adaptive025-lut-internal-audit','wall',['-DRAYLIB_LITE_WALL_AUDIT=ON','-DRENDER_BENCH_LUT_INTERNAL=ON']),
         ('adaptive025-lut-internal-timing','wall',['-DRENDER_BENCH_LUT_INTERNAL=ON'])):
         build=output/name
@@ -171,7 +182,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='action',required=True)
     sub.add_parser('list')
     q=sub.add_parser('plan');q.add_argument('--output',type=Path,required=True)
-    q=sub.add_parser('host');q.add_argument('--suite',choices=('core','wall'),default='core')
+    q=sub.add_parser('host');q.add_argument('--suite',choices=('core','wall','stack'),default='core')
     q.add_argument('--variant',choices=VARIANTS,default='adaptive025')
     q.add_argument('--rounds',type=int,default=3);q.add_argument('--output',type=Path,required=True)
     q=sub.add_parser('collect');q.add_argument('logs',nargs='+',type=Path)
@@ -199,7 +210,8 @@ def main():
     files=set(EXAMPLE.rglob('*'))
     files.update((ROOT/'src/renderer').rglob('*'))
     files.update((ROOT/'include/raylib_lite').glob('*.h'))
-    files.update((ROOT/'include/raylib_lite').glob('*.h'))
+    files.update((ROOT/'compat/raylib/include').glob('*.h'))
+    files.add(ROOT/'src/runtime/raylib_lite_raylib_port.c')
     files.add(ROOT/'host/include/raylib.h');files.add(Path(__file__).resolve());files.add(ROOT/'tools/wall_benchmark.py')
     files={x for x in files if x.is_file() and x.suffix in ('.c','.h','.S','.cmake','.txt','.json','.py') and not any(part.startswith('build') or part in ('managed_components','.git','__pycache__') for part in x.relative_to(ROOT).parts)}
     manifest={str(f.relative_to(ROOT)):sha(f) for f in sorted(files)}

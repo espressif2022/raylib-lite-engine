@@ -26,6 +26,10 @@ int main(int argc,char **argv){
 int raylib_lite_wall_benchmark(void);
 #define RUN_BENCHMARK raylib_lite_wall_benchmark
 #define SUITE "wall"
+#elif defined(RENDER_BENCH_STACK)
+int render_stack_benchmark(void);
+#define RUN_BENCHMARK render_stack_benchmark
+#define SUITE "stack"
 #else
 int render_core_benchmark(void);
 #define RUN_BENCHMARK render_core_benchmark

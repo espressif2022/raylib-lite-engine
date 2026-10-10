@@ -4,6 +4,7 @@ get_filename_component(ENGINE_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${ENGINE_ROOT}/src/renderer/raylib_lite_wall_bench.c"
     "${CMAKE_CURRENT_LIST_DIR}/main/core_bench.c"
+    "${CMAKE_CURRENT_LIST_DIR}/main/stack_bench.c"
     "${CMAKE_CURRENT_LIST_DIR}/main/render_preview.c")
 option(RENDER_BENCH_HOST "Build standalone host benchmark" OFF)
 if(RENDER_BENCH_HOST)
@@ -16,15 +17,15 @@ set(RENDER_BENCH_PREVIEW_FRAMES "0" CACHE STRING "Preview frame limit; 0 runs un
 if(NOT RENDER_BENCH_PREVIEW_FRAMES MATCHES "^[0-9]+$")
     message(FATAL_ERROR "RENDER_BENCH_PREVIEW_FRAMES must be non-negative")
 endif()
-set(RENDER_BENCH_SUITE "wall" CACHE STRING "wall or core")
+set(RENDER_BENCH_SUITE "wall" CACHE STRING "wall, core or stack")
 set(RAYLIB_LITE_WALL_MODE "3" CACHE STRING "0 legacy, 1 exact, 2 fixed, 3 error bounded")
 set(RAYLIB_LITE_WALL_FIXED_PIXELS "16" CACHE STRING "Fixed segment length")
 set(RAYLIB_LITE_WALL_ERROR_TEXELS "0.25" CACHE STRING "UV error budget")
 option(RAYLIB_LITE_WALL_AUDIT "UV audit; timings not eligible" OFF)
 option(RENDER_BENCH_PIE "Use ESP32-S31 PIE copy/fill" OFF)
 option(RENDER_BENCH_LUT_INTERNAL "Place wall LUT in internal RAM" OFF)
-if(NOT RENDER_BENCH_SUITE MATCHES "^(wall|core)$")
-    message(FATAL_ERROR "RENDER_BENCH_SUITE must be wall or core")
+if(NOT RENDER_BENCH_SUITE MATCHES "^(wall|core|stack)$")
+    message(FATAL_ERROR "RENDER_BENCH_SUITE must be wall, core or stack")
 endif()
 if(RAYLIB_LITE_WALL_AUDIT AND NOT RENDER_BENCH_SUITE STREQUAL "wall")
     message(FATAL_ERROR "UV audit belongs to wall suite")
