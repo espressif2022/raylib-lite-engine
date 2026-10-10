@@ -8,6 +8,11 @@
  *
  * It shares the single raylib_lite_raylib_port instance, so a process must
  * not drive it and the raylib_lite_raylib_* compatibility layer at once. */
+#ifdef RAYLIB_LITE_RAYLIB_COMPAT
+#error "raylib_lite_rcore.h and raylib_lite_raylib.h select different Raylib implementations; include only one"
+#endif
+#define RAYLIB_LITE_RCORE_PLATFORM 1
+
 #include <stddef.h>
 #include <stdint.h>
 #include "raylib_lite_clock.h"
