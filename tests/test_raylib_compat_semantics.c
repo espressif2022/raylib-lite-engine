@@ -106,6 +106,14 @@ static void text_format_keeps_four_recent_results(void)
     memset(wide, 'x', sizeof(wide) - 1);
     wide[sizeof(wide) - 1] = '\0';
     assert(strlen(TextFormat("%s", wide)) == sizeof(wide) - 1);
+    char overflow[700];
+    memset(overflow,'z',sizeof(overflow)-1);overflow[sizeof(overflow)-1]=0;
+    const char *truncated=TextFormat("%s",overflow);
+    assert(strlen(truncated)==511&&!strcmp(truncated+508,"..."));
+    const char *slot=TextFormat(NULL);
+    assert(!*slot);
+    assert(TextFormat("after null")==slot);
+
 }
 
 int main(void)

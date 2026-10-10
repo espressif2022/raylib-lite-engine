@@ -898,68 +898,105 @@ void raylib_lite_raylib_draw_poly_lines(Vector2 center,int sides,float radius,
                               float rotation,Color color)
 { raylib_lite_raylib_draw_poly_lines_ex(center,sides,radius,rotation,1,color); }
 
-static const uint8_t DIGITS[10][7] = {
-    {14,17,19,21,25,17,14},{4,12,4,4,4,4,14},{14,17,1,2,4,8,31},
-    {30,1,1,14,1,1,30},{2,6,10,18,31,2,2},{31,16,16,30,1,1,30},
-    {14,16,16,30,17,17,14},{31,1,2,4,8,8,8},{14,17,17,14,17,17,14},
-    {14,17,17,15,1,1,14}
-};
-static const uint8_t LETTERS[26][7] = {
-    {14,17,17,31,17,17,17},{30,17,17,30,17,17,30},{14,17,16,16,16,17,14},
-    {30,17,17,17,17,17,30},{31,16,16,30,16,16,31},{31,16,16,30,16,16,16},
-    {14,17,16,23,17,17,15},{17,17,17,31,17,17,17},{14,4,4,4,4,4,14},
-    {7,2,2,2,18,18,12},{17,18,20,24,20,18,17},{16,16,16,16,16,16,31},
-    {17,27,21,21,17,17,17},{17,25,21,19,17,17,17},{14,17,17,17,17,17,14},
-    {30,17,17,30,16,16,16},{14,17,17,17,21,18,13},{30,17,17,30,20,18,17},
-    {15,16,16,14,1,1,30},{31,4,4,4,4,4,4},{17,17,17,17,17,17,14},
-    {17,17,17,17,17,10,4},{17,17,17,21,21,21,10},{17,17,10,4,10,17,17},
-    {17,17,10,4,4,4,4},{31,1,2,4,8,16,31}
-};
+#include "raylib_lite_default_font.h"
 
-static const uint8_t *glyph(char ch)
+/* Decode UTF-8 without reading past NUL; unsupported codepoints use '?'. */
+static unsigned text_codepoint(const char **text)
 {
-    static const uint8_t slash[7]={1,2,2,4,8,8,16};
-    static const uint8_t dash[7]={0,0,0,31,0,0,0};
-    static const uint8_t colon[7]={0,4,4,0,4,4,0};
-    static const uint8_t dot[7]={0,0,0,0,0,6,6};
-    if(ch>='0'&&ch<='9') return DIGITS[ch-'0'];
-    if(ch>='A'&&ch<='Z') return LETTERS[ch-'A'];
-    if(ch>='a'&&ch<='z') return LETTERS[ch-'a'];
-    if(ch=='/') return slash;
-    if(ch=='-') return dash;
-    if(ch==':') return colon;
-    if(ch=='.') return dot;
-    return NULL;
+    const unsigned char *p=(const unsigned char *)*text;
+    unsigned cp=*p++, count=0, minimum=0;
+    if(cp>=0xc2&&cp<=0xdf){cp&=31;count=1;minimum=0x80;}
+    else if(cp>=0xe0&&cp<=0xef){cp&=15;count=2;minimum=0x800;}
+    else if(cp>=0xf0&&cp<=0xf4){cp&=7;count=3;minimum=0x10000;}
+    else if(cp>=0x80){++*text;return '?';}
+    for(unsigned i=0;i<count;++i){
+        if((*p&0xc0)!=0x80){++*text;return '?';}
+        cp=(cp<<6)|(*p++&63);
+    }
+    if(count&&(cp<minimum||cp>0x10ffff||(cp>=0xd800&&cp<=0xdfff))){
+        ++*text;return '?';
+    }
+    *text=(const char *)p;
+    return cp;
 }
+
+static unsigned text_glyph(unsigned cp)
+{ return cp>=32&&cp<=255?cp-32:'?'-32; }
 
 void raylib_lite_raylib_draw_text(const char *text, int x, int y, int font_size,
                          Color color)
 {
-    if(!text) return;
-    bool restore_camera=s_camera_active;
-    if(s_camera_active){Vector2 p=active_to_screen((Vector2){(float)x,(float)y});x=(int)p.x;y=(int)p.y;font_size=(int)(font_size*s_camera.zoom);s_camera_active=false;}
-    int scale=font_size/8; if(scale<1)scale=1;
-    for(;*text;++text,x+=6*scale){
-        const uint8_t *rows=glyph(*text); if(!rows) continue;
-        for(int yy=0;yy<7;++yy){
-            int xx=0;
-            while(xx<5){
-                while(xx<5&&!(rows[yy]&(1U<<(4-xx))))++xx;
-                int start=xx;
-                while(xx<5&&(rows[yy]&(1U<<(4-xx))))++xx;
-                if(start<xx)raylib_lite_raylib_draw_rectangle(x+start*scale,y+yy*scale,
-                    (xx-start)*scale,scale,color);
+    if(!text||!color.a)return;
+    if(font_size<10)font_size=10;
+    double scale=font_size/10.0, spacing=font_size/10;
+    double base_x=x,base_y=y,offset_x=0,offset_y=0;
+    if(s_camera_active){
+        Vector2 p=active_to_screen((Vector2){base_x,base_y});
+        base_x=p.x;base_y=p.y;scale*=s_camera.zoom;spacing*=s_camera.zoom;
+    }
+    if(scale<=0)return;
+    span_paint_t paint=span_paint(color);
+    while(*text){
+        unsigned cp=text_codepoint(&text),g=text_glyph(cp);
+        if(cp=='\n'){offset_x=0;offset_y+=font_size+2;continue;}
+        double left=base_x+offset_x,top=base_y+offset_y*(s_camera_active?s_camera.zoom:1);
+        int width=compat_font_width[g];
+        int top_tenths=(int)lround(top*10);
+        float inverse_scale=(float)(1.0/scale);
+        if(cp!=' '&&cp!='\t'){
+            int x0=(int)ceil(left-.5-1e-9),x1=(int)ceil(left+width*scale-.5-1e-9);
+            int y0=(int)ceil(top-.5-1e-9),y1=(int)ceil(top+10*scale-.5-1e-9);
+            /* Clip before sampling; a large off-screen glyph costs no work. */
+            if(x0<0)x0=0;
+            if(x1>s_screen_width)x1=s_screen_width;
+            if(y0<0)y0=0;
+            if(y1>s_screen_height)y1=s_screen_height;
+            if(s_scissor_active){
+                if(x0<s_scissor_x0)x0=s_scissor_x0;
+                if(x1>s_scissor_x1)x1=s_scissor_x1;
+                if(y0<s_scissor_y0)y0=s_scissor_y0;
+                if(y1>s_scissor_y1)y1=s_scissor_y1;
+            }
+            if(x0>=x1||y0>=y1){offset_x+=width*scale+spacing;continue;}
+            for(int row=y0;row<y1;++row){
+                int sy=s_camera_active?(int)((row+.5f-(float)top)*inverse_scale):
+                    ((2*row+1)*5-top_tenths)/font_size;
+                int first=-1;
+                if((unsigned)sy>=10)continue;
+                /* Scan at most nine source bits, then scale whole runs.
+                 * Avoid a division for every destination pixel. */
+                for(int col=0;col<=width;++col){
+                    bool ink=col<width&&(compat_font_rows[g][sy]&(1U<<col));
+                    if(ink&&first<0)first=col;
+                    if(!ink&&first>=0){
+                        int start=(int)ceil(left+first*scale-.5-1e-9);
+                        int end=(int)ceil(left+col*scale-.5-1e-9);
+                        if(start<x0)start=x0;
+                        if(end>x1)end=x1;
+                        fill_span(row,start,end,&paint);first=-1;
+                    }
+                }
             }
         }
+        offset_x+=width*scale+spacing;
     }
-    s_camera_active=restore_camera;
 }
 
 int raylib_lite_raylib_measure_text(const char *text, int font_size)
 {
-    if(!text||!*text) return 0;
-    int scale=font_size/8; if(scale<1)scale=1;
-    return (int)strlen(text)*6*scale-scale;
+    if(!text||!*text)return 0;
+    if(font_size<10)font_size=10;
+    int width=0,max_width=0,count=0,max_count=0;
+    while(*text){
+        unsigned cp=text_codepoint(&text);++count;
+        if(cp=='\n'){
+            if(width>max_width)max_width=width;
+            width=0;count=0;
+        }else width+=compat_font_width[text_glyph(cp)];
+        if(count>max_count)max_count=count;
+    }
+    if(width>max_width)max_width=width;
+    return (int)(max_width*(font_size/10.0f)+(max_count-1)*(font_size/10));
 }
 
 const char *raylib_lite_raylib_text_format_v(const char *format, va_list args)
@@ -967,8 +1004,14 @@ const char *raylib_lite_raylib_text_format_v(const char *format, va_list args)
     /* MAX_TEXTFORMAT_BUFFERS and MAX_TEXT_BUFFER_LENGTH from third_party/raylib config.h. */
     static char buffers[4][512];
     static unsigned index;
-    char *out = buffers[index++ & 3U];
-    vsnprintf(out, sizeof(buffers[0]), format ? format : "", args);
+    char *out = buffers[index];
+    memset(out, 0, sizeof(buffers[0]));
+    if(format){
+        int required=vsnprintf(out, sizeof(buffers[0]), format, args);
+        if(required >= (int)sizeof(buffers[0]))
+            memcpy(out+sizeof(buffers[0])-4, "...", 4);
+        index=(index+1)&3U;
+    }
     return out;
 }
 

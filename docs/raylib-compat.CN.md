@@ -92,9 +92,9 @@ CloseWindow();
 | `DrawTriangle` `DrawTriangleLines` `DrawTriangleFan` `DrawTriangleStrip` | 差异 | 整数顶点上的左上填充规则（上游 rlsw 在像素中心采样）；共享边只覆盖一次，半透明扇形和条带无重叠 |
 | `DrawPoly` `DrawPolyLines` `DrawPolyLinesEx` | 差异 | 由三角形路径组成，继承上述覆盖规则 |
 | `LoadTexture` `UnloadTexture` | 契约 | 只读取引擎打包资源；纹理 ID 是本仓库槽位，不能交给上游纹理函数 |
-| `DrawTexture` `DrawTextureV` `DrawTextureRec` `DrawTextureEx` `DrawTexturePro` | 差异 | 均转到自有纹理光栅；画质未与 rlsw 对照 |
-| `DrawText` `MeasureText` | 差异 | 5×7 点阵调试字体，小写显示为大写，整数倍缩放 |
-| `TextFormat` | 等价 | 与上游 `config.h` 相同：4 个 512 字节轮换缓冲 |
+| `DrawTexture` `DrawTextureV` `DrawTextureRec` `DrawTextureEx` `DrawTexturePro` | 差异 | 均转到自有纹理光栅；保留不透明快路径。半透明着色保留 8 位通道精度至最终 RGB565 写入，旋转按实际四角包围盒与像素中心采样；仍未全面对齐 rlsw |
+| `DrawText` `MeasureText` | 差异 | 使用上游默认字体的 224 个字形与宽度，支持小写、UTF-8 Latin-1、非整数倍字号与换行；旋转相机和边缘采样仍有差异，不支持自定义字体 |
+| `TextFormat` | 等价 | 与上游 `config.h` 相同：4 个 512 字节轮换缓冲；超长输出以 `...` 结尾，空格式不推进轮换 |
 | `CheckCollisionRecs` `CheckCollisionCircles` `CheckCollisionPointRec` `CheckCollisionCircleRec` `CheckCollisionPointCircle` `CheckCollisionPointTriangle` `GetCollisionRec` | 等价 | 与 raylib 6.0 `rshapes.c` 一致，包括边界规则 |
 | `Fade` `ColorAlpha` `ColorTint` `ColorBrightness` | 等价 | 与 raylib 6.0 `rtextures.c` 一致，包括截断规则 |
 
@@ -112,8 +112,53 @@ CloseWindow();
 
 三角形变换每个顶点；矩形只变换起点并缩放宽高；文字只变换位置和字号。修正方向：相机带旋转时，矩形类图元降级为“变换四个顶点后按多边形填充”，无旋转时保留轴对齐快速路径。
 
+## 已测得的整帧对照
+
+以下板端数据来自文字和纹理修正前的版本，不能作为当前实现的耗时或哈希结果。
+
+2026-10-10，同一帧 480×480，三个场景：基础图元、贴图标题、光线投射墙面。兼容层和上游 rlsw 各编一个程序。S31 为离屏，显示帧和 rlsw 缓冲都在 PSRAM，CPU 320 MHz，不含面板送数。下表是同一次启动里 3 次取样的中位数，计时从 `BeginDrawing` 到 `EndDrawing`。
+
+| 场景 | 兼容层 | 上游整帧 | 其中行逆序拷贝 |
+| --- | ---: | ---: | ---: |
+| 基础图元 | 14.1 ms | 76.9 ms | 8.0 ms |
+| 贴图标题 | 21.2 ms | 212 ms | 8.0 ms |
+| 光线投射墙面 | 24.0 ms | 180 ms | 8.0 ms |
+
+- rlsw 颜色缓冲和深度缓冲各 450 KB，指针都在 PSRAM。上游这次多占用 1.81 MB PSRAM 和 64 KB 内部 RAM。兼容层多占用 456 KB PSRAM，基本上就是显示帧本身。
+- Host 上不同像素分别是 6.6%、8.7%、4.8%。不透明放大贴图一致；半透明、渐变色阶、多边形边缘和两边字体不同。
+- S31 上基础图元和贴图标题的哈希与 Host 一致。光线投射的哈希不同：场景里的浮点求交在设备 libm 上走到了另一组墙面列。
+- 30 fps 的帧预算约 33 ms。这三场里兼容层都在预算内，上游都超出。贴图标题一场就要 212 ms。面板 DMA 还没算进去。
+
+复现：Host 用 `python3 tools/frame_compare.py --width 480 --height 480 --output artifacts/frame-compare`。设备先加载 IDF 6.1，再分别构建 `examples/frame_compare`，`-DFRAME_COMPARE_IMPL=compat` 与 `upstream` 使用不同的构建目录。`IDF_TARGET=esp32s3` 时使用 `sdkconfig.defaults.esp32s3`（CPU 240 MHz、八线 PSRAM 80 MHz）；未指定时仍是 S31 的 320 MHz / 250 MHz。烧录后看到 `FRAMECOMPARE_END` 为止。哈希对照的是 Host 输出的 `.raw` 帧，不是 `report.json`。
+
+### ESP32-S3，当前固件
+
+2026-10-10，同一份 480×480 离屏程序烧到 ESP32-S3（CPU 240 MHz，八线 PSRAM 80 MHz，帧和 rlsw 缓冲都在 PSRAM）。这是和 S31 同分辨率的算力对照，不是 BOX-3 的 320×240 上屏，也不含面板 DMA。每场 3 次取样的中位数，计时从 `BeginDrawing` 到 `EndDrawing`。
+
+| 场景 | 兼容层 | 上游整帧 | 其中行逆序拷贝 |
+| --- | ---: | ---: | ---: |
+| 基础图元 | 34.9 ms | 156.7 ms | 20.6 ms |
+| 贴图标题 | 48.0 ms | 373 ms | 20.7 ms |
+| 光线投射墙面 | 59.9 ms | 303 ms | 20.7 ms |
+
+- 上游颜色和深度缓冲仍各 450 KB，且都在 PSRAM。上游占用 1.81 MB PSRAM 和 64 KB 内部 RAM；兼容层占用 456 KB PSRAM。和先前 S31 的内存量级相同。
+- 30 fps 的约 33 ms 预算在这三场里兼容层也超出。扣掉拷贝后，上游绘制仍是兼容层的约 3.9 / 7.3 / 4.7 倍。
+- 上游三场哈希与上面那次 S31 上游捕获相同。兼容层的光线投射哈希也相同；基础图元和贴图标题不同，因为那次 S31 捕获早于后来的文字与纹理修正，这次没有用当前固件重测 S31。
+
+## 本轮文字与纹理修正
+
+Host 480×480 同场景、同上游版本的逐像素对照（不是设备性能测试）：
+
+| 场景 | 修正前不同像素 | 修正后不同像素 |
+| --- | ---: | ---: |
+| 基础图元 | 15,234 | 13,933 |
+| 贴图标题 | 20,098 | 2,783 |
+| 光线投射墙面 | 10,961 | 10,961 |
+
+默认字体以只读字形数据保存，224 个字形的行掩码和宽度合计 4,704 字节，不分配字体纹理或堆内存。`python3 tools/generate_compat_font.py --check` 验证它和 benchmark 的独立 atlas oracle 均来自当前 vendored `rtext.c`。未知 Unicode 字符显示为 `?`；这不等于支持中文字体。文字与纹理继续登记为「差异」，其余图元、相机、输入和音频行为保持。
+
+当前固件的 S3 离屏整帧见上一节。S31 还没有用修正后的固件重测整帧，面板送数两边都没有测。
+
 ## 下一步
 
-1. **设备验证平台层**：构建一个只用原生 raylib 的示例固件，在目标板上记录启动、输入、上屏、退出，以及 rlsw 颜色缓冲加深度缓冲的峰值 RAM。
-2. **同板对照**：选三个场景（基础图元、Koala Seasons 标题与核心画面、raycast），分别用 rlsw 和自有光栅绘制，比较画质、峰值 RAM、Flash 和帧耗时。
-3. 根据对照结果，逐项把“差异”行改为“等价”，或者删除对应映射、改走上游。
+按游戏定路线。兼容层和 rcore 不能出现在同一个游戏里，纹理 ID 也不能混用。贴图量大、要跟上 30 fps 的游戏留在兼容层。映射先保持上表的「差异」：这次对照说明像素并不相同，不能改成「等价」，也不能按函数删映射。某个映射要退役，仍然要等使用它的游戏整页迁走。仍留在兼容层的游戏，只修真正影响它们的差异，优先半透明贴图和文字。
