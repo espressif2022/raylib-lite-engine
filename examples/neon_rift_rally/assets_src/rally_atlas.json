@@ -1,0 +1,15 @@
+{
+  "image": "rally_atlas_source.png",
+  "columns": 4,
+  "rows": 3,
+  "output_cell": 96,
+  "alpha_mode": "binary",
+  "frames": [
+    {"name": "craft_player"}, {"name": "craft_rival_cyan"},
+    {"name": "craft_rival_gold"}, {"name": "craft_rival_pink"},
+    {"name": "gate_cyan"}, {"name": "gate_pink"},
+    {"name": "boost_cyan"}, {"name": "boost_pink"},
+    {"name": "boost_gold"}, {"name": "energy_ring"},
+    {"name": "roadside_rock"}, {"name": "roadside_beacon"}
+  ]
+}

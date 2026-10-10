@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mosaico Game Development"
+  short_description: "Build and validate Raylib Lite Engine games"
+  default_prompt: "Develop a Raylib Lite Engine game with portable shared sources; use the Host simulator, choose native or ELF integration from the build matrix; use Vibe documentation for Iris/Gateway product workflows, and report the validation path."

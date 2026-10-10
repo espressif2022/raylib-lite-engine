@@ -1,0 +1,13 @@
+{
+  "image": "tactical_materials.png",
+  "columns": 4,
+  "rows": 1,
+  "output_columns": 3,
+  "output_cell": 128,
+  "layout": "column-major",
+  "frames": [
+    {"name": "wall_concrete", "source_index": 0},
+    {"name": "wall_brick", "source_index": 1},
+    {"name": "wall_container", "source_index": 2}
+  ]
+}

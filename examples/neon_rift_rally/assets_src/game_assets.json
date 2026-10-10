@@ -1,0 +1,15 @@
+{
+  "schema": "mosaico-game-assets/v1",
+  "atlases": [
+    {"config": "rally_atlas.json", "source": "rally_atlas_source.png", "output": "rally.atlas"},
+    {"config": "track_background.json", "source": "track_canyon.png", "output": "track_background.atlas"},
+    {"config": "motorcycle_poses.json", "source": "motorcycle_poses_source.png", "output": "motorcycle.atlas"}
+  ],
+  "sounds": [
+    {"source": "engine.wav"}, {"source": "boost.wav"},
+    {"source": "drift.wav"}, {"source": "jump.wav"},
+    {"source": "land.wav"}, {"source": "checkpoint.wav"},
+    {"source": "lap.wav"}, {"source": "finish.wav"},
+    {"source": "offtrack.wav"}, {"source": "collision.wav"}
+  ]
+}

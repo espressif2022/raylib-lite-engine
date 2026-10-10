@@ -1,0 +1,20 @@
+{
+  "image": "textures.png",
+  "columns": 5,
+  "rows": 2,
+  "layout": "row-major",
+  "output_cell": 64,
+  "alpha_mode": "opaque",
+  "frames": [
+    {"name": "tex_wall"},
+    {"name": "tex_floor"},
+    {"name": "tex_ceiling"},
+    {"name": "tex_carved"},
+    {"name": "tex_mossy_wall"},
+    {"name": "tex_steps"},
+    {"name": "tex_cloth"},
+    {"name": "tex_face"},
+    {"name": "tex_water"},
+    {"name": "tex_bone"}
+  ]
+}

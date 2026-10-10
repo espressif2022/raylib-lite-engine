@@ -80,6 +80,21 @@ class RasterStats(ctypes.Structure):
         ("triangle_pixels", ctypes.c_uint32),
         ("triangle_direct_pixels", ctypes.c_uint32),
         ("triangle_mirror_pixels", ctypes.c_uint32),
+        ("quad_calls", ctypes.c_uint32),
+        ("quad_pixels", ctypes.c_uint32),
+        ("primitive_pixels", ctypes.c_uint32),
+        ("primitive_runs", ctypes.c_uint32),
+        ("clear_pixels", ctypes.c_uint32),
+        ("rgb_const_v_pixels", ctypes.c_uint32),
+        ("rgb_vary_v_pixels", ctypes.c_uint32),
+        ("indexed_const_v_pixels", ctypes.c_uint32),
+        ("indexed_vary_v_pixels", ctypes.c_uint32),
+        ("indexed_magnify_pixels", ctypes.c_uint32),
+        ("indexed_minify_pixels", ctypes.c_uint32),
+        ("triangle_setup_us", ctypes.c_uint32),
+        ("triangle_raster_us", ctypes.c_uint32),
+        ("fb_runs", ctypes.c_uint32),
+        ("fb_pixels", ctypes.c_uint32),
     ]
 
 def load_replay(path: Path | None) -> list[dict[str, object]]:
@@ -108,11 +123,9 @@ def load_replay(path: Path | None) -> list[dict[str, object]]:
         })
     return normalized
 
-def _rgb565_png_bytes(framebuffer: object, width: int, height: int) -> bytes:
-    # Pillow's raw decoder performs the RGB565 expansion in native code. The
-    # previous Python pixel loop cost 120-200 ms for a 480x480 frame and held
-    # the simulation lock long enough to stall the fixed 30 Hz game clock.
-    pixels = ctypes.string_at(ctypes.addressof(framebuffer), width * height * 2)
+def _rgb565_png_bytes(pixels: bytes, width: int, height: int) -> bytes:
+    # Pillow's raw decoder performs the RGB565 expansion in native code. Encode
+    # outside the simulation lock so input/update keep the 30 Hz game clock.
     image = Image.frombytes("RGB", (width, height), pixels, "raw", "BGR;16")
     output = io.BytesIO()
     image.save(output, format="PNG", compress_level=1)
@@ -149,7 +162,7 @@ class GenericHostRuntime:
         suffix = ".dll" if os.name == "nt" else ".so"
         library = directory / f"host_game_{generation}{suffix}"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if manifest.get("schema") != "mosaico-game-sim/v1":
+        if manifest.get("schema") != "raylib-lite-game-sim/v1":
             raise RuntimeError(f"unsupported simulator manifest: {manifest_path}")
         project_sources = []
         for value in manifest.get("sources", []):
@@ -166,25 +179,26 @@ class GenericHostRuntime:
         sources = [
             *project_sources,
             ENGINE_ROOT / "host/host_module_bridge.c",
-            ENGINE_ROOT / "host/host_raylib_port.c",
+            ENGINE_ROOT / "host/host_video_backend.c",
+            ENGINE_ROOT / "host/host_clock.c",
+            ENGINE_ROOT / "src/runtime/raylib_lite_raylib_port.c",
             ENGINE_ROOT / "host/host_asset_runtime.c",
-            ENGINE_ROOT / "components/mosaico_game_2d/mosaico_game_2d.c",
-            ENGINE_ROOT / "components/mosaico_game_2d/mosaico_rgb565.c",
-            ENGINE_ROOT / "components/mosaico_raylib_fast/mosaico_raylib_fast.c",
-            ENGINE_ROOT / "components/mosaico_game_fx/mosaico_game_fx.c",
-            ENGINE_ROOT / "components/mosaico_game_tilemap/mosaico_game_tilemap.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_renderer.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_renderer_raylib.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_rgb565.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_raylib_impl.c",
+            ENGINE_ROOT / "src/fx/raylib_lite_fx.c",
+            ENGINE_ROOT / "src/renderer/raylib_lite_tilemap.c",
         ]
         includes = [ENGINE_ROOT / "host/include", ENGINE_ROOT / "host",
-                    ENGINE_ROOT / "components/mosaico_game_assets/include",
-                    ENGINE_ROOT / "components/mosaico_game_2d/include",
-                    ENGINE_ROOT / "components/mosaico_raylib_fast/include",
-                    ENGINE_ROOT / "components/mosaico_game_fx/include",
-                    ENGINE_ROOT / "components/mosaico_game_tilemap/include",
+                    ENGINE_ROOT / "examples/common_components/examples_common/include",
+                    ENGINE_ROOT / "include/raylib_lite",
+                    ENGINE_ROOT / "compat/raylib/include",
                     project / "main", project / "assets/generated",
                     project / "managed_components/georgik__raylib/include",
                     project / "managed_components/georgik__raylib/raylib/src"]
         command = [_host_compiler(), "-shared", "-O3", "-funroll-loops", "-std=c11", "-Wall",
-                   "-Wextra", "-Werror", "-DMOSAICO_HOST_SIMULATION=1",
+                   "-Wextra", "-Werror", "-DRAYLIB_LITE_HOST_SIMULATION=1",
                    *(str(path) for path in sources)]
         if os.name != "nt":
             command.insert(2, "-fPIC")
@@ -197,24 +211,24 @@ class GenericHostRuntime:
                 (compiled.stdout or "") + (compiled.stderr or "")
             )
         self.api = ctypes.CDLL(str(library))
-        self.api.mosaico_host_game_v1.restype = ctypes.POINTER(HostGameDescriptor)
-        descriptor = self.api.mosaico_host_game_v1().contents
+        self.api.raylib_lite_host_game_v1.restype = ctypes.POINTER(HostGameDescriptor)
+        descriptor = self.api.raylib_lite_host_game_v1().contents
         if descriptor.abi_version != 1:
             raise RuntimeError(f"unsupported host game ABI {descriptor.abi_version}")
         self.descriptor = descriptor
-        self.api.mosaico_host_game_create_v1.argtypes = [ctypes.c_char_p]
-        self.api.mosaico_host_game_create_v1.restype = ctypes.c_void_p
-        self.api.mosaico_host_game_destroy_v1.argtypes = [ctypes.c_void_p]
-        self.api.mosaico_host_game_input_v1.argtypes = [ctypes.c_void_p,
+        self.api.raylib_lite_host_game_create_v1.argtypes = [ctypes.c_char_p]
+        self.api.raylib_lite_host_game_create_v1.restype = ctypes.c_void_p
+        self.api.raylib_lite_host_game_destroy_v1.argtypes = [ctypes.c_void_p]
+        self.api.raylib_lite_host_game_input_v1.argtypes = [ctypes.c_void_p,
                                                         ctypes.POINTER(HostGameInput)]
-        self.api.mosaico_host_game_update_v1.argtypes = [ctypes.c_void_p]
-        self.api.mosaico_host_game_render_rgb565_v1.argtypes = [ctypes.c_void_p,
+        self.api.raylib_lite_host_game_update_v1.argtypes = [ctypes.c_void_p]
+        self.api.raylib_lite_host_game_render_rgb565_v1.argtypes = [ctypes.c_void_p,
             ctypes.POINTER(ctypes.c_uint16), ctypes.c_size_t]
-        self.api.mosaico_host_game_state_json_v1.argtypes = [ctypes.c_void_p,
+        self.api.raylib_lite_host_game_state_json_v1.argtypes = [ctypes.c_void_p,
             ctypes.c_char_p, ctypes.c_size_t]
-        self.api.mosaico_game_2d_get_raster_stats.argtypes = [ctypes.POINTER(RasterStats)]
-        self.api.mosaico_game_2d_reset_raster_stats.argtypes = []
-        self.context = self.api.mosaico_host_game_create_v1(
+        self.api.raylib_lite_renderer_get_raster_stats.argtypes = [ctypes.POINTER(RasterStats)]
+        self.api.raylib_lite_renderer_reset_raster_stats.argtypes = []
+        self.context = self.api.raylib_lite_host_game_create_v1(
             str(project / "assets/generated").encode())
         if not self.context: raise RuntimeError("host adapter create failed")
         self.framebuffer = (ctypes.c_uint16 * (descriptor.width * descriptor.height))()
@@ -224,12 +238,12 @@ class GenericHostRuntime:
         self.encode_ns = 0
         self.last_render_ns = 0
         self.last_encode_ns = 0
-        self.api.mosaico_game_2d_reset_raster_stats()
+        self.api.raylib_lite_renderer_reset_raster_stats()
         self.lock = threading.Lock()
 
     def close(self) -> None:
         if self.context:
-            self.api.mosaico_host_game_destroy_v1(self.context)
+            self.api.raylib_lite_host_game_destroy_v1(self.context)
             self.context = None
         if os.name == "nt" and self.api is not None:
             handle = self.api._handle
@@ -242,7 +256,7 @@ class GenericHostRuntime:
                value_z: float = 0) -> None:
         value = HostGameInput(kind, code, x, y, track_id, pressed,
                               value_x, value_y, value_z)
-        self.api.mosaico_host_game_input_v1(self.context, ctypes.byref(value))
+        self.api.raylib_lite_host_game_input_v1(self.context, ctypes.byref(value))
 
     def step(self, left: bool, right: bool, jump: bool,
              restart: bool = False, pause: bool = False) -> None:
@@ -250,7 +264,7 @@ class GenericHostRuntime:
             self._input(1, code, pressed)
         if restart: self._input(1, 4)
         if pause: self._input(1, 3)
-        self.api.mosaico_host_game_update_v1(self.context); self.frames += 1
+        self.api.raylib_lite_host_game_update_v1(self.context); self.frames += 1
 
     def control(self, code: int) -> None: self._input(3, code)
     def action(self, code: int, pressed: bool) -> None:
@@ -261,11 +275,11 @@ class GenericHostRuntime:
         self._input(4, 0, True, value_x=x, value_y=y, value_z=z)
     def metadata(self) -> dict[str, object]:
         output = ctypes.create_string_buffer(2048)
-        if self.api.mosaico_host_game_state_json_v1(self.context, output, len(output)) < 0:
+        if self.api.raylib_lite_host_game_state_json_v1(self.context, output, len(output)) < 0:
             return {"error": "state unavailable"}
         value = json.loads(output.value)
         raster = RasterStats()
-        self.api.mosaico_game_2d_get_raster_stats(ctypes.byref(raster))
+        self.api.raylib_lite_renderer_get_raster_stats(ctypes.byref(raster))
         value.update({"frames": self.frames, "abi": 1,
                       "game_id": self.descriptor.game_id.decode(),
                       "title": self.descriptor.title.decode(),
@@ -280,20 +294,27 @@ class GenericHostRuntime:
                       "raster": {name: getattr(raster, name)
                           for name, _ctype in RasterStats._fields_}})
         return value
-    def frame(self) -> bytes:
+    def snapshot_rgb565(self) -> tuple[bytes, int, int]:
         started = time.perf_counter_ns()
-        status = self.api.mosaico_host_game_render_rgb565_v1(
+        status = self.api.raylib_lite_host_game_render_rgb565_v1(
             self.context, self.framebuffer, self.descriptor.width)
         if status: raise RuntimeError(f"host render failed: {status}")
         rendered = time.perf_counter_ns()
-        frame = _rgb565_png_bytes(self.framebuffer, self.descriptor.width,
-                                  self.descriptor.height)
-        encoded = time.perf_counter_ns()
+        width, height = self.descriptor.width, self.descriptor.height
+        pixels = ctypes.string_at(ctypes.addressof(self.framebuffer),
+                                  width * height * 2)
         self.last_render_ns = rendered - started
-        self.last_encode_ns = encoded - rendered
         self.render_ns += self.last_render_ns
-        self.encode_ns += self.last_encode_ns
         self.render_count += 1
+        return pixels, width, height
+    def note_encode_ns(self, encode_ns: int) -> None:
+        self.last_encode_ns = encode_ns
+        self.encode_ns += encode_ns
+    def frame(self) -> bytes:
+        pixels, width, height = self.snapshot_rgb565()
+        started = time.perf_counter_ns()
+        frame = _rgb565_png_bytes(pixels, width, height)
+        self.note_encode_ns(time.perf_counter_ns() - started)
         return frame
 
 class ReloadableHostRuntime:
@@ -339,6 +360,10 @@ class ReloadableHostRuntime:
         self.current.action(code, pressed)
     def pointer(self, *args: object) -> None: self.current.pointer(*args)
     def imu(self, *args: object) -> None: self.current.imu(*args)
+    def snapshot_rgb565(self) -> tuple[bytes, int, int]:
+        return self.current.snapshot_rgb565()
+    def note_encode_ns(self, encode_ns: int) -> None:
+        self.current.note_encode_ns(encode_ns)
     def frame(self) -> bytes: return self.current.frame()
     def metadata(self) -> dict[str, object]:
         return {**self.current.metadata(), "reload_error": self.reload_error,
@@ -430,11 +455,11 @@ def serve_interactive_preview(listen: str, port: int, runtime: object,
 <title>Mosaico game simulator</title><style>
 body{margin:0;background:#07111c;color:#dff;font:14px system-ui;display:grid;place-items:center;min-height:100vh}
 main{position:relative;padding:16px;background:#0c2030;border:1px solid #299fad;border-radius:16px;box-shadow:0 18px 80px #000;width:min(512px,calc(100vw - 24px))}
-img{width:480px;height:480px;max-width:100%;aspect-ratio:1/1;object-fit:contain;display:block;image-rendering:pixelated;touch-action:none}
+img{width:480px;height:480px;max-width:100%;aspect-ratio:1/1;object-fit:contain;display:block;image-rendering:pixelated;touch-action:none;background:#000;border-radius:60px;clip-path:inset(0 round 60px)}
 #state{margin-top:10px;color:#9ee;white-space:pre-wrap;height:4.8em;overflow:hidden;line-height:1.35}
 .hint{color:#fff;margin-top:8px}.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}button,select{background:#17364b;color:#dff;border:1px solid #299fad;border-radius:6px;padding:6px 10px}
 </style></head><body><main><div class=tools><button id=pause>Pause</button><button id=step>Step</button><button id=reset>Reset</button><button id=shot>Screenshot</button><button id=record>Record</button><select id=speed><option>.25</option><option>.5</option><option selected>1</option><option>2</option></select></div><img id=screen tabindex=0 draggable=false><div id=state></div>
-<div class=hint>Keyboard: A/D turn, W/S walk, Shift sprint, Q/E strafe, F fire · Touch: left stick, right look, FIRE ring</div></main>
+<div class=hint id=hint>Keyboard controls depend on the running game.</div></main>
 <script>
 const held=new Set(), pointers=new Map(), img=document.querySelector('#screen'), state=document.querySelector('#state'), sfxCache={};
 let busy=false, phase='start',paused=false,armedSfx='';
@@ -456,10 +481,11 @@ async function control(command){await fetch('/api/v1/control',{method:'POST',hea
 async function tick(){if(busy)return;busy=true;
  try{const res=await fetch('/api/v1/frame');const meta=JSON.parse(res.headers.get('X-Mosaico-State'));const blob=await res.blob();
  phase=meta.phase;if(meta.sfx&&meta.sfx!==armedSfx)playSfx(meta.sfx);armedSfx=meta.sfx||'';const old=img.src,url=URL.createObjectURL(blob);img.onload=()=>{if(old.startsWith('blob:'))URL.revokeObjectURL(old);img.onload=null};img.src=url;
+ document.querySelector('#hint').textContent=meta.game_id==='neon_rift_rally'?'Keyboard: A/D steer · W throttle · S brake · Space nitro · Shift drift · Enter restart':'Keyboard: A/D move · W/Space action · S back · Shift sprint · Q/E strafe · F fire';
  paused=meta.simulation.paused;const fields=Object.entries(meta).filter(([k])=>!['simulation','reload_error','title'].includes(k)).map(([k,v])=>`${k}=${v}`).join('  ');
  state.textContent=`${meta.title||meta.game_id||'Mosaico game'}\nLogic ${meta.simulation.logic_fps.toFixed(1)} Hz  Raster ${meta.host_render_ms.toFixed(2)} ms  PNG ${meta.host_encode_ms.toFixed(2)} ms\n${fields}`}
  finally{busy=false}}
-pause.onclick=()=>control(paused?'resume':'pause');step.onclick=()=>control('step');reset.onclick=()=>control('reset');speed.onchange=()=>control('speed:'+speed.value);shot.onclick=()=>{const a=document.createElement('a');a.href=img.src;a.download='mosaico-game.png';a.click()};record.onclick=async()=>{if(!metaRecording()){await control('record');record.textContent='Stop record'}else{await control('record');const a=document.createElement('a');a.href='/api/v1/recording';a.download='scenario.json';a.click();record.textContent='Record'}};
+pause.onclick=()=>control(paused?'resume':'pause');step.onclick=()=>control('step');reset.onclick=()=>control('reset');speed.onchange=()=>control('speed:'+speed.value);shot.onclick=()=>{const canvas=document.createElement('canvas'),c=canvas.getContext('2d');canvas.width=canvas.height=480;c.beginPath();c.roundRect(0,0,480,480,60);c.clip();c.drawImage(img,0,0,480,480);const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download='mosaico-game.png';a.click()};record.onclick=async()=>{if(!metaRecording()){await control('record');record.textContent='Stop record'}else{await control('record');const a=document.createElement('a');a.href='/api/v1/recording';a.download='scenario.json';a.click();record.textContent='Record'}};
 function metaRecording(){return record.textContent==='Stop record'}
 let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()}requestAnimationFrame(animate)}requestAnimationFrame(animate);
 </script></body></html>""".encode("utf-8")
@@ -476,11 +502,12 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                 "recording": simulation["recording"]}}
         def do_GET(self) -> None:
             if self.path.startswith("/api/v1/frame") or self.path.startswith("/frame"):
-                from urllib.parse import parse_qs, urlparse
-                values = parse_qs(urlparse(self.path).query)
-                flag = lambda name: values.get(name, ["0"])[0] == "1"
                 with runtime.lock:
-                    body, metadata = runtime.frame(), self.metadata()
+                    pixels, width, height = runtime.snapshot_rgb565()
+                    metadata = self.metadata()
+                encode_started = time.perf_counter_ns()
+                body = _rgb565_png_bytes(pixels, width, height)
+                runtime.note_encode_ns(time.perf_counter_ns() - encode_started)
                 content_type = "image/png"
             elif self.path.startswith("/api/v1/info"):
                 body = json.dumps({"abi": 1, "endpoints": ["info","state","frame","input","control","recording"],

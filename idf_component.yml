@@ -1,0 +1,39 @@
+version: "0.1.0"
+description: Lightweight Raylib-compatible game runtime and RGB565 software renderer for ESP-IDF
+license: Apache-2.0
+url: https://github.com/espressif2022/raylib-lite-engine
+repository: https://github.com/espressif2022/raylib-lite-engine.git
+documentation: https://github.com/espressif2022/raylib-lite-engine/tree/main/docs
+issues: https://github.com/espressif2022/raylib-lite-engine/issues
+changelog: https://github.com/espressif2022/raylib-lite-engine/blob/main/CHANGELOG.md
+
+maintainers:
+  - "xuxin <xuxin@espressif.com>"
+
+# Repository examples are assembled by tools/prepare_release.py before upload.
+files:
+  use_gitignore: true
+  exclude:
+    - "examples/**/*"
+    - "release/**/*"
+    - "tests/**/*"
+    - "host/**/*"
+    - "artifacts/**/*"
+    - "**/*.patch"
+    - "**/.codex-runs/**/*"
+    - "**/.agents/**/*"
+    - "**/.codex/**/*"
+    - "**/.aws/**/*"
+    - "AGENTS.md"
+    - "CONTRIBUTING*"
+
+tags:
+  - graphics
+  - game
+  - raylib
+  - rgb565
+
+dependencies:
+  idf: ">=6.1"
+  georgik/raylib: "==6.0.0~2"
+  espressif/esp_mmap_assets: "^2.0.0"

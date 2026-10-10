@@ -1,0 +1,11 @@
+{
+  "image": "weapon.png",
+  "columns": 2,
+  "rows": 1,
+  "output_cell": 144,
+  "alpha_mode": "binary",
+  "frames": [
+    {"name": "tactical_rifle"},
+    {"name": "tactical_bolt"}
+  ]
+}
