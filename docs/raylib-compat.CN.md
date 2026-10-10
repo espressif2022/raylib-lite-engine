@@ -98,6 +98,16 @@ CloseWindow();
 | `CheckCollisionRecs` `CheckCollisionCircles` `CheckCollisionPointRec` `CheckCollisionCircleRec` `CheckCollisionPointCircle` `CheckCollisionPointTriangle` `GetCollisionRec` | 等价 | 与 raylib 6.0 `rshapes.c` 一致，包括边界规则 |
 | `Fade` `ColorAlpha` `ColorTint` `ColorBrightness` | 等价 | 与 raylib 6.0 `rtextures.c` 一致，包括截断规则 |
 
+音频映射位于 `raylib_lite_raylib_audio.h`，转到 `raylib_lite_game_audio_*`，由示例音频组件 `examples_audio` 实现：
+
+| API | 状态 | 说明 |
+| --- | --- | --- |
+| `InitAudioDevice` `CloseAudioDevice` `IsAudioDeviceReady` | 契约 | 打开和关闭 Board 音频服务；主音量跨初始化保留 |
+| `LoadSound` `UnloadSound` `LoadMusicStream` `UnloadMusicStream` | 契约 | 只读取引擎打包的音频资源，不解析任意文件格式 |
+| `PlaySound` `StopSound` `IsSoundPlaying` `SetSoundVolume` | 契约 | 由引擎混音器播放 |
+| `PlayMusicStream` `StopMusicStream` `SetMusicVolume` | 契约 | 由引擎混音器的独立音乐声部播放 |
+| `UpdateMusicStream` | 差异 | 空操作；混音服务自行推流，调用它是为了兼容上游写法 |
+
 ### 相机
 
 三角形变换每个顶点；矩形只变换起点并缩放宽高；文字只变换位置和字号。修正方向：相机带旋转时，矩形类图元降级为“变换四个顶点后按多边形填充”，无旋转时保留轴对齐快速路径。
