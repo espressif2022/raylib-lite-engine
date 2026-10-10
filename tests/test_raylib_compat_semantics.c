@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include "raylib_lite_raylib.h"
 #include "raylib_lite_raylib_port.h"
 #include "raylib_lite_host_video.h"
@@ -95,6 +96,18 @@ static void helpers_match_raylib(void)
     assert(CheckCollisionCircleRec((Vector2){11, 11}, 1.5f, r));
 }
 
+static void text_format_keeps_four_recent_results(void)
+{
+    const char *first = TextFormat("a%d", 1), *second = TextFormat("b%d", 2);
+    const char *third = TextFormat("c%d", 3), *fourth = TextFormat("d%d", 4);
+    assert(!strcmp(first, "a1") && !strcmp(second, "b2"));
+    assert(!strcmp(third, "c3") && !strcmp(fourth, "d4"));
+    char wide[300];
+    memset(wide, 'x', sizeof(wide) - 1);
+    wide[sizeof(wide) - 1] = '\0';
+    assert(strlen(TextFormat("%s", wide)) == sizeof(wide) - 1);
+}
+
 int main(void)
 {
     raylib_lite_clock_t clock = {.monotonic_us = fake_now, .sleep_for_us = fake_sleep};
@@ -104,6 +117,7 @@ int main(void)
     attached_runtime_owns_ticks_and_edges();
     fps_is_measured_from_presented_frames();
     helpers_match_raylib();
+    text_format_keeps_four_recent_results();
     raylib_lite_host_video_clear_target();
     raylib_lite_host_video_shutdown();
     puts("raylib compat semantics: ok");

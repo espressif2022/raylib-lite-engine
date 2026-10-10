@@ -703,13 +703,50 @@ void raylib_lite_raylib_draw_rectangle_rounded(Rectangle r,float roundness,int s
     (void)segments;
     float radius=rounded_radius(r,roundness);
     if(radius<1){raylib_lite_raylib_draw_rectangle_rec(r,color);return;}
-    int rad=(int)ceilf(radius);
-    raylib_lite_raylib_draw_rectangle((int)r.x+rad,(int)r.y,(int)r.width-2*rad,(int)r.height,color);
-    raylib_lite_raylib_draw_rectangle((int)r.x,(int)r.y+rad,(int)r.width,(int)r.height-2*rad,color);
-    raylib_lite_raylib_draw_circle((int)r.x+rad,(int)r.y+rad,radius,color);
-    raylib_lite_raylib_draw_circle((int)(r.x+r.width)-rad-1,(int)r.y+rad,radius,color);
-    raylib_lite_raylib_draw_circle((int)r.x+rad,(int)(r.y+r.height)-rad-1,radius,color);
-    raylib_lite_raylib_draw_circle((int)(r.x+r.width)-rad-1,(int)(r.y+r.height)-rad-1,radius,color);
+    if(!color.a)return;
+    int x=(int)r.x,y=(int)r.y,width=(int)r.width,height=(int)r.height;
+    if(s_camera_active){
+        Vector2 p=active_to_screen((Vector2){(float)x,(float)y});
+        x=(int)p.x;y=(int)p.y;
+        width=(int)(width*s_camera.zoom);height=(int)(height*s_camera.zoom);
+        radius*=s_camera.zoom;
+    }
+    /* One span per row, so translucent fills blend each pixel once. The
+     * covered set is two cross rectangles plus four corner circles, clipped
+     * to the rectangle (corner circles can overshoot when a side is ~2*radius). */
+    int rad=(int)ceilf(radius),cr=(int)radius,rr=cr*cr;
+    int left_cx=x+rad,right_cx=x+width-rad-1;
+    int top_cy=y+rad,bottom_cy=y+height-rad-1;
+    span_paint_t paint=span_paint(color);
+    for(int row=y;row<y+height;++row){
+        int lo[4],hi[4],count=0,span=-1;
+        if(height>2*rad&&row>=y+rad&&row<y+height-rad){lo[0]=x;hi[0]=x+width;count=1;}
+        else{
+            if(width>2*rad){lo[count]=x+rad;hi[count++]=x+width-rad;}
+            const int centers[2]={top_cy,bottom_cy};
+            for(int i=0;i<2;++i){
+                int dy=row-centers[i];
+                if(dy>=-cr&&dy<=cr){
+                    int s=(int)sqrtf((float)(rr-dy*dy));
+                    if(s>span)span=s;
+                }
+            }
+            if(span>=0){
+                lo[count]=left_cx-span;hi[count++]=left_cx+span+1;
+                lo[count]=right_cx-span;hi[count++]=right_cx+span+1;
+            }
+        }
+        for(int i=1;i<count;++i)for(int j=i;j>0&&lo[j]<lo[j-1];--j){
+            int t=lo[j];lo[j]=lo[j-1];lo[j-1]=t;t=hi[j];hi[j]=hi[j-1];hi[j-1]=t;
+        }
+        for(int i=0;i<count;){
+            int first=lo[i],last=hi[i++];
+            while(i<count&&lo[i]<=last){if(hi[i]>last)last=hi[i];++i;}
+            if(first<x)first=x;
+            if(last>x+width)last=x+width;
+            if(first<last)fill_span(row,first,last,&paint);
+        }
+    }
 }
 
 void raylib_lite_raylib_draw_rectangle_rounded_lines(Rectangle r,float roundness,int segments,
@@ -780,9 +817,10 @@ void raylib_lite_raylib_draw_triangle(Vector2 av, Vector2 bv, Vector2 cv, Color 
     int64_t area=edge(ax,ay,bx,by,cx,cy);
     if(!area||!color.a||minx>maxx||miny>maxy)return;
     span_paint_t paint=span_paint(color);
-    /* Intersect the three inclusive integer half-planes directly. This is
-     * exactly the legacy edge test at integer pixel coordinates, including
-     * shared edges and either winding, without scanning each row's box. */
+    /* Intersect the three integer half-planes directly, either winding.
+     * Top-left rule: pixels on a left or top edge are inside, pixels on a
+     * right or bottom edge are not, so triangles sharing an edge (fans,
+     * strips, polygons, DrawRectanglePro) cover each pixel exactly once. */
     int winding=area>0?1:-1;
     int vx[3]={ax,bx,cx},vy[3]={ay,by,cy};
     int64_t slope[3],value[3],step[3];
@@ -791,6 +829,7 @@ void raylib_lite_raylib_draw_triangle(Vector2 av, Vector2 bv, Vector2 cv, Color 
         slope[i]=((int64_t)vy[j]-vy[i])*winding;
         step[i]=-((int64_t)vx[j]-vx[i])*winding;
         value[i]=edge(vx[i],vy[i],vx[j],vy[j],0,miny)*winding;
+        if(!(slope[i]>0||(slope[i]==0&&step[i]>0)))value[i]-=1;
     }
     for(int y=miny;y<=maxy;++y){
         int64_t first=minx,last=maxx;
@@ -925,9 +964,10 @@ int raylib_lite_raylib_measure_text(const char *text, int font_size)
 
 const char *raylib_lite_raylib_text_format_v(const char *format, va_list args)
 {
-    static char buffers[2][64];
+    /* MAX_TEXTFORMAT_BUFFERS and MAX_TEXT_BUFFER_LENGTH from third_party/raylib config.h. */
+    static char buffers[4][512];
     static unsigned index;
-    char *out = buffers[index++ & 1U];
+    char *out = buffers[index++ & 3U];
     vsnprintf(out, sizeof(buffers[0]), format ? format : "", args);
     return out;
 }

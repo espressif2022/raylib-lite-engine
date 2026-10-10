@@ -88,13 +88,13 @@ CloseWindow();
 | `DrawLineEx` | 差异 | 圆端粗线；上游为四边形 |
 | `DrawCircle` `DrawCircleV` `DrawCircleLines` `DrawCircleLinesV` `DrawEllipse` `DrawEllipseV` `DrawEllipseLines` `DrawEllipseLinesV` | 差异 | 整数扫描线覆盖，非上游三角形扇 |
 | `DrawRectangle` `DrawRectangleV` `DrawRectangleRec` `DrawRectanglePro` `DrawRectangleGradientV` `DrawRectangleGradientH` `DrawRectangleLines` `DrawRectangleLinesEx` | 差异 | 旋转相机下矩形保持轴对齐 |
-| `DrawRectangleRounded` `DrawRectangleRoundedLines` | 差异 | 忽略 `segments`；半透明时重叠区域会重复混合 |
-| `DrawTriangle` `DrawTriangleLines` `DrawTriangleFan` `DrawTriangleStrip` | 差异 | 共享边包含规则；半透明相邻三角形可能重复覆盖 |
+| `DrawRectangleRounded` `DrawRectangleRoundedLines` | 差异 | 忽略 `segments`，圆角为整数扫描线；填充每行一段，半透明时每个像素只混合一次 |
+| `DrawTriangle` `DrawTriangleLines` `DrawTriangleFan` `DrawTriangleStrip` | 差异 | 整数顶点上的左上填充规则（上游 rlsw 在像素中心采样）；共享边只覆盖一次，半透明扇形和条带无重叠 |
 | `DrawPoly` `DrawPolyLines` `DrawPolyLinesEx` | 差异 | 由三角形路径组成，继承上述覆盖规则 |
 | `LoadTexture` `UnloadTexture` | 契约 | 只读取引擎打包资源；纹理 ID 是本仓库槽位，不能交给上游纹理函数 |
 | `DrawTexture` `DrawTextureV` `DrawTextureRec` `DrawTextureEx` `DrawTexturePro` | 差异 | 均转到自有纹理光栅；画质未与 rlsw 对照 |
 | `DrawText` `MeasureText` | 差异 | 5×7 点阵调试字体，小写显示为大写，整数倍缩放 |
-| `TextFormat` | 差异 | 两个 64 字节轮换缓冲，超长输出被截断 |
+| `TextFormat` | 等价 | 与上游 `config.h` 相同：4 个 512 字节轮换缓冲 |
 | `CheckCollisionRecs` `CheckCollisionCircles` `CheckCollisionPointRec` `CheckCollisionCircleRec` `CheckCollisionPointCircle` `CheckCollisionPointTriangle` `GetCollisionRec` | 等价 | 与 raylib 6.0 `rshapes.c` 一致，包括边界规则 |
 | `Fade` `ColorAlpha` `ColorTint` `ColorBrightness` | 等价 | 与 raylib 6.0 `rtextures.c` 一致，包括截断规则 |
 
