@@ -195,8 +195,7 @@ class GenericHostRuntime:
                     ENGINE_ROOT / "include/raylib_lite",
                     ENGINE_ROOT / "compat/raylib/include",
                     project / "main", project / "assets/generated",
-                    project / "managed_components/georgik__raylib/include",
-                    project / "managed_components/georgik__raylib/raylib/src"]
+                    ENGINE_ROOT / "third_party/raylib/src"]
         command = [_host_compiler(), "-shared", "-O3", "-funroll-loops", "-std=c11", "-Wall",
                    "-Wextra", "-Werror", "-DRAYLIB_LITE_HOST_SIMULATION=1",
                    *(str(path) for path in sources)]

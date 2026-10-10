@@ -48,6 +48,13 @@ endif()
 set(_raylib_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_raylib_port.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_raylib_impl.c")
+set(_upstream_raylib_dir "${RAYLIB_LITE_ENGINE_ROOT}/third_party/raylib")
+set(_upstream_raylib_sources
+    "${_upstream_raylib_dir}/src/rshapes.c"
+    "${_upstream_raylib_dir}/src/rtextures.c"
+    "${_upstream_raylib_dir}/src/rtext.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/rcore/raylib_lite_rcore.c")
+list(APPEND _platform_sources "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/raylib_lite_rcore_posix.c")
 set(_feature_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_tilemap.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/scene/raylib_lite_scene.c"
@@ -59,20 +66,31 @@ set(_feature_sources
 idf_component_register(
     SRCS ${_platform_sources} ${_runner_sources} ${_runtime_sources}
          ${_asset_sources} ${_audio_sources} ${_renderer_sources}
-         ${_raylib_sources} ${_feature_sources}
+         ${_raylib_sources} ${_feature_sources} ${_upstream_raylib_sources}
     INCLUDE_DIRS
         "${RAYLIB_LITE_ENGINE_ROOT}/include/raylib_lite"
         "${RAYLIB_LITE_ENGINE_ROOT}/compat/raylib/include"
+        "${_upstream_raylib_dir}/src"
     PRIV_INCLUDE_DIRS
         "${RAYLIB_LITE_ENGINE_ROOT}/src/assets"
         "${RAYLIB_LITE_ENGINE_ROOT}/src/audio"
         "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer"
-    REQUIRES raylib
     PRIV_REQUIRES esp_timer esp_system heap freertos esp_mmap_assets
                   nvs_flash log)
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC
-    RAYLIB_LITE_DEFAULT_FPS=${CONFIG_RAYLIB_LITE_DEFAULT_FPS})
+    RAYLIB_LITE_DEFAULT_FPS=${CONFIG_RAYLIB_LITE_DEFAULT_FPS}
+    GRAPHICS_API_OPENGL_SOFTWARE
+    PLATFORM_CUSTOM
+    SW_COLOR_BUFFER_BITS=16
+    SW_DEPTH_BUFFER_BITS=16)
+
+set_property(SOURCE ${_upstream_raylib_sources} APPEND PROPERTY COMPILE_OPTIONS
+    "-I${_upstream_raylib_dir}/src/external"
+    -Wno-incompatible-pointer-types -Wno-uninitialized -Wno-nonnull
+    -Wno-return-type -Wno-unused-variable -Wno-unused-function
+    -Wno-unused-label -Wno-stringop-truncation -Wno-unused-parameter
+    -Wno-missing-field-initializers -Wno-sign-compare)
 
 set(_renderer_c_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_esp.c"
