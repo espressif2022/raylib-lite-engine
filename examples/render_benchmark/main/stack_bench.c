@@ -78,13 +78,15 @@ static uint16_t blend(uint16_t dst,Color c)
  unsigned b=((dst%32)*8*(255-c.a)+c.b*c.a)/255;
  return (uint16_t)((r/8)*2048+(g/4)*32+b/8);
 }
-/* Texture blend contract: packed 0xf81f/0x07e0 fields, >>8. */
+/* Scalar expanded-channel oracle, /255 before final RGB565 packing. */
 static uint16_t texture_blend(uint16_t d,uint16_t s,unsigned a)
 {
- if(a>=255)return s;
- unsigned ia=255-a;
- return (uint16_t)(((((s&0xf81fU)*a+(d&0xf81fU)*ia)>>8)&0xf81fU)|
-                   ((((s&0x07e0U)*a+(d&0x07e0U)*ia)>>8)&0x07e0U));
+ unsigned sr=s/2048,sg=(s/32)%64,sb=s%32;
+ unsigned dr=d/2048,dg=(d/32)%64,db=d%32;
+ unsigned r=(((sr*8+sr/4)*a+(dr*8+dr/4)*(255-a))/255)/8;
+ unsigned g=(((sg*4+sg/16)*a+(dg*4+dg/16)*(255-a))/255)/4;
+ unsigned b=(((sb*8+sb/4)*a+(db*8+db/4)*(255-a))/255)/8;
+ return (uint16_t)(r*2048+g*32+b);
 }
 static uint16_t texel(int x,int y){return (uint16_t)(((x*4)<<11)^(y*1000)^(x*y));}
 static void plot(int x,int y,Color c)
@@ -132,61 +134,40 @@ static bool poly_vertex(int index,int i,int *x,int *y)
  *x=(int)px;*y=(int)py;return true;
 }
 
-/* 5x7 debug font, copied as the independent reference for DrawText. */
-static const uint8_t DIGITS[10][7] = {
-    {14,17,19,21,25,17,14},{4,12,4,4,4,4,14},{14,17,1,2,4,8,31},
-    {30,1,1,14,1,1,30},{2,6,10,18,31,2,2},{31,16,16,30,1,1,30},
-    {14,16,16,30,17,17,14},{31,1,2,4,8,8,8},{14,17,17,14,17,17,14},
-    {14,17,17,15,1,1,14}
-};
-static const uint8_t LETTERS[26][7] = {
-    {14,17,17,31,17,17,17},{30,17,17,30,17,17,30},{14,17,16,16,16,17,14},
-    {30,17,17,17,17,17,30},{31,16,16,30,16,16,31},{31,16,16,30,16,16,16},
-    {14,17,16,23,17,17,15},{17,17,17,31,17,17,17},{14,4,4,4,4,4,14},
-    {7,2,2,2,18,18,12},{17,18,20,24,20,18,17},{16,16,16,16,16,16,31},
-    {17,27,21,21,17,17,17},{17,25,21,19,17,17,17},{14,17,17,17,17,17,14},
-    {30,17,17,30,16,16,16},{14,17,17,17,21,18,13},{30,17,17,30,20,18,17},
-    {15,16,16,14,1,1,30},{31,4,4,4,4,4,4},{17,17,17,17,17,17,14},
-    {17,17,17,17,17,10,4},{17,17,17,21,21,21,10},{17,17,10,4,10,17,17},
-    {17,17,10,4,4,4,4},{31,1,2,4,8,16,31}
-};
-static const uint8_t *bench_glyph(char ch)
-{
-    static const uint8_t slash[7]={1,2,2,4,8,8,16};
-    static const uint8_t dash[7]={0,0,0,31,0,0,0};
-    static const uint8_t colon[7]={0,4,4,0,4,4,0};
-    static const uint8_t dot[7]={0,0,0,0,0,6,6};
-    if(ch>='0'&&ch<='9') return DIGITS[ch-'0'];
-    if(ch>='A'&&ch<='Z') return LETTERS[ch-'A'];
-    if(ch>='a'&&ch<='z') return LETTERS[ch-'a'];
-    if(ch=='/') return slash;
-    if(ch=='-') return dash;
-    if(ch==':') return colon;
-    if(ch=='.') return dot;
-    return NULL;
-}
+#include "default_font_oracle.h"
+/* Reconstruct atlas rectangles and sample each destination pixel with integer
+ * rational coordinates, independently of the renderer's row-span algorithm. */
 static void oracle_text(const char *text,int x,int y,int font_size,Color color)
 {
-    int scale=font_size/8; if(scale<1)scale=1;
-    for(;*text;++text,x+=6*scale){
-        const uint8_t *rows=bench_glyph(*text); if(!rows)continue;
-        for(int yy=0;yy<7;++yy){
-            int xx=0;
-            while(xx<5){
-                while(xx<5&&!(rows[yy]&(1U<<(4-xx))))++xx;
-                int start=xx;
-                while(xx<5&&(rows[yy]&(1U<<(4-xx))))++xx;
-                for(int py=0;py<scale;++py)for(int px=0;px<(xx-start)*scale;++px)
-                    plot(x+start*scale+px,y+yy*scale+py,color);
-            }
-        }
-    }
+ if(font_size<10)font_size=10;
+ int advance=0;
+ for(;*text;++text){
+  unsigned g=(unsigned char)*text-32;
+  if(g>=224)g='?'-32;
+  int ax=1,ay=1;
+  for(unsigned i=0;i<=g;++i){
+   int w=oracle_font_width[i];
+   if(ax+w+1>=128){ax=1;ay+=11;}
+   if(i!=g)ax+=w+1;
+  }
+  int width=oracle_font_width[g],left=x*10+advance;
+  if(*text!=' ')for(int py=0;py<H;++py)for(int px=0;px<W;++px){
+   int rx=(2*px+1)*5-left,ry=(2*py+1)*5-y*10;
+   if(rx<0||rx>=width*font_size||ry<0||ry>=10*font_size)continue;
+   int bit=(ay+ry/font_size)*128+ax+rx/font_size;
+   if(oracle_font_atlas[bit/32]&(1U<<(bit%32)))plot(px,py,color);
+  }
+  advance+=width*font_size+(font_size/10)*10;
+ }
 }
 static int oracle_measure(const char *text,int font_size)
 {
-    if(!text||!*text)return 0;
-    int scale=font_size/8; if(scale<1)scale=1;
-    return (int)strlen(text)*6*scale-scale;
+ if(!text||!*text)return 0;
+ if(font_size<10)font_size=10;
+ int width=0,count=0;
+ for(;*text;++text){unsigned g=(unsigned char)*text-32;
+  width+=oracle_font_width[g<224?g:'?'-32];++count;}
+ return (width*font_size)/10+(count-1)*(font_size/10);
 }
 /* Translation and zoom only: rectangles stay axis-aligned, which is correct
  * for rotation 0. Rotation is intentionally not frozen here. */

@@ -18,7 +18,10 @@ class RenderExampleTests(unittest.TestCase):
         registry=json.loads((bench.EXAMPLE/'config/techniques.json').read_text())
         self.assertEqual(len({x['id'] for x in registry['entries']}),len(registry['entries']))
         for entry in registry['entries']:
-            if entry['source']:self.assertTrue((ROOT/entry['source']).is_file(),entry['source'])
+            if entry['source']:
+                for path in entry['source'].split(','):
+                    path=path.strip()
+                    self.assertTrue((ROOT/path).is_file(),path)
         plan=bench.plan(Path('/tmp/render-plan-fixture'))
         self.assertEqual(len(plan['entries']),23)
         self.assertEqual(len({x['name'] for x in plan['entries']}),23)

@@ -127,8 +127,8 @@
         "RENDER_BENCH_PIE=OFF",
         "RENDER_BENCH_PIE=ON"
       ],
-      "source": "src/arch/esp32s31/raylib_lite_rgb565_pie.S",
-      "gate": "copy/fill 输出相同，固定同一硬件环境"
+      "source": "src/arch/esp32s31/raylib_lite_rgb565_pie.S, src/arch/esp32s3/raylib_lite_rgb565_pie.S",
+      "gate": "2026-10-10 S31 core：copy 37.3→20.8 µs（P95 1.79×）、fill 21.0→19.2 µs（P95 1.09×），三轮波动<1%，采集器认定每次都更快。S3 core：copy 45.1→42.6 µs（P95 1.06×，通过），fill 32.6→34.9 µs（P95 0.93×，变慢）。像素错误 0。引擎只为 S31 打开 PIE，S3 仅在 RENDER_BENCH_PIE=ON 时编译。其余内核不算 PIE 收益"
     },
     {
       "id": "memory",
@@ -244,7 +244,7 @@
     {
       "id": "primitive_alpha",
       "title": "矩形、圆、椭圆等图形原语的 alpha 混合",
-      "status": "host_tested",
+      "status": "device_tested",
       "suite": "stack",
       "variants": [
         "opaque",
@@ -255,12 +255,12 @@
         "single_blend_rounded"
       ],
       "source": "src/renderer/raylib_lite_raylib_impl.c",
-      "gate": "stack suite 覆盖图元、5x7 文字、缩放相机和矩形裁剪（Host 已通过）；板端多轮计时尚未采集"
+      "gate": "2026-10-10 stack 在 S31 与 S3 各 3 轮，像素错误 0，波动均低于 2%。Host oracle 通过，Host 计时波动超过 20%，不作为耗时结论"
     },
     {
       "id": "sprites_alpha",
       "title": "Atlas、缩放、透明与精灵",
-      "status": "host_tested",
+      "status": "device_tested",
       "suite": "stack",
       "variants": [
         "opaque_copy",
@@ -268,12 +268,12 @@
         "tint_alpha"
       ],
       "source": "src/renderer/raylib_lite_renderer.c",
-      "gate": "stack suite 覆盖不透明、2 倍最近邻与半透明贴图（Host 已通过）；带 alpha 通道纹理与图集帧查找、板端计时待补"
+      "gate": "2026-10-10 texture_opaque / texture_scale2x / texture_alpha 在 S31 与 S3 各 3 轮通过，波动低于 1%。S31 半透明中位 13.97 ms，S3 为 25.20 ms。这是 9 次贴图的内核时间，不是整帧"
     },
     {
       "id": "tilemap_layer",
       "title": "瓦片层绘制与视口裁剪",
-      "status": "host_tested",
+      "status": "device_tested",
       "suite": "stack",
       "variants": [
         "viewport_cull",
@@ -281,7 +281,7 @@
         "ram_asset"
       ],
       "source": "src/renderer/raylib_lite_tilemap.c",
-      "gate": "stack suite 用内存中的地图和贴图集逐像素验收可见瓦片（Host 已通过）；板端计时待采集"
+      "gate": "2026-10-10 tilemap_layer 在 S31（138.6 µs）与 S3（146.5 µs）各 3 轮通过，像素错误 0，波动不超过 1.2%"
     },
     {
       "id": "numeric",

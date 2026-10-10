@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <assert.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -161,6 +162,52 @@ int main(int argc,char **argv){
     (Rectangle){dx,dy,dw,dh},(Vector2){0,0},0,tint);
   assert(!memcmp(actual,expected,sizeof(actual)));
  }
+ /* Independent affine oracle: solve coordinates in the transformed quad
+  * basis at pixel centers, not the renderer's inverse-rotation formula.
+  * Includes external origins, diagonal rotations, fractional destinations,
+  * source flips, clipping, tint and nontrivial RGB565 backgrounds. */
+ Texture2D alpha_texture=raylib_lite_2d_load_texture("alpha.atlas");assert(alpha_texture.id);
+ for(int pass=0;pass<2;++pass)for(int trial=0;trial<80;++trial){
+  double angle=((trial*23+7)%360)*0.017453292519943295,cs=cos(angle),sn=sin(angle);
+  Rectangle dest={37.25f,32.75f,13.5f+trial%19,18.25f+trial%13};
+  Vector2 origin={trial%4==0?73.5f:dest.width*.5f,trial%3==0?-19.25f:dest.height*.5f};
+  Color tint={(uint8_t)(31+trial*7),(uint8_t)(63+trial*11),(uint8_t)(101+trial*13),
+              (uint8_t)(1+trial*3)};
+  bool fx=trial&1,fy=trial&2;
+  memset(actual,0x5a,sizeof(actual));memset(expected,0x5a,sizeof(expected));
+  raylib_lite_renderer_set_clip(3,2,W-8,W-5);
+  double px=dest.x-origin.x*cs+origin.y*sn,py=dest.y-origin.x*sn-origin.y*cs;
+  double ux=dest.width*cs,uy=dest.width*sn,vx=-dest.height*sn,vy=dest.height*cs;
+  double determinant=ux*vy-uy*vx;
+  for(int y=2;y<W-3;++y)for(int x=3;x<W-5;++x){
+   double rx=x+.5-px,ry=y+.5-py;
+   double u=(rx*vy-ry*vx)/determinant,v=(ux*ry-uy*rx)/determinant;
+   if(u<0||u>=1||v<0||v>=1)continue;
+   int sx=(int)(u*8),sy=(int)(v*8);
+   if(fx)sx=7-sx;
+   if(fy)sy=7-sy;
+   uint16_t src=pixel(sx,sy),dst=0x5a5a,result=0;
+   unsigned alpha=pass?((sy*8+sx)*37U)&255U:255U;
+   if(!alpha)continue;
+   unsigned shifts[3]={11,5,0},bits[3]={5,6,5},colors[3]={tint.r,tint.g,tint.b};
+   for(int c=0;c<3;++c){
+    unsigned mask=(1U<<bits[c])-1,sv=(src>>shifts[c])&mask,dv=(dst>>shifts[c])&mask;
+    unsigned ss=(sv<<(8-bits[c]))|(sv>>(2*bits[c]-8));
+    unsigned dd=(dv<<(8-bits[c]))|(dv>>(2*bits[c]-8));
+    uint64_t a=alpha*tint.a;
+    uint64_t numerator=(uint64_t)ss*colors[c]*a+(uint64_t)dd*255*(65025-a);
+    unsigned out=(unsigned)(numerator/16581375U);
+    result|=(uint16_t)((out>>(8-bits[c]))<<shifts[c]);
+   }
+   expected[y*STRIDE+x]=result;
+  }
+  raylib_lite_2d_draw_texture_pro(pass?alpha_texture:texture,(Rectangle){0,0,fx?-8:8,fy?-8:8},
+   dest,origin,(float)(trial*23+7),tint);
+  for(int k=0;k<STRIDE*W;++k)if(actual[k]!=expected[k]){
+   fprintf(stderr,"rotation trial=%d x=%d y=%d actual=%x expected=%x\n",trial,k%STRIDE,k/STRIDE,actual[k],expected[k]);abort();
+  }
+ }
+ raylib_lite_2d_unload_texture(alpha_texture);
  /* Constant-UV triangle/quad: every written pixel equals one atlas texel. */
  raylib_lite_renderer_set_clip(0,0,W,W);
  raylib_lite_rgb565_shade_lut_init();
