@@ -8,6 +8,7 @@
 #include "raylib_lite_raylib.h"
 #include "raylib_lite_2d.h"
 #include "raylib_lite_raylib_port.h"
+#include "raylib_lite_tilemap.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,13 +30,15 @@ static void *alloc(size_t n){return calloc(1,n);}
 #define H 240
 #define S 247
 #define TEX 64
-#define CASES 13
+#define CASES 17
 static const char *names[CASES]={"clear_background","rect_opaque","rect_alpha",
  "gradient_v","circle_alpha","triangle_fan_alpha","rect_pro_alpha",
  "rounded_rect_alpha","poly_alpha","line_thick","texture_opaque",
- "texture_scale2x","texture_alpha"};
+ "texture_scale2x","texture_alpha","text_bitmap","camera2d_zoom",
+ "scissor_rect","tilemap_layer"};
 static uint16_t *frame,*reference,*texels;
 static Texture2D texture;
+static raylib_lite_tilemap_t tilemap;
 
 /* Memory-backed video backend: the benchmark measures drawing, not a display. */
 static raylib_lite_result_t info(void *context,raylib_lite_video_info_t *out)
@@ -129,6 +132,75 @@ static bool poly_vertex(int index,int i,int *x,int *y)
  *x=(int)px;*y=(int)py;return true;
 }
 
+/* 5x7 debug font, copied as the independent reference for DrawText. */
+static const uint8_t DIGITS[10][7] = {
+    {14,17,19,21,25,17,14},{4,12,4,4,4,4,14},{14,17,1,2,4,8,31},
+    {30,1,1,14,1,1,30},{2,6,10,18,31,2,2},{31,16,16,30,1,1,30},
+    {14,16,16,30,17,17,14},{31,1,2,4,8,8,8},{14,17,17,14,17,17,14},
+    {14,17,17,15,1,1,14}
+};
+static const uint8_t LETTERS[26][7] = {
+    {14,17,17,31,17,17,17},{30,17,17,30,17,17,30},{14,17,16,16,16,17,14},
+    {30,17,17,17,17,17,30},{31,16,16,30,16,16,31},{31,16,16,30,16,16,16},
+    {14,17,16,23,17,17,15},{17,17,17,31,17,17,17},{14,4,4,4,4,4,14},
+    {7,2,2,2,18,18,12},{17,18,20,24,20,18,17},{16,16,16,16,16,16,31},
+    {17,27,21,21,17,17,17},{17,25,21,19,17,17,17},{14,17,17,17,17,17,14},
+    {30,17,17,30,16,16,16},{14,17,17,17,21,18,13},{30,17,17,30,20,18,17},
+    {15,16,16,14,1,1,30},{31,4,4,4,4,4,4},{17,17,17,17,17,17,14},
+    {17,17,17,17,17,10,4},{17,17,17,21,21,21,10},{17,17,10,4,10,17,17},
+    {17,17,10,4,4,4,4},{31,1,2,4,8,16,31}
+};
+static const uint8_t *bench_glyph(char ch)
+{
+    static const uint8_t slash[7]={1,2,2,4,8,8,16};
+    static const uint8_t dash[7]={0,0,0,31,0,0,0};
+    static const uint8_t colon[7]={0,4,4,0,4,4,0};
+    static const uint8_t dot[7]={0,0,0,0,0,6,6};
+    if(ch>='0'&&ch<='9') return DIGITS[ch-'0'];
+    if(ch>='A'&&ch<='Z') return LETTERS[ch-'A'];
+    if(ch>='a'&&ch<='z') return LETTERS[ch-'a'];
+    if(ch=='/') return slash;
+    if(ch=='-') return dash;
+    if(ch==':') return colon;
+    if(ch=='.') return dot;
+    return NULL;
+}
+static void oracle_text(const char *text,int x,int y,int font_size,Color color)
+{
+    int scale=font_size/8; if(scale<1)scale=1;
+    for(;*text;++text,x+=6*scale){
+        const uint8_t *rows=bench_glyph(*text); if(!rows)continue;
+        for(int yy=0;yy<7;++yy){
+            int xx=0;
+            while(xx<5){
+                while(xx<5&&!(rows[yy]&(1U<<(4-xx))))++xx;
+                int start=xx;
+                while(xx<5&&(rows[yy]&(1U<<(4-xx))))++xx;
+                for(int py=0;py<scale;++py)for(int px=0;px<(xx-start)*scale;++px)
+                    plot(x+start*scale+px,y+yy*scale+py,color);
+            }
+        }
+    }
+}
+static int oracle_measure(const char *text,int font_size)
+{
+    if(!text||!*text)return 0;
+    int scale=font_size/8; if(scale<1)scale=1;
+    return (int)strlen(text)*6*scale-scale;
+}
+/* Translation and zoom only: rectangles stay axis-aligned, which is correct
+ * for rotation 0. Rotation is intentionally not frozen here. */
+static const Camera2D BENCH_CAMERA={.offset={30,20},.target={10,5},.zoom=2};
+static void camera_rect(int x,int y,int w,int h,int *ox,int *oy,int *ow,int *oh)
+{
+    *ox=(int)(BENCH_CAMERA.offset.x+((float)x-BENCH_CAMERA.target.x)*BENCH_CAMERA.zoom);
+    *oy=(int)(BENCH_CAMERA.offset.y+((float)y-BENCH_CAMERA.target.y)*BENCH_CAMERA.zoom);
+    *ow=(int)(w*BENCH_CAMERA.zoom); *oh=(int)(h*BENCH_CAMERA.zoom);
+}
+/* Tile atlas pixels. The same formula builds the RAM asset in benchmark_assets.c. */
+static uint16_t tile_texel(int tile,int x,int y)
+{ return (uint16_t)((tile*0x2940)^(x*37+y*101)); }
+
 static void draw(int which)
 {
  switch(which){
@@ -154,6 +226,27 @@ static void draw(int which)
  case 11:DrawTexturePro(texture,(Rectangle){0,0,TEX,TEX},(Rectangle){8,8,2*TEX,2*TEX},(Vector2){0,0},0,WHITE);
   DrawTexturePro(texture,(Rectangle){0,0,TEX,TEX},(Rectangle){104,104,2*TEX,2*TEX},(Vector2){0,0},0,WHITE);break;
  case 12:for(int i=0;i<9;++i)DrawTexture(texture,8+(i%3)*76,8+(i/3)*76,(Color){255,255,255,128});break;
+ case 13:
+  DrawText("Score: 12",12,18,16,OPAQUE);
+  DrawText("a/b-c.",12,80,8,ALPHA);
+  DrawText("CLIP",220,200,16,OPAQUE);
+  break;
+ case 14:
+  BeginMode2D(BENCH_CAMERA);
+  for(int i=0;i<6;++i)DrawRectangle(10+i*18,5+i*12,14,10,i%2?ALPHA:OPAQUE);
+  EndMode2D();
+  break;
+ case 15:
+  BeginScissorMode(30,40,90,70);
+  DrawRectangle(10,20,200,180,OPAQUE);
+  DrawCircle(60,70,40,ALPHA);
+  EndScissorMode();
+  DrawRectangle(0,0,16,16,(Color){250,200,40,255});
+  break;
+ case 16:
+  raylib_lite_tilemap_draw_layer(tilemap,0,
+      (raylib_lite_renderer_rect_t){32,16,96,64},(raylib_lite_renderer_vec2_t){0,0});
+  break;
  }
 }
 
@@ -230,6 +323,27 @@ static void oracle(int which)
    for(int y=o;y<o+2*TEX&&y<H;++y)for(int x=o;x<o+2*TEX&&x<W;++x)
     reference[y*S+x]=texel((x-o)/2,(y-o)/2);
   }break;
+ case 13:
+  oracle_text("Score: 12",12,18,16,OPAQUE);
+  oracle_text("a/b-c.",12,80,8,ALPHA);
+  oracle_text("CLIP",220,200,16,OPAQUE);
+  break;
+ case 14:for(int i=0;i<6;++i){
+   int x,y,w,h;camera_rect(10+i*18,5+i*12,14,10,&x,&y,&w,&h);
+   for(int py=y;py<y+h;++py)for(int px=x;px<x+w;++px)plot(px,py,i%2?ALPHA:OPAQUE);
+  }break;
+ case 15:
+  for(int y=40;y<110;++y)for(int x=30;x<120;++x){
+   if(x>=10&&x<210&&y>=20&&y<200)plot(x,y,OPAQUE);
+   int dx=x-60,dy=y-70; if(dx*dx+dy*dy<=40*40)plot(x,y,ALPHA);
+  }
+  for(int y=0;y<16;++y)for(int x=0;x<16;++x)plot(x,y,(Color){250,200,40,255});
+  break;
+ case 16:for(int ty=1;ty<5;++ty)for(int tx=2;tx<8;++tx){
+   int id=((ty*8+tx)*3)%5; if(!id)continue;
+   for(int y=0;y<16;++y)for(int x=0;x<16;++x)
+    reference[(ty*16+y)*S+tx*16+x]=tile_texel(id-1,x,y);
+  }break;
  }
 }
 
@@ -248,6 +362,8 @@ static int fixture_init(void)
  /* Fail closed if a rotated vertex could truncate differently on device. */
  for(int i=0;i<6;++i){int v[8];if(!pro_vertices(i,v))return 3;}
  for(int k=0;k<5;++k)for(int i=0;i<=polys[k].sides;++i){int x,y;if(!poly_vertex(k,i,&x,&y))return 3;}
+ tilemap=raylib_lite_tilemap_load("bench-map");
+ if(!tilemap)return 2;
  if(raylib_lite_raylib_port_init_backend(&backend)!=RAYLIB_LITE_OK)return 2;
  InitWindow(W,H,"stack benchmark");
  return 0;
@@ -256,6 +372,8 @@ static int fixture_init(void)
 static void fixture_shutdown(void)
 {
  CloseWindow();
+ raylib_lite_tilemap_unload(tilemap);
+ tilemap=NULL;
  raylib_lite_raylib_port_deinit();
  if(texture.id)raylib_lite_2d_unload_texture(texture);
  texture=(Texture2D){0};
@@ -263,11 +381,46 @@ static void fixture_shutdown(void)
  frame=reference=texels=NULL;
 }
 
+static double median7(const double *v)
+{
+ double s[7];
+ memcpy(s,v,sizeof(s));
+ for(int i=1;i<7;++i){double x=s[i];int j=i;while(j>0&&s[j-1]>x){s[j]=s[j-1];--j;}s[j]=x;}
+ return s[3];
+}
+
+static void format_us(char *out,size_t size,double us)
+{
+ if(us>=1000.0)snprintf(out,size,"%6.2f ms",us/1000.0);
+ else snprintf(out,size,"%6.1f us",us);
+}
+
+static void print_summary(const double *median,const double *low,const double *high,
+                          const unsigned *errors,int status)
+{
+ char a[16],b[16],c[16];
+ unsigned failed=0;
+ puts("");
+ puts("渲染基准 stack：单次绘制耗时，不是帧率。上面的 JSON 行留给采集器。");
+ printf("%-24s %14s   %-12s   %-12s %8s  %s\n","用例","中位","最小","最大","波动","像素错误");
+ for(int i=0;i<CASES;++i){
+  format_us(a,sizeof(a),median[i]);
+  format_us(b,sizeof(b),low[i]);
+  format_us(c,sizeof(c),high[i]);
+  double spread=median[i]>0?(high[i]-low[i])/median[i]:0;
+  printf("%-20s %10s   %s – %s %6.1f%%  %u\n",names[i],a,b,c,spread*100,errors[i]);
+  if(errors[i])++failed;
+ }
+ printf("合计 %d 项，像素错误 %u 项，结论：%s\n",CASES,failed,status?"未通过":"通过");
+}
+
 int render_stack_benchmark(void)
 {
  int setup=fixture_init();
  if(setup){printf("STACKBENCH_SETUP {\"status\":%d}\n",setup);fixture_shutdown();return 2;}
  int status=0;
+ double median[CASES],low[CASES],high[CASES];
+ unsigned case_errors[CASES];
  for(int which=0;which<CASES;++which){
   for(int y=0;y<H;++y)for(int x=0;x<S;++x)frame[y*S+x]=reference[y*S+x]=background(x,y);
   BeginDrawing();
@@ -276,7 +429,10 @@ int render_stack_benchmark(void)
   if(raylib_lite_raylib_get_last_present_result()!=RAYLIB_LITE_OK)status=1;
   oracle(which);
   unsigned errors=0;uint32_t hash=2166136261U;
-  for(int i=0;i<S*H;++i){if(frame[i]!=reference[i])++errors;hash=(hash^frame[i])*16777619U;}
+  for(int i=0;i<S*H;++i){  if(frame[i]!=reference[i])++errors;hash=(hash^frame[i])*16777619U;}
+  if(which==13&&(MeasureText("Score: 12",16)!=oracle_measure("Score: 12",16)||
+                 MeasureText("",20)!=0||MeasureText("a/b-c.",8)!=oracle_measure("a/b-c.",8)))
+      ++errors;
   if(errors)status=1;
   double times[7];
   BeginDrawing();
@@ -294,7 +450,11 @@ int render_stack_benchmark(void)
          names[which],W*H,errors,(unsigned)hash);
   for(int r=0;r<7;++r)printf("%s%.6f",r?",":"",times[r]);
   puts("]}");
+  median[which]=median7(times);low[which]=times[0];high[which]=times[0];
+  for(int r=1;r<7;++r){if(times[r]<low[which])low[which]=times[r];if(times[r]>high[which])high[which]=times[r];}
+  case_errors[which]=errors;
  }
+ print_summary(median,low,high,case_errors,status);
  fixture_shutdown();
  return status;
 }

@@ -21,7 +21,8 @@ CORE_CASES = ('copy_rgb565','fill_rgb565','shade_rgb565','columns_rgb565',
               'quad_rgb565','quad_index8','span_mtx2','sin_direct','sin_recurrence')
 STACK_CASES = ('clear_background','rect_opaque','rect_alpha','gradient_v','circle_alpha',
                'triangle_fan_alpha','rect_pro_alpha','rounded_rect_alpha','poly_alpha',
-               'line_thick','texture_opaque','texture_scale2x','texture_alpha')
+               'line_thick','texture_opaque','texture_scale2x','texture_alpha',
+               'text_bitmap','camera2d_zoom','scissor_rect','tilemap_layer')
 STACK_PIXELS = 240*240
 
 
@@ -123,6 +124,32 @@ def summarize(logs,audit_log=None):
             'log_sha256':{str(p):sha(p) for p in paths}}
 
 
+def print_human(result):
+    """Readable summary. The JSON report remains the collected record."""
+    accepted=result['measurement_accepted']
+    device=result.get('device') or {}
+    where=device.get('chip','Host')
+    print(f"渲染基准 {result['config']['suite']}（{where}，{result['rounds']} 轮）："
+          f"{'计时稳定，可以对比' if accepted else '计时不稳定，不能当作性能结论'}")
+    print("耗时是单次调用的时间，不是帧率。")
+    def show(us):
+        return f"{us/1000:8.2f} ms" if us>=1000 else f"{us:8.1f} us"
+    print(f"{'用例':<22}{'中位':>12}{'P95':>12}{'波动':>8}  检查")
+    for name,row in result['cases'].items():
+        if 'errors' in row: check=f"像素错误 {row['errors']}"
+        elif 'max_error' in row: check=f"最大误差 {row['max_error']:.3g}"
+        else: check='画质见审计'
+        print(f"{name:<22}{show(row['p50_us']):>12}{show(row['p95_us']):>12}"
+              f"{row['relative_range']*100:7.1f}%  {check}")
+    memory=result.get('memory_observations') or []
+    if memory and 'internal_min_free' in memory[-1]:
+        last=memory[-1]
+        print(f"内存水位：内部 RAM 最低剩余 {last['internal_min_free']/1024:.1f} KB，"
+              f"PSRAM 最低剩余 {last['psram_min_free']/1024/1024:.1f} MB，"
+              f"任务栈剩余 {last['task_stack_free_bytes']} 字节。")
+        print("水位从启动算起，包含启动过程，不是本次绘制单独占用的峰值。")
+
+
 def compare(base,new,dimension):
     if base['schema']!=new['schema']:raise ValueError('report schema mismatch')
     excluded={'perspective':{'mode','fixed','bound'},'lut':{'lut_storage'},'pie':{'pie'},'implementation':set()}[dimension]
@@ -197,6 +224,7 @@ def main():
         result=summarize(args.logs,args.audit_log)
         if args.baseline:result['comparison']=compare(json.loads(args.baseline.read_text()),result,args.dimension)
         with args.output.open('x') as stream:json.dump(result,stream,indent=2,allow_nan=False);stream.write('\n')
+        print_human(result)
         return 0 if result['measurement_accepted'] else 2
     if args.rounds<3:p.error('at least 3 rounds required')
     run_lock = None
@@ -237,6 +265,7 @@ def main():
         'compiler':subprocess.check_output(['cc','--version'],text=True),
         'affinity':sorted(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else None}
     (out/'report.json').write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
+    print_human(result)
     print(json.dumps({'report':str(out/'report.json'),'measurement_accepted':result['measurement_accepted'],
                      'cases':len(result['cases']),'device':False}))
     if run_lock is not None:run_lock.close()

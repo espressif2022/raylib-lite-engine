@@ -69,14 +69,23 @@ static int run(void){
 #endif
  fflush(stdout);
  int status=RUN_BENCHMARK();
+#ifdef ESP_PLATFORM
+ unsigned internal_min=(unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+ unsigned psram_min=(unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM);
+ unsigned stack_free=(unsigned)uxTaskGetStackHighWaterMark(NULL);
+#endif
  printf("RENDERBENCH_END {\"suite\":\"%s\",\"status\":%d",SUITE,status);
 #ifdef ESP_PLATFORM
  printf(",\"internal_min_free\":%u,\"psram_min_free\":%u,\"task_stack_free_bytes\":%u",
-        (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
-        (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM),
-        (unsigned)uxTaskGetStackHighWaterMark(NULL));
+        internal_min,psram_min,stack_free);
 #endif
- puts("}");fflush(stdout);return status;
+ puts("}");
+#ifdef ESP_PLATFORM
+ printf("内存水位：内部 RAM 最低剩余 %.1f KB，PSRAM 最低剩余 %.1f MB，任务栈剩余 %u 字节。\n"
+        "水位从启动算起，包含启动过程，不是本次绘制单独占用的峰值。\n",
+        internal_min/1024.0,psram_min/1024.0/1024.0,stack_free);
+#endif
+ fflush(stdout);return status;
 }
 #ifdef ESP_PLATFORM
 void app_main(void){vTaskDelay(pdMS_TO_TICKS(1500));(void)run();}
