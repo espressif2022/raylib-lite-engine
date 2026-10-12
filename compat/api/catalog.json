@@ -1,0 +1,1203 @@
+{
+  "schema": "raylib-lite-api-catalog-1",
+  "evidence_policy": "tests and checkout_only_evidence are validated in the repository, not shipped at their original paths; staged releases validate public headers, shipped implementations and contract/status consistency. Static references do not prove runtime or external use.",
+  "modules": {
+    "action": {
+      "header": "include/raylib_lite/raylib_lite_action.h",
+      "entries": [
+        "raylib_lite_action_apply_event",
+        "raylib_lite_action_begin_frame",
+        "raylib_lite_action_contact",
+        "raylib_lite_action_contact_count",
+        "raylib_lite_action_down",
+        "raylib_lite_action_pressed",
+        "raylib_lite_action_released",
+        "raylib_lite_action_reset",
+        "raylib_lite_action_set_axis_threshold",
+        "raylib_lite_action_set_zones"
+      ],
+      "implementation": [
+        "src/input/raylib_lite_action.c"
+      ],
+      "ownership": "静态动作状态；事件与 zones 在调用时读取/复制，不拥有设备。",
+      "failure": "动作越界返回 false；超过配置容量的区域不会扩大静态存储。",
+      "cleanup": "reset 清除状态；边沿按 begin_frame 消费。",
+      "boundary": "输入映射，不承接 Board 生命周期。",
+      "tests": [
+        "tests/test_game_action.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "game",
+      "entry_roles": {}
+    },
+    "assets": {
+      "header": "include/raylib_lite/raylib_lite_assets.h",
+      "entries": [
+        "raylib_lite_asset_find",
+        "raylib_lite_asset_id",
+        "raylib_lite_asset_open",
+        "raylib_lite_asset_open_id",
+        "raylib_lite_asset_register_memory",
+        "raylib_lite_asset_release",
+        "raylib_lite_asset_stream_close",
+        "raylib_lite_asset_stream_open",
+        "raylib_lite_asset_stream_read",
+        "raylib_lite_assets_is_mounted",
+        "raylib_lite_assets_materialized_bytes",
+        "raylib_lite_assets_materialized_peak",
+        "raylib_lite_assets_mount",
+        "raylib_lite_assets_mount_backing",
+        "raylib_lite_assets_toc_bytes",
+        "raylib_lite_assets_unmount"
+      ],
+      "implementation": [
+        "src/assets/raylib_lite_assets.c",
+        "src/idf/raylib_lite_assets_mmap.c"
+      ],
+      "ownership": "直接注册数据与 backing context 为借用；open view 可持有读取缓存/租约。",
+      "failure": "加载与读写返回 result；find 可返回 NULL。",
+      "cleanup": "每个成功 open 配对 release；销毁 backing 前关闭租约并 unmount。",
+      "boundary": "资源服务，不承诺任意文件系统路径。",
+      "tests": [
+        "tests/test_game_assets.py",
+        "tests/test_renderer_core.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "game",
+      "entry_roles": {}
+    },
+    "audio": {
+      "header": "include/raylib_lite/raylib_lite_audio.h",
+      "entries": [
+        "RAYLIB_LITE_AUDIO_FORMAT_DEFAULT",
+        "raylib_lite_audio_format_default"
+      ],
+      "implementation": [
+        "include/raylib_lite/raylib_lite_audio.h"
+      ],
+      "ownership": "PCM 和 backend context 为调用者所有；format_default 返回值对象。",
+      "failure": "start 重复调用返回 INVALID_STATE；短写及 BUSY/TIMEOUT 可带进度。",
+      "cleanup": "stop 失败时 context 仍有效，成功后才允许释放。",
+      "boundary": "音频 backend 回调契约，板端输出由适配层实现。",
+      "tests": [
+        "tests/test_audio_service_lifecycle.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "audio_mixer": {
+      "header": "include/raylib_lite/raylib_lite_audio_mixer.h",
+      "entries": [
+        "RAYLIB_LITE_AUDIO_CLIP_INVALID",
+        "raylib_lite_audio_clip_invalid",
+        "raylib_lite_audio_mixer_clip_frames",
+        "raylib_lite_audio_mixer_create",
+        "raylib_lite_audio_mixer_destroy",
+        "raylib_lite_audio_mixer_get_stats",
+        "raylib_lite_audio_mixer_is_sound_playing",
+        "raylib_lite_audio_mixer_load",
+        "raylib_lite_audio_mixer_mix",
+        "raylib_lite_audio_mixer_play_music",
+        "raylib_lite_audio_mixer_play_sound",
+        "raylib_lite_audio_mixer_set_master_volume",
+        "raylib_lite_audio_mixer_set_music_clip_volume",
+        "raylib_lite_audio_mixer_set_music_volume",
+        "raylib_lite_audio_mixer_set_sound_volume",
+        "raylib_lite_audio_mixer_stop_music",
+        "raylib_lite_audio_mixer_stop_music_clip",
+        "raylib_lite_audio_mixer_stop_sound",
+        "raylib_lite_audio_mixer_unload"
+      ],
+      "implementation": [
+        "src/audio/raylib_lite_audio_mixer.c"
+      ],
+      "ownership": "配置借用音频 backend；已加载声音/音乐使用 mixer 句柄管理。",
+      "failure": "result 或无效句柄报告加载/播放失败；详见各入口签名。",
+      "cleanup": "卸载声音/音乐，等待服务停机后 deinit，不抢先释放 backend context。",
+      "boundary": "混音/解码服务与设备输出分离。",
+      "tests": [
+        "tests/test_audio_mixer.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "low_level",
+      "entry_roles": {}
+    },
+    "clock": {
+      "header": "include/raylib_lite/raylib_lite_clock.h",
+      "entries": [
+        "raylib_lite_time_us"
+      ],
+      "implementation": [
+        "src/idf/clock_esp.c",
+        "host/host_clock.c"
+      ],
+      "ownership": "clock context 借用；time_us 不返回拥有资源。",
+      "failure": "无 result；适配器提供单调时间，不能替代确定性游戏时间。",
+      "cleanup": "调用者等待 runner 退出后释放 clock context。",
+      "boundary": "平台时钟与 GetTime 逻辑时间职责不同。",
+      "tests": [
+        "tests/test_runner.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "compat.2d": {
+      "header": "compat/raylib/include/raylib_lite_2d.h",
+      "entries": [
+        "raylib_lite_2d_cache_texture_light",
+        "raylib_lite_2d_draw_column",
+        "raylib_lite_2d_draw_floor_row",
+        "raylib_lite_2d_draw_floor_rows",
+        "raylib_lite_2d_draw_raycast_walls",
+        "raylib_lite_2d_draw_span",
+        "raylib_lite_2d_draw_texture_pro",
+        "raylib_lite_2d_draw_textured_quad",
+        "raylib_lite_2d_draw_textured_triangle",
+        "raylib_lite_2d_draw_tile_row",
+        "raylib_lite_2d_load_texture",
+        "raylib_lite_2d_register_rgb565",
+        "raylib_lite_2d_to_renderer_color",
+        "raylib_lite_2d_to_renderer_rect",
+        "raylib_lite_2d_to_renderer_texture",
+        "raylib_lite_2d_to_renderer_vec2",
+        "raylib_lite_2d_unload_texture",
+        "raylib_lite_atlas_get_frame",
+        "raylib_lite_atlas_get_frame_copy",
+        "raylib_lite_atlas_load",
+        "raylib_lite_atlas_unload",
+        "raylib_lite_wall_atlas_get_frame"
+      ],
+      "implementation": [
+        "compat/raylib/include/raylib_lite_2d.h",
+        "src/renderer/raylib_lite_renderer.c"
+      ],
+      "ownership": "转换返回值对象；纹理句柄和缓冲区所有权转交中性 renderer 契约。",
+      "failure": "转换/inline wrapper 无独立失败返回；draw/load 沿用 renderer。",
+      "cleanup": "load/unload 配对，借用注册内存绘制期间有效。",
+      "boundary": "Raylib-shaped 旧 facade；迁移目标为同名能力的中性 renderer。",
+      "tests": [
+        "tests/test_columns.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "compatibility",
+      "entry_roles": {}
+    },
+    "compat.game_audio": {
+      "header": "compat/raylib/include/raylib_lite_game_audio.h",
+      "entries": [
+        "raylib_lite_game_audio_close",
+        "raylib_lite_game_audio_get_stats",
+        "raylib_lite_game_audio_init",
+        "raylib_lite_game_audio_is_sound_playing",
+        "raylib_lite_game_audio_load_music",
+        "raylib_lite_game_audio_load_sound",
+        "raylib_lite_game_audio_play_music",
+        "raylib_lite_game_audio_play_sound",
+        "raylib_lite_game_audio_ready",
+        "raylib_lite_game_audio_set_master_volume",
+        "raylib_lite_game_audio_set_music_volume",
+        "raylib_lite_game_audio_set_sound_volume",
+        "raylib_lite_game_audio_stop_music",
+        "raylib_lite_game_audio_stop_sound",
+        "raylib_lite_game_audio_unload_music",
+        "raylib_lite_game_audio_unload_sound",
+        "raylib_lite_game_audio_update_music"
+      ],
+      "implementation": [
+        "examples/common_components/examples_audio/game_audio.c"
+      ],
+      "ownership": "示例音频服务拥有加载句柄；后端与 worker 由 launcher 管理。",
+      "failure": "无效 Sound/Music 或 ready/playing 查询反映状态，void 调用无错误传播。",
+      "cleanup": "卸载句柄并关闭服务；UpdateMusicStream 空操作，混音器自己推流。",
+      "boundary": "示例音频桥，不是上游音频文件系统实现。",
+      "tests": [
+        "tests/test_audio_facade.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "compatibility",
+      "entry_roles": {}
+    },
+    "compat.raylib": {
+      "header": "compat/raylib/include/raylib_lite_raylib.h",
+      "entries": [
+        "BeginDrawing",
+        "BeginMode2D",
+        "BeginScissorMode",
+        "CheckCollisionCircleRec",
+        "CheckCollisionCircles",
+        "CheckCollisionPointCircle",
+        "CheckCollisionPointRec",
+        "CheckCollisionPointTriangle",
+        "CheckCollisionRecs",
+        "ClearBackground",
+        "CloseWindow",
+        "ColorAlpha",
+        "ColorBrightness",
+        "ColorTint",
+        "DrawCircle",
+        "DrawCircleLines",
+        "DrawCircleLinesV",
+        "DrawCircleV",
+        "DrawEllipse",
+        "DrawEllipseLines",
+        "DrawEllipseLinesV",
+        "DrawEllipseV",
+        "DrawLine",
+        "DrawLineDashed",
+        "DrawLineEx",
+        "DrawLineStrip",
+        "DrawLineV",
+        "DrawPixel",
+        "DrawPixelV",
+        "DrawPoly",
+        "DrawPolyLines",
+        "DrawPolyLinesEx",
+        "DrawRectangle",
+        "DrawRectangleGradientH",
+        "DrawRectangleGradientV",
+        "DrawRectangleLines",
+        "DrawRectangleLinesEx",
+        "DrawRectanglePro",
+        "DrawRectangleRec",
+        "DrawRectangleRounded",
+        "DrawRectangleRoundedLines",
+        "DrawRectangleV",
+        "DrawText",
+        "DrawTexture",
+        "DrawTextureEx",
+        "DrawTexturePro",
+        "DrawTextureRec",
+        "DrawTextureV",
+        "DrawTriangle",
+        "DrawTriangleFan",
+        "DrawTriangleLines",
+        "DrawTriangleStrip",
+        "EndDrawing",
+        "EndMode2D",
+        "EndScissorMode",
+        "Fade",
+        "GetCollisionRec",
+        "GetFPS",
+        "GetFrameTime",
+        "GetMousePosition",
+        "GetMouseX",
+        "GetMouseY",
+        "GetRenderHeight",
+        "GetRenderWidth",
+        "GetScreenHeight",
+        "GetScreenToWorld2D",
+        "GetScreenWidth",
+        "GetTime",
+        "GetTouchPointCount",
+        "GetTouchPointId",
+        "GetTouchPosition",
+        "GetTouchX",
+        "GetTouchY",
+        "GetWorldToScreen2D",
+        "InitWindow",
+        "IsKeyDown",
+        "IsKeyPressed",
+        "IsKeyReleased",
+        "IsKeyUp",
+        "IsMouseButtonDown",
+        "IsMouseButtonPressed",
+        "IsMouseButtonReleased",
+        "IsMouseButtonUp",
+        "IsWindowReady",
+        "LoadTexture",
+        "MeasureText",
+        "SetTargetFPS",
+        "TextFormat",
+        "UnloadTexture",
+        "WindowShouldClose"
+      ],
+      "implementation": [
+        "compat/raylib/include/raylib_lite_raylib.h",
+        "src/renderer/raylib_lite_raylib_impl.c"
+      ],
+      "ownership": "宏映射到兼容 runtime；帧属于 backend，纹理为自有资源句柄。",
+      "failure": "冻结名称状态沿用 raylib-compat 文档；不承诺所有原生行为。",
+      "cleanup": "Begin/EndDrawing 配对；EndDrawing 清理相机与裁剪，load/unload 配对。",
+      "boundary": "105 个冻结映射中的图形部分，不增加或删除名称。",
+      "tests": [
+        "tests/test_raylib_compat_policy.py",
+        "tests/test_raylib_compat_semantics.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "compatibility",
+      "entry_roles": {}
+    },
+    "compat.raylib_audio": {
+      "header": "compat/raylib/include/raylib_lite_raylib_audio.h",
+      "entries": [
+        "CloseAudioDevice",
+        "InitAudioDevice",
+        "IsAudioDeviceReady",
+        "IsSoundPlaying",
+        "LoadMusicStream",
+        "LoadSound",
+        "PlayMusicStream",
+        "PlaySound",
+        "SetMusicVolume",
+        "SetSoundVolume",
+        "StopMusicStream",
+        "StopSound",
+        "UnloadMusicStream",
+        "UnloadSound",
+        "UpdateMusicStream"
+      ],
+      "implementation": [
+        "compat/raylib/include/raylib_lite_raylib_audio.h",
+        "examples/common_components/examples_audio/game_audio.c"
+      ],
+      "ownership": "宏映射到示例 game_audio 服务。",
+      "failure": "沿用 game_audio 与既有兼容状态。",
+      "cleanup": "load/unload 与 Init/CloseAudioDevice 配对；worker 清理由 launcher 管理。",
+      "boundary": "冻结音频映射，不能交给上游音频句柄。",
+      "tests": [
+        "tests/test_audio_facade.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "compatibility",
+      "entry_roles": {}
+    },
+    "compat.raylib_impl": {
+      "header": "compat/raylib/include/raylib_lite_raylib_impl.h",
+      "entries": [
+        "raylib_lite_raylib_attach_runtime",
+        "raylib_lite_raylib_begin_drawing",
+        "raylib_lite_raylib_begin_mode2_d",
+        "raylib_lite_raylib_begin_scissor_mode",
+        "raylib_lite_raylib_check_collision_circle_rec",
+        "raylib_lite_raylib_check_collision_circles",
+        "raylib_lite_raylib_check_collision_point_circle",
+        "raylib_lite_raylib_check_collision_point_rec",
+        "raylib_lite_raylib_check_collision_point_triangle",
+        "raylib_lite_raylib_check_collision_recs",
+        "raylib_lite_raylib_clear_background",
+        "raylib_lite_raylib_close_window",
+        "raylib_lite_raylib_color_alpha",
+        "raylib_lite_raylib_color_brightness",
+        "raylib_lite_raylib_color_tint",
+        "raylib_lite_raylib_consume_input_edges",
+        "raylib_lite_raylib_detach_runtime",
+        "raylib_lite_raylib_draw_circle",
+        "raylib_lite_raylib_draw_circle_lines",
+        "raylib_lite_raylib_draw_circle_lines_v",
+        "raylib_lite_raylib_draw_circle_v",
+        "raylib_lite_raylib_draw_ellipse",
+        "raylib_lite_raylib_draw_ellipse_lines",
+        "raylib_lite_raylib_draw_ellipse_lines_v",
+        "raylib_lite_raylib_draw_ellipse_v",
+        "raylib_lite_raylib_draw_line",
+        "raylib_lite_raylib_draw_line_dashed",
+        "raylib_lite_raylib_draw_line_ex",
+        "raylib_lite_raylib_draw_line_strip",
+        "raylib_lite_raylib_draw_line_v",
+        "raylib_lite_raylib_draw_pixel",
+        "raylib_lite_raylib_draw_pixel_v",
+        "raylib_lite_raylib_draw_poly",
+        "raylib_lite_raylib_draw_poly_lines",
+        "raylib_lite_raylib_draw_poly_lines_ex",
+        "raylib_lite_raylib_draw_rectangle",
+        "raylib_lite_raylib_draw_rectangle_gradient_h",
+        "raylib_lite_raylib_draw_rectangle_gradient_v",
+        "raylib_lite_raylib_draw_rectangle_lines",
+        "raylib_lite_raylib_draw_rectangle_lines_ex",
+        "raylib_lite_raylib_draw_rectangle_pro",
+        "raylib_lite_raylib_draw_rectangle_rec",
+        "raylib_lite_raylib_draw_rectangle_rounded",
+        "raylib_lite_raylib_draw_rectangle_rounded_lines",
+        "raylib_lite_raylib_draw_rectangle_v",
+        "raylib_lite_raylib_draw_text",
+        "raylib_lite_raylib_draw_texture",
+        "raylib_lite_raylib_draw_texture_ex",
+        "raylib_lite_raylib_draw_texture_pro",
+        "raylib_lite_raylib_draw_texture_rec",
+        "raylib_lite_raylib_draw_texture_v",
+        "raylib_lite_raylib_draw_triangle",
+        "raylib_lite_raylib_draw_triangle_fan",
+        "raylib_lite_raylib_draw_triangle_lines",
+        "raylib_lite_raylib_draw_triangle_strip",
+        "raylib_lite_raylib_end_drawing",
+        "raylib_lite_raylib_end_logic_tick",
+        "raylib_lite_raylib_end_mode2_d",
+        "raylib_lite_raylib_end_scissor_mode",
+        "raylib_lite_raylib_fade",
+        "raylib_lite_raylib_frame_available",
+        "raylib_lite_raylib_get_collision_rec",
+        "raylib_lite_raylib_get_fps",
+        "raylib_lite_raylib_get_frame_time",
+        "raylib_lite_raylib_get_framebuffer",
+        "raylib_lite_raylib_get_imu_acceleration",
+        "raylib_lite_raylib_get_last_acquire_result",
+        "raylib_lite_raylib_get_last_present_result",
+        "raylib_lite_raylib_get_mouse_position",
+        "raylib_lite_raylib_get_mouse_x",
+        "raylib_lite_raylib_get_mouse_y",
+        "raylib_lite_raylib_get_render_height",
+        "raylib_lite_raylib_get_render_width",
+        "raylib_lite_raylib_get_screen_height",
+        "raylib_lite_raylib_get_screen_to_world2_d",
+        "raylib_lite_raylib_get_screen_width",
+        "raylib_lite_raylib_get_target_fps",
+        "raylib_lite_raylib_get_time",
+        "raylib_lite_raylib_get_touch_point_count",
+        "raylib_lite_raylib_get_touch_point_id",
+        "raylib_lite_raylib_get_touch_position",
+        "raylib_lite_raylib_get_touch_x",
+        "raylib_lite_raylib_get_touch_y",
+        "raylib_lite_raylib_get_world_to_screen2_d",
+        "raylib_lite_raylib_init_window",
+        "raylib_lite_raylib_inject_action",
+        "raylib_lite_raylib_inject_imu",
+        "raylib_lite_raylib_inject_key",
+        "raylib_lite_raylib_inject_pointer",
+        "raylib_lite_raylib_is_key_down",
+        "raylib_lite_raylib_is_key_pressed",
+        "raylib_lite_raylib_is_key_released",
+        "raylib_lite_raylib_is_key_up",
+        "raylib_lite_raylib_is_mouse_button_down",
+        "raylib_lite_raylib_is_mouse_button_pressed",
+        "raylib_lite_raylib_is_mouse_button_released",
+        "raylib_lite_raylib_is_mouse_button_up",
+        "raylib_lite_raylib_is_window_ready",
+        "raylib_lite_raylib_load_texture",
+        "raylib_lite_raylib_measure_text",
+        "raylib_lite_raylib_set_target_fps",
+        "raylib_lite_raylib_text_format",
+        "raylib_lite_raylib_text_format_v",
+        "raylib_lite_raylib_unload_texture",
+        "raylib_lite_raylib_window_should_close"
+      ],
+      "implementation": [
+        "src/renderer/raylib_lite_raylib_impl.c"
+      ],
+      "ownership": "静态兼容状态；帧缓冲借用至 EndDrawing。",
+      "failure": "acquire/present 可查询 result；绘图 void 入口依赖帧可用。",
+      "cleanup": "EndDrawing 清理裁剪、相机与 target，卸载资源句柄。",
+      "boundary": "兼容实现入口，相机和坐标截断不下沉私有光栅。",
+      "tests": [
+        "tests/test_raylib_compat_semantics.py",
+        "tests/test_compat_text.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "compatibility",
+      "entry_roles": {}
+    },
+    "debug": {
+      "header": "include/raylib_lite/raylib_lite_debug.h",
+      "entries": [
+        "raylib_lite_debug_log"
+      ],
+      "implementation": [
+        "src/runtime/raylib_lite_debug.c"
+      ],
+      "ownership": "tag 字符串调用时借用。",
+      "failure": "void 日志入口，不提供持久化成功反馈。",
+      "cleanup": "无需逐调用释放。",
+      "boundary": "日志适配入口，不由游戏持有平台日志设备。",
+      "tests": [
+        "tests/test_platform_dependency_boundaries.py"
+      ],
+      "test_gaps": "当前关联仅为结构/依赖边界检查；缺少此模块完整行为和设备生命周期验证。",
+      "usage_role": "game",
+      "entry_roles": {}
+    },
+    "fx": {
+      "header": "include/raylib_lite/raylib_lite_fx.h",
+      "entries": [
+        "raylib_lite_ease",
+        "raylib_lite_particle_pool_init",
+        "raylib_lite_particle_pool_update",
+        "raylib_lite_particle_spawn",
+        "raylib_lite_tween_start",
+        "raylib_lite_tween_tick"
+      ],
+      "implementation": [
+        "src/fx/raylib_lite_fx.c"
+      ],
+      "ownership": "tween、particle pool 和 items 存储均由调用者拥有。",
+      "failure": "空指针与容量限制按实现处理；spawn 可返回 NULL。",
+      "cleanup": "停止更新后由调用者释放池与 items。",
+      "boundary": "模型效果辅助，无设备与绘图所有权。",
+      "tests": [
+        "tests/test_platform_dependency_boundaries.py"
+      ],
+      "test_gaps": "当前关联仅为结构/依赖边界检查；缺少此模块完整行为和设备生命周期验证。",
+      "usage_role": "game",
+      "entry_roles": {}
+    },
+    "game_app": {
+      "header": "include/raylib_lite/raylib_lite_game_app.h",
+      "entries": [
+        "raylib_lite_game_app_run"
+      ],
+      "implementation": [
+        "src/runtime/raylib_lite_game_app.c"
+      ],
+      "ownership": "复制/借用 app 回调配置；平台与 input context 由 launcher 管理。",
+      "failure": "返回 result；on_start 进入后即使失败仍执行一次 on_stop。",
+      "cleanup": "首帧接受并 flush 后才回调 on_first_present；launcher 执行平台 teardown。",
+      "boundary": "共享游戏生命周期，不创建 Board 或 worker。",
+      "tests": [
+        "tests/test_game_app_first_frame.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "input": {
+      "header": "include/raylib_lite/raylib_lite_input.h",
+      "entries": [
+        "raylib_lite_input_count",
+        "raylib_lite_input_dropped",
+        "raylib_lite_input_poll",
+        "raylib_lite_input_push",
+        "raylib_lite_input_queue_deinit",
+        "raylib_lite_input_queue_init",
+        "raylib_lite_input_queue_reset"
+      ],
+      "implementation": [
+        "src/runner/raylib_lite_input_queue.c"
+      ],
+      "ownership": "FIFO、events 和 sync context 均由调用者拥有；不分配。",
+      "failure": "init 不允许半个锁回调；满队列返回 BUSY 且累加丢弃计数。",
+      "cleanup": "reset/deinit/释放前停止并 join 所有调用者；对象不可复制。",
+      "boundary": "同步策略注入，游戏模型不依赖 FreeRTOS。",
+      "tests": [
+        "tests/test_runner.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "mtx2": {
+      "header": "include/raylib_lite/raylib_lite_mtx2.h",
+      "entries": [
+        "raylib_lite_mtx2_blit",
+        "raylib_lite_mtx2_decode_block_row",
+        "raylib_lite_mtx2_open",
+        "raylib_lite_mtx2_palette",
+        "raylib_lite_mtx2_span",
+        "raylib_lite_mtx2_span_constv"
+      ],
+      "implementation": [
+        "src/renderer/raylib_lite_mtx2.c"
+      ],
+      "ownership": "压缩块、纹理与输出 palette/dst 均借用；open 输出 view。",
+      "failure": "open 对短/坏 payload 返回 false；低层 span/blit 依赖合法边界。",
+      "cleanup": "借用数据在采样期间有效；无需 close。",
+      "boundary": "压缩采样低层 API，需审查是否应留在公共头。",
+      "tests": [
+        "tests/test_mtx2.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "review",
+      "entry_roles": {}
+    },
+    "native_services": {
+      "header": "include/raylib_lite/raylib_lite_native_services.h",
+      "entries": [
+        "raylib_lite_native_services_get"
+      ],
+      "implementation": [
+        "examples/common_components/examples_common/native_module_main.c"
+      ],
+      "ownership": "services 返回 launcher 管理的服务对象；游戏不拥有 backend。",
+      "failure": "缺省服务是否可用由所选 launcher 契约决定。",
+      "cleanup": "launcher 退出后不得持有 services/context。",
+      "boundary": "native launcher 专用扩展，不能仅因游戏无直接调用而删除。",
+      "tests": [
+        "tests/test_platform_dependency_boundaries.py"
+      ],
+      "test_gaps": "当前关联仅为结构/依赖边界检查；缺少此模块完整行为和设备生命周期验证。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "platform": {
+      "header": "include/raylib_lite/raylib_lite_platform.h",
+      "entries": [],
+      "implementation": [
+        "include/raylib_lite/raylib_lite_platform.h"
+      ],
+      "ownership": "platform 聚合借用 video/audio/clock backend 和 context。",
+      "failure": "回调沿用各子服务的 result 语义。",
+      "cleanup": "launcher 管理构造、flush、停机和释放。",
+      "boundary": "纯类型契约，不包含独立函数入口。",
+      "tests": [
+        "tests/test_runner.py",
+        "tests/test_game_app_first_frame.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "raylib_port": {
+      "header": "include/raylib_lite/raylib_lite_raylib_port.h",
+      "entries": [
+        "raylib_lite_raylib_port_begin_frame",
+        "raylib_lite_raylib_port_copy_latest",
+        "raylib_lite_raylib_port_deinit",
+        "raylib_lite_raylib_port_discard_frame",
+        "raylib_lite_raylib_port_flush",
+        "raylib_lite_raylib_port_get_dimensions",
+        "raylib_lite_raylib_port_in_flight_frames",
+        "raylib_lite_raylib_port_init_backend",
+        "raylib_lite_raylib_port_last_acquire_result",
+        "raylib_lite_raylib_port_last_acquire_us",
+        "raylib_lite_raylib_port_last_present_result",
+        "raylib_lite_raylib_port_last_present_us",
+        "raylib_lite_raylib_port_now_us",
+        "raylib_lite_raylib_port_present_frame",
+        "raylib_lite_raylib_port_set_clock"
+      ],
+      "implementation": [
+        "src/runtime/raylib_lite_raylib_port.c"
+      ],
+      "ownership": "借用 video backend；同时最多持有一个后端拥有的 frame。",
+      "failure": "acquire/present/flush 返回 result；结果与耗时查询不改变资源所有权。",
+      "cleanup": "present/discard 消费 frame；flush 后才能安全 deinit backend。",
+      "boundary": "兼容运行时的 backend 适配。",
+      "tests": [
+        "tests/test_raylib_lite_video_port.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "rcore": {
+      "header": "include/raylib_lite/raylib_lite_rcore.h",
+      "entries": [
+        "raylib_lite_rcore_configure",
+        "raylib_lite_rcore_flush",
+        "raylib_lite_rcore_last_acquire_result",
+        "raylib_lite_rcore_last_present_result"
+      ],
+      "implementation": [
+        "src/rcore/raylib_lite_rcore.c"
+      ],
+      "ownership": "configure 复制配置；video/clock/input/context 生命周期由调用者保证。",
+      "failure": "configure 返回 result；present BUSY/错误丢当前帧。",
+      "cleanup": "CloseWindow 后再换配置；flush 后释放后台显示资源。",
+      "boundary": "上游 rcore 平台路径，不能与兼容纹理句柄混用。",
+      "tests": [
+        "tests/test_rcore_platform.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "renderer": {
+      "header": "include/raylib_lite/raylib_lite_renderer.h",
+      "entries": [],
+      "implementation": [
+        "include/raylib_lite/raylib_lite_renderer.h"
+      ],
+      "ownership": "target、注册纹理内存借用；load 资源句柄持有 view/槽位。",
+      "failure": "load 返回空句柄；坏 draw 静默拒绝并按契约统计；借用指针真实长度无法检查。",
+      "cleanup": "unload 释放句柄/view；绘制期间保持 target、纹理、LUT 和列数组有效。",
+      "boundary": "旧聚合头；重新导出 draw/stats/benchmark 三份契约，没有重复独立声明。新代码按用途选窄头。",
+      "tests": [
+        "tests/test_renderer_headers.py",
+        "tests/test_renderer_core.py",
+        "tests/test_columns.py"
+      ],
+      "test_gaps": "聚合头 C/C++ 编译及原消费者回归验证，不作为独立的新能力。",
+      "usage_role": "game",
+      "entry_roles": {}
+    },
+    "renderer_benchmark": {
+      "header": "include/raylib_lite/raylib_lite_renderer_benchmark.h",
+      "entries": [
+        "raylib_lite_renderer_run_benchmark"
+      ],
+      "implementation": [
+        "src/renderer/raylib_lite_raster_bench.c"
+      ],
+      "ownership": "诊断入口在启用配置时建立临时绘制目标/数据；不能在实时绘制帧中调用。",
+      "failure": "void 入口；禁用配置为空操作，不是有效测量结果；启用时错误通过日志报告。",
+      "cleanup": "基准实现清理临时目标/缓冲；不代替应用的 Board 或 worker 生命周期。",
+      "boundary": "独立基准头，声明不等于当前构建启用基准。",
+      "tests": [
+        "tests/test_renderer_headers.py",
+        "tests/test_render_benchmark.py"
+      ],
+      "test_gaps": "验证声明隔离与 C/C++ ABI；本批未运行设备诊断入口或报告性能。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "renderer_draw": {
+      "header": "include/raylib_lite/raylib_lite_renderer_draw.h",
+      "entries": [
+        "raylib_lite_2d_copy_scanline",
+        "raylib_lite_2d_draw_indexed_raycast_walls",
+        "raylib_lite_2d_draw_indexed_textured_quad",
+        "raylib_lite_2d_draw_indexed_textured_triangle",
+        "raylib_lite_2d_draw_solid_raycast_walls",
+        "raylib_lite_animation_frame_at",
+        "raylib_lite_renderer_atlas_get_frame",
+        "raylib_lite_renderer_atlas_get_frame_copy",
+        "raylib_lite_renderer_cache_texture_light",
+        "raylib_lite_renderer_draw_column",
+        "raylib_lite_renderer_draw_floor_row",
+        "raylib_lite_renderer_draw_floor_rows",
+        "raylib_lite_renderer_draw_raycast_walls",
+        "raylib_lite_renderer_draw_span",
+        "raylib_lite_renderer_draw_texture_pro",
+        "raylib_lite_renderer_draw_textured_quad",
+        "raylib_lite_renderer_draw_textured_triangle",
+        "raylib_lite_renderer_draw_tile_row",
+        "raylib_lite_renderer_load_atlas",
+        "raylib_lite_renderer_load_texture",
+        "raylib_lite_renderer_register_rgb565",
+        "raylib_lite_renderer_set_clip",
+        "raylib_lite_renderer_set_target",
+        "raylib_lite_renderer_unload_atlas",
+        "raylib_lite_renderer_unload_texture",
+        "raylib_lite_renderer_wall_atlas_get_frame",
+        "raylib_lite_wall_atlas_load",
+        "raylib_lite_wall_atlas_unload"
+      ],
+      "implementation": [
+        "src/renderer/raylib_lite_renderer.c"
+      ],
+      "ownership": "target、注册纹理内存借用；load 资源句柄持有 view/槽位。",
+      "failure": "load 返回空句柄；坏 draw 静默拒绝并按契约统计；借用指针真实长度无法检查。",
+      "cleanup": "unload 释放句柄/view；绘制期间保持 target、纹理、LUT 和列数组有效。",
+      "boundary": "中性绘制/资源契约；没有统计或 benchmark 依赖；保留历史 2d 名称，不自动应用相机。",
+      "tests": [
+        "tests/test_renderer_headers.py",
+        "tests/test_renderer_core.py",
+        "tests/test_columns.py",
+        "tests/test_primitives.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "game",
+      "entry_roles": {
+        "raylib_lite_renderer_set_target": "integration"
+      }
+    },
+    "renderer_stats": {
+      "header": "include/raylib_lite/raylib_lite_renderer_stats.h",
+      "entries": [
+        "raylib_lite_renderer_get_raster_stats",
+        "raylib_lite_renderer_get_rejected_draw_calls",
+        "raylib_lite_renderer_note_primitives",
+        "raylib_lite_renderer_reset_raster_stats",
+        "raylib_lite_renderer_set_phase_us"
+      ],
+      "implementation": [
+        "src/renderer/raylib_lite_renderer.c"
+      ],
+      "ownership": "进程内光栅统计；get 按值复制快照，不拥有帧缓冲或设备。",
+      "failure": "void 记账/查询不提供事务型并发快照；所有调用与绘制串行。",
+      "cleanup": "reset 清空光栅和拒绝计数；没有资源释放动作。",
+      "boundary": "统计集成专用头；保留结构布局、签名和五个历史 phase 字段。",
+      "tests": [
+        "tests/test_renderer_headers.py",
+        "tests/test_renderer_core.py",
+        "tests/test_columns.py",
+        "tests/test_primitives.py"
+      ],
+      "test_gaps": "ABI 大小/偏移、C/C++ 联接和已有统计行为验证；没有新的并发/设备保证。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "result": {
+      "header": "include/raylib_lite/raylib_lite_result.h",
+      "entries": [],
+      "implementation": [
+        "include/raylib_lite/raylib_lite_result.h"
+      ],
+      "ownership": "枚举和 WAIT_FOREVER 常量为值，不持有资源。",
+      "failure": "列举 result 语义，不包含函数入口。",
+      "cleanup": "无需释放。",
+      "boundary": "共享错误与等待语义。",
+      "tests": [
+        "tests/test_raylib_lite_video_port.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "rgb565": {
+      "header": "include/raylib_lite/raylib_lite_rgb565.h",
+      "entries": [
+        "raylib_lite_rgb565_copy",
+        "raylib_lite_rgb565_fill",
+        "raylib_lite_rgb565_shade",
+        "raylib_lite_rgb565_shade_lut_init",
+        "raylib_lite_rgb565_shade_pixel"
+      ],
+      "implementation": [
+        "src/renderer/raylib_lite_rgb565.c"
+      ],
+      "ownership": "dst/src 存储均由调用者提供。",
+      "failure": "低层 void 操作要求合法长度和缓冲区，不做分配边界检查。",
+      "cleanup": "无需释放；不得在拷贝/填充时失效。",
+      "boundary": "CPU/PIE 搬运辅助，板端快速路径验收独立于 Host。",
+      "tests": [
+        "tests/test_rgb565.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "low_level",
+      "entry_roles": {}
+    },
+    "runner": {
+      "header": "include/raylib_lite/raylib_lite_runner.h",
+      "entries": [
+        "raylib_lite_runner_run"
+      ],
+      "implementation": [
+        "src/runner/raylib_lite_runner.c"
+      ],
+      "ownership": "config、clock 与 user context 借用，在调用线程运行。",
+      "failure": "返回 result；超预算时丢弃旧整 tick，保留余量。",
+      "cleanup": "返回后才释放 context；线程 placement 与 join 为 launcher 职责。",
+      "boundary": "确定性调度与 worker 创建分离。",
+      "tests": [
+        "tests/test_runner.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "runtime_stats": {
+      "header": "include/raylib_lite/raylib_lite_runtime_stats.h",
+      "entries": [
+        "raylib_lite_runtime_stats_get",
+        "raylib_lite_runtime_stats_record_display_failure",
+        "raylib_lite_runtime_stats_record_display_release",
+        "raylib_lite_runtime_stats_record_frame",
+        "raylib_lite_runtime_stats_record_logic",
+        "raylib_lite_runtime_stats_record_queue_overflow",
+        "raylib_lite_runtime_stats_record_render",
+        "raylib_lite_runtime_stats_record_superseded",
+        "raylib_lite_runtime_stats_record_timing",
+        "raylib_lite_runtime_stats_reset",
+        "raylib_lite_runtime_stats_set_queue_overflows"
+      ],
+      "implementation": [
+        "src/runner/raylib_lite_runtime_stats.c"
+      ],
+      "ownership": "进程内原子统计；get 复制快照。",
+      "failure": "void 记录；无事务型多字段一致快照保证。",
+      "cleanup": "reset 用于测量窗口，不释放资源。",
+      "boundary": "帧接受、显示释放与逻辑更新分别记录。",
+      "tests": [
+        "tests/test_runtime_stats.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "save": {
+      "header": "include/raylib_lite/raylib_lite_save.h",
+      "entries": [
+        "raylib_lite_save_flush",
+        "raylib_lite_save_init",
+        "raylib_lite_save_load",
+        "raylib_lite_save_nvs_storage",
+        "raylib_lite_save_request"
+      ],
+      "implementation": [
+        "src/save/raylib_lite_save.c",
+        "src/idf/raylib_lite_save_nvs.c"
+      ],
+      "ownership": "对象拥有 pending payload；storage、namespace/key 与回调 context 借用。",
+      "failure": "init/load/request/flush 返回 result；失败不得视为已持久化。",
+      "cleanup": "退出前 force flush，成功或明确处理失败后再释放 storage context。",
+      "boundary": "便携 save 核心与 NVS backend 分离。",
+      "tests": [
+        "tests/test_game_save.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "game",
+      "entry_roles": {}
+    },
+    "scene": {
+      "header": "include/raylib_lite/raylib_lite_scene.h",
+      "entries": [
+        "raylib_lite_scene_event",
+        "raylib_lite_scene_pop",
+        "raylib_lite_scene_push",
+        "raylib_lite_scene_render",
+        "raylib_lite_scene_replace",
+        "raylib_lite_scene_stack_init",
+        "raylib_lite_scene_update"
+      ],
+      "implementation": [
+        "src/scene/raylib_lite_scene.c"
+      ],
+      "ownership": "固定容量栈借用 scene 回调表与 context。",
+      "failure": "push/pop/replace/event 返回 bool；空栈与满栈按入口处理。",
+      "cleanup": "pop/replace 回调 exit；所有借用 context 在场景退出前有效。",
+      "boundary": "通用场景栈与游戏自有场景切换可能重复，需先证明替代生命周期。",
+      "tests": [
+        "tests/test_scene_ui_behavior.py",
+        "tests/test_scene_behavior.c",
+        "tests/test_platform_dependency_boundaries.py"
+      ],
+      "test_gaps": "已验证回调顺序、栈顶输入/更新、栈底到栈顶绘制、容量失败原子性、退出/恢复和空回调；尚未验证回调重入或真实游戏迁移。",
+      "usage_role": "review",
+      "entry_roles": {}
+    },
+    "tilemap": {
+      "header": "include/raylib_lite/raylib_lite_tilemap.h",
+      "entries": [
+        "raylib_lite_tilemap_draw_layer",
+        "raylib_lite_tilemap_find_object",
+        "raylib_lite_tilemap_is_blocked",
+        "raylib_lite_tilemap_load",
+        "raylib_lite_tilemap_object_at",
+        "raylib_lite_tilemap_path_points",
+        "raylib_lite_tilemap_unload"
+      ],
+      "implementation": [
+        "src/renderer/raylib_lite_tilemap.c"
+      ],
+      "ownership": "load 句柄拥有资源 view/解析存储；返回的 path points 为 map 借用。",
+      "failure": "load 返回 NULL；找对象/碰撞等返回 bool 或数量。",
+      "cleanup": "unload 后禁止使用 map、objects 和 path points。",
+      "boundary": "资源模型与 renderer 绘制能力组合，不依赖具体 Board。",
+      "tests": [
+        "tests/test_tilemap.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "game",
+      "entry_roles": {}
+    },
+    "ui": {
+      "header": "include/raylib_lite/raylib_lite_ui.h",
+      "entries": [
+        "raylib_lite_ui_action",
+        "raylib_lite_ui_add",
+        "raylib_lite_ui_draw",
+        "raylib_lite_ui_init",
+        "raylib_lite_ui_pointer"
+      ],
+      "implementation": [
+        "src/ui/raylib_lite_ui.c"
+      ],
+      "ownership": "ui 对象拥有固定容量节点；text/click context 借用。",
+      "failure": "add/pointer/action 返回 bool；容量与指针数受限；action 只选择可见按钮，失效焦点清除，方向参数按符号解释。",
+      "cleanup": "无析构；停止事件/绘制后释放借用 text/context。",
+      "boundary": "模型节点中性；现有 draw 实现仍依赖兼容 renderer，需审查边界。",
+      "tests": [
+        "tests/test_scene_ui_behavior.py",
+        "tests/test_ui_behavior.c",
+        "tests/test_platform_dependency_boundaries.py"
+      ],
+      "test_gaps": "已验证半开命中、多指针释放/容量复用、重复释放、隐藏/失效焦点、方向符号/极值、重置和 facade 绘制调用；实际像素、设备输入及真实游戏迁移未验证。点击仍按上次采样和释放点，不保证原始按下点捕获。",
+      "usage_role": "review",
+      "entry_roles": {}
+    },
+    "video": {
+      "header": "include/raylib_lite/raylib_lite_video.h",
+      "entries": [],
+      "implementation": [
+        "include/raylib_lite/raylib_lite_video.h"
+      ],
+      "ownership": "backend 拥有帧；acquire 后调用者获得独占借用权。",
+      "failure": "result 区分 BUSY 与错误；present 任意返回都消费 frame。",
+      "cleanup": "discard 消费未提交帧；flush 达到 backend 释放点后才 teardown。",
+      "boundary": "纯 backend 回调/类型契约，不以独立函数消费者判定废弃。",
+      "tests": [
+        "tests/test_raylib_lite_video_port.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    },
+    "wall_config": {
+      "header": "include/raylib_lite/raylib_lite_wall_config.h",
+      "entries": [
+        "WALL_AUDIT_DIVIDE",
+        "WALL_AUDIT_SPAN",
+        "raylib_lite_wall_audit_divide",
+        "raylib_lite_wall_audit_span"
+      ],
+      "implementation": [
+        "include/raylib_lite/raylib_lite_wall_config.h"
+      ],
+      "ownership": "编译配置与 audit hook，无资源所有权。",
+      "failure": "非法 mode/段长编译时报错，浮点误差限由 CMake 验证。",
+      "cleanup": "audit 与 timing 使用独立构建，配置在 renderer 编译侧生效。",
+      "boundary": "验证 hook 与运行时公共绘图功能分离。",
+      "tests": [
+        "tests/test_wall_benchmark.py"
+      ],
+      "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
+      "usage_role": "integration",
+      "entry_roles": {}
+    }
+  },
+  "compatibility": {
+    "BeginDrawing": "契约",
+    "BeginMode2D": "差异",
+    "BeginScissorMode": "契约",
+    "CheckCollisionCircleRec": "等价",
+    "CheckCollisionCircles": "等价",
+    "CheckCollisionPointCircle": "等价",
+    "CheckCollisionPointRec": "等价",
+    "CheckCollisionPointTriangle": "等价",
+    "CheckCollisionRecs": "等价",
+    "ClearBackground": "差异",
+    "CloseAudioDevice": "契约",
+    "CloseWindow": "契约",
+    "ColorAlpha": "等价",
+    "ColorBrightness": "等价",
+    "ColorTint": "等价",
+    "DrawCircle": "差异",
+    "DrawCircleLines": "差异",
+    "DrawCircleLinesV": "差异",
+    "DrawCircleV": "差异",
+    "DrawEllipse": "差异",
+    "DrawEllipseLines": "差异",
+    "DrawEllipseLinesV": "差异",
+    "DrawEllipseV": "差异",
+    "DrawLine": "差异",
+    "DrawLineDashed": "差异",
+    "DrawLineEx": "差异",
+    "DrawLineStrip": "差异",
+    "DrawLineV": "差异",
+    "DrawPixel": "差异",
+    "DrawPixelV": "差异",
+    "DrawPoly": "差异",
+    "DrawPolyLines": "差异",
+    "DrawPolyLinesEx": "差异",
+    "DrawRectangle": "差异",
+    "DrawRectangleGradientH": "差异",
+    "DrawRectangleGradientV": "差异",
+    "DrawRectangleLines": "差异",
+    "DrawRectangleLinesEx": "差异",
+    "DrawRectanglePro": "差异",
+    "DrawRectangleRec": "差异",
+    "DrawRectangleRounded": "差异",
+    "DrawRectangleRoundedLines": "差异",
+    "DrawRectangleV": "差异",
+    "DrawText": "差异",
+    "DrawTexture": "差异",
+    "DrawTextureEx": "差异",
+    "DrawTexturePro": "差异",
+    "DrawTextureRec": "差异",
+    "DrawTextureV": "差异",
+    "DrawTriangle": "差异",
+    "DrawTriangleFan": "差异",
+    "DrawTriangleLines": "差异",
+    "DrawTriangleStrip": "差异",
+    "EndDrawing": "契约",
+    "EndMode2D": "差异",
+    "EndScissorMode": "契约",
+    "Fade": "等价",
+    "GetCollisionRec": "等价",
+    "GetFPS": "等价",
+    "GetFrameTime": "契约",
+    "GetMousePosition": "等价",
+    "GetMouseX": "等价",
+    "GetMouseY": "等价",
+    "GetRenderHeight": "等价",
+    "GetRenderWidth": "等价",
+    "GetScreenHeight": "等价",
+    "GetScreenToWorld2D": "等价",
+    "GetScreenWidth": "等价",
+    "GetTime": "契约",
+    "GetTouchPointCount": "差异",
+    "GetTouchPointId": "差异",
+    "GetTouchPosition": "差异",
+    "GetTouchX": "差异",
+    "GetTouchY": "差异",
+    "GetWorldToScreen2D": "等价",
+    "InitAudioDevice": "契约",
+    "InitWindow": "契约",
+    "IsAudioDeviceReady": "契约",
+    "IsKeyDown": "契约",
+    "IsKeyPressed": "契约",
+    "IsKeyReleased": "契约",
+    "IsKeyUp": "契约",
+    "IsMouseButtonDown": "差异",
+    "IsMouseButtonPressed": "差异",
+    "IsMouseButtonReleased": "差异",
+    "IsMouseButtonUp": "差异",
+    "IsSoundPlaying": "契约",
+    "IsWindowReady": "契约",
+    "LoadMusicStream": "契约",
+    "LoadSound": "契约",
+    "LoadTexture": "契约",
+    "MeasureText": "差异",
+    "PlayMusicStream": "契约",
+    "PlaySound": "契约",
+    "SetMusicVolume": "契约",
+    "SetSoundVolume": "契约",
+    "SetTargetFPS": "契约",
+    "StopMusicStream": "契约",
+    "StopSound": "契约",
+    "TextFormat": "等价",
+    "UnloadMusicStream": "契约",
+    "UnloadSound": "契约",
+    "UnloadTexture": "契约",
+    "UpdateMusicStream": "差异",
+    "WindowShouldClose": "契约"
+  },
+  "retirement_review": [
+    {
+      "status": "待审查",
+      "entries": [
+        "raylib_lite_scene_event",
+        "raylib_lite_scene_pop",
+        "raylib_lite_scene_push",
+        "raylib_lite_scene_render",
+        "raylib_lite_scene_replace",
+        "raylib_lite_scene_stack_init",
+        "raylib_lite_scene_update"
+      ],
+      "reason": "维护游戏使用自有模型场景切换；通用栈可能重复，需要确认是否有共享消费者。",
+      "replacement": "游戏模型已有场景状态机；不是现成的同语义公共替代入口。",
+      "migration": "先证明 enter/exit/pause/resume/event/render 顺序可由模型替代，再提供逐游戏迁移方案。",
+      "validation": "补场景回调顺序、容量、失败和清理对照测试；审计外部用户。",
+      "external_usage": "未知，保留现有 API；外部消费者审计完成前不进入可执行退役候选",
+      "external_evidence": []
+    },
+    {
+      "status": "待审查",
+      "entries": [
+        "raylib_lite_ui_action",
+        "raylib_lite_ui_add",
+        "raylib_lite_ui_draw",
+        "raylib_lite_ui_init",
+        "raylib_lite_ui_pointer"
+      ],
+      "reason": "未发现维护游戏使用通用节点 UI；draw 仍跨到兼容实现，存在边界问题。",
+      "replacement": "游戏现有共享 view 中的按钮与文本绘制；无完整事件等价替代。",
+      "migration": "先确定节点/焦点/多指针行为替代契约，迁移真实消费者后才讨论废弃。",
+      "validation": "补命中、焦点、多指针、释放/清理及画面对照；审计外部用户。",
+      "external_usage": "未知，保留现有 API；外部消费者审计完成前不进入可执行退役候选",
+      "external_evidence": []
+    },
+    {
+      "status": "待审查",
+      "entries": [
+        "raylib_lite_mtx2_blit",
+        "raylib_lite_mtx2_decode_block_row",
+        "raylib_lite_mtx2_open",
+        "raylib_lite_mtx2_palette",
+        "raylib_lite_mtx2_span",
+        "raylib_lite_mtx2_span_constv"
+      ],
+      "reason": "低层压缩采样入口公开，而维护游戏资源主要使用 RGB565/INDEX8；可能属于内部实现职责。",
+      "replacement": "现有 renderer 纹理/墙列入口仅覆盖部分用途，不能直接替代 MTX2 格式。",
+      "migration": "先明确是停止支持格式还是将解码封装到 renderer；本批不改变资源格式与 ABI。",
+      "validation": "保留 MTX2 解码 oracle；比较资源体积、板端采样与格式迁移成本；审计外部用户。",
+      "external_usage": "未知，保留现有 API；外部消费者审计完成前不进入可执行退役候选",
+      "external_evidence": []
+    }
+  ],
+  "checkout_only_evidence": [
+    "examples/common_components/examples_audio/game_audio.c",
+    "examples/common_components/examples_common/native_module_main.c",
+    "host/host_clock.c"
+  ]
+}

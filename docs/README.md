@@ -16,6 +16,8 @@ First use: follow the [quickstart](quickstart.EN.md) to create a game and see it
 
 | Reference | Purpose |
 | --- | --- |
+| [Custom API boundaries (Chinese)](custom-api.CN.md) | Game APIs, integration hooks, low-level tools and retained review modules |
+| [Scene/UI contract (Chinese)](scene-ui.CN.md) | Scene lifecycle, pointer handling and focus navigation |
 | [Public API contract](../API.md) | Lifecycle, ownership, input and backend contracts |
 | [Raylib compatibility direction and status (Chinese)](raylib-compat.CN.md) | Equivalence status of each Raylib-name mapping, freeze rule and upstream migration plan |
 | [Component release](releasing.md) | Assemble independent examples, validate packages and publish from main |
@@ -33,4 +35,4 @@ First use: follow the [quickstart](quickstart.EN.md) to create a game and see it
 
 Repository and documentation indexes use `README.md` for English and `README.CN.md` for Chinese. Contribution and detailed bilingual guides use `.EN.md` and `.CN.md`. `SKILL.md` remains the tool-compatible entry point. Single-language references are labelled in this index.
 
-Public Engine APIs use the `raylib_lite_*` namespace; Raylib-shaped compatibility lives under `compat/raylib/`. See [versioning](../API.md#installation-and-compatibility). One-off measurements and migration notes belong outside the maintained `docs/` guides; local `docs/debug/` is ignored by Git.
+Public Engine APIs use the `raylib_lite_*` namespace; Raylib-shaped compatibility lives under `compat/raylib/`. See [versioning](../API.md#installation-and-compatibility). This index contains current usage and contracts. Development plans and one-off measurements are not component documentation.

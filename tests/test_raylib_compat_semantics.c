@@ -7,6 +7,7 @@
 #include "raylib_lite_raylib.h"
 #include "raylib_lite_raylib_port.h"
 #include "raylib_lite_host_video.h"
+#include "raylib_lite_renderer.h"
 
 static uint16_t pixels[4 * 4];
 static uint64_t s_now_us = 1;
@@ -96,6 +97,34 @@ static void helpers_match_raylib(void)
     assert(CheckCollisionCircleRec((Vector2){11, 11}, 1.5f, r));
 }
 
+static void primitive_clip_and_stats_survive_core_migration(void)
+{
+    InitWindow(4,4,"primitive lifecycle");
+    BeginDrawing();
+    ClearBackground(BLACK);
+    DrawRectangle(-1,-1,3,3,WHITE);
+    BeginScissorMode(1,1,2,2);
+    DrawTriangle((Vector2){0,0},(Vector2){4,0},(Vector2){0,4},WHITE);
+    EndScissorMode();
+    DrawRectangle(3,3,1,1,WHITE);
+    EndDrawing();
+    raylib_lite_renderer_raster_stats_t stats;
+    raylib_lite_renderer_get_raster_stats(&stats);
+    assert(stats.primitive_pixels==8&&stats.primitive_runs==5);
+    assert(stats.clear_pixels==16&&stats.fb_pixels==24&&stats.fb_runs==9);
+    const uint16_t expected[16]={0xffff,0xffff,0,0,0xffff,0xffff,0xffff,0,
+                               0,0xffff,0,0,0,0,0,0xffff};
+    assert(!memcmp(pixels,expected,sizeof(expected)));
+    DrawRectangle(0,0,4,4,BLACK);
+    DrawTriangle((Vector2){0,0},(Vector2){4,0},(Vector2){0,4},BLACK);
+    assert(!memcmp(pixels,expected,sizeof(expected)));
+    BeginDrawing();
+    DrawRectangle(0,0,4,4,BLACK);
+    EndDrawing();
+    raylib_lite_renderer_get_raster_stats(&stats);
+    assert(stats.primitive_pixels==16&&stats.primitive_runs==4&&stats.clear_pixels==0);
+}
+
 static void text_format_keeps_four_recent_results(void)
 {
     const char *first = TextFormat("a%d", 1), *second = TextFormat("b%d", 2);
@@ -126,6 +155,7 @@ int main(void)
     fps_is_measured_from_presented_frames();
     helpers_match_raylib();
     text_format_keeps_four_recent_results();
+    primitive_clip_and_stats_survive_core_migration();
     raylib_lite_host_video_clear_target();
     raylib_lite_host_video_shutdown();
     puts("raylib compat semantics: ok");

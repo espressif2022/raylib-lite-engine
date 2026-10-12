@@ -83,3 +83,19 @@ Boot runs before Board creation, attach borrows the Board video/input interfaces
 and first-present runs after frame submission/flush and input startup. Detach must
 finish before the Board is destroyed; failure retains resources. A selected provider
 is a required link dependency. Ordinary native examples select no provider.
+
+## API audiences
+
+Public visibility does not make every entrypoint a default game API. The reviewed
+[catalog](compat/api/catalog.json) separates game capabilities, application integration
+hooks, low-level tools, compatibility facades and retained modules under review.
+Some legacy `raylib_lite_2d_*` names use neutral types in the renderer header;
+classify them by header/type contract rather than name alone. See the
+[custom API boundaries (Chinese)](docs/custom-api.CN.md) and
+[Scene/UI usage contract (Chinese)](docs/scene-ui.CN.md).
+
+Renderer callers may include the narrow [drawing](include/raylib_lite/raylib_lite_renderer_draw.h),
+[statistics](include/raylib_lite/raylib_lite_renderer_stats.h), or
+[benchmark](include/raylib_lite/raylib_lite_renderer_benchmark.h) contracts. The old renderer
+header re-exports all three. Statistics keep their existing layout and five legacy phase
+slots; benchmark entrypoint availability does not prove it was enabled or run.

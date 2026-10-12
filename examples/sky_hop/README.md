@@ -44,3 +44,7 @@ python3 tools/game_cli.py sim examples/sky_hop --headless --frames 300
 ## Native build
 
 See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.
+
+设备诊断构建可加 `-DRAYLIB_LITE_EXAMPLE_STATS_SECONDS=1`，把周期日志
+从默认每 300 个渲染帧缩短为每 30 帧。日志中的渲染阶段耗时是平滑统计，
+不能将其分位数当作逐帧 P95；Host 计时也不能作为设备 FPS。

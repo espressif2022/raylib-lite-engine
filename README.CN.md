@@ -1,6 +1,6 @@
 # Raylib Lite Engine
 
-[English](README.md) · [开发文档](docs/README.CN.md)
+[English](README.md) · [使用文档](docs/README.CN.md)
 
 面向 ESP-IDF 的轻量游戏运行时与 RGB565 软件渲染引擎，提供固定步长更新、输入处理、资源加载、音频混合，以及场景和 UI 工具。游戏可在 PC Host 上开发和回放，再构建为设备原生固件。
 
@@ -42,7 +42,7 @@ python3 tools/game_cli.py sim examples/sky_hop
 
 ## 文档
 
-- [开发文档索引](docs/README.CN.md)：资源、输入、音频、绘制和板卡移植。
+- [使用与接口文档索引](docs/README.CN.md)：资源、输入、音频、绘制和板卡移植。
 - [组件发布（English）](docs/releasing.md)：组装可独立使用的例程并发布组件。
 - [更新记录](CHANGELOG.md)。
 - [贡献指南](CONTRIBUTING.CN.md)。

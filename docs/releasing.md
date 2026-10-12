@@ -30,6 +30,9 @@ manifest uses the Registry dependency and has no checkout-relative override.
 Board Git dependencies remain pinned. No sibling Engine checkout is required.
 Registry download still needs network access to resolve dependencies and Pillow/
 NumPy for asset preparation. Benchmarks and `*_dev` directories are not uploaded.
+Development plans, historical captures and review notes under `docs/development/`
+stay in the checkout and are excluded both by release assembly and the Registry
+manifest. The package includes current usage documentation only.
 
 ## Prepare and validate locally
 

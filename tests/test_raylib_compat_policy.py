@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import unittest
+from tools.audit_raylib import check_frozen
 
 ROOT = Path(__file__).resolve().parents[1]
 FACADES = (ROOT / "compat/raylib/include/raylib_lite_raylib.h",
@@ -34,6 +35,9 @@ def registered_names():
 
 
 class RaylibCompatPolicyTests(unittest.TestCase):
+    def test_names_match_frozen_baseline(self):
+        check_frozen()
+
     def test_every_mapping_has_a_status(self):
         missing = sorted(set(mapped_names()) - set(registered_names()))
         self.assertEqual(missing, [], "register new mappings in docs/raylib-compat.CN.md")

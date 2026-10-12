@@ -273,16 +273,19 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
     def test_renderer_core_is_raylib_type_neutral(self) -> None:
         renderer = ENGINE / "src/renderer"
         core = (renderer / "raylib_lite_renderer.c").read_text(encoding="utf-8")
-        neutral = (ENGINE / "include/raylib_lite/raylib_lite_renderer.h").read_text(encoding="utf-8")
+        neutral = [(ENGINE / "include/raylib_lite" / name).read_text(encoding="utf-8")
+                   for name in ("raylib_lite_renderer.h", "raylib_lite_renderer_draw.h",
+                                "raylib_lite_renderer_stats.h", "raylib_lite_renderer_benchmark.h")]
         legacy = (ENGINE / "compat/raylib/include/raylib_lite_2d.h").read_text(encoding="utf-8")
         adapter = (renderer / "raylib_lite_renderer_raylib.c").read_text(encoding="utf-8")
         cmake = (ENGINE / "CMakeLists.txt").read_text(encoding="utf-8")
 
-        for source in (core, neutral):
+        for source in (core, *neutral):
             for token in ("raylib.h", "Texture2D", "Rectangle", "Vector2",
                           "Color", "PIXELFORMAT_"):
                 self.assertNotIn(token, source)
-        self.assertIn('#include "raylib_lite_renderer.h"', core)
+        self.assertIn('#include "raylib_lite_renderer_draw.h"', core)
+        self.assertIn('#include "raylib_lite_renderer_stats.h"', core)
         self.assertIn('#include "raylib.h"', legacy)
         self.assertIn("Texture2D", legacy)
         self.assertIn("to_renderer_texture", adapter)

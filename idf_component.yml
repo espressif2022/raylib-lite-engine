@@ -17,6 +17,7 @@ files:
     - "examples/**/*"
     - "release/**/*"
     - "tests/**/*"
+    - "docs/development/**/*"
     - "host/**/*"
     - "artifacts/**/*"
     - "**/*.patch"

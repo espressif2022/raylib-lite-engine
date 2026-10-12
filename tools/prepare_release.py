@@ -16,7 +16,8 @@ GAMES = ("sky_hop", "tower_defense", "raylib_shooter", "living_worlds",
 CORE_FILES = {"CMakeLists.txt", "Kconfig", "idf_component.yml", "LICENSE", "VERSION",
               "README.md", "README.EN.md", "README.CN.md", "API.md", "CHANGELOG.md",
               "THIRD_PARTY_NOTICES.md"}
-CORE_TREES = ("src/", "include/", "compat/", "docs/")
+DEVELOPMENT_DOCS = "docs/development/"
+CORE_TREES = ("src/", "include/", "compat/", "docs/", "third_party/raylib/")
 TOOLS = {"tools/pack_game_assets.py", "tools/mtx2_codec.py",
          "tools/cmake/raylib_lite_native_assets.cmake"}
 
@@ -87,8 +88,8 @@ def assemble(destination, games=GAMES, root=ROOT):
     names = source_files(root)
     stage = destination / "component"
     stage.mkdir(parents=True)
-    selected = [name for name in names if name in CORE_FILES or name in TOOLS
-                or name.startswith(CORE_TREES)]
+    selected = [name for name in names if not name.startswith(DEVELOPMENT_DOCS)
+                and (name in CORE_FILES or name in TOOLS or name.startswith(CORE_TREES))]
     copy_files(selected, "", stage, root)
     # The source manifest excludes unassembled repository examples. Only this
     # staging tree contains Registry-ready examples.

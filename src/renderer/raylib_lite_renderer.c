@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "raylib_lite_renderer.h"
+#include "raylib_lite_renderer_draw.h"
+#include "raylib_lite_renderer_stats.h"
+#include "raylib_lite_primitives_internal.h"
 #include "raylib_lite_rgb565.h"
 #include "raylib_lite_wall_config.h"
 #include <math.h>
@@ -65,6 +67,128 @@ void raylib_lite_renderer_set_phase_us(uint32_t sky_us,uint32_t floor_us,uint32_
  s_raster_stats.sky_us=sky_us;s_raster_stats.floor_us=floor_us;s_raster_stats.wall_us=wall_us;
  s_raster_stats.enemy_us=enemy_us;s_raster_stats.hud_us=hud_us;
 }
+/* Validate packaged metadata once at load time, outside draw hot paths. */
+static bool atlas_frames_valid(const uint8_t *data, unsigned count,
+                               unsigned width, unsigned height)
+{
+    for (unsigned i = 0; i < count; ++i) {
+        atlas_frame_t frame;
+        memcpy(&frame, data + (size_t)i * sizeof(frame), sizeof(frame));
+        if (!frame.width || !frame.height ||
+                (uint32_t)frame.x + frame.width > width ||
+                (uint32_t)frame.y + frame.height > height) return false;
+    }
+    return true;
+}
+
+void raylib_lite_primitive_draw_span(raylib_lite_primitive_surface_t *surface,
+    int y, int x0, int x1, const raylib_lite_primitive_paint_t *paint)
+{
+    raylib_lite_primitive_fill_span(surface,y,x0,x1,paint);
+}
+
+void raylib_lite_primitive_draw_rectangle(raylib_lite_primitive_surface_t *surface,
+    int x, int y, int width, int height, raylib_lite_renderer_color_t color)
+{
+    if (!surface->pixels || width <= 0 || height <= 0) return;
+    int x0 = x < 0 ? 0 : x;
+    int y0 = y < 0 ? 0 : y;
+    int x1 = x + width > surface->width ? surface->width : x + width;
+    int y1 = y + height > surface->height ? surface->height : y + height;
+    if (surface->clip_active) {
+        if (x0 < surface->clip_x0) x0 = surface->clip_x0;
+        if (y0 < surface->clip_y0) y0 = surface->clip_y0;
+        if (x1 > surface->clip_x1) x1 = surface->clip_x1;
+        if (y1 > surface->clip_y1) y1 = surface->clip_y1;
+    }
+    if (x0 >= x1 || y0 >= y1) return;
+    if (!color.a) return;
+    raylib_lite_primitive_paint_t paint = raylib_lite_primitive_paint(color);
+    if (x1-x0 == 1) {
+        /* Jelly caps and vertical gradients use one-pixel columns. Bounds
+         * are already clipped above; avoid redoing span setup for every row. */
+        uint16_t *dst = surface->pixels + (size_t)y0*surface->stride + x0;
+        surface->pixel_count += (uint32_t)(y1-y0);
+        surface->run_count += (uint32_t)(y1-y0);
+        if (color.a == 255) {
+            for (int yy=y0; yy<y1; ++yy, dst+=surface->stride) *dst=paint.pixel;
+        } else {
+            for (int yy=y0; yy<y1; ++yy, dst+=surface->stride) *dst=raylib_lite_primitive_blend(*dst,&paint);
+        }
+        return;
+    }
+    for (int yy=y0; yy<y1; ++yy) raylib_lite_primitive_write_span(surface, yy, x0, x1, &paint);
+}
+
+static inline int64_t edge(int ax, int ay, int bx, int by, int px, int py)
+{
+    return ((int64_t)px-ax)*((int64_t)by-ay) -
+           ((int64_t)py-ay)*((int64_t)bx-ax);
+}
+
+/* Positive denominator; C division truncates toward zero rather than floor. */
+static inline int64_t triangle_floor_div(int64_t n, int64_t d)
+{
+    return n/d - (n%d < 0);
+}
+
+static inline int64_t triangle_ceil_div(int64_t n, int64_t d)
+{
+    return n/d + (n%d > 0);
+}
+
+void raylib_lite_primitive_draw_triangle(raylib_lite_primitive_surface_t *surface,
+    int ax, int ay, int bx, int by, int cx, int cy, raylib_lite_renderer_color_t color)
+{
+    if (!surface->pixels) return;
+    int minx=ax<bx?(ax<cx?ax:cx):(bx<cx?bx:cx);
+    int maxx=ax>bx?(ax>cx?ax:cx):(bx>cx?bx:cx);
+    int miny=ay<by?(ay<cy?ay:cy):(by<cy?by:cy);
+    int maxy=ay>by?(ay>cy?ay:cy):(by>cy?by:cy);
+    if(minx<0) minx=0;
+    if(miny<0) miny=0;
+    if(maxx>=surface->width) maxx=surface->width-1;
+    if(maxy>=surface->height) maxy=surface->height-1;
+    if (surface->clip_active) {
+        if(minx<surface->clip_x0)minx=surface->clip_x0;
+        if(miny<surface->clip_y0)miny=surface->clip_y0;
+        if(maxx>=surface->clip_x1)maxx=surface->clip_x1-1;
+        if(maxy>=surface->clip_y1)maxy=surface->clip_y1-1;
+    }
+    int64_t area=edge(ax,ay,bx,by,cx,cy);
+    if(!area||!color.a||minx>maxx||miny>maxy)return;
+    raylib_lite_primitive_paint_t paint=raylib_lite_primitive_paint(color);
+    /* Intersect the three integer half-planes directly, either winding.
+     * Top-left rule: pixels on a left or top edge are inside, pixels on a
+     * right or bottom edge are not, so triangles sharing an edge (fans,
+     * strips, polygons, rotated rectangles) cover each pixel exactly once. */
+    int winding=area>0?1:-1;
+    int vx[3]={ax,bx,cx},vy[3]={ay,by,cy};
+    int64_t slope[3],value[3],step[3];
+    for(int i=0;i<3;++i){
+        int j=(i+1)%3;
+        slope[i]=((int64_t)vy[j]-vy[i])*winding;
+        step[i]=-((int64_t)vx[j]-vx[i])*winding;
+        value[i]=edge(vx[i],vy[i],vx[j],vy[j],0,miny)*winding;
+        if(!(slope[i]>0||(slope[i]==0&&step[i]>0)))value[i]-=1;
+    }
+    for(int y=miny;y<=maxy;++y){
+        int64_t first=minx,last=maxx;
+        bool inside=true;
+        for(int i=0;i<3;++i){
+            if(slope[i]>0){
+                int64_t lo=triangle_ceil_div(-value[i],slope[i]);
+                if(lo>first)first=lo;
+            }else if(slope[i]<0){
+                int64_t hi=triangle_floor_div(value[i],-slope[i]);
+                if(hi<last)last=hi;
+            }else if(value[i]<0)inside=false;
+            value[i]+=step[i];
+        }
+        if(inside&&first<=last)raylib_lite_primitive_write_span(surface,y,(int)first,(int)last+1,&paint);
+    }
+}
+
 raylib_lite_renderer_texture_t raylib_lite_renderer_load_texture(const char *path)
 {
     raylib_lite_asset_view_t asset = {0};
@@ -78,9 +202,13 @@ raylib_lite_renderer_texture_t raylib_lite_renderer_load_texture(const char *pat
     size_t frame_bytes = (size_t)header->frame_count * sizeof(atlas_frame_t);
     uint64_t expected = (uint64_t)sizeof(*header) + frame_bytes +
                         header->rgb_bytes + header->alpha_bytes;
+    uint64_t pixels = (uint64_t)header->width * header->height;
     if (header->magic != M2D_MAGIC || !header->width || !header->height ||
             expected > asset.size ||
-            header->rgb_bytes != (uint32_t)header->width * header->height * 2U) {
+            header->rgb_bytes != pixels * 2U ||
+            (header->alpha_bytes && header->alpha_bytes != pixels) ||
+            !atlas_frames_valid(asset.data + sizeof(*header), header->frame_count,
+                                header->width, header->height)) {
         raylib_lite_asset_release(&asset);
         return (raylib_lite_renderer_texture_t){0};
     }
@@ -148,7 +276,9 @@ raylib_lite_wall_atlas_t raylib_lite_wall_atlas_load(const char *path)
             !header->width || !header->height || header->light_levels != 16 ||
             header->palette_entries != 256 ||
             header->index_bytes != (uint32_t)header->width * header->height ||
-            expected > asset.size) {
+            expected > asset.size ||
+            !atlas_frames_valid(asset.data + sizeof(*header), header->frame_count,
+                                header->width, header->height)) {
         raylib_lite_asset_release(&asset);
         return (raylib_lite_wall_atlas_t){0};
     }

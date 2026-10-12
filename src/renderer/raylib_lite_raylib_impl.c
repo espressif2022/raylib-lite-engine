@@ -10,8 +10,10 @@
 #include "raylib_lite_2d.h"
 #include "raylib_lite_raylib_port.h"
 #include "raylib_lite_rgb565.h"
+#include "raylib_lite_primitives_internal.h"
 
 static uint16_t *s_pixels;
+static raylib_lite_primitive_surface_t s_primitive_surface;
 static uint32_t s_primitive_pixels,s_primitive_runs,s_clear_pixels;
 static size_t s_stride;
 static Camera2D s_camera;
@@ -86,59 +88,16 @@ static inline uint16_t rgb565(Color c)
                       ((uint16_t)(c.g & 0xfcU) << 3) | (c.b >> 3));
 }
 
-/* Constant-color spans share preparation across rows. Keep the exact /255
- * blend used by put_pixel; quantizing alpha would change layered UI output. */
-typedef struct {
-    uint16_t pixel;
-    unsigned alpha, inverse, red, green, blue, red_blue;
-} span_paint_t;
-
-static span_paint_t span_paint(Color c)
+/* Shared screen-space paint and writer; camera handling stays in this facade. */
+typedef raylib_lite_primitive_paint_t span_paint_t;
+static span_paint_t span_paint(Color color)
 {
-    return (span_paint_t){rgb565(c), c.a, 255U-c.a,
-                          c.r*c.a, c.g*c.a, c.b*c.a, ((uint32_t)c.r*c.a<<16)|(c.b*c.a)};
+    return raylib_lite_primitive_paint(
+        (raylib_lite_renderer_color_t){color.r,color.g,color.b,color.a});
 }
-
-static inline uint16_t blend_span_pixel(unsigned old, const span_paint_t *paint)
-{
-    /* Two independent 16-bit lanes. Each channel numerator is at
-     * most 65025, so neither multiplication nor the exact /255
-     * correction can carry into the adjacent channel. */
-    uint32_t rb = (((old&0xf800U)<<8)|((old&31U)<<3))*paint->inverse + paint->red_blue;
-    rb = (rb + 0x00010001U + ((rb>>8)&0x00ff00ffU))>>8;
-    unsigned g = (((old>>5)&63U)<<2)*paint->inverse + paint->green;
-    g = (g + 1U + (g>>8))>>8;
-    return (uint16_t)(((rb&0x00f80000U)>>8)|((g&0xfcU)<<3)|((rb&0xf8U)>>3));
-}
-
 static void fill_span(int y, int x0, int x1, const span_paint_t *paint)
 {
-    if (!s_pixels || !paint->alpha || (unsigned)y >= (unsigned)s_screen_height) return;
-    if (x0 < 0) x0 = 0;
-    if (x1 > s_screen_width) x1 = s_screen_width;
-    if (s_scissor_active) {
-        if (y < s_scissor_y0 || y >= s_scissor_y1) return;
-        if (x0 < s_scissor_x0) x0 = s_scissor_x0;
-        if (x1 > s_scissor_x1) x1 = s_scissor_x1;
-    }
-    if (x0 >= x1) return;
-    uint16_t *dst = s_pixels + (size_t)y*s_stride + x0;
-    int count = x1-x0;
-    s_primitive_pixels+=(uint32_t)count;++s_primitive_runs;
-    if (paint->alpha == 255) {
-        /* Long opaque spans use the existing S31 eight-pixel PIE stores.
-         * Keep tiny glyph and ray fragments on the inline scalar path. */
-        if(count>=32){raylib_lite_rgb565_fill(dst,paint->pixel,(size_t)count);return;}
-        uint16_t pixel = paint->pixel;
-        uint32_t pair = (uint32_t)pixel | ((uint32_t)pixel << 16);
-        if ((uintptr_t)dst & 3U) { *dst++ = pixel; --count; }
-        while (count >= 2) { memcpy(dst, &pair, sizeof(pair)); dst += 2; count -= 2; }
-        if (count) *dst = pixel;
-    } else {
-        for (int i = 0; i < count; ++i) {
-            dst[i] = blend_span_pixel(dst[i], paint);
-        }
-    }
+    raylib_lite_primitive_fill_span(&s_primitive_surface,y,x0,x1,paint);
 }
 
 static inline void put_pixel(int x, int y, Color color)
@@ -324,6 +283,13 @@ void raylib_lite_raylib_begin_drawing(void)
                                s_screen_height);
     raylib_lite_renderer_reset_raster_stats();
     s_primitive_pixels=s_primitive_runs=s_clear_pixels=0;
+    s_primitive_surface=(raylib_lite_primitive_surface_t){
+        .pixels=s_pixels,.stride=s_stride,.width=s_screen_width,.height=s_screen_height,
+        .clip_active=s_scissor_active,
+        .clip_x0=s_scissor_active?s_scissor_x0:0,
+        .clip_y0=s_scissor_active?s_scissor_y0:0,
+        .clip_x1=s_scissor_active?s_scissor_x1:s_screen_width,
+        .clip_y1=s_scissor_active?s_scissor_y1:s_screen_height};
 }
 
 bool raylib_lite_raylib_frame_available(void) { return s_pixels != NULL; }
@@ -360,10 +326,12 @@ void raylib_lite_raylib_end_logic_tick(void)
 void raylib_lite_raylib_end_drawing(void)
 {
     if (s_pixels) {
-        raylib_lite_renderer_note_primitives(s_primitive_pixels,s_primitive_runs,s_clear_pixels);
+        raylib_lite_renderer_note_primitives(s_primitive_pixels+s_primitive_surface.pixel_count,
+            s_primitive_runs+s_primitive_surface.run_count,s_clear_pixels);
         s_last_present = raylib_lite_raylib_port_present_frame();
     }
     s_pixels = NULL;
+    s_primitive_surface.pixels = NULL;
     s_stride = 0;
     raylib_lite_renderer_set_target(NULL, 0, 0, 0);
     s_camera_active = false;
@@ -382,6 +350,11 @@ void raylib_lite_raylib_begin_scissor_mode(int x, int y, int width, int height)
     s_scissor_y1 = y + height > s_screen_height ? s_screen_height : y + height;
     s_scissor_active = width > 0 && height > 0 &&
         s_scissor_x0 < s_scissor_x1 && s_scissor_y0 < s_scissor_y1;
+    s_primitive_surface.clip_active=s_scissor_active;
+    s_primitive_surface.clip_x0=s_scissor_active?s_scissor_x0:0;
+    s_primitive_surface.clip_y0=s_scissor_active?s_scissor_y0:0;
+    s_primitive_surface.clip_x1=s_scissor_active?s_scissor_x1:s_screen_width;
+    s_primitive_surface.clip_y1=s_scissor_active?s_scissor_y1:s_screen_height;
     raylib_lite_renderer_set_clip(s_scissor_x0, s_scissor_y0,
         s_scissor_x1 - s_scissor_x0, s_scissor_y1 - s_scissor_y0);
 }
@@ -389,6 +362,9 @@ void raylib_lite_raylib_begin_scissor_mode(int x, int y, int width, int height)
 void raylib_lite_raylib_end_scissor_mode(void)
 {
     s_scissor_active = false;
+    s_primitive_surface.clip_active=false;
+    s_primitive_surface.clip_x0=s_primitive_surface.clip_y0=0;
+    s_primitive_surface.clip_x1=s_screen_width;s_primitive_surface.clip_y1=s_screen_height;
     raylib_lite_renderer_set_clip(0, 0, s_screen_width, s_screen_height);
 }
 
@@ -465,34 +441,8 @@ void raylib_lite_raylib_draw_rectangle(int x, int y, int width, int height, Colo
         x = (int)p.x; y = (int)p.y;
         width = (int)(width*s_camera.zoom); height = (int)(height*s_camera.zoom);
     }
-    if (!s_pixels || width <= 0 || height <= 0) return;
-    int x0 = x < 0 ? 0 : x;
-    int y0 = y < 0 ? 0 : y;
-    int x1 = x + width > s_screen_width ? s_screen_width : x + width;
-    int y1 = y + height > s_screen_height ? s_screen_height : y + height;
-    if (s_scissor_active) {
-        if (x0 < s_scissor_x0) x0 = s_scissor_x0;
-        if (y0 < s_scissor_y0) y0 = s_scissor_y0;
-        if (x1 > s_scissor_x1) x1 = s_scissor_x1;
-        if (y1 > s_scissor_y1) y1 = s_scissor_y1;
-    }
-    if (x0 >= x1 || y0 >= y1) return;
-    if (!color.a) return;
-    span_paint_t paint = span_paint(color);
-    if (x1-x0 == 1) {
-        /* Jelly caps and vertical gradients use one-pixel columns. Bounds
-         * are already clipped above; avoid redoing span setup for every row. */
-        uint16_t *dst = s_pixels + (size_t)y0*s_stride + x0;
-        s_primitive_pixels += (uint32_t)(y1-y0);
-        s_primitive_runs += (uint32_t)(y1-y0);
-        if (color.a == 255) {
-            for (int yy=y0; yy<y1; ++yy, dst+=s_stride) *dst=paint.pixel;
-        } else {
-            for (int yy=y0; yy<y1; ++yy, dst+=s_stride) *dst=blend_span_pixel(*dst,&paint);
-        }
-        return;
-    }
-    for (int yy=y0; yy<y1; ++yy) fill_span(yy, x0, x1, &paint);
+    raylib_lite_primitive_draw_rectangle(&s_primitive_surface,x,y,width,height,
+        (raylib_lite_renderer_color_t){color.r,color.g,color.b,color.a});
 }
 
 void raylib_lite_raylib_draw_rectangle_v(Vector2 position,Vector2 size,Color color)
@@ -744,7 +694,7 @@ void raylib_lite_raylib_draw_rectangle_rounded(Rectangle r,float roundness,int s
             while(i<count&&lo[i]<=last){if(hi[i]>last)last=hi[i];++i;}
             if(first<x)first=x;
             if(last>x+width)last=x+width;
-            if(first<last)fill_span(row,first,last,&paint);
+            if(first<last)raylib_lite_primitive_draw_span(&s_primitive_surface,row,first,last,&paint);
         }
     }
 }
@@ -778,74 +728,12 @@ void raylib_lite_raylib_draw_rectangle_rounded_lines(Rectangle r,float roundness
     }
 }
 
-static inline int64_t edge(int ax, int ay, int bx, int by, int px, int py)
+void raylib_lite_raylib_draw_triangle(Vector2 a, Vector2 b, Vector2 c, Color color)
 {
-    return ((int64_t)px-ax)*((int64_t)by-ay) -
-           ((int64_t)py-ay)*((int64_t)bx-ax);
-}
-
-/* Positive denominator; C division truncates toward zero rather than floor. */
-static inline int64_t triangle_floor_div(int64_t n, int64_t d)
-{
-    return n/d - (n%d < 0);
-}
-
-static inline int64_t triangle_ceil_div(int64_t n, int64_t d)
-{
-    return n/d + (n%d > 0);
-}
-
-void raylib_lite_raylib_draw_triangle(Vector2 av, Vector2 bv, Vector2 cv, Color color)
-{
-    av=active_to_screen(av); bv=active_to_screen(bv); cv=active_to_screen(cv);
-    int ax=(int)av.x, ay=(int)av.y, bx=(int)bv.x, by=(int)bv.y;
-    int cx=(int)cv.x, cy=(int)cv.y;
-    int minx=ax<bx?(ax<cx?ax:cx):(bx<cx?bx:cx);
-    int maxx=ax>bx?(ax>cx?ax:cx):(bx>cx?bx:cx);
-    int miny=ay<by?(ay<cy?ay:cy):(by<cy?by:cy);
-    int maxy=ay>by?(ay>cy?ay:cy):(by>cy?by:cy);
-    if(minx<0) minx=0;
-    if(miny<0) miny=0;
-    if(maxx>=s_screen_width) maxx=s_screen_width-1;
-    if(maxy>=s_screen_height) maxy=s_screen_height-1;
-    if(s_scissor_active){
-        if(minx<s_scissor_x0)minx=s_scissor_x0;
-        if(miny<s_scissor_y0)miny=s_scissor_y0;
-        if(maxx>=s_scissor_x1)maxx=s_scissor_x1-1;
-        if(maxy>=s_scissor_y1)maxy=s_scissor_y1-1;
-    }
-    int64_t area=edge(ax,ay,bx,by,cx,cy);
-    if(!area||!color.a||minx>maxx||miny>maxy)return;
-    span_paint_t paint=span_paint(color);
-    /* Intersect the three integer half-planes directly, either winding.
-     * Top-left rule: pixels on a left or top edge are inside, pixels on a
-     * right or bottom edge are not, so triangles sharing an edge (fans,
-     * strips, polygons, DrawRectanglePro) cover each pixel exactly once. */
-    int winding=area>0?1:-1;
-    int vx[3]={ax,bx,cx},vy[3]={ay,by,cy};
-    int64_t slope[3],value[3],step[3];
-    for(int i=0;i<3;++i){
-        int j=(i+1)%3;
-        slope[i]=((int64_t)vy[j]-vy[i])*winding;
-        step[i]=-((int64_t)vx[j]-vx[i])*winding;
-        value[i]=edge(vx[i],vy[i],vx[j],vy[j],0,miny)*winding;
-        if(!(slope[i]>0||(slope[i]==0&&step[i]>0)))value[i]-=1;
-    }
-    for(int y=miny;y<=maxy;++y){
-        int64_t first=minx,last=maxx;
-        bool inside=true;
-        for(int i=0;i<3;++i){
-            if(slope[i]>0){
-                int64_t lo=triangle_ceil_div(-value[i],slope[i]);
-                if(lo>first)first=lo;
-            }else if(slope[i]<0){
-                int64_t hi=triangle_floor_div(value[i],-slope[i]);
-                if(hi<last)last=hi;
-            }else if(value[i]<0)inside=false;
-            value[i]+=step[i];
-        }
-        if(inside&&first<=last)fill_span(y,(int)first,(int)last+1,&paint);
-    }
+    a=active_to_screen(a);b=active_to_screen(b);c=active_to_screen(c);
+    raylib_lite_primitive_draw_triangle(&s_primitive_surface,
+        (int)a.x,(int)a.y,(int)b.x,(int)b.y,(int)c.x,(int)c.y,
+        (raylib_lite_renderer_color_t){color.r,color.g,color.b,color.a});
 }
 
 void raylib_lite_raylib_draw_triangle_lines(Vector2 a,Vector2 b,Vector2 c,Color color)

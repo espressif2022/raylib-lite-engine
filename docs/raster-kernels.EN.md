@@ -1,10 +1,12 @@
 # Raster-kernel contract
 
-[简体中文](raster-kernels.CN.md) · [Design principles](reference-designs.EN.md) · [Neutral renderer](../include/raylib_lite/raylib_lite_renderer.h) · [Legacy 2D facade](../compat/raylib/include/raylib_lite_2d.h)
+[简体中文](raster-kernels.CN.md) · [Design principles](reference-designs.EN.md) · [Neutral renderer](../include/raylib_lite/raylib_lite_renderer_draw.h) · [Legacy 2D facade](../compat/raylib/include/raylib_lite_2d.h)
 
 This page describes the current raster contract. The implementation core uses the Raylib-neutral types and functions in `raylib_lite_renderer.h`; `raylib_lite_2d.h` provides the Raylib-shaped `raylib_lite_2d_*` compatibility API and converts its types at the boundary. Hot draw wrappers are `static inline`, so the compatibility boundary does not add a second draw call in the column/span/triangle hot paths. Set an RGB565 target, pixel stride, width, and height with `raylib_lite_renderer_set_target()`, then a half-open clip rectangle with `raylib_lite_renderer_set_clip()`. Drawing is also limited by the target extent. Later pixels overwrite earlier ones; there is no general Z buffer. Host independent oracles define exact pixel-center and fixed-point rounding acceptance.
 
 `Texture2D` must be a valid handle from `raylib_lite_2d_load_texture()` or `raylib_lite_2d_register_rgb565()`. Its dimensions are fixed by registration or the asset and need not be powers of two. A `raylib_lite_wall_atlas_t` needs valid INDEX8 data, an RGB565 LUT with 256 entries per light level, nonzero dimensions, and exactly 16 light levels. Column-major data suits wall columns; row-major data suits horizontal spans. Callers keep borrowed textures, indices, LUTs, and column arrays alive during draws. The API cannot validate their actual allocation length.
+
+Packaged resources are checked at load time for declared payload length, RGB565 byte count, an absent alpha plane or exactly one alpha byte per pixel, and nonempty frame rectangles inside the atlas. Wall assets also validate frame bounds. Failure returns an empty handle and releases the opened resource view without consuming a texture slot. Metadata validation stays outside per-frame draw loops. Directly registered borrowed memory still requires the caller to provide valid storage and lifetime.
 
 | Function | Texture, dimensions, sampling | Light, coverage, clipping |
 | --- | --- | --- |
@@ -24,3 +26,5 @@ This page describes the current raster contract. The implementation core uses th
 `raylib_lite_2d_copy_scanline` is not a `Draw*` function. It copies only the clip's horizontal extent and requires both rows inside the clip. No API can make a fabricated pointer or texture buffer length memory-safe.
 
 A rejected whole-draw request returns silently and increments a separate counter, available through `raylib_lite_renderer_get_rejected_draw_calls()`. The existing raster-stats structure layout is unchanged. Empty batches, wholly clipped draws, transparent tint, and a single skipped bad column do not count as whole-call rejections. This counter diagnoses invalid calls without changing the existing `void` API; callers still check failures when loading resources. Validate candidate fast paths against an independent pixel oracle before comparing kernel and display time on device.
+
+Solid rectangles, triangles and constant-color RGB565 spans share the internal screen-space surface in `src/renderer/raylib_lite_primitives_internal.h`. It borrows the framebuffer and stores half-open clipping and per-frame counters without Raylib types or per-frame allocation. Camera conversion and coordinate truncation remain in the compatibility facade. Games must not depend on this internal contract; see the [custom API boundaries (Chinese)](custom-api.CN.md).
