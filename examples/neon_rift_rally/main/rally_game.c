@@ -31,7 +31,7 @@ static const float s_checkpoints[RALLY_CHECKPOINT_COUNT - 1U] = {
 };
 
 static const float s_opponent_speeds[RALLY_OPPONENT_COUNT] = {
-    33.2f, 31.4f, 29.8f, 32.4f, 30.6f, 28.9f,
+    37.0f, 33.0f, 32.5f, 35.5f, 32.2f, 31.5f,
 };
 static const float s_opponent_lanes[RALLY_OPPONENT_COUNT] = {
     -3.5f, -2.1f, -0.7f, 0.7f, 2.1f, 3.5f,
@@ -361,6 +361,24 @@ static float loop_gap(float a, float b)
     return gap;
 }
 
+static bool opponent_lane_clear(const rally_game_t *game, unsigned self, float lane)
+{
+    const rally_opponent_t *rider = &game->opponents[self];
+    float distance = race_distance(rider->progress, rider->laps_completed);
+    float player = race_distance(game->progress, game->laps_completed);
+    if (fabsf(player - distance) < 10 && fabsf(game->lateral - lane) < 1.4f)
+        return false;
+    for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
+        const rally_opponent_t *other = &game->opponents[i];
+        if (i == self || !other->active || other->finished)
+            continue;
+        if (fabsf(race_distance(other->progress, other->laps_completed) - distance) < 10 &&
+            fabsf(other->lateral - lane) < 1.4f)
+            return false;
+    }
+    return true;
+}
+
 static void update_opponents(rally_game_t *game)
 {
     for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
@@ -383,15 +401,36 @@ static void update_opponents(rally_game_t *game)
         const float catch_up = opponent->style == RALLY_OPPONENT_CHASER ?
                                clampf(gap * 0.008f, 0.0f, 3.0f) : 0.0f;
         const float leader_brake = clampf(-gap * 0.006f, 0.0f, 1.5f);
-        rally_track_segment_t segment = {0};
-        (void)rally_track_segment_sample(opponent->progress, &segment);
-        float bend = clampf(fabsf(segment.curve) * 45.0f, 0.0f, 1.0f);
+        rally_track_pose_t here, ahead;
+        rally_track_sample_course(game->course_id, opponent->progress, 0, &here);
+        rally_track_sample_course(game->course_id, opponent->progress + 12, 0, &ahead);
+        float bend = clampf(
+            fabsf(here.tangent_x * ahead.tangent_z - here.tangent_z * ahead.tangent_x) * 3, 0, 1);
         float style_speed = opponent->style == RALLY_OPPONENT_SPRINTER ?
                             1.4f - bend * 2.1f :
                             opponent->style == RALLY_OPPONENT_DEFENDER ? -.25f : .35f;
         float final_lap = opponent->laps_completed + 1U >= RALLY_TARGET_LAPS ? .6f : 0.0f;
-        const float target_speed = s_opponent_speeds[i] + wave + catch_up -
-                                   leader_brake + style_speed + final_lap;
+        float target_speed =
+            s_opponent_speeds[i] + wave + catch_up - leader_brake + style_speed + final_lap;
+        bool blocked = false;
+        for (unsigned j = 0; j < RALLY_OPPONENT_COUNT; ++j) {
+            const rally_opponent_t *front = &game->opponents[j];
+            if (j == i || !front->active || front->finished)
+                continue;
+            float ahead_gap =
+                race_distance(front->progress, front->laps_completed) - opponent_distance;
+            if (ahead_gap > 0 && ahead_gap < 12 &&
+                fabsf(front->lateral - opponent->lateral) < 1.4f) {
+                blocked = true;
+                if (ahead_gap < 6)
+                    target_speed = fminf(target_speed, fmaxf(0, front->speed - 1));
+            }
+        }
+        if (gap > 0 && gap < 12 && fabsf(game->lateral - opponent->lateral) < 1.4f) {
+            blocked = true;
+            if (gap < 6)
+                target_speed = fminf(target_speed, fmaxf(0, game->speed - 1));
+        }
         /* Launch with comparable acceleration instead of jumping to race pace.
          * Existing bounded catch-up and driving styles still set the target. */
         opponent->speed += clampf((target_speed - opponent->speed) * 2.7f,
@@ -400,9 +439,25 @@ static void update_opponents(rally_game_t *game)
         else {
             float target = s_opponent_lanes[i] +
                 .55f * sinf(opponent->phase + (float)game->tick * .013f);
-            if (opponent->style == RALLY_OPPONENT_DEFENDER &&
-                gap < 0.0f && gap > -20.0f)
+            if (opponent->style == RALLY_OPPONENT_DEFENDER && gap < -5.0f && gap > -20.0f)
                 target += clampf(game->lateral - target, -1.2f, 1.2f);
+            if (opponent->style == RALLY_OPPONENT_CHASER && gap > 12 && gap < 30)
+                target = game->lateral;
+            if (blocked) {
+                float first = clampf(opponent->lateral + 2.2f, -4.2f, 4.2f);
+                float second = clampf(opponent->lateral - 2.2f, -4.2f, 4.2f);
+                if (i & 1) {
+                    float swap = first;
+                    first = second;
+                    second = swap;
+                }
+                if (opponent_lane_clear(game, i, first))
+                    target = first;
+                else if (opponent_lane_clear(game, i, second))
+                    target = second;
+                else
+                    target = opponent->lateral;
+            }
             opponent->target_lane = clampf(target, -4.2f, 4.2f);
             opponent->decision_cooldown = 30U;
         }

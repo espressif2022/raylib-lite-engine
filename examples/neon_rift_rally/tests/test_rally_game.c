@@ -151,12 +151,37 @@ static void harbor_geometry(void)
     puts("authored harbor has continuous seams, correct tangents and port/bridge alignment");
 }
 
+static void opponent_traffic(void)
+{
+    for(unsigned course=0;course<3;++course) {
+        rally_game_t game;
+        driving_state(&game,course);
+        game.progress=300;game.lateral=-4;
+        for(unsigned i=0;i<2;++i) {
+            game.opponents[i].active=true;
+            game.opponents[i].laps_completed=0;
+            game.opponents[i].lateral=0;game.opponents[i].lane=0;
+            game.opponents[i].decision_cooldown=0;
+        }
+        game.opponents[0].progress=330;game.opponents[0].speed=32;
+        game.opponents[1].progress=335;game.opponents[1].speed=20;
+        float initial_speed=game.opponents[0].speed;
+        rally_update(&game);
+        assert(game.opponents[0].speed<initial_speed);
+        assert(fabsf(game.opponents[0].target_lane)>1.4f);
+        assert(fabsf(game.opponents[0].lateral)<.3f); /* Smooth lane change. */
+        assert(game.opponents[0].progress>330 && game.opponents[0].progress<332);
+    }
+    puts("rivals slow for occupied lanes and choose a smooth passing lane on every course");
+}
+
 int main(void)
 {
     steering_recovery();
     drift_assist_and_clean_release();
     fair_launch();
     harbor_geometry();
+    opponent_traffic();
     rally_game_t a, b;
     rally_reset(&a); rally_reset(&b);
     deterministic_drive(&a, 900U);

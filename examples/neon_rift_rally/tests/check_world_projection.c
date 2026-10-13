@@ -26,5 +26,11 @@ int main(void)
     s_road_top[8]=230;
     assert(world_clip(10)==400); /* Future hill must not hide a closer object. */
     assert(world_clip(30)==230);
+    s_camera=(rally_camera_t){.forward_z=1,.right_x=1,.focal=240,.roll_cos=1};
+    rally_point3_t near={2,0,4},far={4,0,8};
+    float near_size=billboard_size(near,1),far_size=billboard_size(far,1);
+    assert(fabsf(near_size-60)<.01f && fabsf(far_size-30)<.01f);
+    assert(fabsf(project(NULL,near).x-project(NULL,far).x)<.01f);
+    assert(billboard_size((rally_point3_t){0,0,.05f},1)==0);
     puts("world polygons clip to independent area; nearer crests occlude farther objects");
 }

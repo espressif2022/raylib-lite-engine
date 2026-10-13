@@ -161,6 +161,20 @@ static void prepare_camera(const rally_game_t *g)
     s_camera.shake_y = impact * ((g->collision_ticks & 2U) ? 1.5f : -1.5f);
 }
 
+static float camera_depth(rally_point3_t point)
+{
+    return (point.x - s_camera.x) * s_camera.forward_x +
+           (point.z - s_camera.z) * s_camera.forward_z;
+}
+
+/* Billboard size uses the same camera-space depth as its ground position.
+ * Progress units are not world metres and vary along each authored course. */
+static float billboard_size(rally_point3_t point, float world_height)
+{
+    float depth = camera_depth(point);
+    return depth >= RALLY_NEAR_Z ? s_camera.focal * world_height / depth : 0;
+}
+
 static rally_point2_t project(const rally_game_t *g, rally_point3_t p)
 {
     (void)g;
@@ -346,11 +360,8 @@ static void draw_scenery_prop(const rally_game_t *g, float distance,
     rally_point2_t center = project(g, center_world);
     const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(art, sprite);
     if (frame && center.visible) {
-        /* The authored asset becomes a readable 8–92px landmark at the
-         * near edge, while the same world anchor shrinks naturally into the
-         * horizon.  Clamp after applying the authored scale so randomised
-         * scenery never grows into a screen-filling billboard. */
-        float size = clampf(1250.0f / (distance + 12.0f) * anchor->scale, 8.0f, 92.0f);
+        /* Ground contact and authored world size use one perspective scale. */
+        float size = billboard_size(center_world, 1.65f * anchor->scale);
         if (center.y - size > RALLY_H || center.y < 0 || center.x + size < 0 ||
             center.x - size > RALLY_W)
             return;
@@ -363,10 +374,16 @@ static void draw_scenery_prop(const rally_game_t *g, float distance,
             if (turn > 0)
                 source.width = -source.width;
         }
-        DrawEllipse((int)center.x, (int)center.y + 1, size * .22f, size * .045f,
-                    (Color){5, 12, 22, 255});
-        DrawTexturePro(art.texture, source,
-                       (Rectangle){center.x - size * .5f, center.y - size, size, size},
+        float clip = world_clip(distance);
+        float top = center.y - size;
+        if (top >= clip || top >= RALLY_H || size < 1)
+            return;
+        float height = fminf(size, clip - top);
+        source.height *= height / size;
+        if (center.y + size * .045f < clip)
+            DrawEllipse((int)center.x, (int)center.y + 1, size * .22f, size * .045f,
+                        (Color){5, 12, 22, 255});
+        DrawTexturePro(art.texture, source, (Rectangle){center.x - size * .5f, top, size, height},
                        (Vector2){0, 0}, 0, WHITE);
         return;
     }
@@ -412,8 +429,8 @@ static void draw_track(const rally_game_t *g, bool near_only)
         s_road_top[i] = center.visible ? center.y : RALLY_H;
     }
     float clip_y = (float)s_horizon;
-    /* The harbor's authored broad bends need fewer painted slices. Keep all
-     * 33 samples for precise object/crest clipping, but join pairs for road
+    /* The harbor's authored broad bends need fewer painted slices. Keep the full
+     * sample set for precise object/crest clipping, but join pairs for road
      * faces to pay for its continuous guardrails and buildings. */
     const int stride = g->course_id == 0U ? 2 : 1;
     for (int i = RALLY_SEGMENTS - stride; i >= 0; i -= stride) {
@@ -596,8 +613,8 @@ static void draw_opponent_car(const rally_game_t *g, float distance,
     if (!rally_track_sample_course(g->course_id, g->progress + distance, opponent->lateral, &at) ||
         !rally_track_sample_course(g->course_id, g->progress + distance + 6, 0, &ahead))
         return;
-    rally_point2_t center = project(g, (rally_point3_t){at.x, at.y + .03f, at.z});
-    if (!center.visible || center.y < 0 || center.y > RALLY_H + 80)
+    rally_point2_t center = project(g, (rally_point3_t){at.x, at.y, at.z});
+    if (!center.visible)
         return;
     float turn = at.tangent_x * ahead.tangent_z - at.tangent_z * ahead.tangent_x;
     float lean = (opponent->target_lane - opponent->lateral) * .5f - turn * 1.8f;
@@ -608,25 +625,41 @@ static void draw_opponent_car(const rally_game_t *g, float distance,
     else if (lean > .12f)
         pose = lean > .45f ? RAYLIB_LITE_ASSET_ID_MOTORCYCLE_HEAVY_RIGHT
                            : RAYLIB_LITE_ASSET_ID_MOTORCYCLE_LIGHT_RIGHT;
-    float size = clampf(860.0f / (distance + 10), 14, 76);
-    float clip = world_clip(distance);
-    if (center.y - size >= clip)
+    float size = billboard_size((rally_point3_t){at.x, at.y, at.z}, 1.05f);
+    /* All five authored poses end at 97% of their cell height. */
+    float top=center.y-size*.97f;
+    if (size < 1 || top > RALLY_H || center.y < 0 || center.x + size * .5f < 0 ||
+        center.x - size * .5f > RALLY_W)
         return;
+    float clip = world_clip(distance);
+    if (top >= clip) return;
     const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(art, pose);
     if (!frame)
         return;
-    DrawEllipse((int)center.x, (int)center.y + 1, size * .21f, size * .06f,
-                (Color){4, 10, 20, 255});
+    if (center.y + size * .06f < clip)
+        DrawEllipse((int)center.x, (int)center.y + 1, size * .21f, size * .06f,
+                    (Color){4, 10, 20, 255});
     Rectangle source = frame->source;
-    float height = fminf(size, clip - (center.y - size));
+    float height = fminf(size, clip - top);
     source.height *= height / size;
     DrawTexturePro(art.texture, source,
-                   (Rectangle){center.x - size * .5f, center.y - size, size, height},
+                   (Rectangle){center.x - size * .5f, top, size, height},
                    (Vector2){0, 0}, 0, WHITE);
-    /* A small opaque race bib keeps identity without tinting every texel. */
-    if (size >= 18)
-        DrawRectangle((int)(center.x - size * .12f), (int)(center.y - size * .55f),
-                      (int)(size * .24f) + 1, (int)(size * .08f) + 1, color);
+    /* Helmet and race bib identify each rider without per-texel tinting.
+     * Both follow the authored lean and the same hill cut as the texture. */
+    if (size >= 18) {
+        float offset = clampf(lean, -1, 1) * size * .10f;
+        float bib_y = top + size * .45f;
+        int bib_h = (int)fminf(size * .10f, clip - bib_y);
+        if (bib_h > 0)
+            DrawRectangle((int)(center.x + offset - size * .12f), (int)bib_y,
+                          (int)(size * .24f) + 1, bib_h, color);
+        float helmet_y = top + size * .22f;
+        int helmet_h = (int)fminf(size * .04f, clip - helmet_y);
+        if (helmet_h > 0)
+            DrawRectangle((int)(center.x + offset - size * .07f), (int)helmet_y,
+                          (int)(size * .14f) + 1, helmet_h, color);
+    }
 }
 
 static void draw_world(const rally_game_t *g, raylib_lite_atlas_t scenery,
@@ -645,6 +678,7 @@ static void draw_world(const rally_game_t *g, raylib_lite_atlas_t scenery,
         float distance;
         unsigned kind, index;
         float side;
+        float depth;
     } item_t;
     item_t items[32];
     unsigned count = 0;
@@ -659,7 +693,7 @@ static void draw_world(const rally_game_t *g, raylib_lite_atlas_t scenery,
             float at = first + i * 18, dist = at - g->progress;
             if (dist <= RALLY_NEAR_Z || dist >= RALLY_FAR_Z)
                 continue;
-            items[count++] = (item_t){dist, WORLD_LAMP, 0, ((int)(at / 18) & 1) ? -1 : 1};
+            items[count++] = (item_t){dist, WORLD_LAMP, 0, ((int)(at / 18) & 1) ? -1 : 1, 0};
         }
         first = floorf(g->progress / 48) * 48;
         for (int i = 0; i < 3; ++i) {
@@ -669,8 +703,9 @@ static void draw_world(const rally_game_t *g, raylib_lite_atlas_t scenery,
             float wrapped = fmodf(at, RALLY_TRACK_LENGTH);
             if (wrapped >= 500 && wrapped < 800)
                 continue;
-            items[count++] = (item_t){
-                dist, wrapped >= 300 && wrapped < 500 ? WORLD_WAREHOUSE : WORLD_CONTAINER, 0, -1};
+            items[count++] =
+                (item_t){dist, wrapped >= 300 && wrapped < 500 ? WORLD_WAREHOUSE : WORLD_CONTAINER,
+                         0, -1, 0};
         }
     } else {
         unsigned current = (unsigned)(g->progress / RALLY_TRACK_SEGMENT_LENGTH);
@@ -685,7 +720,7 @@ static void draw_world(const rally_game_t *g, raylib_lite_atlas_t scenery,
                 if (dist >= RALLY_FAR_Z)
                     continue;
                 anchors[anchor_count] = anchor;
-                items[count++] = (item_t){dist, WORLD_SPRITE, anchor_count++, 0};
+                items[count++] = (item_t){dist, WORLD_SPRITE, anchor_count++, 0, 0};
             }
     }
     if (g->course_id == 0U) {
@@ -694,7 +729,7 @@ static void draw_world(const rally_game_t *g, raylib_lite_atlas_t scenery,
             if (dist < RALLY_NEAR_Z)
                 dist += RALLY_TRACK_LENGTH;
             if (dist > RALLY_NEAR_Z && dist < RALLY_FAR_Z)
-                items[count++] = (item_t){dist, WORLD_BRIDGE, 0, 0};
+                items[count++] = (item_t){dist, WORLD_BRIDGE, 0, 0, 0};
         }
     }
     for (unsigned i = 0; i < RALLY_CHECKPOINT_COUNT - 1U; ++i) {
@@ -702,7 +737,7 @@ static void draw_world(const rally_game_t *g, raylib_lite_atlas_t scenery,
         if (dist < RALLY_NEAR_Z)
             dist += RALLY_TRACK_LENGTH;
         if (dist > RALLY_NEAR_Z && dist < RALLY_FAR_Z)
-            items[count++] = (item_t){dist, WORLD_CHECKPOINT, i, 0};
+            items[count++] = (item_t){dist, WORLD_CHECKPOINT, i, 0, 0};
     }
     for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
         if (!g->opponents[i].active)
@@ -712,13 +747,32 @@ static void draw_world(const rally_game_t *g, raylib_lite_atlas_t scenery,
             dist += RALLY_TRACK_LENGTH;
         if (dist > RALLY_TRACK_LENGTH * .5f)
             dist -= RALLY_TRACK_LENGTH;
-        if (dist > RALLY_NEAR_Z && dist < RALLY_FAR_Z)
-            items[count++] = (item_t){dist, WORLD_RIDER, i, 0};
+        if (dist > -4.0f && dist < RALLY_FAR_Z)
+            items[count++] = (item_t){dist, WORLD_RIDER, i, 0, 0};
+    }
+    for (unsigned i = 0; i < count; ++i) {
+        item_t *item = &items[i];
+        rally_track_pose_t pose;
+        float lateral = 0;
+        if (item->kind == WORLD_RIDER)
+            lateral = g->opponents[item->index].lateral;
+        else if (item->kind == WORLD_LAMP)
+            lateral = item->side * 6.8f;
+        else if (item->kind == WORLD_CONTAINER)
+            lateral = item->side * 9.2f;
+        else if (item->kind == WORLD_WAREHOUSE)
+            lateral = item->side * 10.8f;
+        else if (item->kind == WORLD_SPRITE)
+            lateral = anchors[item->index].lateral;
+        else if (item->kind == WORLD_CHECKPOINT)
+            lateral = (item->index & 1) ? 5.55f : -5.55f;
+        rally_track_sample_course(g->course_id, g->progress + item->distance, lateral, &pose);
+        item->depth = camera_depth((rally_point3_t){pose.x, pose.y, pose.z});
     }
     for (unsigned i = 1; i < count; ++i) {
         item_t value = items[i];
         unsigned j = i;
-        while (j && items[j - 1].distance < value.distance) {
+        while (j && items[j - 1].depth < value.depth) {
             items[j] = items[j - 1];
             --j;
         }
