@@ -252,7 +252,23 @@ static void draw_ground(const rally_game_t *g)
     /* Clear the lower half exactly once. Road segments then cover only their
      * own trapezoids; this avoids the old per-segment full-width overdraw. */
     DrawRectangle(0, s_horizon, RALLY_W, RALLY_H - s_horizon, theme.terrain);
-    DrawRectangle(0, s_horizon, RALLY_W, 2, color_lerp(theme.accent, theme.sky_bottom, .42f));
+    /* The vista contains water (harbor/lake) or a painted canyon floor, not
+     * the driving surface. A distant land shelf joins it to the world-space
+     * verge. Keep harbor water at the sides of the causeway, never directly
+     * underneath the road's vanishing point. Opaque bands avoid alpha cost. */
+    Color distant_land = color_lerp(theme.sky_bottom, theme.terrain, .65f);
+    DrawTriangle((Vector2){-80, s_horizon}, (Vector2){95, s_horizon - 23},
+                 (Vector2){290, s_horizon}, distant_land);
+    DrawTriangle((Vector2){100, s_horizon}, (Vector2){270, s_horizon - 16},
+                 (Vector2){430, s_horizon}, distant_land);
+    DrawTriangle((Vector2){285, s_horizon}, (Vector2){435, s_horizon - 25},
+                 (Vector2){560, s_horizon}, distant_land);
+    for (int y = s_horizon - 8; y < s_horizon; ++y) {
+        float t = (float)(y - (s_horizon - 8)) / 7.0f;
+        Color land = color_lerp(theme.sky_bottom, theme.terrain, .65f + .35f * t);
+        int inset = g->course_id == 0U ? (int)(150.0f * (1.0f - t)) : 0;
+        DrawRectangle(inset, y, RALLY_W - inset * 2, 1, land);
+    }
 }
 
 /* Retain the visible part of a face crossing the near plane. Discarding
@@ -619,6 +635,11 @@ static void draw_track(const rally_game_t *g, bool near_only)
          * speed cue and advance in world distance rather than segment index. */
         Color asphalt =
             color_lerp(theme.road, theme.sky_bottom, .38f * s_segment_z[i + stride] / RALLY_FAR_Z);
+        /* A finite road mesh must disappear into its surrounding land rather
+         * than terminate in a contrasting horizontal asphalt edge. This only
+         * affects the distant tail; nearby bends and lane widths stay intact. */
+        float distance_fade = clampf((s_segment_z[i + stride] - 45.0f) / 25.0f, 0, 1);
+        asphalt = color_lerp(asphalt, theme.terrain, distance_fade);
         draw_quad(asphalt, l0, r0, l1, r1);
 
         /* A metre-wide opaque curb. A one-pixel line disappears once RGB565
@@ -639,13 +660,15 @@ static void draw_track(const rally_game_t *g, bool near_only)
         rally_point2_t rl1 = project(g, p);
         track_offset(p1, 5.45f, .05f, &p);
         rally_point2_t rr1 = project(g, p);
-        draw_quad(g->course_id == 0   ? (Color){126, 171, 181, 255}
+        Color left_curb = g->course_id == 0   ? (Color){126, 171, 181, 255}
                   : g->course_id == 1 ? (Color){209, 171, 127, 255}
-                                      : (Color){207, 225, 234, 255},
-                  ll0, lr0, ll1, lr1);
-        draw_quad(g->course_id == 0   ? (Color){193, 199, 188, 255}
+                                      : (Color){207, 225, 234, 255};
+        Color right_curb = g->course_id == 0   ? (Color){193, 199, 188, 255}
                   : g->course_id == 1 ? (Color){153, 104, 85, 255}
-                                      : (Color){144, 178, 196, 255},
+                                      : (Color){144, 178, 196, 255};
+        draw_quad(color_lerp(left_curb, theme.terrain, distance_fade),
+                  ll0, lr0, ll1, lr1);
+        draw_quad(color_lerp(right_curb, theme.terrain, distance_fade),
                   rl0, rr0, rl1, rr1);
 
         if (g->course_id == 0U) {
@@ -1133,7 +1156,12 @@ int rally_view_render(const rally_game_t *state, raylib_lite_atlas_t rally_art,
     const raylib_lite_sprite_frame_t *backdrop =
         raylib_lite_atlas_get_frame(track_background, skies[s_course_id]);
     if (backdrop) {
-        DrawTexturePro(track_background.texture, backdrop->source,
+        Rectangle vista = backdrop->source;
+        /* Water painted into the lower third has no relationship to track
+         * coordinates. Retain the skyline, and let the land shelf supply the
+         * foreground instead of presenting an unbridged sea/lake ahead. */
+        if (s_course_id != 1U) vista.height *= .70f;
+        DrawTexturePro(track_background.texture, vista,
                        (Rectangle){0, 0, RALLY_W, s_horizon}, (Vector2){0, 0}, 0, WHITE);
     } else
         draw_sky(g);
