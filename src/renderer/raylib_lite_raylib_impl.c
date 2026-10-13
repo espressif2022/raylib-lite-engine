@@ -811,6 +811,10 @@ static unsigned text_codepoint(const char **text)
 static unsigned text_glyph(unsigned cp)
 { return cp>=32&&cp<=255?cp-32:'?'-32; }
 
+/* ceil(value / 10), including negative coordinates, without floating point. */
+static int text_ceil_tenths(int64_t value)
+{ return (int)(value>=0 ? (value+9)/10 : value/10); }
+
 void raylib_lite_raylib_draw_text(const char *text, int x, int y, int font_size,
                          Color color)
 {
@@ -818,6 +822,7 @@ void raylib_lite_raylib_draw_text(const char *text, int x, int y, int font_size,
     if(font_size<10)font_size=10;
     double scale=font_size/10.0, spacing=font_size/10;
     double base_x=x,base_y=y,offset_x=0,offset_y=0;
+    int64_t offset_tenths=0;
     if(s_camera_active){
         Vector2 p=active_to_screen((Vector2){base_x,base_y});
         base_x=p.x;base_y=p.y;scale*=s_camera.zoom;spacing*=s_camera.zoom;
@@ -826,13 +831,18 @@ void raylib_lite_raylib_draw_text(const char *text, int x, int y, int font_size,
     span_paint_t paint=span_paint(color);
     while(*text){
         unsigned cp=text_codepoint(&text),g=text_glyph(cp);
-        if(cp=='\n'){offset_x=0;offset_y+=font_size+2;continue;}
+        if(cp=='\n'){offset_x=0;offset_tenths=0;offset_y+=font_size+2;continue;}
         double left=base_x+offset_x,top=base_y+offset_y*(s_camera_active?s_camera.zoom:1);
         int width=compat_font_width[g];
+        int64_t left_tenths=(int64_t)x*10+offset_tenths;
+        bool integer_edges=!s_camera_active && font_size<=512 &&
+            left_tenths>=-1000000000 && left_tenths<=1000000000;
         int top_tenths=(int)lround(top*10);
         float inverse_scale=(float)(1.0/scale);
         if(cp!=' '&&cp!='\t'){
-            int x0=(int)ceil(left-.5-1e-9),x1=(int)ceil(left+width*scale-.5-1e-9);
+            int x0=integer_edges?text_ceil_tenths(left_tenths-5):(int)ceil(left-.5-1e-9);
+            int x1=integer_edges?text_ceil_tenths(left_tenths+width*font_size-5):
+                (int)ceil(left+width*scale-.5-1e-9);
             int y0=(int)ceil(top-.5-1e-9),y1=(int)ceil(top+10*scale-.5-1e-9);
             /* Clip before sampling; a large off-screen glyph costs no work. */
             if(x0<0)x0=0;
@@ -845,36 +855,51 @@ void raylib_lite_raylib_draw_text(const char *text, int x, int y, int font_size,
                 if(y0<s_scissor_y0)y0=s_scissor_y0;
                 if(y1>s_scissor_y1)y1=s_scissor_y1;
             }
-            if(x0>=x1||y0>=y1){offset_x+=width*scale+spacing;continue;}
-            /* The default atlas is at most nine columns wide. Reuse the
-             * exact sample boundaries across rows; double ceil is costly
-             * on targets with only single-precision hardware. */
+            if(x0>=x1||y0>=y1){
+                offset_x+=width*scale+spacing;
+                offset_tenths+=(int64_t)width*font_size+(font_size/10)*10;
+                continue;
+            }
+            /* Without a camera, pen advances are exact tenths of a pixel.
+             * Integer ceil preserves the atlas sample boundaries. Retain
+             * the floating path for camera zoom and unusually large text.
+             * The default atlas is at most nine columns wide. */
             int edges[10];
             for(int col=0;col<=width;++col){
-                int edge=(int)ceil(left+col*scale-.5-1e-9);
+                int edge=integer_edges?text_ceil_tenths(left_tenths+col*font_size-5):
+                    (int)ceil(left+col*scale-.5-1e-9);
                 if(edge<x0)edge=x0;
                 if(edge>x1)edge=x1;
                 edges[col]=edge;
             }
+            int cached_sy=-1,run_count=0;
+            int run_start[5],run_end[5];
             for(int row=y0;row<y1;++row){
                 int sy=s_camera_active?(int)((row+.5f-(float)top)*inverse_scale):
                     ((2*row+1)*5-top_tenths)/font_size;
-                int first=-1;
                 if((unsigned)sy>=10)continue;
-                /* Scan at most nine source bits, then scale whole runs.
-                 * Avoid a division for every destination pixel. */
-                for(int col=0;col<=width;++col){
-                    bool ink=col<width&&(compat_font_rows[g][sy]&(1U<<col));
-                    if(ink&&first<0)first=col;
-                    if(!ink&&first>=0){
-                        int start=edges[first];
-                        int end=edges[col];
-                        fill_span(row,start,end,&paint);first=-1;
+                if(sy!=cached_sy){
+                    int first=-1;
+                    run_count=0;cached_sy=sy;
+                    /* A scaled source row may cover several target rows.
+                     * Decode its ink runs once; preserve each row write and
+                     * blend so translucent pixels are still touched once. */
+                    for(int col=0;col<=width;++col){
+                        bool ink=col<width&&(compat_font_rows[g][sy]&(1U<<col));
+                        if(ink&&first<0)first=col;
+                        if(!ink&&first>=0){
+                            int start=edges[first];
+                            int end=edges[col];
+                            run_start[run_count]=start;run_end[run_count++]=end;first=-1;
+                        }
                     }
                 }
+                for(int run=0;run<run_count;++run)
+                    fill_span(row,run_start[run],run_end[run],&paint);
             }
         }
         offset_x+=width*scale+spacing;
+        offset_tenths+=(int64_t)width*font_size+(font_size/10)*10;
     }
 }
 
