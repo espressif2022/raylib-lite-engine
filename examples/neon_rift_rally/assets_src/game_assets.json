@@ -2,7 +2,7 @@
   "schema": "mosaico-game-assets/v1",
   "atlases": [
     {"config": "rally_atlas.json", "source": "rally_atlas_source.png", "output": "rally.atlas"},
-    {"config": "track_background.json", "source": "track_canyon.png", "output": "track_background.atlas"},
+    {"config": "track_background.json", "source": "rally_panoramas.png", "output": "track_background.atlas"},
     {"config": "motorcycle_poses.json", "source": "motorcycle_poses_v2_source.png", "output": "motorcycle.atlas"}
   ],
   "sounds": [

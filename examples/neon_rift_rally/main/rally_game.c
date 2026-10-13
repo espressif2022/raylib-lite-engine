@@ -367,7 +367,10 @@ static void update_opponents(rally_game_t *game)
         float final_lap = opponent->laps_completed + 1U >= RALLY_TARGET_LAPS ? .6f : 0.0f;
         const float target_speed = s_opponent_speeds[i] + wave + catch_up -
                                    leader_brake + style_speed + final_lap;
-        opponent->speed += (target_speed - opponent->speed) * 2.7f * RALLY_DT;
+        /* Launch with comparable acceleration instead of jumping to race pace.
+         * Existing bounded catch-up and driving styles still set the target. */
+        opponent->speed += clampf((target_speed - opponent->speed) * 2.7f,
+                                   -20.0f, 18.0f) * RALLY_DT;
         if (opponent->decision_cooldown) --opponent->decision_cooldown;
         else {
             float target = s_opponent_lanes[i] +
@@ -474,12 +477,17 @@ static void update_risk(rally_game_t *game)
 {
     if (game->combo_timer) --game->combo_timer;
     else game->combo = 0U;
-    if (game->drifting) {
+    /* A clean release pays out. Leaving the road, jumping or crashing
+     * cancels the charge instead of rewarding a failed turn. */
+    const bool clean = game->grounded && !game->offtrack &&
+                       !game->collision_ticks && game->phase == RALLY_PHASE_PLAYING;
+    if (!clean) game->risk_meter = 0.0f;
+    if (game->drifting && clean) {
         game->risk_meter = clampf(game->risk_meter +
                                   fabsf(game->lateral_velocity) * 2.3f * RALLY_DT,
                                   0.0f, 100.0f);
     }
-    if (game->previous_drifting && !game->drifting && game->risk_meter >= 8.0f) {
+    if (clean && game->previous_drifting && !game->drifting && game->risk_meter >= 8.0f) {
         const uint32_t payout = (uint32_t)(game->risk_meter * 4.0f);
         const float boost = clampf(game->risk_meter * 0.045f,
                                    RALLY_DRIFT_BOOST_MIN, RALLY_DRIFT_BOOST_MAX);
@@ -543,7 +551,7 @@ void rally_reset(rally_game_t *game)
     game->gap_ahead = -1.0f;
     game->phase = RALLY_PHASE_COUNTDOWN;
     for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
-        game->opponents[i].progress = 9.0f * (float)(i + 1U);
+        game->opponents[i].progress = 6.5f * (float)(i + 1U);
         game->opponents[i].lateral = s_opponent_lanes[i];
         game->opponents[i].lane = s_opponent_lanes[i];
         game->opponents[i].target_lane = s_opponent_lanes[i];
@@ -866,4 +874,26 @@ uint32_t rally_state_hash(const rally_game_t *game)
         hash = hash_mix(hash, opponent->finished ? 1u : 0u);
     }
     return hash;
+}
+
+void rally_drift_assist_reset(rally_drift_assist_t *assist)
+{
+    if (assist) *assist = (rally_drift_assist_t){0};
+}
+
+bool rally_drift_assist_update(rally_drift_assist_t *assist,
+                              const rally_game_t *game, float steer)
+{
+    if (!assist) return false;
+    if (!game || game->phase != RALLY_PHASE_PLAYING || !game->grounded ||
+        game->offtrack || game->collision_ticks || game->speed < 12.0f ||
+        !isfinite(steer) || fabsf(steer) < .28f) {
+        rally_drift_assist_reset(assist);
+        return false;
+    }
+    if (assist->active) return true;
+    if (game->speed >= 18.0f && fabsf(steer) >= .60f) {
+        if (++assist->hold_ticks >= 8U) assist->active = true;
+    } else assist->hold_ticks = 0U;
+    return assist->active;
 }

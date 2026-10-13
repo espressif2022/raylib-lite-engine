@@ -63,9 +63,69 @@ static void steering_recovery(void)
     puts("high-speed pulses recover; all courses require steering and remain controllable");
 }
 
+static void drift_assist_and_clean_release(void)
+{
+    rally_game_t game;
+    driving_state(&game, 0);
+    rally_drift_assist_t assist = {0};
+    for (unsigned i = 0; i < 7; ++i)
+        assert(!rally_drift_assist_update(&assist, &game, .75f));
+    assert(rally_drift_assist_update(&assist, &game, .75f));
+    assert(rally_drift_assist_update(&assist, &game, .35f));
+    assert(!rally_drift_assist_update(&assist, &game, .2f));
+    assert(assist.hold_ticks == 0 && !assist.active);
+    for (unsigned i = 0; i < 20; ++i) {
+        assert(!rally_drift_assist_update(&assist, &game, i % 2 ? .4f : .75f));
+    }
+    for (unsigned condition = 0; condition < 4; ++condition) {
+        driving_state(&game, 0);
+        assist = (rally_drift_assist_t){8, true};
+        if (condition == 0) game.grounded = false;
+        if (condition == 1) game.offtrack = true;
+        if (condition == 2) game.collision_ticks = 8;
+        if (condition == 3) game.phase = RALLY_PHASE_COUNTDOWN;
+        assert(!rally_drift_assist_update(&assist, &game, -.75f));
+        assert(!assist.active && !assist.hold_ticks);
+    }
+    for (unsigned condition = 0; condition < 4; ++condition) {
+        driving_state(&game, 0);
+        game.risk_meter = 60;
+        game.previous_drifting = true;
+        if (condition == 1) game.lateral = RALLY_MAX_LATERAL;
+        if (condition == 2) { game.grounded = false; game.height = 2; }
+        if (condition == 3) game.collision_ticks = 8;
+        rally_set_controls(&game, 1, 0, 0, false, false);
+        rally_update(&game);
+        assert(!!(rally_events(&game) & RALLY_EVENT_DRIFT_BOOST) == (condition == 0));
+        assert(game.risk_meter == 0);
+    }
+    puts("drift assist hysteresis and clean release reward passed");
+}
+
+static void fair_launch(void)
+{
+    rally_game_t game;
+    rally_reset(&game);
+    game.phase = RALLY_PHASE_PLAYING;
+    game.countdown_ticks = 0;
+    rally_set_controls(&game, 1, 0, 0, false, false);
+    for (unsigned tick = 0; tick < 30; ++tick) {
+        rally_update(&game);
+        for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i)
+            assert(game.opponents[i].speed <= game.speed + .01f);
+    }
+    for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
+        float gap = game.opponents[i].progress - game.progress;
+        assert(gap > 0 && gap < 45);
+    }
+    puts("opponents launch fairly and remain in sight");
+}
+
 int main(void)
 {
     steering_recovery();
+    drift_assist_and_clean_release();
+    fair_launch();
     rally_game_t a, b;
     rally_reset(&a); rally_reset(&b);
     deterministic_drive(&a, 900U);

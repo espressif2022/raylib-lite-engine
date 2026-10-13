@@ -198,6 +198,16 @@ typedef struct {
     rally_opponent_t opponents[RALLY_OPPONENT_COUNT];
 } rally_game_t;
 
+/* Native one-finger/tilt drift: hold a strong turn, release toward center.
+ * Kept outside race state so keyboard/replay inputs retain explicit drift. */
+typedef struct {
+    uint8_t hold_ticks;
+    bool active;
+} rally_drift_assist_t;
+void rally_drift_assist_reset(rally_drift_assist_t *assist);
+bool rally_drift_assist_update(rally_drift_assist_t *assist,
+                              const rally_game_t *game, float steer);
+
 void rally_reset(rally_game_t *game);
 void rally_start(rally_game_t *game);
 void rally_set_input(rally_game_t *game, rally_input_t input);

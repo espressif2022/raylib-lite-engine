@@ -8,6 +8,7 @@ cc -std=c11 -Wall -Wextra -Werror -I"$project_dir/main" \
 "$out"
 python3 "$project_dir/tests/check_feedback.py"
 python3 "$project_dir/tests/check_motorcycle_poses.py"
+python3 "$project_dir/tests/check_scenery_assets.py"
 python3 "$project_dir/tests/check_view_motion.py"
 python3 "$project_dir/tests/check_steering_response.py"
 

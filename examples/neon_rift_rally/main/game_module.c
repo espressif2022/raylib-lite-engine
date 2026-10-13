@@ -53,6 +53,7 @@ typedef struct {
     bool brake;
     bool nitro;
     bool drift;
+    rally_drift_assist_t drift_assist;
     int32_t steer_track;
     int32_t nitro_track;
     int32_t course_select_track;
@@ -237,6 +238,7 @@ static void reset_run(neon_rift_rally_module_t *state)
     state->imu_calibrated = false;
     state->last_feedback_serial = 0;
     state->feedback_cooldown = 0;
+    rally_drift_assist_reset(&state->drift_assist);
     rally_view_motion_reset(&state->view_motion);
 }
 
@@ -408,6 +410,7 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
     if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
         if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) {
             state->paused = true;
+            rally_drift_assist_reset(&state->drift_assist);
 #if defined(RAYLIB_LITE_GAME_NATIVE)
             feedback_stop();
 #endif
@@ -431,6 +434,7 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         else if (event->code == 7) state->drift = event->pressed;
         else if (event->code == 3 && event->pressed) {
             state->paused = !state->paused;
+            if (state->paused) rally_drift_assist_reset(&state->drift_assist);
 #if defined(RAYLIB_LITE_GAME_NATIVE)
             if (state->paused) feedback_stop();
 #endif
@@ -515,7 +519,11 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
 static void update(void *value)
 {
     neon_rift_rally_module_t *state = value;
-    if (!state || state->paused) return;
+    if (!state) return;
+    if (state->paused) {
+        rally_drift_assist_reset(&state->drift_assist);
+        return;
+    }
     if (state->imu_age_ticks < UINT8_MAX) ++state->imu_age_ticks;
     float tilt = 0.0f;
     if (state->imu_calibrated && state->imu_age_ticks <= 12U) {
@@ -534,14 +542,16 @@ static void update(void *value)
         steer = (state->steer_right ? 1.0f : 0.0f) -
                 (state->steer_left ? 1.0f : 0.0f);
     bool drive_throttle = state->throttle || state->touch_throttle;
+    bool drive_drift = state->drift;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
     /* Touch-first kart controls: native play auto-accelerates so one finger
        steers and the second can boost. Host/replay controls remain explicit. */
     drive_throttle = true;
+    drive_drift |= rally_drift_assist_update(&state->drift_assist, &state->game, steer);
 #endif
     rally_set_controls(&state->game,
         drive_throttle,
-        state->brake, steer, state->drift,
+        state->brake, steer, drive_drift,
         state->nitro || state->touch_nitro);
     rally_update(&state->game);
     rally_view_motion_update(&state->view_motion, &state->game);
