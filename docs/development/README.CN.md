@@ -13,6 +13,7 @@
 | [Scene/UI 行为补证](scene-ui-contracts.CN.md) | 回归复现、修正和验证范围 |
 | [Renderer 公共头拆分](renderer-header-split-20261012.CN.md) | 绘制、统计与基准声明拆分及兼容验证 |
 | [Sky Hop 原生适配](sky-hop-rcore-20261012.CN.md) | S31 同板实测、性能不达标与兼容路径回退 |
+| [示例渲染技术提取审查](render-extraction-review.CN.md) | 共享与公开门槛、候选归属和未实施的处理顺序 |
 | [Raylib 历史对照](raylib-comparison-history.CN.md) | 历史整帧及像素测量，保留当时计划 |
 
 新增正式契约写入正式指南；执行过程、候选数据、固件身份和未验证路径写入本目录。正式指南不链接开发记录，避免发布后指向未打包内容。

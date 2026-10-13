@@ -7,6 +7,8 @@ cc -std=c11 -Wall -Wextra -Werror -I"$project_dir/main" \
   -lm -o "$out"
 "$out"
 python3 "$project_dir/tests/check_feedback.py"
+python3 "$project_dir/tests/check_motorcycle_poses.py"
+python3 "$project_dir/tests/check_view_motion.py"
 python3 "$project_dir/tests/check_steering_response.py"
 
 state="${TMPDIR:-/tmp}/neon_rift_rally_two_finger.json"

@@ -66,15 +66,29 @@ static void draw_enemy(raylib_lite_atlas_t atlas,const shooter_actor_t *enemy)
     static const Color colors[]={
         {255,105,62,255},{255,54,173,255},{72,238,170,255}
     };
-    float size=enemy->kind==0?43.0f:(enemy->kind==1?49.0f:55.0f);
+    float size=enemy->elite?72.0f:(enemy->kind==0?43.0f:(enemy->kind==1?49.0f:55.0f));
     DrawEllipse((int)enemy->x+14,(int)enemy->y+17,size*.43f,size*.31f,
                 (Color){12,10,36,255});
     draw_sprite(atlas,ids[enemy->kind],enemy->x+(28.0f-size)*.5f,
                 enemy->y+(28.0f-size)*.5f,size,size);
+    if(enemy->elite)
+        DrawText("ACE",(int)enemy->x+3,(int)enemy->y-22,10,C_GOLD);
     if(enemy->kind>0&&enemy->hp){
         DrawRectangle((int)enemy->x+3,(int)enemy->y-8,24,2,(Color){32,26,55,255});
-        DrawRectangle((int)enemy->x+3,(int)enemy->y-8,8*(int)enemy->hp,2,
+        int hpw=enemy->max_hp?24*(int)enemy->hp/(int)enemy->max_hp:0;
+        DrawRectangle((int)enemy->x+3,(int)enemy->y-8,hpw,2,
                       colors[enemy->kind]);
+    }
+}
+
+static void draw_danger_cues(const shooter_game_t *game)
+{
+    for(size_t i=0;i<SHOOTER_MAX_ENEMIES;++i){
+        const shooter_actor_t *enemy=&game->enemies[i];
+        if(!enemy->active||enemy->y<330.0f)continue;
+        Color color=enemy->y>400.0f?C_PINK:C_GOLD;
+        int x=(int)enemy->x+14;
+        DrawTriangle((Vector2){x,452},(Vector2){x-7,464},(Vector2){x+7,464},color);
     }
 }
 
@@ -170,6 +184,7 @@ void shooter_view_render(const shooter_game_t *game,raylib_lite_atlas_t atlas)
     draw_projectiles(game);
     for(size_t i=0;i<SHOOTER_MAX_ENEMIES;++i)if(game->enemies[i].active)
         draw_enemy(atlas,&game->enemies[i]);
+    draw_danger_cues(game);
     draw_particles(game);
     draw_hud(game);
     if(game->phase==SHOOTER_START)draw_start_card();

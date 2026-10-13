@@ -39,8 +39,9 @@ def replay(tilt: float, touch: bool = False) -> dict:
 def main() -> int:
     neutral = replay(.25)
     centered = replay(.29)
-    right = replay(.8)
-    left = replay(-.3)
+    # The mounted board reports increasing sensor X when its left edge drops.
+    left = replay(.8)
+    right = replay(-.3)
     touch_override = replay(.8, touch=True)
     if abs(centered["lateral"] - neutral["lateral"]) > .15:
         raise AssertionError(f"tilt deadzone moved the motorcycle: {centered}")

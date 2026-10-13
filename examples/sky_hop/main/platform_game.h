@@ -52,6 +52,8 @@ typedef struct {
     bool checkpoint_active;
     uint8_t coyote_frames;
     uint8_t jump_buffer;
+    uint8_t coin_chain;
+    uint8_t coin_chain_timer;
     uint32_t tick;
     uint32_t phase_tick;
     uint16_t score;

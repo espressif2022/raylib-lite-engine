@@ -12,6 +12,14 @@ system. Small tilts use a nonlinear response, steering engagement is rate
 limited, and release is faster. Vehicle motion and camera yaw share the shaped
 command. Curve drift remains, with enough steering authority to counter it.
 
+The view maps that continuous command to five single-frame poses: heavy left,
+light left, straight, light right, and heavy right. Separate entry and exit
+thresholds suppress boundary flicker. A reversal advances one pose at a time
+and must cross straight; release uses the faster continuous filter. Extra
+rotation pivots around the rear-tyre contact point, while drift adds a small
+tail offset instead of rotating the whole bike more aggressively. These states
+are view-only and do not enter the race hash or saved records.
+
 ## Host verification
 
 The [control replay](../tests/check_steering_response.py) compiles the actual
@@ -30,6 +38,8 @@ replay, in track-local game units; they are not physical distances.
 These pulse measurements matched across all three courses. Additional checks
 cover alternating ±0.30 g swings every six ticks, neutral touch takeover,
 leftward touch drag, repeated 3 g spikes, steering release and heading recovery.
+The replay also verifies that left touch selects a left pose, sustained right
+input reaches heavy right, and an IMU pulse does not skip pose levels.
 After the repeated swings, the shaped steering returns to zero; maximum extra
 lateral excursion is approximately 0.25 units. Deliberately holding a large
 right tilt still exits the road. High-speed model tests check both directions,

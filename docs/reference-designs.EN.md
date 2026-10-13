@@ -70,6 +70,34 @@ The raster core is deliberately Raylib-neutral: `raylib_lite_renderer.h` owns re
 
 Choose texture layout by access direction: ray columns can use column-major INDEX8; horizontal spans can use row-major data. Compare RGB565, INDEX8, and compressed textures by image quality, memory, and device time. Do not assume bitmask wrapping for dimensions that are not powers of two. Declare coverage, masking, or alpha blending for each layer. RGB565 quantization, rounding, stride padding, and resource lifetime are part of the pixel contract. Match fast paths against an independent per-pixel reference.
 
+### Where example rendering techniques belong
+
+An example optimization can be useful to other games without becoming a public API. Keep game style, map rules, and approximation policies in the game. Share repeated implementations with matching semantics through application-side helpers first. Promote a capability to an engine-owned public API only when existing entrypoints are insufficient, multiple real consumers need it, and its contract is stable. Shared example helpers do not automatically carry a public support commitment or permit dependencies on engine-private headers or concrete boards.
+
+| Technique | Reuse value | Appropriate boundary and limits |
+| --- | --- | --- |
+| Atlas frame IDs, pivots, flips, and destination sizing | Common in 2D games | Reuse existing atlas and texture entrypoints; share wrappers with matching conventions. A wrapper alone does not establish an FPS gain |
+| Wrapped panoramas and split background seams | Scrolling backgrounds, panoramas, and skies | Share after defining arbitrary-size wrapping, source normalization, clipping, and seam coverage at fractional scales |
+| Camera precomputation, shared vertex projection, and early culling | Several lightweight 3D scenes | Check existing raymath first. Make viewport, coordinates, near plane, and workspace explicit; leave camera effects to games |
+| Near-plane clipping with UV attributes | Lightweight 3D games | Validate independently, then share. Define interpolation, output capacity, degenerate faces, and overflow before seeking a second consumer |
+| Depth meshes and projection caches | Depth-driven 2.5D scenes | Share stable mesh preparation or projection; keep water, aurora, and waterfall animation formulas in games |
+| Sparse rays, wall-edge refinement, and road sampling | Raycast games or pseudo-3D racers | Keep map queries, doors/windows, road layout, and error budgets as example policies |
+| Coarse occlusion grids, average-depth sorting, and adaptive subdivision | Quality/performance tradeoffs in constrained scenes | Keep private or experimental initially. These do not provide a general depth buffer or complete visibility guarantee |
+
+For example, [Living Worlds volume and coverage](../examples/living_worlds/main/living_worlds_volume.c) uses a fixed vertex workspace and a 32×32 coverage grid without general per-pixel depth comparison. [Tomb clipping and draw queues](../examples/tomb_raycast/main/tomb_view.c) uses bounded storage, average-depth sorting, and subdivision thresholds. [Rally projection](../examples/neon_rift_rally/main/rally_view.c) retains horizontally off-screen vertices for raster clipping. Similar function purposes do not justify replacing these policies with one default. Check existing [raymath](../third_party/raylib/src/raymath.h) before introducing another matrix or transformation API.
+
+Textured triangles/quads, wall-column batches, floor rows, atlas lookup, and animation selection already exist in the [renderer drawing API](../include/raylib_lite/raylib_lite_renderer_draw.h). Distinguish missing raster capabilities from game-specific generation of draw parameters. Another wrapper, a few parameter conversions, or an `extern` declaration alone does not justify a public capability. See [custom API roles](custom-api.CN.md) for ownership and usage boundaries.
+
+### Acceptance before extraction
+
+Complete these checks before publishing an interface. Unimplemented work order belongs in repository development records rather than the interface commitments on this page.
+
+1. Identify actual consumers and shared semantics; check existing APIs. Put ordinary wrappers in shared example code first and retain game-dependent or insufficiently reused implementations privately.
+2. Define coordinates and attributes, texture formats, coverage/sampling, resource ownership or borrowing, workspace capacity and lifetime, failure returns, cleanup, and call restrictions. Review fixed resolutions, static arrays, and thresholds so they do not become hidden public constants.
+3. Migrate consumers individually while preserving default drawing behavior. Use explicit capacities or independently owned workspaces. Avoid cross-game global state, large default allocations, and per-frame allocation. Do not merge incompatible near-plane, sorting, or occlusion policies.
+4. Use independent pixel references or explicit geometric invariants to validate seams, clipping, boundaries, empty input, overflow, resource release, and cache invalidation. Compare quality before kernel and whole-device cost with identical inputs and scenes. Cache hits and static reference counts are not performance measurements.
+5. Only then update public headers, the machine-readable catalogue, contracts, test associations, audits, and release checks. New engine-owned APIs do not extend the frozen compatibility mapping list. Keep the example implementation if extraction fails to improve reuse or regresses quality, memory, or device time.
+
 ## 4. Validate reuse
 
 First use deterministic Host replay to test state, pixels, boundaries, and failure cleanup. Then measure kernels and actual display submission separately on device. Finally test the complete game for interaction, worst frames, and FPS. Record primitives, written pixels, samples, buffer waits, and display submission separately. Change one variable at a time while holding board, clocks, asset location, build settings, and scene constant. Version scoring rules; a microbenchmark score does not establish a game-frame improvement.

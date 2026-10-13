@@ -1,44 +1,39 @@
 # Living Worlds
 
-A 360-degree living-world viewer for ESP-Mosaico. Drag to look around four
-scenes — Aurora, Ocean, Sunrise, and Jungle — then idle three seconds to resume
-the automatic tour. The Host RGB565 preview and the device compile the same
-world and view sources.
-
-四场景 360° 环视 Demo。拖动环视极光、深海、日出和丛林；静止约三秒后自动巡游恢复。Host RGB565 预览与真机编译同一套世界与画面源码。
+Living Worlds 是四场景 360° 环视体验。玩家可浏览 Aurora、Ocean、Sunrise 和 Jungle；
+停止操作约三秒后，自动巡游会继续运行。
 
 ![Living Worlds Sunrise](docs/screenshot.png)
 
-The screenshot above is a live device capture of the Sunrise scene.
-
 上图为 Sunrise 场景的真机截图。
 
-## Play / 玩法
+## 玩法与操作
 
-- Horizontal drag turns through the full panorama. / 水平拖动完成 360° 转向。
-- Vertical drag looks toward the sky or the ground. / 垂直拖动仰视或俯视。
-- Bottom buttons switch Aurora / Ocean / Sunrise / Jungle. / 底部按钮切换极光 / 深海 / 日出 / 丛林。
-- The top FX chip cycles living / mid / low effects. / 顶部 FX 芯片在 Living / Mid / Low 效果档之间切换。
+### 真机
 
-The example builds a deterministic 2.5D RGB565 scene: perspective ground bands,
-volume meshes, and light. It does not depend on OpenGL, Camera3D, shaders, or a
-project-specific PC host.
+- 水平拖动旋转视角，垂直拖动仰视或俯视。
+- 底部按钮切换四个场景。
+- 顶部 FX 按钮在 `Living`、`Mid`、`Low` 效果档之间切换。
 
-场景用确定性 2.5D RGB565 路径绘制体积网格与光照，不依赖 OpenGL、Camera3D、shader 或项目私有 PC Host。
+### Host
 
-## Run / 运行
+鼠标拖动和真机触摸使用相同的视角规则，场景和 FX 按钮也可直接点击。
 
-```bash
-# Host 仿真：本仓库根目录，主机 C 编译器 + Pillow
+## Host 预览
+
+在仓库根目录运行：
+
+```sh
 python3 tools/game_cli.py sim examples/living_worlds
-python3 tools/game_cli.py sim examples/living_worlds --headless --frames 300
 ```
 
-本目录提供仓库内 ESP-IDF native 工程，需要相邻共享目录。`main/idf_component.yml` 只声明版本化 Engine 依赖，Application CMake 选择通用 Board component；Living Worlds 的 device-only JPEG adapter 隔离在 `main/native/`，仍属于 Game `main` component，且不依赖具体 Board API。仓库内通过 `override_path` 联调 Engine；ESP-Mosaico Board 自动获取固定 Git revision 的 BSP 依赖。设备安装与更新由 `esp-mosaico-vibe` 的 Recovery-first 流程维护，Host 仿真不需要板级依赖。
+## 实现特点
 
-当前支持 Host 和 native ESP-IDF 固件，不支持 ELF 游戏构建、打包或加载。
-历史测量见[历史真机记录](HISTORICAL_PERFORMANCE.md)和[性能实验日志](PERFORMANCE.md)；它们不是当前版本的性能验收值。
+场景使用确定性的 2.5D RGB565 路径绘制透视地面、体积网格和光照，不依赖 OpenGL、
+Camera3D 或 shader。Host 与真机共用世界模型和视图；设备 JPEG 适配保留在 native
+实现中。
 
-## Native build
+## Native 构建
 
-See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.
+构建目标和 Board 选择见[构建路径](../../docs/build-matrix.CN.md)。历史设备记录保存在
+[历史真机记录](HISTORICAL_PERFORMANCE.md)，不代表当前版本的性能结论。

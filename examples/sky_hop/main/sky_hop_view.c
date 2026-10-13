@@ -189,10 +189,21 @@ bool sky_hop_view_render(const sky_hop_view_t *view)
              181, 11, 18, (Color){129, 224, 171, 255});
     DrawText(TextFormat("BEST %04u", view->best_score), 250, 13, 14,
              (Color){255, 220, 80, 255});
+    if (game->coin_chain > 1U)
+        DrawText(TextFormat("COIN x%u", game->coin_chain), 250, 29, 10,
+                 (Color){255, 220, 80, 255});
     DrawText(TextFormat("LIFE %u", game->lives), 365, 11, 20, RAYWHITE);
     DrawRectangle(438, 4, 36, 32, (Color){52, 77, 104, 255});
     DrawRectangle(449, 11, 4, 18, RAYWHITE);
     DrawRectangle(459, 11, 4, 18, RAYWHITE);
+    if (game->phase == PLATFORM_PLAYING && game->level == 0 && game->tick < 240U) {
+        const char *hint = game->tick < 105U ? "HOLD A DIRECTION TO RUN"
+                          : "TAP JUMP / HOLD FOR HEIGHT";
+        int width = MeasureText(hint, 13) + 24;
+        DrawRectangle((480 - width) / 2, 54, width, 25, (Color){20, 39, 65, 220});
+        DrawRectangle((480 - width) / 2, 77, width, 2, (Color){129, 224, 171, 255});
+        centered(hint, 60, 13, RAYWHITE);
+    }
     draw_button((Rectangle){8, 408, 138, 64}, "LEFT", (Color){25, 43, 65, 210},
                 game->move_left);
     draw_button((Rectangle){154, 408, 138, 64}, "RIGHT", (Color){25, 43, 65, 210},

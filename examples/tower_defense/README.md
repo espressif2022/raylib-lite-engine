@@ -1,35 +1,38 @@
-# Circuit Keep 塔防游戏
+# Circuit Keep
 
-塔防参考游戏，使用 480×480 RGB565 画面。
-地图来自 Tiled `.tmj`，角色和塔来自统一 RGB565+A8 Atlas，短音效采用 PCM16，循环
-背景音乐采用 IMA-ADPCM。设备和 Host 使用相同的资源文件、游戏模型和 C 像素渲染核心。
+Circuit Keep 是 480×480 RGB565 塔防游戏。玩家在固定基座上建造和改造三类防御塔，
+阻止敌人沿道路进入右侧核心。
 
-## 玩法
+## 玩法与操作
+
+### 真机
 
 1. 点击开始。
 2. 在底部选择 `PULSE`、`RAPID` 或 `FROST`。
-3. 点击地图上的 `+` 基座建塔；选中同类塔再点已有塔可升级，最高三级。
-   选中不同类型再点已有塔可将其改造为新塔，旧塔累计投入按 50% 折抵。
-4. 阻止三类敌人沿道路进入右侧核心。击杀获得金币，波次结束有奖励。
-5. 右上角按钮暂停或继续，核心生命归零后点击面板重新开始。
+3. 点击地图上的 `+` 基座建塔。
+4. 选中同类塔再点已有塔可升级；选择不同类型可改造，旧投入按 50% 折抵。
+5. 右上角按钮暂停或继续；失败后点击结果面板重新开始。
 
-三类塔分别侧重均衡伤害、高射速和减速控制；游戏模型使用固定对象池，运行中不分配对象。
+三类塔分别侧重均衡伤害、高射速和减速控制。相邻不同类型的塔还能形成组合增益。
 
-## 运行
+### Host
 
-```bash
-# Host 仿真：本仓库根目录，主机 C 编译器 + Pillow
+鼠标点击和真机触摸使用同一套界面与放置规则。浏览器工具栏可暂停、单步和重新开始。
+
+## Host 预览
+
+在仓库根目录运行：
+
+```sh
 python3 tools/game_cli.py sim examples/tower_defense
-python3 tools/game_cli.py sim examples/tower_defense --headless --frames 300
-python3 tools/game_cli.py sim examples/tower_defense --headless \
-  --scenario replay.json --state-output artifacts/tower-state.json
 ```
 
-本目录提供独立 ESP-IDF 原生固件工程；生产固件的板级策略由外部产品仓库决定。
+## 实现特点
 
-非 headless 预览地址为 `http://127.0.0.1:8460/`；局域网预览可加
-`--listen 0.0.0.0`。
+地图来自 Tiled，角色和防御塔使用 RGB565+A8 Atlas。游戏模型采用固定对象池，运行时
+不分配敌人、弹丸或特效对象。设备和 Host 共用资源、模型和 C 绘制代码。
 
-## Native build
+## Native 构建
 
-See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.
+构建目标和 Board 选择见[构建路径](../../docs/build-matrix.CN.md)。Host 测试、回放和
+设备验收方法见[游戏开发指南](../../docs/game-development.CN.md)。

@@ -57,6 +57,7 @@ void tower_game_reset(tower_game_t *game, uint32_t seed)
     game->credits = 190;
     game->base_hp = 20;
     game->selected_type = TOWER_PULSE;
+    game->selected_pad = -1;
     game->wave = 1;
     game->wave_total = 9;
     game->intermission = 45;
@@ -108,6 +109,7 @@ static void handle_tap(tower_game_t *game, float x, float y)
     for (size_t i = 0; i < TOWER_PAD_COUNT; ++i) {
         tower_slot_t *tower = &game->towers[i];
         if (distance_sq(x, y, tower->x, tower->y) > 24.0f*24.0f) continue;
+        game->selected_pad = (int8_t)i;
         if (!tower->occupied) {
             uint16_t cost = COST[game->selected_type];
             if (game->credits >= cost) {
@@ -238,7 +240,12 @@ static void update_projectiles(tower_game_t *game)
         float dx = enemy->x-p->x, dy = enemy->y-p->y;
         float d2 = dx*dx+dy*dy;
         if (d2 < 10.0f*10.0f) {
-            enemy->hp -= p->damage;
+            uint8_t damage = p->damage;
+            if (enemy->slow_ticks && p->kind != TOWER_FROST) {
+                damage = (uint8_t)(damage + (p->kind == TOWER_PULSE ? damage : 2U));
+                ++game->synergy_hits;
+            }
+            enemy->hp -= damage;
             if (p->kind == TOWER_FROST) enemy->slow_ticks = 42;
             p->active = false;
             if (enemy->hp <= 0) destroy_enemy(game, enemy);

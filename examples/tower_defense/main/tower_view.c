@@ -12,6 +12,7 @@ static const Color C_GOLD = {255, 193, 61, 255};
 static const Color C_CYAN = {42, 224, 231, 255};
 static const Color C_RED = {255, 73, 105, 255};
 static const Color C_BLUE = {110, 145, 255, 255};
+static const float TOWER_RANGE[TOWER_TYPE_COUNT] = {96.0f, 78.0f, 112.0f};
 
 static void draw_sprite(raylib_lite_atlas_t atlas, const char *name, float x, float y,
                         float size, float rotation, Color tint)
@@ -109,11 +110,15 @@ static void draw_hud(const tower_game_t *game)
     DrawRectangleLines(12, 9, 118, 47, (Color){35, 100, 112, 255});
     DrawRectangle(18, 15, 4, 35, C_CYAN);
     DrawText(TextFormat("WAVE %02u", game->wave), 29, 14, 17, RAYWHITE);
-    DrawText(TextFormat("CRED %03u", game->credits), 29, 36, 13, C_GOLD);
+    DrawText(TextFormat("%02u/%02u  C%03u", game->wave_spawned, game->wave_total,
+                        game->credits), 29, 36, 11, C_GOLD);
     DrawRectangle(140, 9, 132, 47, (Color){10, 27, 39, 255});
     DrawRectangleLines(140, 9, 132, 47, (Color){35, 77, 91, 255});
     DrawText("TACTICAL SCORE", 151, 15, 11, (Color){107, 151, 160, 255});
     DrawText(TextFormat("%06lu", (unsigned long)game->score), 151, 34, 17, RAYWHITE);
+    if (game->synergy_hits)
+        DrawText(TextFormat("SYNC %lu", (unsigned long)game->synergy_hits),
+                 211, 49, 7, C_BLUE);
     DrawRectangle(282, 9, 125, 47, (Color){10, 27, 39, 255});
     DrawRectangleLines(282, 9, 125, 47, (Color){35, 77, 91, 255});
     DrawText(TextFormat("CORE %02u", game->base_hp), 293, 15, 14,
@@ -125,6 +130,20 @@ static void draw_hud(const tower_game_t *game)
     DrawRectangleLines(418, 9, 50, 47, C_CYAN);
     DrawRectangle(432, 21, 7, 22, (Color){181, 246, 245, 255});
     DrawRectangle(447, 21, 7, 22, (Color){181, 246, 245, 255});
+}
+
+static void draw_selected_range(const tower_game_t *game)
+{
+    if (game->selected_pad < 0 || game->selected_pad >= TOWER_PAD_COUNT) return;
+    const tower_slot_t *tower = &game->towers[(unsigned)game->selected_pad];
+    if (!tower->occupied) return;
+    Color color = tower->type == TOWER_PULSE ? C_CYAN
+        : tower->type == TOWER_RAPID ? C_GOLD : C_BLUE;
+    float range = TOWER_RANGE[tower->type] + (tower->level - 1U) * 12.0f;
+    DrawCircleLines(tower->x, tower->y, range, (Color){color.r, color.g, color.b, 150});
+    DrawRectangle(tower->x - 34, tower->y - 39, 68, 16, (Color){3, 12, 18, 225});
+    DrawText(TextFormat("L%u  R%03u", tower->level, (unsigned)range),
+             tower->x - 29, tower->y - 36, 9, color);
 }
 
 static void draw_shop_card(const tower_game_t *game, int type, int x, const char *name,
@@ -157,9 +176,9 @@ static void draw_shop(const tower_game_t *game)
 {
     DrawRectangle(0, 392, 480, 88, (Color){3, 10, 16, 255});
     DrawRectangle(0, 392, 480, 2, (Color){31, 106, 112, 255});
-    draw_shop_card(game, TOWER_PULSE, 8, "PULSE", "BALANCED", "$70", C_CYAN);
-    draw_shop_card(game, TOWER_RAPID, 164, "RAPID", "FIRE RATE", "$95", C_GOLD);
-    draw_shop_card(game, TOWER_FROST, 320, "FROST", "SLOW FIELD", "$120", C_BLUE);
+    draw_shop_card(game, TOWER_PULSE, 8, "PULSE", "2X FROZEN", "$70", C_CYAN);
+    draw_shop_card(game, TOWER_RAPID, 164, "RAPID", "+2 FROZEN", "$95", C_GOLD);
+    draw_shop_card(game, TOWER_FROST, 320, "FROST", "SETUP SLOW", "$120", C_BLUE);
 }
 
 static void draw_feedback(const tower_game_t *game)
@@ -252,6 +271,7 @@ void tower_view_render(const tower_view_t *view)
         (raylib_lite_renderer_vec2_t){0, 69});
     draw_core(view);
     for (size_t i = 0; i < TOWER_PAD_COUNT; ++i) draw_pad(view, &game->towers[i]);
+    draw_selected_range(game);
     for (size_t i = 0; i < TOWER_MAX_ENEMIES; ++i)
         if (game->enemies[i].active) draw_enemy(view->atlas, &game->enemies[i]);
     draw_projectiles(view);

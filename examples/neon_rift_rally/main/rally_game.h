@@ -53,7 +53,16 @@ typedef enum {
     RALLY_EVENT_START      = 1u << 11,
     RALLY_EVENT_FAIL       = 1u << 12,
     RALLY_EVENT_DRIFT_BOOST = 1u << 13,
+    RALLY_EVENT_OVERTAKE    = 1u << 14,
+    RALLY_EVENT_OVERTAKEN   = 1u << 15,
+    RALLY_EVENT_DRAFT_READY = 1u << 16,
 } rally_event_flags_t;
+
+typedef enum {
+    RALLY_OPPONENT_SPRINTER = 0,
+    RALLY_OPPONENT_DEFENDER,
+    RALLY_OPPONENT_CHASER,
+} rally_opponent_style_t;
 
 typedef struct {
     float throttle; /* 0..1 */
@@ -112,11 +121,14 @@ typedef struct {
     float lateral;
     float speed;
     float lane;
+    float target_lane;
     float phase;
     uint16_t laps_completed;
     uint8_t position;
     uint8_t collision_cooldown;
     uint8_t near_miss_cooldown;
+    uint8_t decision_cooldown;
+    uint8_t style;
     bool active;
     bool finished;
 } rally_opponent_t;
@@ -169,6 +181,10 @@ typedef struct {
     uint16_t combo;
     uint16_t combo_timer;
     float risk_meter;
+    float draft_meter;
+    float gap_ahead;
+    uint8_t draft_boost_ticks;
+    uint8_t previous_position;
 
     rally_input_t input;
     bool previous_jump;

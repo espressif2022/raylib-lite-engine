@@ -36,9 +36,9 @@ def main() -> int:
                     for tick in range(90):
                         tilt = .25
                         if mode == "moderate_pulse" and tick < 15:
-                            tilt += .30
+                            tilt -= .30
                         if mode == "full_pulse" and tick < 15 or mode == "held_right":
-                            tilt += .60
+                            tilt -= .60
                         if mode == "oscillation" and tick < 60:
                             tilt += .30 if tick % 12 < 6 else -.30
                         if mode == "shock" and tick % 10 == 0:
@@ -61,8 +61,12 @@ def main() -> int:
                           "moderate_pulse_excursion": excursion("moderate_pulse"),
                           "full_pulse_excursion": excursion("full_pulse"),
                           "touch_left_lateral": traces["touch_left"][-1]["lateral"],
+                          "touch_left_pose": min(s["view_pose"] for s in traces["touch_left"]),
                           "neutral_lateral": base[-1]["lateral"],
                           "held_right_offtrack": traces["held_right"][-1]["offtrack"],
+                          "held_right_pose": max(s["view_pose"] for s in traces["held_right"]),
+                          "moderate_pose": min(s["view_pose"] for s in traces["moderate_pulse"]),
+                          "full_pulse_pose": max(s["view_pose"] for s in traces["full_pulse"]),
                           "pulse_offtrack": any(s["offtrack"] for s in traces["full_pulse"]),
                           "oscillation_excursion": excursion("oscillation"),
                           "oscillation_return_steering": traces["oscillation"][-1]["steering"],
@@ -83,6 +87,10 @@ def main() -> int:
             assert r["moderate_pulse_excursion"] < r["full_pulse_excursion"] < 3.0, r
             assert not r["pulse_offtrack"], r
             assert r["touch_left_lateral"] < r["neutral_lateral"] - .5, r
+            assert r["touch_left_pose"] == -1, r
+            assert r["held_right_pose"] == 2, r
+            assert r["moderate_pose"] == 0, r
+            assert r["full_pulse_pose"] >= 1, r
             assert r["held_right_offtrack"], r
             assert r["oscillation_excursion"] < 1.5, r
             assert abs(r["oscillation_return_steering"]) < .02, r

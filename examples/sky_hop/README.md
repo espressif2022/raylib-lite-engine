@@ -1,50 +1,41 @@
 # Sky Hop
 
-Sky Hop is a four-level scrolling platform game. Level data is kept in the
-host-testable gameplay model: progress, score, and remaining lives carry into
-the next level, while completing level 4 finishes the run.
+Sky Hop 是四关横版平台跳跃游戏。收集金币、踩掉巡逻怪并抵达关卡终点；生命、分数和
+连续收集奖励会跨关保留，完成第四关即完成整局。
 
-原创横版平台跳跃 Demo，用于验证 Raylib Lite Engine 的玩法与设备接口。
+## 玩法与操作
 
-## 操作
+### 真机
 
 - 点击标题卡开始。
-- 屏幕底部左侧 `<` 向左移动，中间 `>` 向右移动，右侧 `JUMP` 跳跃。
-- 点击右上角暂停按钮暂停/继续；Button、Joystick 和 IMU 事件会映射到相同 Action。
-- 收集金币、踩掉紫色巡逻怪，并抵达关卡最右侧。
+- 屏幕底部 `<`、`>` 控制左右移动，`JUMP` 控制跳跃；短按与长按会形成不同跳跃高度。
+- 可同时按住移动和跳跃。右上角按钮用于暂停和继续。
+- Button、Joystick 和 IMU 输入会先映射为相同的游戏动作。
 
-本版本使用平台 `Camera2D` 世界坐标渲染，加入场景滑入 Tween、固定容量粒子、
-暂停场景与 NVS 最高分存档。游戏更新模型仍可脱离 ESP-IDF 在 Host 上测试。
+### Host
 
-当前同时嵌入一份只读 Atlas/音频作为资源分区不可用时的恢复兜底。正常情况下仍
-优先读取 `game_assets` 分区；确认分区可用后可取消整包嵌入，以恢复约 300 KiB
-应用空间。
+- `A`/`D` 或方向键：移动。
+- `Space`：跳跃。
+- `Enter`：开始或进入下一关。
+- `P`：暂停或继续。
 
-## Host 运行
+## Host 预览
 
-```bash
-# Host 仿真：本仓库根目录，主机 C 编译器 + Pillow
+在仓库根目录运行：
+
+```sh
 python3 tools/game_cli.py sim examples/sky_hop
-python3 tools/game_cli.py sim examples/sky_hop --headless --frames 300
 ```
 
-本目录提供独立 ESP-IDF native 工程，需显式配置板级依赖后构建。产品固件的
-板级策略和 app glue 由外部产品仓库维护。
+Host 与真机共用玩法模型、Camera2D 世界视图和 RGB565 绘制代码；音频、物理输入和
+LCD 上屏仍需在设备上验证。
 
-浏览器模拟器地址为 `http://127.0.0.1:8460/`。键盘使用 `A/D` 或方向键移动、
-空格跳跃、`P` 暂停、回车开始/进入下一关；触屏设备可同时按住底部移动键和跳跃键。
-模拟器直接编译并调用设备相同的 `platform_game.c`，所以关卡、碰撞、分数和状态切换
-不需要在网页端重复实现。Host 与设备共享 RGB565 view，浏览器直接显示 C 渲染结果；音频、LCD 时序和
-物理输入仍需真机验证。
+## 实现特点
 
-开发与回放流程见[游戏开发指南](../../docs/game-development.CN.md)，
-性能比较应固定输入、场景、构建和板卡配置，并保留原始日志；
-通用方法见[可复用设计方法](../../docs/reference-designs.CN.md)。
+游戏采用固定容量对象、四关连续进度、可变跳跃、连续金币奖励、场景滑入、粒子效果和
+最高分存档。资源优先从游戏资源分区读取，并保留只读恢复资源。
 
-## Native build
+## Native 构建
 
-See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.
-
-设备诊断构建可加 `-DRAYLIB_LITE_EXAMPLE_STATS_SECONDS=1`，把周期日志
-从默认每 300 个渲染帧缩短为每 30 帧。日志中的渲染阶段耗时是平滑统计，
-不能将其分位数当作逐帧 P95；Host 计时也不能作为设备 FPS。
+构建目标、Board 选择和独立例程说明见[构建路径](../../docs/build-matrix.CN.md)。Host
+测试、固定回放和设备验收流程见[游戏开发指南](../../docs/game-development.CN.md)。

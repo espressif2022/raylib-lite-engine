@@ -575,10 +575,11 @@ static void draw_collision_feedback(const rally_game_t *g)
     }
 }
 
-static void draw_vehicle(const rally_game_t *g, raylib_lite_atlas_t art)
+static void draw_vehicle(const rally_game_t *g, raylib_lite_atlas_t art,
+                         const rally_view_motion_t *motion)
 {
-    float steer = g->heading_error * 32.0f +
-                  g->lateral_velocity * (g->drifting ? 1.4f : .7f);
+    float steer = motion ? motion->steering : 0.0f;
+    int pose_direction = motion ? motion->pose : 0;
     float x = 240.0f + g->lateral * 7.0f;
     float bob = g->grounded ? sinf((float)g->tick * .30f) *
                 clampf(g->speed / RALLY_MAX_SPEED, 0.0f, 1.0f) * 1.2f : 0.0f;
@@ -593,14 +594,40 @@ static void draw_vehicle(const rally_game_t *g, raylib_lite_atlas_t art)
                    (Vector2){x + 23, ground_y + trail}, 5, C_PINK);
     }
     raylib_lite_asset_id_t pose = RAYLIB_LITE_ASSET_ID_MOTORCYCLE_STRAIGHT;
-    if (steer < -2.5f) pose = RAYLIB_LITE_ASSET_ID_MOTORCYCLE_LEFT;
-    if (steer > 2.5f) pose = RAYLIB_LITE_ASSET_ID_MOTORCYCLE_RIGHT;
+    /* Pose IDs use the player's screen-space steering direction. */
+    if (pose_direction <= -2) pose = RAYLIB_LITE_ASSET_ID_MOTORCYCLE_HEAVY_LEFT;
+    else if (pose_direction == -1) pose = RAYLIB_LITE_ASSET_ID_MOTORCYCLE_LIGHT_LEFT;
+    else if (pose_direction == 1) pose = RAYLIB_LITE_ASSET_ID_MOTORCYCLE_LIGHT_RIGHT;
+    else if (pose_direction >= 2) pose = RAYLIB_LITE_ASSET_ID_MOTORCYCLE_HEAVY_RIGHT;
     const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(art, pose);
-    if (frame)
+    if (frame) {
+        float lean_limit = pose_direction == 0 ? .8f : 1.5f;
+        float lean = clampf(steer * .10f, -lean_limit, lean_limit);
+        float tail_lag = g->drifting ? -g->lateral_velocity * .65f : 0.0f;
         DrawTexturePro(art.texture, frame->source,
-                       (Rectangle){x - 88.0f, ground_y - 177.0f, 176.0f, 176.0f},
-                       (Vector2){0, 0}, 0,
+                       (Rectangle){x + tail_lag, ground_y - 17.0f, 176.0f, 176.0f},
+                       (Vector2){88.0f, 160.0f}, lean,
                        g->collision_ticks ? (Color){255, 166, 177, 255} : WHITE);
+    }
+}
+
+static void draw_corner_cue(const rally_game_t *g)
+{
+    rally_track_pose_t near_pose = {0}, far_pose = {0};
+    if (!rally_track_sample_course(g->course_id, g->progress + 70.0f, 0, &near_pose) ||
+        !rally_track_sample_course(g->course_id, g->progress + 150.0f, 0, &far_pose)) return;
+    float turn = near_pose.tangent_x * far_pose.tangent_z -
+                 near_pose.tangent_z * far_pose.tangent_x;
+    if (fabsf(turn) < .16f || g->speed < 12.0f) return;
+    Color color = fabsf(turn) > .42f ? C_PINK : C_GOLD;
+    int x = turn < 0 ? 86 : 394;
+    DrawCircle(x, 112, 25, (Color){3, 8, 24, 220});
+    DrawCircleLines(x, 112, 25, color);
+    if (turn < 0) {
+        DrawTriangle((Vector2){x-12,112},(Vector2){x+8,99},(Vector2){x+8,125},color);
+    } else {
+        DrawTriangle((Vector2){x+12,112},(Vector2){x-8,99},(Vector2){x-8,125},color);
+    }
 }
 
 static void draw_hud(const rally_game_t *g)
@@ -631,6 +658,15 @@ static void draw_hud(const rally_game_t *g)
     DrawText(TextFormat("CP %u/%u", (unsigned)g->next_checkpoint,
                         (unsigned)(RALLY_CHECKPOINT_COUNT - 1U)),
              365, 47, 9, theme.accent);
+    if (g->gap_ahead > 0.0f)
+        DrawText(TextFormat("AHEAD %04.1f", g->gap_ahead), 17, 74, 9, muted);
+    if (g->draft_meter > 0.0f || g->draft_boost_ticks) {
+        DrawRectangle(174, 73, 132, 9, (Color){3, 8, 22, 220});
+        DrawRectangle(177, 76, (int)(126 * clampf(g->draft_meter / 100.0f, 0, 1)),
+                      4, g->draft_boost_ticks ? C_MINT : C_CYAN);
+        DrawText(g->draft_boost_ticks ? "DRAFT BOOST" : "DRAFT", 312, 73, 8,
+                 g->draft_boost_ticks ? C_MINT : C_CYAN);
+    }
 
     DrawText("N2O", 311, 438, 9, muted);
     DrawRectangle(338, 439, 126, 8, (Color){13, 25, 45, 230});
@@ -642,6 +678,14 @@ static void draw_hud(const rally_game_t *g)
     if (g->combo > 0)
         DrawText(TextFormat("DRIFT  X%u", (unsigned)(g->combo + 1U)), 187, 438, 9,
                  g->drifting ? C_GOLD : theme.accent2);
+    if (g->drifting || g->risk_meter > 0.0f) {
+        int risk = (int)clampf(g->risk_meter, 0.0f, 100.0f);
+        DrawRectangle(174, 454, 132, 12, (Color){3, 8, 22, 220});
+        DrawRectangle(177, 457, risk * 126 / 100, 6,
+                      risk >= 65 ? C_PINK : C_GOLD);
+        DrawText(risk >= 8 && g->drifting ? "RELEASE TO CASH" : "DRIFT RISK",
+                 196, 468, 8, risk >= 65 ? C_PINK : C_GOLD);
+    }
 }
 
 static void draw_start_banner(const rally_game_t *g, unsigned course_id)
@@ -666,24 +710,49 @@ static void draw_start_banner(const rally_game_t *g, unsigned course_id)
     DrawText(">", 369, 191, 22, C_PINK);
 }
 
-static void draw_race_alert(const rally_game_t *g, bool near_miss,
-                            rally_theme_t theme)
+static bool draw_race_alert(const rally_game_t *g, bool near_miss,
+                            rally_theme_t theme,
+                            const rally_view_motion_t *motion)
 {
-    if (near_miss) {
+    const char *message = NULL;
+    Color color = theme.accent2;
+    if (motion && motion->alert_ticks && motion->alert == 1U) {
+        message = "POSITION GAINED"; color = C_MINT;
+    } else if (motion && motion->alert_ticks && motion->alert == 2U) {
+        message = "RIVAL PASSED"; color = C_PINK;
+    } else if (motion && motion->alert_ticks && motion->alert == 3U) {
+        message = "DRAFT BOOST"; color = C_CYAN;
+    }
+    else if (g->laps_completed + 1U == RALLY_TARGET_LAPS &&
+             g->next_checkpoint == 0U && g->progress < 100.0f) {
+        message = "FINAL LAP"; color = C_GOLD;
+    }
+    if (message) {
+        int width = MeasureText(message, 11) + 30;
+        DrawRectangle((RALLY_W-width)/2, 92, width, 21, (Color){4, 9, 29, 230});
+        DrawRectangle((RALLY_W-width)/2, 92, 3, 21, color);
+        DrawText(message, (RALLY_W-MeasureText(message,11))/2, 97, 11, color);
+        return true;
+    } else if (near_miss) {
         DrawRectangle(157, 92, 166, 19, (Color){24, 13, 47, 225});
         DrawRectangle(157, 92, 3, 19, theme.accent2);
         DrawRectangle(320, 92, 3, 19, theme.accent2);
         DrawText("NEAR MISS // +DRIFT", 174, 97, 10, theme.accent2);
+        return true;
     } else if (g->event_flags & RALLY_EVENT_OFFTRACK) {
         DrawText("OFF TRACK", 199, 96, 12, C_PINK);
+        return true;
     } else if (g->drifting && g->drift_meter > 65.0f) {
-        DrawText("SLIPSTREAM", 194, 96, 12, C_GOLD);
+        DrawText("DRIFT CHARGED", 184, 96, 12, C_GOLD);
+        return true;
     }
+    return false;
 }
 
 int rally_view_render(const rally_game_t *state, raylib_lite_atlas_t rally_art,
                       raylib_lite_atlas_t track_background,
-                      raylib_lite_atlas_t motorcycle_art, unsigned course_id)
+                      raylib_lite_atlas_t motorcycle_art, unsigned course_id,
+                      const rally_view_motion_t *motion)
 {
     rally_game_t idle = {0};
     const rally_game_t *g = state ? state : &idle;
@@ -722,11 +791,11 @@ int rally_view_render(const rally_game_t *state, raylib_lite_atlas_t rally_art,
     bool near_miss = draw_opponents(g, motorcycle_art);
     draw_speed_lines(g, theme_for(g->progress));
     draw_drift_sparks(g, theme_for(g->progress));
-    draw_vehicle(g, motorcycle_art);
+    draw_vehicle(g, motorcycle_art, motion);
     draw_collision_feedback(g);
     PROFILE_PHASE(3);
     draw_hud(g);
-    draw_race_alert(g, near_miss, theme_for(g->progress));
+    if (!draw_race_alert(g, near_miss, theme_for(g->progress), motion)) draw_corner_cue(g);
     draw_start_banner(g, s_course_id);
     if (g->phase == RALLY_PHASE_FINISHED) {
         Color accent = C_GOLD;
