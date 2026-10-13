@@ -173,6 +173,20 @@ int main(int argc,char **argv){
   raylib_lite_2d_draw_indexed_raycast_walls(wall,columns,n);
   assert(!memcmp(actual,expected,sizeof(actual)));
  }
+ /* Narrow/mixed/wide INDEX8 batches, repeated source rows, and painter
+  * overlap across three 64-column blocks in both atlas layouts. */
+ for(int layout=0;layout<2;++layout)for(int mode=0;mode<3;++mode){
+  memset(actual,0x5a,sizeof(actual));memset(expected,0x5a,sizeof(expected));
+  raylib_lite_renderer_set_clip(4,4,188,188);
+  for(int i=0;i<130;++i){
+   int width=mode==0?1:mode==1?(i%9==0?4:1):4;
+   columns[i]=(raylib_lite_raycast_wall_t){i%96,i%27-8,width,280+i%91,
+    i%8,-(i%3),1,8,(unsigned)(i*31)%350,0,0};
+   indexed_reference(&columns[i],4,192);
+  }
+  raylib_lite_2d_draw_indexed_raycast_walls(layout?row_wall:wall,columns,130);
+  assert(!memcmp(actual,expected,sizeof(actual)));
+ }
  /* Floor/span oracle includes negative wrapping, non-power-of-two tiles,
   * invalid source edges, independent row occlusion, and clipped destinations. */
  for(int trial=0;trial<200;trial++){

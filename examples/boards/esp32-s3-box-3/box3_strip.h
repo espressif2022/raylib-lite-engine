@@ -13,6 +13,8 @@ static inline void box3_fill_strip_pixels(
 {
     const uint32_t logical_w = view->logical_width;
     const uint32_t logical_h = view->logical_height;
+    const uint32_t base=logical_w/view->view_width;
+    const uint32_t remainder=logical_w%view->view_width;
     for (uint32_t row = 0; row < count; row++) {
         uint32_t y = (uint32_t)top + row;
         uint16_t *dst = strip + row * view->lcd_width;
@@ -23,16 +25,20 @@ static inline void box3_fill_strip_pixels(
         }
         uint32_t src_y = ((y - view->view_y) * logical_h) / view->view_height;
         const uint16_t *src = frame + src_y * logical_w;
-        for (uint32_t x = 0; x < view->lcd_width; x++) {
-            uint16_t color = 0;
-            if (x >= view->view_x &&
-                    x < (uint32_t)view->view_x + view->view_width) {
-                uint32_t src_x = ((x - view->view_x) * logical_w) / view->view_width;
-                color = src[src_x];
-                if (swap_bytes)
-                    color = (uint16_t)((color << 8) | (color >> 8));
-            }
-            dst[x] = color;
+        /* Bars are constant; only sample the viewport. The rational step
+         * gives exactly floor(x * logical_w / view_width), including upscales,
+         * without a division and viewport bounds test for every pixel. */
+        memset(dst, 0, view->view_x * sizeof(uint16_t));
+        memset(dst + view->view_x + view->view_width, 0,
+               (view->lcd_width-view->view_x-view->view_width)*sizeof(uint16_t));
+        uint16_t *out=dst+view->view_x;
+        uint32_t source_x=0,error=0;
+        for(uint32_t x=0;x<view->view_width;++x){
+            uint16_t color=src[source_x];
+            if(swap_bytes)color=(uint16_t)((color<<8)|(color>>8));
+            out[x]=color;
+            source_x+=base;error+=remainder;
+            if(error>=view->view_width){error-=view->view_width;++source_x;}
         }
     }
 }

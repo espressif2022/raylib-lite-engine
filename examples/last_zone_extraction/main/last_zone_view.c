@@ -677,11 +677,10 @@ static void raycast_world(const last_zone_game_t *game)
     s_view_stats.rays_cast = (uint16_t)(LAST_ZONE_COLUMNS + extra);
 }
 
-static int floor_kind_at(const last_zone_game_t *game, float wx, float wy)
+static int floor_kind_at(const last_zone_game_t *game, float wx, float wy, int ex, int ey)
 {
     int mx = (int)wx, my = (int)wy;
     if (last_zone_cell(game, mx, my) == 5) return 2;
-    int ex=(int)last_zone_extract_x(game),ey=(int)last_zone_extract_y(game);
     if (abs(mx-ex)<=1&&abs(my-ey)<=1) return 2;
     switch(game->layout){
         case 0: if(mx<8||my>=18)return 1;break;                 /* dock planks */
@@ -701,7 +700,13 @@ static void draw_floor(const last_zone_game_t *game, raylib_lite_atlas_t materia
     int horizon = view_horizon(game);
     float cam0 = (0.5f / (float)LAST_ZONE_COLUMNS) * 2.0f - 1.0f;
     float cam_step = 2.0f / (float)LAST_ZONE_COLUMNS;
+    const int ex=(int)last_zone_extract_x(game),ey=(int)last_zone_extract_y(game);
+    unsigned first_visible=LAST_ZONE_SCREEN;
+    for(int column=0;column<LAST_ZONE_COLUMNS;++column)
+        if(s_wall_bottom[column]<first_visible)first_visible=s_wall_bottom[column];
     for (int y = horizon + 1; y < 480; y += 2) {
+        /* Both repeated rows are hidden: avoid projection and map queries. */
+        if((unsigned)(y+1)<first_visible)continue;
         float dist = LAST_ZONE_FLOOR_SCALE / (float)(y - horizon);
         float ray_x = s_camera_dir_x + s_camera_plane_x * cam0;
         float ray_y = s_camera_dir_y + s_camera_plane_y * cam0;
@@ -719,9 +724,13 @@ static void draw_floor(const last_zone_game_t *game, raylib_lite_atlas_t materia
         int run_kind = -1, run_start = 0;
         for (int column = 0; column <= LAST_ZONE_COLUMNS; ++column) {
             int kind = 0;
-            if (column < LAST_ZONE_COLUMNS)
-                kind = floor_kind_at(game, wx + dwx * (float)column,
-                                     wy + dwy * (float)column);
+            if (column < LAST_ZONE_COLUMNS) {
+                /* Carry a run through hidden columns. Their material cannot
+                 * affect either row, and visible columns still split runs. */
+                if(y+1<s_wall_bottom[column])kind=run_kind<0?0:run_kind;
+                else kind = floor_kind_at(game, wx + dwx * (float)column,
+                                          wy + dwy * (float)column, ex, ey);
+            }
             if (column == 0) {
                 run_kind = kind;
                 run_start = 0;

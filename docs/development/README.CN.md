@@ -16,6 +16,7 @@
 | [三组耗时的读数范围](frame-cost-reading-20261013.CN.md) | 半透明内核、S3 480×480 整帧、Sky Hop 启动页各自能说明的范围 |
 | [性能优化与闭环收敛](performance-convergence-20261013.CN.md) | 优化优先级、等价半透明候选、实际游戏与送屏验收及停止条件 |
 | [S3 / S31 三帧送屏统一](present-unification-20261013.CN.md) | 共用异步队列、SPI 配套、双板启停验证及 Last Zone 帧率回退核查与字体修复 |
+| [帧链路与不可见工作消除](frame-work-20261013.CN.md) | 地板遮挡前移、条带采样、固定关卡双板对照及墙面重排回退 |
 | [示例渲染技术提取审查](render-extraction-review.CN.md) | 共享与公开门槛、候选归属和未实施的处理顺序 |
 | [Raylib 历史对照](raylib-comparison-history.CN.md) | 历史整帧及像素测量，保留当时计划 |
 
