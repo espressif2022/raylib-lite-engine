@@ -6,6 +6,7 @@ idf_component_register(
     SRCS
         "native_module_main.c"
         "native_feedback.c"
+        "example_async_video.c"
     INCLUDE_DIRS
         "include"
     REQUIRES
@@ -14,7 +15,7 @@ idf_component_register(
         esp_timer
         heap
         log
-    PRIV_REQUIRES ${_native_services})
+    PRIV_REQUIRES freertos ${_native_services})
 
 if(DEFINED RAYLIB_LITE_EXAMPLE_TARGET_FPS)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE

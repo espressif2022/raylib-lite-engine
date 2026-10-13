@@ -846,6 +846,16 @@ void raylib_lite_raylib_draw_text(const char *text, int x, int y, int font_size,
                 if(y1>s_scissor_y1)y1=s_scissor_y1;
             }
             if(x0>=x1||y0>=y1){offset_x+=width*scale+spacing;continue;}
+            /* The default atlas is at most nine columns wide. Reuse the
+             * exact sample boundaries across rows; double ceil is costly
+             * on targets with only single-precision hardware. */
+            int edges[10];
+            for(int col=0;col<=width;++col){
+                int edge=(int)ceil(left+col*scale-.5-1e-9);
+                if(edge<x0)edge=x0;
+                if(edge>x1)edge=x1;
+                edges[col]=edge;
+            }
             for(int row=y0;row<y1;++row){
                 int sy=s_camera_active?(int)((row+.5f-(float)top)*inverse_scale):
                     ((2*row+1)*5-top_tenths)/font_size;
@@ -857,10 +867,8 @@ void raylib_lite_raylib_draw_text(const char *text, int x, int y, int font_size,
                     bool ink=col<width&&(compat_font_rows[g][sy]&(1U<<col));
                     if(ink&&first<0)first=col;
                     if(!ink&&first>=0){
-                        int start=(int)ceil(left+first*scale-.5-1e-9);
-                        int end=(int)ceil(left+col*scale-.5-1e-9);
-                        if(start<x0)start=x0;
-                        if(end>x1)end=x1;
+                        int start=edges[first];
+                        int end=edges[col];
                         fill_span(row,start,end,&paint);first=-1;
                     }
                 }

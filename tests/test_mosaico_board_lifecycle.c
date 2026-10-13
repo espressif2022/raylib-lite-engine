@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "sdk.h"
+#include "raylib_lite_example_async_video.h"
 #include "board_under_test.inc"
 
 static esp_display_presenter_t presenter;

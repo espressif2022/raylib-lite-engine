@@ -268,7 +268,7 @@
         "tint_alpha"
       ],
       "source": "src/renderer/raylib_lite_renderer.c",
-      "gate": "2026-10-10 texture_opaque / texture_scale2x / texture_alpha 在 S31 与 S3 各 3 轮通过，波动低于 1%。S31 半透明中位 13.97 ms，S3 为 25.20 ms。这是 9 次贴图的内核时间，不是整帧"
+      "gate": "2026-10-10 texture_opaque / texture_scale2x / texture_alpha 在 S31 与 S3 各 3 轮通过，波动低于 1%。同一摆放的 9 张互不重叠 64×64：不透明 S31 0.960 ms、S3 2.90 ms；alpha 128 为 S31 13.97 ms、S3 25.20 ms。合计 36864 像素，约占 240×240 帧的 64%。慢在 RGB565 拆包、/255 混合和打包。这是该覆盖量的内核时间，不含面板传输，也不等于游戏整帧"
     },
     {
       "id": "tilemap_layer",

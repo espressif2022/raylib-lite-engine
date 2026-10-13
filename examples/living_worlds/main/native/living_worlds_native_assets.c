@@ -23,7 +23,7 @@ void raylib_lite_example_game_board_config(raylib_lite_example_board_config_t *c
     *config = (raylib_lite_example_board_config_t) {
         .touch_points = 1,
         .enable_imu = false,
-        .drawbuf_lines = 40,
+        .drawbuf_lines = 34,
         .drawbuf_count = 2,
     };
 }

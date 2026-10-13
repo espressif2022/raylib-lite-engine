@@ -32,7 +32,7 @@ typedef struct esp_display_presenter { int dummy; } esp_display_presenter_t;
 #define ESP_DISPLAY_PRESENT_TE_SYNC_DISABLED() 0
 #define ESP_DISPLAY_PRESENT_MODE_NONE 0
 typedef struct {
-    unsigned width, height, pixel_format, max_damage_areas;
+    unsigned width, height, pixel_format, max_damage_areas, transfer_timeout_ms;
     struct {
         struct { void *panel, *io; unsigned panel_type, input_pixel_format, rotation;
             bool swap_bytes, te_enabled; unsigned te_sync; } hw;

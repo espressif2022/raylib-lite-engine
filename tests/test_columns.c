@@ -15,6 +15,49 @@ static uint16_t actual[STRIDE*W], expected[STRIDE*W];
 static uint32_t seed=42;
 static unsigned random_u(void){seed=seed*1664525U+1013904223U;return seed;}
 static uint16_t pixel(int x,int y){return (uint16_t)((y*8+x)*997U+123U);}
+static uint16_t white_reference(uint16_t dst,uint16_t src,unsigned alpha){
+ uint16_t result=0;
+ unsigned shifts[]={11,5,0},bits[]={5,6,5};
+ for(unsigned c=0;c<3;++c){
+  unsigned mask=(1U<<bits[c])-1,sv=(src>>shifts[c])&mask,dv=(dst>>shifts[c])&mask;
+  unsigned ss=(sv<<(8-bits[c]))|(sv>>(2*bits[c]-8));
+  unsigned dd=(dv<<(8-bits[c]))|(dv>>(2*bits[c]-8));
+  uint64_t a=255U*alpha;
+  unsigned out=(unsigned)(((uint64_t)ss*255*a+(uint64_t)dd*255*(65025-a))/16581375U);
+  result|=(uint16_t)((out>>(8-bits[c]))<<shifts[c]);
+ }
+ return result;
+}
+/* Exercise every RGB565 source and every tint alpha against independently
+ * expanded, 64-bit compositing. The masked atlas also spans all raw alpha
+ * values for each tint alpha; destination colors permute the RGB565 space. */
+static void white_alpha_oracle(void){
+ for(int masked=0;masked<2;++masked){
+  Texture2D texture=raylib_lite_2d_load_texture(masked?"white-1.atlas":"white-0.atlas");
+  assert(texture.id);
+  for(unsigned ta=0;ta<256;++ta){
+   for(unsigned i=0;i<65536;++i)actual[(i/256)*STRIDE+i%256]=(uint16_t)(i*40503U+31U);
+   raylib_lite_2d_draw_texture_pro(texture,(Rectangle){0,0,256,256},
+    (Rectangle){0,0,256,256},(Vector2){0,0},0,(Color){255,255,255,(uint8_t)ta});
+   for(unsigned i=0;i<65536;++i){
+    uint16_t dst=(uint16_t)(i*40503U+31U),result=0;
+    unsigned shifts[]={11,5,0},bits[]={5,6,5};
+    uint64_t a=(masked?i%256:255)*ta;
+    for(unsigned c=0;c<3;++c){
+     unsigned mask=(1U<<bits[c])-1,sv=(i>>shifts[c])&mask,dv=(dst>>shifts[c])&mask;
+     unsigned ss=(sv<<(8-bits[c]))|(sv>>(2*bits[c]-8));
+     unsigned dd=(dv<<(8-bits[c]))|(dv>>(2*bits[c]-8));
+     unsigned out=(unsigned)(((uint64_t)ss*255*a+(uint64_t)dd*255*(65025-a))/16581375U);
+     result|=(uint16_t)((out>>(8-bits[c]))<<shifts[c]);
+    }
+    if(actual[(i/256)*STRIDE+i%256]!=result){
+     fprintf(stderr,"white alpha masked=%d tint=%u source=%u\n",masked,ta,i);abort();
+    }
+   }
+  }
+  raylib_lite_2d_unload_texture(texture);
+ }
+}
 /* Independent division-based oracle: deliberately not the optimized sampler. */
 static void reference(const raylib_lite_raycast_wall_t *c,int lo,int hi){
  if(c->dest_width<=0||c->dest_height<=0||!c->src_width||!c->src_height)return;
@@ -49,6 +92,32 @@ int main(int argc,char **argv){
  raylib_lite_wall_atlas_t wall=raylib_lite_wall_atlas_load("test.wall");assert(wall.descriptor);
  raylib_lite_wall_atlas_t row_wall=raylib_lite_wall_atlas_load("test_row.wall");assert(row_wall.descriptor);
  raylib_lite_renderer_set_target(actual,STRIDE,W,W);
+ white_alpha_oracle();
+ /* Uniform alpha blits: clipped subrectangles and fractional origins,
+  * plus atlas-edge fallbacks and flipped/scaled source sampling. Check
+  * untouched pixels and stride padding as well as the written region. */
+ for(int trial=0;trial<120;++trial){
+  int sw=1+trial%8,sh=1+(trial/8)%8;
+  int dw=sw+(trial%3==0?2:0),dh=sh+(trial%5==0?3:0);
+  int sx0=trial%5-1,sy0=trial%4-1;
+  bool fx=trial%7==0,fy=trial%11==0;
+  Rectangle dest={trial%13-4.25f,trial%17-3.75f,dw,dh};
+  Vector2 origin={1.5f,2.25f};
+  int left=(int)(dest.x-origin.x),top=(int)(dest.y-origin.y);
+  unsigned alpha=(unsigned)(trial*37)%256;
+  memset(actual,0x5a,sizeof(actual));memset(expected,0x5a,sizeof(expected));
+  raylib_lite_renderer_set_clip(3,2,17,19);
+  for(int y=2;y<21;++y)for(int x=3;x<20;++x){
+   if(x<left||x>=left+dw||y<top||y>=top+dh)continue;
+   int sx=(x-left)*sw/dw,sy=(y-top)*sh/dh;
+   sx=sx0+(fx?sw-1-sx:sx);sy=sy0+(fy?sh-1-sy:sy);
+   if((unsigned)sx<8&&(unsigned)sy<8)
+    expected[y*STRIDE+x]=white_reference(0x5a5a,pixel(sx,sy),alpha);
+  }
+  raylib_lite_2d_draw_texture_pro(texture,(Rectangle){sx0,sy0,fx?-sw:sw,fy?-sh:sh},
+   dest,origin,0,(Color){255,255,255,(uint8_t)alpha});
+  assert(!memcmp(actual,expected,sizeof(actual)));
+ }
  raylib_lite_raycast_wall_t columns[240];
  for(int trial=0;trial<100;trial++){
   int lo=trial%13,hi=W-trial%17;
@@ -167,12 +236,17 @@ int main(int argc,char **argv){
   * Includes external origins, diagonal rotations, fractional destinations,
   * source flips, clipping, tint and nontrivial RGB565 backgrounds. */
  Texture2D alpha_texture=raylib_lite_2d_load_texture("alpha.atlas");assert(alpha_texture.id);
- for(int pass=0;pass<2;++pass)for(int trial=0;trial<80;++trial){
-  double angle=((trial*23+7)%360)*0.017453292519943295,cs=cos(angle),sn=sin(angle);
+ for(int pass=0;pass<4;++pass)for(int trial=0;trial<80;++trial){
+  float degrees=(float)(trial*23+7);
+  double angle=fmod(degrees,360)*0.017453292519943295,cs=cos(angle),sn=sin(angle);
   Rectangle dest={37.25f,32.75f,13.5f+trial%19,18.25f+trial%13};
   Vector2 origin={trial%4==0?73.5f:dest.width*.5f,trial%3==0?-19.25f:dest.height*.5f};
   Color tint={(uint8_t)(31+trial*7),(uint8_t)(63+trial*11),(uint8_t)(101+trial*13),
               (uint8_t)(1+trial*3)};
+  if(pass>=2){
+   static const uint8_t edges[]={0,1,127,128,254,255};
+   tint=(Color){255,255,255,edges[trial%6]};
+  }
   bool fx=trial&1,fy=trial&2;
   memset(actual,0x5a,sizeof(actual));memset(expected,0x5a,sizeof(expected));
   raylib_lite_renderer_set_clip(3,2,W-8,W-5);
@@ -187,7 +261,7 @@ int main(int argc,char **argv){
    if(fx)sx=7-sx;
    if(fy)sy=7-sy;
    uint16_t src=pixel(sx,sy),dst=0x5a5a,result=0;
-   unsigned alpha=pass?((sy*8+sx)*37U)&255U:255U;
+   unsigned alpha=(pass&1)?((sy*8+sx)*37U)&255U:255U;
    if(!alpha)continue;
    unsigned shifts[3]={11,5,0},bits[3]={5,6,5},colors[3]={tint.r,tint.g,tint.b};
    for(int c=0;c<3;++c){
@@ -201,8 +275,8 @@ int main(int argc,char **argv){
    }
    expected[y*STRIDE+x]=result;
   }
-  raylib_lite_2d_draw_texture_pro(pass?alpha_texture:texture,(Rectangle){0,0,fx?-8:8,fy?-8:8},
-   dest,origin,(float)(trial*23+7),tint);
+  raylib_lite_2d_draw_texture_pro((pass&1)?alpha_texture:texture,(Rectangle){0,0,fx?-8:8,fy?-8:8},
+   dest,origin,degrees,tint);
   for(int k=0;k<STRIDE*W;++k)if(actual[k]!=expected[k]){
    fprintf(stderr,"rotation trial=%d x=%d y=%d actual=%x expected=%x\n",trial,k%STRIDE,k/STRIDE,actual[k],expected[k]);abort();
   }

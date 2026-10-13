@@ -384,6 +384,20 @@ static inline int sample_next(sample_step_t*step){
 /* Texture compositing retains 8-bit tint precision until the final RGB565
  * write. Do not quantize the tinted source or effective alpha first. Other
  * raster kernels retain their existing blend565 pixel contract. */
+static inline uint16_t texture_blend_white8(uint16_t dst,uint16_t src,unsigned a)
+{
+ unsigned inverse=255U-a;
+ unsigned sr=src>>11,sg=(src>>5)&63U,sb=src&31U;
+ unsigned dr=dst>>11,dg=(dst>>5)&63U,db=dst&31U;
+ sr=(sr<<3)|(sr>>2);sg=(sg<<2)|(sg>>4);sb=(sb<<3)|(sb>>2);
+ dr=(dr<<3)|(dr>>2);dg=(dg<<2)|(dg>>4);db=(db<<3)|(db>>2);
+ /* For raw alpha 255 and white tint, cancel two factors of 255 from
+  * the full-precision formula. Preserve floor before RGB565 packing. */
+ unsigned r=(sr*a+dr*inverse)/255U;
+ unsigned g=(sg*a+dg*inverse)/255U;
+ unsigned b=(sb*a+db*inverse)/255U;
+ return (uint16_t)((r>>3)<<11|(g>>2)<<5|(b>>3));
+}
 static uint16_t texture_blend(uint16_t dst,uint16_t src,unsigned raw_alpha,
                              raylib_lite_renderer_color_t tint)
 {
@@ -440,6 +454,23 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
    ++s_raster_stats.opaque_copy_calls;
    s_raster_stats.opaque_copy_pixels+=(uint32_t)copy*(uint32_t)(y1-y0);
    m2d_note_store_rows(copy,y1-y0);
+   return;
+  }
+ }
+ if(identity&&!fx&&!fy&&!s->alpha&&tint.r==255&&tint.g==255&&tint.b==255&&
+    tint.a<255&&dw==(int)sw&&dh==(int)sh){
+  int left=(int)(dest.x-origin.x),top=(int)(dest.y-origin.y);
+  int sx=(int)source.x+(x0-left),sy=(int)source.y+(y0-top),count=x1-x0;
+  if(sx>=0&&sy>=0&&sx+count<=s->header->width&&
+     sy+(y1-y0)<=s->header->height){
+   for(int y=y0;y<y1;++y,++sy){
+    const uint16_t *src=&s->rgb[(size_t)sy*s->header->width+sx];
+    uint16_t *dst=&s_target[(size_t)y*s_stride+x0];
+    for(int x=0;x<count;++x)dst[x]=texture_blend_white8(dst[x],src[x],tint.a);
+   }
+   ++s_raster_stats.alpha_calls;
+   s_raster_stats.alpha_pixels+=(uint32_t)count*(uint32_t)(y1-y0);
+   m2d_note_store_rows(count,y1-y0);
    return;
   }
  }

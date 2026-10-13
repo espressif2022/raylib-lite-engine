@@ -15,6 +15,7 @@
 #include "freertos/task.h"
 #include "raylib_lite_action.h"
 #include "box3_video.h"
+#include "raylib_lite_example_async_video.h"
 #include "platform_esp_audio.h"
 
 #define INPUT_CAPACITY 32U
@@ -212,6 +213,9 @@ esp_err_t raylib_lite_example_board_create(
     if (!config || !out_board || !config->logical_width || !config->logical_height)
         return ESP_ERR_INVALID_ARG;
     *out_board = NULL;
+    if ((config->drawbuf_lines && config->drawbuf_lines != RAYLIB_LITE_EXAMPLE_STRIP_LINES) ||
+            (config->drawbuf_count && config->drawbuf_count != RAYLIB_LITE_EXAMPLE_TRANSFER_DEPTH))
+        return ESP_ERR_INVALID_ARG;
     if (s_claimed) return ESP_ERR_INVALID_STATE;
     s_claimed = true;
     struct raylib_lite_example_board *board = &s_board;

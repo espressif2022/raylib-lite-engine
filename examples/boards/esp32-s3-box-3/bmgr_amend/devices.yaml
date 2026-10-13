@@ -1,6 +1,10 @@
 # Do not make SD-card insertion or audio initialization a display startup
 # requirement. The official board-pack remains authoritative for pin mapping.
 devices:
+  - name: display_lcd
+    config:
+      io_spi_config:
+        trans_queue_depth: 2
   - name: fs_sdcard
     init_skip: true
   - name: audio_dac
