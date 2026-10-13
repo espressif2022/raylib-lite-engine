@@ -130,10 +130,10 @@ static void track_center(unsigned course_id, float progress, float *x, float *y,
         dx = (54.0f * cosf(u) + 10.0f * cosf(2.0f * u)) * du;
         dz = (-70.0f * sinf(u) + 18.0f * cosf(3.0f * u)) * du;
     } else if (course_id % 3U == 2U) {
-        *x = 32.0f * sinf(u) + 18.0f * sinf(3.0f * u);
-        *z = 45.0f * cosf(u) + 14.0f * sinf(4.0f * u);
-        dx = (32.0f * cosf(u) + 54.0f * cosf(3.0f * u)) * du;
-        dz = (-45.0f * sinf(u) + 56.0f * cosf(4.0f * u)) * du;
+        *x = 46.0f * sinf(u) + 4.0f * sinf(3.0f * u);
+        *z = 65.0f * cosf(u) + 3.0f * sinf(4.0f * u);
+        dx = (46.0f * cosf(u) + 12.0f * cosf(3.0f * u)) * du;
+        dz = (-65.0f * sinf(u) + 12.0f * cosf(4.0f * u)) * du;
     } else {
         harbor_center(wrapped, x, z, &dx, &dz);
     }

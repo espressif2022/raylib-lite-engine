@@ -175,6 +175,27 @@ static void opponent_traffic(void)
     puts("rivals slow for occupied lanes and choose a smooth passing lane on every course");
 }
 
+static void polar_road_width(void)
+{
+    float minimum=1000000;
+    for(unsigned at=0;at<1800;at+=5) {
+        rally_track_pose_t a,b,c;
+        rally_track_sample_course(2,(float)at-1,0,&a);
+        rally_track_sample_course(2,(float)at,0,&b);
+        rally_track_sample_course(2,(float)at+1,0,&c);
+        float ab=hypotf(b.x-a.x,b.z-a.z),bc=hypotf(c.x-b.x,c.z-b.z);
+        float ac=hypotf(c.x-a.x,c.z-a.z);
+        float cross=fabsf((b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x));
+        assert(ab>.01f && bc>.01f);
+        if(cross>.000001f) {
+            float radius=ab*bc*ac/(2*cross);
+            assert(radius>RALLY_TRACK_WIDTH*.55f);
+            if(radius<minimum)minimum=radius;
+        }
+    }
+    printf("polar minimum sampled radius %.2f keeps the inside road edge unfolded\n",minimum);
+}
+
 int main(void)
 {
     steering_recovery();
@@ -182,6 +203,7 @@ int main(void)
     fair_launch();
     harbor_geometry();
     opponent_traffic();
+    polar_road_width();
     rally_game_t a, b;
     rally_reset(&a); rally_reset(&b);
     deterministic_drive(&a, 900U);
