@@ -121,11 +121,42 @@ static void fair_launch(void)
     puts("opponents launch fairly and remain in sight");
 }
 
+static void harbor_geometry(void)
+{
+    rally_track_pose_t before, after, pose;
+    for (unsigned joint=0;joint<16;++joint) {
+        float at=RALLY_TRACK_LENGTH*(float)joint/16.0f;
+        assert(rally_track_sample_course(0,at-.01f,0,&before));
+        assert(rally_track_sample_course(0,at+.01f,0,&after));
+        assert(hypotf(after.x-before.x,after.z-before.z)<.02f);
+        assert(hypotf(after.tangent_x-before.tangent_x,
+                      after.tangent_z-before.tangent_z)<.005f);
+    }
+    for(unsigned i=0;i<90;++i) {
+        float at=(float)i*20;
+        rally_track_sample_course(0,at,0,&pose);
+        rally_track_sample_course(0,at-.1f,0,&before);
+        rally_track_sample_course(0,at+.1f,0,&after);
+        float dx=after.x-before.x,dz=after.z-before.z;
+        float length=hypotf(dx,dz);
+        float tangent_length=hypotf(pose.tangent_x,pose.tangent_z);
+        assert(length>.001f);
+        assert(fabsf(dx/length-pose.tangent_x/tangent_length)<.002f);
+        assert(fabsf(dz/length-pose.tangent_z/tangent_length)<.002f);
+    }
+    rally_track_sample_course(0,100,0,&pose);
+    assert(fabsf(pose.x)<.01f && pose.tangent_z>.95f);
+    rally_track_sample_course(0,620,0,&pose);
+    assert(fabsf(pose.z-82)<2.0f && pose.tangent_x<-.95f);
+    puts("authored harbor has continuous seams, correct tangents and port/bridge alignment");
+}
+
 int main(void)
 {
     steering_recovery();
     drift_assist_and_clean_release();
     fair_launch();
+    harbor_geometry();
     rally_game_t a, b;
     rally_reset(&a); rally_reset(&b);
     deterministic_drive(&a, 900U);

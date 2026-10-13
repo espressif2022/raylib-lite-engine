@@ -73,6 +73,7 @@ static float s_segment_z[RALLY_SEGMENTS + 1];
 static rally_track_pose_t s_segment_pose[RALLY_SEGMENTS + 1];
 static bool s_segment_z_ready;
 static unsigned s_course_id;
+static int s_horizon = RALLY_HORIZON;
 
 static float clampf(float value, float low, float high)
 {
@@ -149,7 +150,7 @@ static void prepare_camera(const rally_game_t *g)
     /* Chase height leaves the next bend and both curbs above the bike. */
     s_camera.y = cam.y + 2.05f + g->height * 0.16f;
     s_camera.z = cam.z - cam.tangent_z * 1.40f;
-    float roll = -cam.bank * 0.42f;
+    float roll = -cam.bank * (g->course_id == 0U ? .14f : .42f);
     s_camera.roll_cos = cosf(roll);
     s_camera.roll_sin = sinf(roll);
     float impact = g->collision_ticks ?
@@ -170,10 +171,10 @@ static rally_point2_t project(const rally_game_t *g, rally_point3_t p)
     float vy = p.y - s_camera.y;
     if (view_z < RALLY_NEAR_Z) return (rally_point2_t){0, 0, false};
     float sx = 240.0f + s_camera.focal * vx / view_z;
-    float sy_screen = (float)RALLY_HORIZON - s_camera.focal * vy / view_z;
-    float ox = sx - 240.0f, oy = sy_screen - (float)RALLY_HORIZON;
+    float sy_screen = (float)s_horizon - s_camera.focal * vy / view_z;
+    float ox = sx - 240.0f, oy = sy_screen - (float)s_horizon;
     sx = 240.0f + ox * s_camera.roll_cos - oy * s_camera.roll_sin;
-    sy_screen = (float)RALLY_HORIZON + ox * s_camera.roll_sin + oy * s_camera.roll_cos;
+    sy_screen = (float)s_horizon + ox * s_camera.roll_sin + oy * s_camera.roll_cos;
     sx += s_camera.shake_x;
     sy_screen += s_camera.shake_y;
     /* Keep horizontally off-screen vertices valid. The rasterizer clips the
@@ -234,10 +235,8 @@ static void draw_ground(const rally_game_t *g)
     rally_theme_t theme = theme_for(g->progress);
     /* Clear the lower half exactly once. Road segments then cover only their
      * own trapezoids; this avoids the old per-segment full-width overdraw. */
-    DrawRectangle(0, RALLY_HORIZON, RALLY_W, RALLY_H - RALLY_HORIZON,
-                  theme.terrain);
-    DrawRectangle(0, RALLY_HORIZON, RALLY_W, 2,
-                  color_lerp(theme.accent, theme.sky_bottom, .42f));
+    DrawRectangle(0, s_horizon, RALLY_W, RALLY_H - s_horizon, theme.terrain);
+    DrawRectangle(0, s_horizon, RALLY_W, 2, color_lerp(theme.accent, theme.sky_bottom, .42f));
 }
 
 static void draw_quad(Color fill, rally_point2_t a, rally_point2_t b,
@@ -248,6 +247,93 @@ static void draw_quad(Color fill, rally_point2_t a, rally_point2_t b,
                  (Vector2){c.x, c.y}, fill);
     DrawTriangle((Vector2){b.x, b.y}, (Vector2){d.x, d.y},
                  (Vector2){c.x, c.y}, fill);
+}
+
+/* Clip objects against the nearest road crest, using the road's own samples. */
+static float s_road_top[RALLY_SEGMENTS + 1];
+static float world_clip(float distance)
+{
+    float bottom = RALLY_H;
+    for (int i = 0; i <= RALLY_SEGMENTS; ++i) {
+        if (s_segment_z[i] * 1.05f >= distance)
+            break;
+        if (s_road_top[i] < bottom)
+            bottom = s_road_top[i];
+    }
+    return bottom;
+}
+
+static void world_quad(Color color, rally_point2_t a, rally_point2_t b, rally_point2_t c,
+                       rally_point2_t d, float clip)
+{
+    if (!a.visible || !b.visible || !c.visible || !d.visible)
+        return;
+    rally_point2_t input[4] = {a, b, d, c}, output[8];
+    unsigned count = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        rally_point2_t p = input[i], q = input[(i + 1) % 4];
+        if (p.y <= clip)
+            output[count++] = p;
+        if ((p.y <= clip) != (q.y <= clip)) {
+            float t = (clip - p.y) / (q.y - p.y);
+            output[count++] = (rally_point2_t){p.x + (q.x - p.x) * t, clip, true};
+        }
+    }
+    for (unsigned i = 1; i + 1 < count; ++i)
+        DrawTriangle((Vector2){output[0].x, output[0].y}, (Vector2){output[i].x, output[i].y},
+                     (Vector2){output[i + 1].x, output[i + 1].y}, color);
+}
+
+static rally_point2_t local_project(const rally_track_pose_t *pose, float lateral, float along,
+                                    float height)
+{
+    return project(NULL,
+                   (rally_point3_t){pose->x + pose->right_x * lateral + pose->tangent_x * along,
+                                    pose->y + height,
+                                    pose->z + pose->right_z * lateral + pose->tangent_z * along});
+}
+
+static void harbor_box(const rally_game_t *g, float distance, float side, bool warehouse)
+{
+    rally_track_pose_t p;
+    rally_track_sample_course(0, g->progress + distance, side * (warehouse ? 10.8f : 9.2f), &p);
+    float w = warehouse ? 4.0f : 3.0f, depth = warehouse ? 4.5f : 2.5f;
+    float h = warehouse ? 4.8f : 2.5f, clip = world_clip(fmaxf(0, distance - depth * 5.0f));
+    rally_point2_t a = local_project(&p, -w, -depth, 0), b = local_project(&p, w, -depth, 0);
+    rally_point2_t c = local_project(&p, -w, -depth, h), d = local_project(&p, w, -depth, h);
+    rally_point2_t e = local_project(&p, side * w, depth, 0),
+                   f = local_project(&p, side * w, depth, h);
+    rally_point2_t back = local_project(&p, -side * w, depth, h);
+    float minx = fminf(fminf(a.x, b.x), e.x), maxx = fmaxf(fmaxf(a.x, b.x), e.x);
+    if (maxx < 0 || minx > RALLY_W)
+        return;
+    Color front = warehouse ? (Color){60, 75, 88, 255} : (Color){48, 85, 103, 255};
+    world_quad(front, a, b, c, d, clip);
+    world_quad(color_lerp(front, BLACK, .32f), side < 0 ? a : b, e, side < 0 ? c : d, f, clip);
+    world_quad(color_lerp(front, RAYWHITE, .20f), c, d, side < 0 ? f : back, side < 0 ? back : f,
+               clip);
+    /* Inset door/panel and a physical light band, tied to the object face. */
+    float door = warehouse ? 1.4f : .8f;
+    world_quad((Color){20, 34, 46, 255}, local_project(&p, -door, -depth - .01f, 0),
+               local_project(&p, door, -depth - .01f, 0),
+               local_project(&p, -door, -depth - .01f, h * .72f),
+               local_project(&p, door, -depth - .01f, h * .72f), clip);
+    world_quad(warehouse ? C_GOLD : C_CYAN, local_project(&p, -w, -depth - .02f, h * .82f),
+               local_project(&p, w, -depth - .02f, h * .82f),
+               local_project(&p, -w, -depth - .02f, h * .88f),
+               local_project(&p, w, -depth - .02f, h * .88f), clip);
+}
+
+static void harbor_post(const rally_game_t *g, float distance, float side)
+{
+    rally_track_pose_t p;
+    rally_track_sample_course(0, g->progress + distance, side * 6.8f, &p);
+    float clip = world_clip(distance);
+    world_quad((Color){100, 128, 146, 255}, local_project(&p, -.09f, 0, 0),
+               local_project(&p, .09f, 0, 0), local_project(&p, -.09f, 0, 2.6f),
+               local_project(&p, .09f, 0, 2.6f), clip);
+    world_quad(C_GOLD, local_project(&p, -.35f, 0, 2.55f), local_project(&p, .35f, 0, 2.55f),
+               local_project(&p, -.35f, 0, 2.7f), local_project(&p, .35f, 0, 2.7f), clip);
 }
 
 static void draw_scenery_prop(const rally_game_t *g, float distance,
@@ -302,36 +388,6 @@ static void draw_scenery_prop(const rally_game_t *g, float distance,
     draw_quad(side < 0 ? theme.accent2 : theme.accent, a, b, c, d);
 }
 
-static void draw_track_scenery(const rally_game_t *g, raylib_lite_atlas_t art)
-{
-    rally_theme_t theme = theme_for(g->progress);
-    float wrapped = fmodf(g->progress, RALLY_TRACK_LENGTH);
-    if (wrapped < 0.0f) wrapped += RALLY_TRACK_LENGTH;
-    unsigned current = (unsigned)(wrapped / RALLY_TRACK_SEGMENT_LENGTH);
-    const int visible_segments = 9;
-
-    /* The reverse loop is the painter's order: scenery behind the car is
-     * placed first, then nearby props naturally cover it.  Anchors come from
-     * the gameplay track, not from a camera-relative decoration loop. */
-    for (int offset = visible_segments - 1; offset >= 0; --offset) {
-        unsigned segment = (current + (unsigned)offset) %
-                           RALLY_TRACK_SEGMENT_COUNT;
-        for (unsigned slot = 0; slot < RALLY_TRACK_SCENERY_SLOTS; ++slot) {
-            rally_track_scenery_t anchor;
-            if (!rally_track_scenery_course(g->course_id, segment, slot, &anchor)) continue;
-            float distance = anchor.anchor_progress - wrapped;
-            while (distance < RALLY_NEAR_Z) distance += RALLY_TRACK_LENGTH;
-            if (distance >= RALLY_FAR_Z) continue;
-            raylib_lite_asset_id_t sprite =
-                (anchor.kind & 1U) ? (s_course_id == 0   ? RAYLIB_LITE_ASSET_ID_ROADSIDE_CITY
-                                      : s_course_id == 1 ? RAYLIB_LITE_ASSET_ID_ROADSIDE_ROCK
-                                                         : RAYLIB_LITE_ASSET_ID_ROADSIDE_SNOW)
-                                   : RAYLIB_LITE_ASSET_ID_ROADSIDE_BEACON;
-            draw_scenery_prop(g, distance, &anchor, theme, art, sprite);
-        }
-    }
-}
-
 static void draw_track(const rally_game_t *g, bool near_only)
 {
     /* OutRun-style painter: far-to-near projected strips with a monotonic
@@ -348,12 +404,20 @@ static void draw_track(const rally_game_t *g, bool near_only)
     }
     /* Each boundary's center and tangent are shared by asphalt, shoulders,
      * edge stripes and curb highlights. Sample once per frame and boundary. */
-    for(int i=0;i<=RALLY_SEGMENTS;++i)
+    for (int i = 0; i <= RALLY_SEGMENTS; ++i) {
         rally_track_sample_course(g->course_id, g->progress+s_segment_z[i]*1.05f,
                                   0.0f, &s_segment_pose[i]);
-    float clip_y = (float)RALLY_HORIZON;
-    for (int i = RALLY_SEGMENTS - 1; i >= 0; --i) {
-        const rally_track_pose_t *p0=&s_segment_pose[i],*p1=&s_segment_pose[i+1];
+        rally_point2_t center = project(
+            g, (rally_point3_t){s_segment_pose[i].x, s_segment_pose[i].y, s_segment_pose[i].z});
+        s_road_top[i] = center.visible ? center.y : RALLY_H;
+    }
+    float clip_y = (float)s_horizon;
+    /* The harbor's authored broad bends need fewer painted slices. Keep all
+     * 33 samples for precise object/crest clipping, but join pairs for road
+     * faces to pay for its continuous guardrails and buildings. */
+    const int stride = g->course_id == 0U ? 2 : 1;
+    for (int i = RALLY_SEGMENTS - stride; i >= 0; i -= stride) {
+        const rally_track_pose_t *p0 = &s_segment_pose[i], *p1 = &s_segment_pose[i + stride];
         rally_point3_t p;
         track_offset(p0, -5.0f, 0, &p); rally_point2_t l0 = project(g, p);
         track_offset(p0, 5.0f, 0, &p); rally_point2_t r0 = project(g, p);
@@ -383,22 +447,50 @@ static void draw_track(const rally_game_t *g, bool near_only)
         /* Keep the asphalt continuous; roadside and lane markings carry the
          * speed cue and advance in world distance rather than segment index. */
         Color asphalt =
-            color_lerp(theme.road, theme.sky_bottom, .38f * s_segment_z[i + 1] / RALLY_FAR_Z);
+            color_lerp(theme.road, theme.sky_bottom, .38f * s_segment_z[i + stride] / RALLY_FAR_Z);
         draw_quad(asphalt, l0, r0, l1, r1);
 
         /* A metre-wide opaque curb. A one-pixel line disappears once RGB565
          * quantizes the dark asphalt and the verge to the same value. */
-        track_offset(p0, -5.70f, .05f, &p); rally_point2_t ll0 = project(g, p);
-        track_offset(p0, -4.55f, .05f, &p); rally_point2_t lr0 = project(g, p);
-        track_offset(p1, -5.70f, .05f, &p); rally_point2_t ll1 = project(g, p);
-        track_offset(p1, -4.55f, .05f, &p); rally_point2_t lr1 = project(g, p);
-        track_offset(p0, 4.55f, .05f, &p); rally_point2_t rl0 = project(g, p);
-        track_offset(p0, 5.70f, .05f, &p); rally_point2_t rr0 = project(g, p);
-        track_offset(p1, 4.55f, .05f, &p); rally_point2_t rl1 = project(g, p);
-        track_offset(p1, 5.70f, .05f, &p); rally_point2_t rr1 = project(g, p);
-        draw_quad(theme.accent, ll0, lr0, ll1, lr1);
-        draw_quad(theme.accent2, rl0, rr0, rl1, rr1);
+        track_offset(p0, g->course_id == 0 ? -5.45f : -5.70f, .05f, &p);
+        rally_point2_t ll0 = project(g, p);
+        track_offset(p0, g->course_id == 0 ? -5.00f : -4.55f, .05f, &p);
+        rally_point2_t lr0 = project(g, p);
+        track_offset(p1, g->course_id == 0 ? -5.45f : -5.70f, .05f, &p);
+        rally_point2_t ll1 = project(g, p);
+        track_offset(p1, g->course_id == 0 ? -5.00f : -4.55f, .05f, &p);
+        rally_point2_t lr1 = project(g, p);
+        track_offset(p0, g->course_id == 0 ? 5.00f : 4.55f, .05f, &p);
+        rally_point2_t rl0 = project(g, p);
+        track_offset(p0, g->course_id == 0 ? 5.45f : 5.70f, .05f, &p);
+        rally_point2_t rr0 = project(g, p);
+        track_offset(p1, g->course_id == 0 ? 5.00f : 4.55f, .05f, &p);
+        rally_point2_t rl1 = project(g, p);
+        track_offset(p1, g->course_id == 0 ? 5.45f : 5.70f, .05f, &p);
+        rally_point2_t rr1 = project(g, p);
+        draw_quad(g->course_id == 0 ? (Color){126, 171, 181, 255} : theme.accent, ll0, lr0, ll1,
+                  lr1);
+        draw_quad(g->course_id == 0 ? (Color){193, 199, 188, 255} : theme.accent2, rl0, rr0, rl1,
+                  rr1);
 
+        if (g->course_id == 0U) {
+            float progress = fmodf(g->progress + s_segment_z[i] * 1.05f, RALLY_TRACK_LENGTH);
+            bool bridge = progress >= 500 && progress < 800;
+            float height = bridge ? .65f : .35f;
+            Color wall = bridge ? (Color){91, 111, 128, 255} : (Color){49, 67, 81, 255};
+            for (int side = -1; side <= 1; side += 2) {
+                float lateral = side * 6.0f;
+                track_offset(p0, lateral, 0, &p);
+                rally_point2_t a = project(g, p);
+                track_offset(p1, lateral, 0, &p);
+                rally_point2_t b = project(g, p);
+                track_offset(p0, lateral, height, &p);
+                rally_point2_t c = project(g, p);
+                track_offset(p1, lateral, height, &p);
+                rally_point2_t d = project(g, p);
+                world_quad(wall, a, b, c, d, RALLY_H);
+            }
+        }
         clip_y = near_y;
     }
 }
@@ -496,23 +588,6 @@ static void draw_billboard(const rally_game_t *g, float distance, float side,
     DrawLineEx((Vector2){c.x, c.y + 8}, (Vector2){oc.x, oc.y + 8}, 2, color);
 }
 
-static void draw_route_props(const rally_game_t *g)
-{
-    rally_theme_t theme = theme_for(g->progress);
-    /* Gates are tied to actual fixed checkpoint anchors, not camera-relative
-     * distances. They enter/leave the view naturally as progress advances. */
-    for (unsigned checkpoint = 0; checkpoint < RALLY_CHECKPOINT_COUNT - 1U;
-         ++checkpoint) {
-        float distance = rally_checkpoint_distance(checkpoint) - g->progress;
-        while (distance < RALLY_NEAR_Z) distance += RALLY_TRACK_LENGTH;
-        if (distance < RALLY_FAR_Z)
-            draw_billboard(g, distance,
-                           (checkpoint & 1U) ? 5.55f : -5.55f,
-                           (checkpoint & 1U) ? theme.accent2 : theme.accent,
-                           true);
-    }
-}
-
 static void draw_opponent_car(const rally_game_t *g, float distance,
                               const rally_opponent_t *opponent, Color color,
                               raylib_lite_atlas_t art)
@@ -534,49 +609,155 @@ static void draw_opponent_car(const rally_game_t *g, float distance,
         pose = lean > .45f ? RAYLIB_LITE_ASSET_ID_MOTORCYCLE_HEAVY_RIGHT
                            : RAYLIB_LITE_ASSET_ID_MOTORCYCLE_LIGHT_RIGHT;
     float size = clampf(860.0f / (distance + 10), 14, 76);
+    float clip = world_clip(distance);
+    if (center.y - size >= clip)
+        return;
     const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(art, pose);
     if (!frame)
         return;
     DrawEllipse((int)center.x, (int)center.y + 1, size * .21f, size * .06f,
                 (Color){4, 10, 20, 255});
-    DrawTexturePro(art.texture, frame->source,
-                   (Rectangle){center.x - size * .5f, center.y - size, size, size}, (Vector2){0, 0},
-                   0, WHITE);
+    Rectangle source = frame->source;
+    float height = fminf(size, clip - (center.y - size));
+    source.height *= height / size;
+    DrawTexturePro(art.texture, source,
+                   (Rectangle){center.x - size * .5f, center.y - size, size, height},
+                   (Vector2){0, 0}, 0, WHITE);
     /* A small opaque race bib keeps identity without tinting every texel. */
     if (size >= 18)
         DrawRectangle((int)(center.x - size * .12f), (int)(center.y - size * .55f),
                       (int)(size * .24f) + 1, (int)(size * .08f) + 1, color);
 }
 
-static void draw_opponents(const rally_game_t *g, raylib_lite_atlas_t art)
+static void draw_world(const rally_game_t *g, raylib_lite_atlas_t scenery,
+                       raylib_lite_atlas_t bikes)
 {
-    static const Color colors[RALLY_OPPONENT_COUNT] = {
-        {113, 126, 255, 255}, {255, 84, 154, 255},
-        {87, 240, 190, 255}, {255, 188, 80, 255},
-        {186, 126, 255, 255}, {124, 230, 244, 255}
+    enum {
+        WORLD_RIDER,
+        WORLD_LAMP,
+        WORLD_CONTAINER,
+        WORLD_WAREHOUSE,
+        WORLD_SPRITE,
+        WORLD_BRIDGE,
+        WORLD_CHECKPOINT
     };
-    unsigned order[RALLY_OPPONENT_COUNT];
-    float distances[RALLY_OPPONENT_COUNT];
-    unsigned visible = 0;
-    for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
-        const rally_opponent_t *opponent = &g->opponents[i];
-        if (!opponent->active) continue;
-        float distance = opponent->progress - g->progress;
-        if (distance < -RALLY_TRACK_LENGTH * .5f) distance += RALLY_TRACK_LENGTH;
-        if (distance > RALLY_TRACK_LENGTH * .5f) distance -= RALLY_TRACK_LENGTH;
-        if (distance <= RALLY_NEAR_Z || distance >= RALLY_FAR_Z) continue;
-        unsigned slot = visible++;
-        while (slot && distances[slot - 1] < distance) {
-            distances[slot] = distances[slot - 1];
-            order[slot] = order[slot - 1];
-            --slot;
+    typedef struct {
+        float distance;
+        unsigned kind, index;
+        float side;
+    } item_t;
+    item_t items[32];
+    unsigned count = 0;
+    static const Color colors[6] = {{113, 126, 255, 255}, {255, 84, 154, 255},
+                                    {87, 240, 190, 255},  {255, 188, 80, 255},
+                                    {186, 126, 255, 255}, {124, 230, 244, 255}};
+    rally_track_scenery_t anchors[18];
+    unsigned anchor_count = 0;
+    if (g->course_id == 0) {
+        float first = floorf(g->progress / 18) * 18;
+        for (int i = 0; i < 5; ++i) {
+            float at = first + i * 18, dist = at - g->progress;
+            if (dist <= RALLY_NEAR_Z || dist >= RALLY_FAR_Z)
+                continue;
+            items[count++] = (item_t){dist, WORLD_LAMP, 0, ((int)(at / 18) & 1) ? -1 : 1};
         }
-        distances[slot] = distance;
-        order[slot] = i;
+        first = floorf(g->progress / 48) * 48;
+        for (int i = 0; i < 3; ++i) {
+            float at = first + i * 48, dist = at - g->progress;
+            if (dist <= RALLY_NEAR_Z || dist >= RALLY_FAR_Z)
+                continue;
+            float wrapped = fmodf(at, RALLY_TRACK_LENGTH);
+            if (wrapped >= 500 && wrapped < 800)
+                continue;
+            items[count++] = (item_t){
+                dist, wrapped >= 300 && wrapped < 500 ? WORLD_WAREHOUSE : WORLD_CONTAINER, 0, -1};
+        }
+    } else {
+        unsigned current = (unsigned)(g->progress / RALLY_TRACK_SEGMENT_LENGTH);
+        for (unsigned i = 0; i < 9; ++i)
+            for (unsigned slot = 0; slot < 2; ++slot) {
+                rally_track_scenery_t anchor;
+                if (!rally_track_scenery_course(g->course_id, current + i, slot, &anchor))
+                    continue;
+                float dist = anchor.anchor_progress - g->progress;
+                if (dist < RALLY_NEAR_Z)
+                    dist += RALLY_TRACK_LENGTH;
+                if (dist >= RALLY_FAR_Z)
+                    continue;
+                anchors[anchor_count] = anchor;
+                items[count++] = (item_t){dist, WORLD_SPRITE, anchor_count++, 0};
+            }
     }
-    for (unsigned slot = 0; slot < visible; ++slot) {
-        unsigned i = order[slot];
-        draw_opponent_car(g, distances[slot], &g->opponents[i], colors[i], art);
+    if (g->course_id == 0U) {
+        for (float at = 560; at <= 680; at += 120) {
+            float dist = at - g->progress;
+            if (dist < RALLY_NEAR_Z)
+                dist += RALLY_TRACK_LENGTH;
+            if (dist > RALLY_NEAR_Z && dist < RALLY_FAR_Z)
+                items[count++] = (item_t){dist, WORLD_BRIDGE, 0, 0};
+        }
+    }
+    for (unsigned i = 0; i < RALLY_CHECKPOINT_COUNT - 1U; ++i) {
+        float dist = rally_checkpoint_distance(i) - g->progress;
+        if (dist < RALLY_NEAR_Z)
+            dist += RALLY_TRACK_LENGTH;
+        if (dist > RALLY_NEAR_Z && dist < RALLY_FAR_Z)
+            items[count++] = (item_t){dist, WORLD_CHECKPOINT, i, 0};
+    }
+    for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
+        if (!g->opponents[i].active)
+            continue;
+        float dist = g->opponents[i].progress - g->progress;
+        if (dist < -RALLY_TRACK_LENGTH * .5f)
+            dist += RALLY_TRACK_LENGTH;
+        if (dist > RALLY_TRACK_LENGTH * .5f)
+            dist -= RALLY_TRACK_LENGTH;
+        if (dist > RALLY_NEAR_Z && dist < RALLY_FAR_Z)
+            items[count++] = (item_t){dist, WORLD_RIDER, i, 0};
+    }
+    for (unsigned i = 1; i < count; ++i) {
+        item_t value = items[i];
+        unsigned j = i;
+        while (j && items[j - 1].distance < value.distance) {
+            items[j] = items[j - 1];
+            --j;
+        }
+        items[j] = value;
+    }
+    for (unsigned i = 0; i < count; ++i) {
+        item_t item = items[i];
+        if (item.kind == WORLD_RIDER)
+            draw_opponent_car(g, item.distance, &g->opponents[item.index], colors[item.index],
+                              bikes);
+        else if (item.kind == WORLD_LAMP)
+            harbor_post(g, item.distance, item.side);
+        else if (item.kind == WORLD_CONTAINER || item.kind == WORLD_WAREHOUSE)
+            harbor_box(g, item.distance, item.side, item.kind == WORLD_WAREHOUSE);
+        else if (item.kind == WORLD_CHECKPOINT) {
+            rally_theme_t theme = theme_for(g->progress);
+            draw_billboard(g, item.distance, (item.index & 1) ? 5.55f : -5.55f,
+                           (item.index & 1) ? theme.accent2 : theme.accent, true);
+        } else if (item.kind == WORLD_BRIDGE) {
+            rally_track_pose_t pose;
+            rally_track_sample_course(0, g->progress + item.distance, 0, &pose);
+            float clip = world_clip(item.distance);
+            Color metal = {102, 127, 145, 255};
+            for (int side = -1; side <= 1; side += 2)
+                world_quad(metal, local_project(&pose, side * 6.1f, 0, 0),
+                           local_project(&pose, side * 6.5f, 0, 0),
+                           local_project(&pose, side * 6.1f, 0, 4.4f),
+                           local_project(&pose, side * 6.5f, 0, 4.4f), clip);
+            world_quad(metal, local_project(&pose, -6.5f, 0, 4.1f),
+                       local_project(&pose, 6.5f, 0, 4.1f), local_project(&pose, -6.5f, 0, 4.4f),
+                       local_project(&pose, 6.5f, 0, 4.4f), clip);
+        } else {
+            rally_track_scenery_t *anchor = &anchors[item.index];
+            raylib_lite_asset_id_t sprite =
+                (anchor->kind & 1) ? (g->course_id == 1 ? RAYLIB_LITE_ASSET_ID_ROADSIDE_ROCK
+                                                        : RAYLIB_LITE_ASSET_ID_ROADSIDE_SNOW)
+                                   : RAYLIB_LITE_ASSET_ID_ROADSIDE_BEACON;
+            draw_scenery_prop(g, item.distance, anchor, theme_for(g->progress), scenery, sprite);
+        }
     }
 }
 
@@ -697,6 +878,7 @@ int rally_view_render(const rally_game_t *state, raylib_lite_atlas_t rally_art,
     rally_game_t idle = {0};
     const rally_game_t *g = state ? state : &idle;
     s_course_id = course_id % 3U;
+    s_horizon = s_course_id == 0U ? 184 : 224;
     BeginDrawing();
     if (!raylib_lite_raylib_frame_available()) {
         EndDrawing();
@@ -711,7 +893,7 @@ int rally_view_render(const rally_game_t *state, raylib_lite_atlas_t rally_art,
         raylib_lite_atlas_get_frame(track_background, skies[s_course_id]);
     if (backdrop) {
         DrawTexturePro(track_background.texture, backdrop->source,
-                       (Rectangle){0, 0, RALLY_W, RALLY_HORIZON}, (Vector2){0, 0}, 0, WHITE);
+                       (Rectangle){0, 0, RALLY_W, s_horizon}, (Vector2){0, 0}, 0, WHITE);
     } else
         draw_sky(g);
     PROFILE_PHASE(0);
@@ -720,10 +902,10 @@ int rally_view_render(const rally_game_t *state, raylib_lite_atlas_t rally_art,
     draw_lane_markings(g);
     draw_corner_rail(g);
     PROFILE_PHASE(1);
-    draw_track_scenery(g, rally_art);
-    draw_route_props(g);
+    draw_world(g, rally_art, motorcycle_art);
+
     PROFILE_PHASE(2);
-    draw_opponents(g, motorcycle_art);
+
     draw_vehicle(g, motorcycle_art, motion);
     draw_collision_feedback(g);
     PROFILE_PHASE(3);

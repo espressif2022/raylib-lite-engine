@@ -86,6 +86,34 @@ static void emit(rally_game_t *game, uint32_t flags)
     game->event_flags |= flags;
 }
 
+/* Authored harbor centerline: port straight, warehouse bend, bridge, return.
+ * Equal progress intervals keep the fixed-step race ABI unchanged. */
+static const float s_harbor_points[16][2] = {
+    {0, 0}, {0, 24}, {0, 48}, {-10, 70}, {-32, 82}, {-56, 82},
+    {-80, 82}, {-100, 62}, {-102, 34}, {-80, 14}, {-60, 8},
+    {-40, -14}, {-34, -40}, {-12, -55}, {0, -48}, {0, -24}
+};
+
+static void harbor_center(float progress, float *x, float *z, float *dx, float *dz)
+{
+    float segment = wrap_progress(progress) * (16.0f / RALLY_TRACK_LENGTH);
+    unsigned index = (unsigned)segment;
+    float t = segment - (float)index;
+    const float *a = s_harbor_points[(index + 15U) % 16U];
+    const float *b = s_harbor_points[index % 16U];
+    const float *c = s_harbor_points[(index + 1U) % 16U];
+    const float *d = s_harbor_points[(index + 2U) % 16U];
+    float *values[2] = {x, z}, *derivatives[2] = {dx, dz};
+    for (unsigned axis = 0; axis < 2; ++axis) {
+        float q = -a[axis] + c[axis];
+        float r = 2*a[axis] - 5*b[axis] + 4*c[axis] - d[axis];
+        float v = -a[axis] + 3*b[axis] - 3*c[axis] + d[axis];
+        *values[axis] = .5f * (2*b[axis] + t*(q + t*(r + t*v)));
+        *derivatives[axis] = .5f * (q + t*(2*r + 3*t*v)) *
+                             (16.0f / RALLY_TRACK_LENGTH);
+    }
+}
+
 static void track_center(unsigned course_id, float progress, float *x, float *y, float *z,
                          float *tx, float *ty, float *tz, float *bank)
 {
@@ -107,10 +135,7 @@ static void track_center(unsigned course_id, float progress, float *x, float *y,
         dx = (32.0f * cosf(u) + 54.0f * cosf(3.0f * u)) * du;
         dz = (-45.0f * sinf(u) + 56.0f * cosf(4.0f * u)) * du;
     } else {
-        *x = 38.0f * sinf(u) + 9.0f * sinf(2.0f * u);
-        *z = 56.0f * cosf(u) + 8.0f * sinf(3.0f * u);
-        dx = (38.0f * cosf(u) + 18.0f * cosf(2.0f * u)) * du;
-        dz = (-56.0f * sinf(u) + 24.0f * cosf(3.0f * u)) * du;
+        harbor_center(wrapped, x, z, &dx, &dz);
     }
     *y = track_height(wrapped);
     float dy = track_height_derivative(wrapped);
