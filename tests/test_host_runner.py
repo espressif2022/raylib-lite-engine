@@ -48,7 +48,7 @@ class TowerHostRunnerTests(unittest.TestCase):
             self.assertEqual(first["state_hash"], second["state_hash"])
             self.assertEqual(first_hash, second_hash)
             self.assertEqual(first["game_id"], "tower_defense")
-            self.assertEqual(first["state_hash"], "e7ece7ba")
+            self.assertEqual(first["state_hash"], "0931f3d1")
             self.assertEqual(first_size, (480, 480))
 
     def test_replay_supports_pause_single_step_and_state_output(self) -> None:

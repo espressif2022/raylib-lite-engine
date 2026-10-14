@@ -11,7 +11,8 @@ typedef enum { SHOOTER_START, SHOOTER_PLAYING, SHOOTER_PAUSED,
                SHOOTER_GAME_OVER } shooter_phase_t;
 typedef struct {
     float x, y, vx, vy;
-    uint8_t kind, hp;
+    uint8_t kind, hp, max_hp;
+    bool elite;
     bool active;
 } shooter_actor_t;
 typedef struct {
@@ -30,6 +31,7 @@ typedef struct {
     uint16_t kills;
     uint8_t lives, combo, max_combo, wave;
     uint8_t invulnerable, hit_flash, wave_banner;
+    uint8_t formation_step;
 } shooter_game_t;
 
 void shooter_game_reset(shooter_game_t *game, uint32_t seed);

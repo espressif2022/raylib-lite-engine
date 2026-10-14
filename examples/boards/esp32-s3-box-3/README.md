@@ -2,7 +2,8 @@
 
 This application-side Board component uses Espressif **ESP Board Manager** and
 the official `esp32_s3_box_3` profile from `espressif/esp_boards`. It does not
-duplicate the panel GPIO, touch controller selection, or LCD bus configuration.
+duplicate the panel GPIO or touch controller selection. Its amend profile sizes
+the LCD SPI transfer limit and queue for the shared strip presenter.
 The package keeps its amend and defaults at this directory's root and its
 Raylib Lite IDF adapter directly in this Board directory, matching the
 `esp-mosaico` package layout.
@@ -15,6 +16,32 @@ clock, and cleanup. BOX-3 also provides ES8311 speaker playback through the
 Board Manager `audio_dac` device using the shared native Game Audio Mixer
 (24 kHz, mono, S16 PCM). IMU and haptic output remain unavailable; no
 ESP-Mosaico-specific Iris/Recovery service is installed.
+
+## Shared presentation policy
+
+BOX-3 and ESP-Mosaico use the same three-frame PSRAM scheduler in
+`examples_common/example_async_video.c`. A priority-4 worker runs on the other
+core; `present` accepts a frame asynchronously, the newest pending frame can
+replace an older one, and `flush` waits for completion. Both expose a coherent
+logical-frame snapshot and in-flight counts. Close retains ownership on timeout
+so cleanup can be retried.
+
+Both use two internal-RAM RGB565 strip buffers, 34 lines each, SPI transaction
+queue depth 2, and a 1500 ms transfer timeout. The BOX-3 amend sets
+`max_transfer_sz` to **21,760 bytes** (`320 * 34 * 2`); ESP-Mosaico uses
+**32,640 bytes** (`480 * 34 * 2`). Keep these limits and the shared profile
+constants together when changing the pipeline. Re-run Board Manager generation
+for existing BOX-3 projects so the amend reaches the generated SPI configuration.
+Explicit Board `drawbuf_lines` / `drawbuf_count` values must be 34 / 2; zero
+selects this profile.
+
+BOX-3 retains CPU scaling and letterboxing; Mosaico can use DMA2D for one-to-one
+strip copies. The BOX-3 amend raises the single-line SPI pixel clock from the
+board-pack 20 MHz to the 40 MHz used by the esp-bsp BOX-3 package; Mosaico keeps
+QSPI at 40 MHz. After one full frame has painted the black bars, BOX-3 sends
+only the viewport (240x240 for a square Game, 25% fewer bytes than 320x240);
+any failed frame falls back to a full-screen frame. Uniform scheduling does
+not imply equal panel throughput or eliminate every transfer gap.
 
 ## Build a native Game
 
@@ -76,7 +103,7 @@ display, input, audio and cleanup separately from compilation.
 ## Current limitations
 
 - The video adapter uses a full logical framebuffer and presenter-owned
-  double-buffered 8-row physical strips; a successful presentation waits for LCD DMA transfer completion,
+  double-buffered 34-row physical strips; a successful presentation waits for LCD DMA transfer completion,
   not for an independent display scan-out signal. Measure board FPS on hardware.
 - RGB565 panel and TT21100 X-axis touch orientation passed an initial BOX-3
   visual/input acceptance; verify additional panel variants independently.
@@ -87,6 +114,6 @@ display, input, audio and cleanup separately from compilation.
   device acceptance.
 - The standard BOX-3 board profile retains its 16 MB flash defaults; any
   atypical Octal-flash development boards require local build overrides.
-- Games requiring ESP32-S31-only hardware services (for example, the current
-  Living Worlds hardware JPEG decode path) still need an explicit S3-compatible
-  provider or fallback; they are not automatically portable to BOX-3.
+- Games requiring ESP32-S31-only hardware services need an explicit
+  S3-compatible fallback. Living Worlds decodes its panoramas with the ESP32-S3
+  ROM TJpgDec decoder instead of the S31 JPEG engine.

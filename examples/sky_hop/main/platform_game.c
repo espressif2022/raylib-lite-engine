@@ -7,8 +7,10 @@
 #define PLAYER_H 36.0f
 #define FLOOR_Y 390.0f
 #define JUMP_VELOCITY (-10.5f)
+#define JUMP_RELEASE_SCALE 0.55f
 #define COYOTE_FRAMES 6U
 #define JUMP_BUFFER_FRAMES 8U
+#define COIN_CHAIN_FRAMES 75U
 
 typedef struct {
     const platform_block_t *blocks;
@@ -183,6 +185,8 @@ static void load_level(platform_game_t *game, uint8_t level_index)
     game->grounded = true;
     game->coyote_frames = COYOTE_FRAMES;
     game->jump_buffer = 0;
+    game->coin_chain = 0;
+    game->coin_chain_timer = 0;
     memset(game->pointers, 0, sizeof(game->pointers));
     game->coin_count = level->coin_count;
     game->enemy_count = level->enemy_count;
@@ -241,6 +245,8 @@ void platform_game_set_action(platform_game_t *game, platform_action_t action,
     if (action == PLATFORM_ACTION_JUMP) {
         if (pressed && !game->jump_held)
             game->jump_buffer = JUMP_BUFFER_FRAMES;
+        if (!pressed && game->jump_held && game->velocity_y < -2.0f)
+            game->velocity_y *= JUMP_RELEASE_SCALE;
         game->jump_held = pressed;
     }
 }
@@ -333,6 +339,9 @@ void platform_game_update(platform_game_t *game)
     if (game->phase != PLATFORM_PLAYING) return;
     const platform_level_t *level = current_level(game);
     ++game->tick;
+    if (game->coin_chain_timer) {
+        if (!--game->coin_chain_timer) game->coin_chain = 0;
+    }
     if (game->move_left) game->facing_left = true;
     else if (game->move_right) game->facing_left = false;
     apply_jump(game);
@@ -391,7 +400,9 @@ void platform_game_update(platform_game_t *game)
         if (!coin->collected && overlap(game->player_x, game->player_y,
                 PLAYER_W, PLAYER_H, coin->x - 8, coin->y - 8, 16, 16)) {
             coin->collected = true;
-            game->score += 100;
+            if (game->coin_chain < 5U) ++game->coin_chain;
+            game->coin_chain_timer = COIN_CHAIN_FRAMES;
+            game->score += (uint16_t)(100U * game->coin_chain);
         }
     }
     if(!game->checkpoint_active&&game->player_x>=level->checkpoint_x){
@@ -411,6 +422,8 @@ void platform_game_update(platform_game_t *game)
             game->velocity_y = -7.5f;
             game->score += 250;
         } else {
+            game->coin_chain = 0;
+            game->coin_chain_timer = 0;
             lose_life(game);
             return;
         }

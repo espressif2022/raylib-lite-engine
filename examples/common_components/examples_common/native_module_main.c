@@ -24,6 +24,10 @@
 #define RAYLIB_LITE_NATIVE_TARGET_FPS 0
 #endif
 
+#ifndef RAYLIB_LITE_NATIVE_STATS_SECONDS
+#define RAYLIB_LITE_NATIVE_STATS_SECONDS 10
+#endif
+
 static const char *TAG = "native_game";
 /* One application per firmware; provider and borrowed Board interfaces are
  * used only by this launcher, which owns attach/detach ordering. */
@@ -256,7 +260,7 @@ void app_main(void)
         .window_title = module->descriptor.title,
         .logic_hz = logic_hz,
         .target_fps = target_fps,
-        .stats_interval = logic_hz * 10,
+        .stats_interval = logic_hz * RAYLIB_LITE_NATIVE_STATS_SECONDS,
         .platform = *services,
         .input = raylib_lite_example_board_input(board),
         .user = &game,

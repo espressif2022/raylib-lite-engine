@@ -1,0 +1,10 @@
+{
+  "image": "shooter_nebula.png",
+  "columns": 1,
+  "rows": 1,
+  "output_cell": 240,
+  "alpha_mode": "opaque",
+  "frames": [
+    {"name": "nebula_field", "pivot_x": 0, "pivot_y": 0}
+  ]
+}

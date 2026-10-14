@@ -3,6 +3,7 @@
   "sources": [
     "main/game_module.c",
     "main/rally_game.c",
+    "main/rally_view_motion.c",
     "main/rally_view.c"
   ]
 }

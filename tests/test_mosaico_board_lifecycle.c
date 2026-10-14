@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "sdk.h"
+#include "raylib_lite_example_async_video.h"
 #include "board_under_test.inc"
 
 static esp_display_presenter_t presenter;
@@ -9,6 +10,7 @@ static char mock_handle;
 static dev_display_lcd_handles_t lcd = {&mock_handle, &mock_handle};
 static dev_lcd_touch_handles_t touch = {&mock_handle};
 static unsigned fail_presenter_create, fail_presenter_delete, fail_manager_deinit;
+static unsigned fail_touch_handle, touch_inits, tasks_created;
 static unsigned clock_seq, audio_seq, close_seq, delete_seq, deinit_seq;
 static bool manager_live;
 static unsigned poll, release_attempts, accepted_releases, accepted_presses;
@@ -21,7 +23,7 @@ int xSemaphoreTake(SemaphoreHandle_t s, TickType_t t) { (void)t; assert(s); retu
 int xSemaphoreGive(SemaphoreHandle_t s) { assert(s); return pdTRUE; }
 void vSemaphoreDelete(SemaphoreHandle_t s) { assert(s); }
 int xTaskCreate(void (*fn)(void *), const char *n, unsigned st, void *arg, unsigned pr, TaskHandle_t *out)
-{ (void)fn; (void)n; (void)st; (void)arg; (void)pr; *out = &mock_handle; return pdPASS; }
+{ (void)fn; (void)n; (void)st; (void)arg; (void)pr; ++tasks_created; *out = &mock_handle; return pdPASS; }
 void vTaskDelay(TickType_t t)
 { (void)t; if (++poll >= 3) atomic_store(&worker_board->sampling, false); }
 void vTaskDelete(void *s) { assert(!s); }
@@ -45,11 +47,17 @@ esp_err_t esp_board_manager_deinit(void)
 esp_err_t esp_board_manager_get_device_handle(const char *name, void **out)
 {
     assert(manager_live);
+    if (!strcmp(name, "lcd_touch") && fail_touch_handle) {
+        --fail_touch_handle;
+        *out = NULL;
+        return ESP_FAIL;
+    }
     *out = !strcmp(name, "display_lcd") ? (void *)&lcd :
            !strcmp(name, "lcd_touch") ? (void *)&touch : (void *)&mock_handle;
     return ESP_OK;
 }
-esp_err_t esp_board_manager_init_device_by_name(const char *n) { (void)n; return ESP_OK; }
+esp_err_t esp_board_manager_init_device_by_name(const char *n)
+{ if (!strcmp(n, "lcd_touch")) ++touch_inits; return ESP_OK; }
 esp_err_t esp_lcd_touch_read_data(void *t) { assert(t); return ESP_OK; }
 esp_err_t esp_lcd_touch_get_data(void *t, esp_lcd_touch_point_data_t *points, uint8_t *count, uint8_t max)
 { assert(t && max); *count = poll == 0 ? 1 : 0; points[0] = (esp_lcd_touch_point_data_t){12, 34, 7}; return ESP_OK; }
@@ -114,6 +122,17 @@ int main(void)
     assert(raylib_lite_example_board_destroy(board, 10) == ESP_FAIL && manager_live);
     assert(raylib_lite_example_board_retry_cleanup(board, 10) == ESP_OK);
     assert(raylib_lite_example_board_create(&cfg, &board) == ESP_OK);
+    assert(raylib_lite_example_board_destroy(board, 10) == ESP_OK);
+    /* A touch probe that fails once is retried; a persistent failure leaves touch off. */
+    fail_touch_handle = 1; touch_inits = tasks_created = 0;
+    assert(raylib_lite_example_board_create(&cfg, &board) == ESP_OK && board->touch);
+    assert(touch_inits == 1);
+    assert(raylib_lite_example_board_start_input(board) == ESP_OK && tasks_created == 1);
+    assert(raylib_lite_example_board_destroy(board, 10) == ESP_OK);
+    fail_touch_handle = 2; touch_inits = tasks_created = 0;
+    assert(raylib_lite_example_board_create(&cfg, &board) == ESP_OK && !board->touch);
+    assert(touch_inits == 1);
+    assert(raylib_lite_example_board_start_input(board) == ESP_OK && tasks_created == 0);
     assert(raylib_lite_example_board_destroy(board, 10) == ESP_OK);
     cfg.logical_width = 320;
     assert(raylib_lite_example_board_create(&cfg, &board) == ESP_ERR_NOT_SUPPORTED && !board);

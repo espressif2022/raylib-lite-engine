@@ -5,6 +5,15 @@ for native Raylib Lite examples through ESP Board Manager 0.7.x. It supports
 Mosaico hardware revisions v1.0, v1.1 and v1.2, selected from eFuse before
 hardware initialization. It does not depend on the product BSP, Iris or Recovery.
 
+The display uses the same `examples_common/example_async_video.c` scheduler as
+BOX-3: three PSRAM frames, an opposite-core priority-4 worker, asynchronous
+`present`, a latest-frame snapshot, and retryable `flush`/close. The SPI profile
+uses 34-line RGB565 strips, two internal-RAM strip buffers, transaction queue
+depth 2, a 1500 ms transfer timeout, and `max_transfer_sz=32640` (`480 * 34 * 2`).
+Explicit Board strip settings must be 34 / 2, or zero for the shared profile.
+DMA2D prepares strips with a CPU-copy fallback; QSPI remains 40 MHz. A completed
+worker submission includes the presenter's transfer-completion fence.
+
 ## Build
 
 From a Game project directory, with ESP-IDF supporting the preview ESP32-S31 target:

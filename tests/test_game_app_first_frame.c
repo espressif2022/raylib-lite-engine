@@ -89,8 +89,10 @@ void raylib_lite_raylib_init_window(int width, int height, const char *title)
 void raylib_lite_raylib_set_target_fps(int fps) { assert(fps == 30); }
 void raylib_lite_raylib_close_window(void) {}
 bool raylib_lite_raylib_window_should_close(void) { return false; }
-int raylib_lite_raylib_get_fps(void) { return 30; }
-void raylib_lite_raylib_consume_input_edges(void) {}
+int raylib_lite_raylib_get_target_fps(void) { return 30; }
+void raylib_lite_raylib_attach_runtime(uint32_t logic_hz) { assert(logic_hz == 30); }
+void raylib_lite_raylib_detach_runtime(void) {}
+void raylib_lite_raylib_end_logic_tick(void) {}
 void raylib_lite_raylib_inject_pointer(int track_id, int x, int y, bool down)
 {
     (void)track_id; (void)x; (void)y; (void)down;

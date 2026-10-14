@@ -17,6 +17,7 @@ typedef struct {
     uint8_t touch_points;
     bool enable_imu;
     uint16_t imu_sample_ms;
+    /* 0 selects the shared SPI profile; explicit values must be 34 / 2. */
     uint16_t drawbuf_lines;
     uint8_t drawbuf_count;
     /* Game-owned logical surface; Boards may scale it to the physical LCD. */

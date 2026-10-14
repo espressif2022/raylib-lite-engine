@@ -16,6 +16,7 @@
 typedef struct {
     shooter_game_t game;
     raylib_lite_atlas_t atlas;
+    raylib_lite_atlas_t backdrop;
     bool paused, left, right;
     float imu_x, imu_y;
 } shooter_module_state_t;
@@ -30,6 +31,7 @@ static int initialize(void *value
 #endif
     state->atlas=raylib_lite_atlas_load("shooter.atlas");
     if(!state->atlas.texture.id)return -1;
+    state->backdrop=raylib_lite_atlas_load("nebula.atlas");
     shooter_game_reset(&state->game,0x4d4f5341U);
 #if !defined(RAYLIB_LITE_GAME_NATIVE)
     InitWindow(480,480,"Mosaico Strike");
@@ -41,7 +43,9 @@ static int initialize(void *value
 static void shutdown(void *value)
 {
     shooter_module_state_t *state=value;
-    if(state)raylib_lite_atlas_unload(state->atlas);
+    if(!state)return;
+    raylib_lite_atlas_unload(state->atlas);
+    raylib_lite_atlas_unload(state->backdrop);
 }
 
 static void input(void *value,const raylib_lite_game_input_v1_t *event)
@@ -85,7 +89,7 @@ static void update(void *value)
 static int render(void *value)
 {
     shooter_module_state_t *state=value;
-    shooter_view_render(&state->game,state->atlas);
+    shooter_view_render(&state->game,state->atlas,state->backdrop);
     return 0;
 }
 

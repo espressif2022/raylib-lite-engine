@@ -38,6 +38,70 @@ static int64_t reference_edge(int ax,int ay,int bx,int by,int x,int y)
            ((int64_t)y-ay)*((int64_t)bx-ax);
 }
 
+/* Pixels exactly on an edge belong to the triangle only for left edges
+ * (inside lies to the right, going down) and top edges (horizontal, inside below). */
+static bool top_left_inside(int ax,int ay,int bx,int by,int x,int y,int sign)
+{
+    int64_t e=reference_edge(ax,ay,bx,by,x,y)*sign;
+    int64_t dy=((int64_t)by-ay)*sign,dx=((int64_t)bx-ax)*sign;
+    return e>0||(e==0&&(dy>0||(dy==0&&dx<0)));
+}
+
+static void fill_background(void)
+{
+    for(int i=0;i<STRIDE*W;++i)pixels[i]=reference[i]=(uint16_t)(i*997U);
+}
+
+/* Translucent shapes made of several pieces must blend every pixel once. */
+static void single_blend_cases(void)
+{
+    const Color c={200,40,90,128};
+    const Vector2 square[4]={{20,20},{60,20},{60,52},{20,52}};
+    const Vector2 fan[6]={{100,100},{140,100},{150,130},{120,160},{90,140},{80,110}};
+    const Vector2 strip[6]={{200,20},{200,60},{230,15},{235,70},{270,25},{260,64}};
+    for(int shape=0;shape<4;++shape){
+        fill_background();
+        if(shape==0)DrawTriangleFan(square,4,c);
+        if(shape==1)DrawRectanglePro((Rectangle){300,300,37,23},(Vector2){0,0},0,c);
+        if(shape==2)DrawTriangleFan(fan,6,c);
+        if(shape==3)DrawTriangleStrip(strip,6,c);
+        for(int i=0;i<STRIDE*W;++i)
+            assert(pixels[i]==reference[i]||pixels[i]==blend(reference[i],c));
+        if(shape==0)for(int y=20;y<52;++y)for(int x=20;x<60;++x)
+            assert(pixels[y*STRIDE+x]==blend(reference[y*STRIDE+x],c));
+        if(shape==1)for(int y=0;y<W;++y)for(int x=0;x<W;++x){
+            bool in=x>=300&&x<337&&y>=300&&y<323;
+            assert(pixels[y*STRIDE+x]==(in?blend(reference[y*STRIDE+x],c):reference[y*STRIDE+x]));
+        }
+    }
+    for(int trial=0;trial<96;++trial){
+        fill_background();
+        Rectangle r={(float)(trial*7%300)-20.5f,(float)(trial*11%300)-15.25f,
+                     (float)(4+trial*13%170),(float)(4+trial*5%150)};
+        float roundness=(float)(trial%11)/10.0f;
+        DrawRectangleRounded(r,roundness,8,c);
+        float radius=fminf(r.width,r.height)*roundness*.5f;
+        int x0=(int)r.x,y0=(int)r.y,w=(int)r.width,h=(int)r.height;
+        int rad=(int)ceilf(radius),cr=(int)radius;
+        const int cx[2]={x0+rad,x0+w-rad-1},cy[2]={y0+rad,y0+h-rad-1};
+        for(int y=0;y<W;++y)for(int x=0;x<W;++x){
+            bool in;
+            if(radius<1)in=x>=x0&&x<x0+w&&y>=y0&&y<y0+h;
+            else{
+                in=(x>=x0+rad&&x<x0+w-rad&&y>=y0&&y<y0+h)||
+                   (x>=x0&&x<x0+w&&y>=y0+rad&&y<y0+h-rad);
+                for(int i=0;i<4&&!in;++i){
+                    int dx=x-cx[i&1],dy=y-cy[i>>1];
+                    in=dy*dy<=cr*cr&&abs(dx)<=(int)sqrtf((float)(cr*cr-dy*dy));
+                }
+                in=in&&x>=x0&&x<x0+w&&y>=y0&&y<y0+h;
+            }
+            assert(pixels[y*STRIDE+x]==(in?blend(reference[y*STRIDE+x],c):reference[y*STRIDE+x]));
+        }
+    }
+    puts("translucent fans, strips, DrawRectanglePro and 96 rounded rectangles blend each pixel once");
+}
+
 static void triangle_oracle(void)
 {
     uint32_t seed=0x91412u;
@@ -64,13 +128,13 @@ static void triangle_oracle(void)
         if(trial%2)BeginScissorMode(lo,lo,hi-lo,hi-lo);
         else EndScissorMode();
         for(int i=0;i<STRIDE*W;++i)pixels[i]=reference[i]=(uint16_t)(i*997U+trial);
+        int vx[3]={ax,bx,cx},vy[3]={ay,by,cy};
         for(int y=lo;y<hi;++y)for(int x=lo;x<hi;++x){
-            int64_t a=reference_edge(ax,ay,bx,by,x,y);
-            int64_t b=reference_edge(bx,by,cx,cy,x,y);
-            int64_t d=reference_edge(cx,cy,ax,ay,x,y);
-            if(area&&((area>0&&a>=0&&b>=0&&d>=0)||
-                      (area<0&&a<=0&&b<=0&&d<=0)))
-                reference[y*STRIDE+x]=blend(reference[y*STRIDE+x],c);
+            bool inside=area!=0;
+            for(int i=0;inside&&i<3;++i)
+                inside=top_left_inside(vx[i],vy[i],vx[(i+1)%3],vy[(i+1)%3],
+                                       x,y,area>0?1:-1);
+            if(inside)reference[y*STRIDE+x]=blend(reference[y*STRIDE+x],c);
         }
         DrawTriangle(points[0],points[1],points[2],c);
         assert(!memcmp(pixels,reference,sizeof(pixels)));
@@ -113,6 +177,7 @@ int main(void)
     EndScissorMode();
     puts("1024 primitive oracle cases passed (all alpha values, clipping, stride padding)");
     triangle_oracle();
+    single_blend_cases();
     for (int kind=0;kind<3;++kind) for (int alpha=128;alpha<=255;alpha+=127) {
         clock_t start=clock();
         for (int i=0;i<500;++i) draw(kind,150,150,120,(Color){137,219,53,alpha});

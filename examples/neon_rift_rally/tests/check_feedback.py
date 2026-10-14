@@ -19,10 +19,11 @@ typedef int Music;
 typedef struct {
     rally_game_t game;
     unsigned last_feedback_serial;
+    unsigned char feedback_cooldown;
     Sound sounds[9];
     Music engine;
 } neon_rift_rally_module_t;
-static unsigned inits, stops, patterns, cues;
+static unsigned inits, stops, patterns, pulses, cues;
 static int strength, first_ms, second_strength, gap_ms, second_ms;
 static void InitAudioDevice(void) {}
 static int IsAudioDeviceReady(void) { return 1; }
@@ -33,7 +34,9 @@ static void PlayMusicStream(Music m) { (void)m; }
 static void PlaySound(Sound s) { (void)s; ++cues; }
 static void raylib_lite_native_feedback_init(void) { ++inits; }
 static void raylib_lite_native_feedback_stop(void) { ++stops; }
-static void raylib_lite_native_feedback_pulse(int a, int b) { (void)a; (void)b; }
+static void raylib_lite_native_feedback_pulse(int a, int b) {
+    ++pulses; strength=a; first_ms=b;
+}
 static void raylib_lite_native_feedback_pattern(int a,int b,int c,int d,int e) {
     ++patterns; strength=a; first_ms=b; second_strength=c; gap_ms=d; second_ms=e;
 }
@@ -52,8 +55,25 @@ int main(void) {
     feedback_events(&state);
     assert(patterns == 1 && cues == before);
     state.game.event_serial = 2;
+    state.game.event_flags = RALLY_EVENT_OVERTAKE | RALLY_EVENT_CHECKPOINT;
     feedback_events(&state);
-    assert(patterns == 2);
+    assert(pulses == 1 && strength == 46 && first_ms == 24);
+    state.game.event_serial = 3;
+    state.game.event_flags = RALLY_EVENT_OVERTAKEN;
+    feedback_events(&state);
+    assert(patterns == 2 && strength == 28 && second_strength == 24);
+    state.game.event_serial = 4;
+    state.game.event_flags = RALLY_EVENT_DRAFT_READY;
+    feedback_events(&state);
+    assert(pulses == 2 && strength == 18 && state.feedback_cooldown == 4);
+    state.game.event_serial = 5;
+    state.game.event_flags = RALLY_EVENT_CHECKPOINT;
+    feedback_events(&state);
+    assert(pulses == 2); /* Low-priority cooldown suppresses stacking. */
+    state.feedback_cooldown = 0;
+    state.game.event_serial = 6;
+    feedback_events(&state);
+    assert(pulses == 3 && strength == 28);
     feedback_stop();
     assert(stops == 1);
     return 0;
@@ -67,4 +87,4 @@ with tempfile.TemporaryDirectory(prefix="rally_feedback_") as directory:
                     str(PROJECT / "main/rally_game.c"), "-lm", "-o",
                     str(path / "check")], check=True)
     subprocess.run([str(path / "check")], check=True)
-print("neon_rift_rally native collision feedback/consumption/stop passed")
+print("neon_rift_rally feedback priority/cooldown/consumption/stop passed")

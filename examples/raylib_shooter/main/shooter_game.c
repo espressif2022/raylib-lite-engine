@@ -73,15 +73,16 @@ static void spawn_bullet(shooter_game_t *game)
     }
 }
 
-static bool spawn_enemy_at(shooter_game_t *game,float x,uint8_t kind)
+static bool spawn_enemy_at(shooter_game_t *game,float x,uint8_t kind,bool elite)
 {
     for (size_t i=0; i<SHOOTER_MAX_ENEMIES; ++i) if (!game->enemies[i].active) {
         uint32_t value=next_random(game);
         const float speed=1.05f+(float)game->wave*0.075f;
+        uint8_t hp=(uint8_t)(elite?8U:kind+1U);
         game->enemies[i]=(shooter_actor_t){.x=x, .y=-36,
             .vx=kind==1?((value>>9)&1?1.15f:-1.15f):0,
-            .vy=speed+(kind==0?0.45f:(kind==2?-0.18f:0.12f)),
-            .kind=kind, .hp=(uint8_t)(kind+1U), .active=true};
+            .vy=(speed+(kind==0?0.45f:(kind==2?-0.18f:0.12f)))*(elite?.72f:1.0f),
+            .kind=kind, .hp=hp, .max_hp=hp, .elite=elite, .active=true};
         return true;
     }
     return false;
@@ -91,10 +92,15 @@ static void spawn_wave_enemy(shooter_game_t *game)
 {
     uint32_t value=next_random(game);
     uint8_t kind=(uint8_t)((value>>5)%3U);
-    float x=14.0f+(float)(value%418U);
-    (void)spawn_enemy_at(game,x,kind);
-    if(game->wave>=3 && (value&7U)==0U)
-        (void)spawn_enemy_at(game,454.0f-x,0);
+    static const float lanes[5]={42.0f,132.0f,222.0f,312.0f,402.0f};
+    uint8_t step=game->formation_step++;
+    float x=game->wave < 2 ? 14.0f+(float)(value%418U)
+                           : lanes[(step+(game->wave&1U))%5U];
+    bool elite=game->wave>=2 && step%10U==9U;
+    if(elite){kind=2;x=222.0f;}
+    (void)spawn_enemy_at(game,x,kind,elite);
+    if(game->wave>=3 && step%5U==4U)
+        (void)spawn_enemy_at(game,454.0f-x,0,false);
 }
 
 static void emit_particles(shooter_game_t *game,float x,float y,uint8_t color,unsigned count)
@@ -168,7 +174,7 @@ void shooter_game_update(shooter_game_t *game)
                     if(game->combo>game->max_combo)game->max_combo=game->combo;
                     game->combo_timer=90;++game->kills;
                     uint32_t multiplier=1U+(uint32_t)game->combo/4U;
-                    game->score+=(uint32_t)(15U+e->kind*20U)*multiplier;
+                    game->score+=(uint32_t)(15U+e->kind*20U+(e->elite?100U:0U))*multiplier;
                     emit_particles(game,e->x+14,e->y+14,e->kind,12U+e->kind*4U);
                 }
                 break;

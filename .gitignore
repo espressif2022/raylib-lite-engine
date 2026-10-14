@@ -30,6 +30,7 @@ artifacts/
 /examples/vector_pet_dev/
 /examples/vector_puppet_dev/
 /examples/sewer_labyrinth_dev/
+/examples/koala_seasons_dev/
 
 # Local integration backups and generated release output
 /*.patch

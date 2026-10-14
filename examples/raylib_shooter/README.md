@@ -1,30 +1,35 @@
 # Mosaico Raylib Shooter
 
-Reference application for Raylib Lite Engine. Its embedded build keeps the
-familiar Raylib 2D call surface through `raylib_lite_raylib.h`, but maps common
-drawing calls directly to a 480x480 RGB565 framebuffer instead of Raylib's
-generic software-OpenGL rasterizer. The platform backend owns buffer retention and display submission.
+[简体中文](README.CN.md) · [Examples](../README.md)
 
-```bash
-# Host 仿真：在本仓库根目录（主机 C 编译器 + Pillow，不是 GSP sim）
+Raylib Shooter is a vertical arcade shooter reference game. Drag the ship to dodge bullet patterns while the weapon fires automatically; breaking formations and elite enemies in a row earns bonuses.
+
+## Play and controls
+
+### Device
+
+- Tap the title screen to start.
+- Drag the ship on screen; firing is automatic.
+- The shared game module handles touch and pause state; the game has no sound effects yet.
+
+### Host
+
+- Press and drag the mouse to move the ship.
+- Arrow keys or `A`/`D`/`W`/`S` move it as well.
+- `Enter` starts or restarts; `P` pauses or resumes.
+
+## Host preview
+
+From the repository root:
+
+```sh
 python3 tools/game_cli.py sim examples/raylib_shooter
 ```
 
-本目录提供独立 ESP-IDF 原生固件工程；产品固件仍由外部产品仓库决定板级策略。
+## Implementation
 
-Host simulation does not run GSP or need `gspc`.
-
-Touch to start and drag the ship; firing is automatic. Gameplay runs at 30 Hz
-and uses fixed enemy and bullet pools. Raylib ESP 6.0.0~2 does not yet populate
-standard mouse state, so device and browser touch use the Mosaico extension
-queue. Device sound effects use the configured audio backend; codec hardware and
-initialization belong to the board/product integration.
-
-The fast compatibility layer currently accelerates `InitWindow`,
-`BeginDrawing`/`EndDrawing`, clear, pixels, rectangles, triangles, bitmap text,
-measurement and `TextFormat`. Extend that layer for additional Raylib calls;
-unsupported APIs must not silently fall back to the slow `rlsw` path.
+The game runs a 30 Hz fixed step; enemies, bullets and effects use fixed-capacity pools. Drawing uses the Raylib-compatible entry points but writes straight into a 480×480 RGB565 framebuffer. Host and device compile the same model and view sources.
 
 ## Native build
 
-See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.
+See [build paths](../../docs/build-matrix.EN.md) for targets and Board selection, and the [game development guide](../../docs/game-development.EN.md) for the compatibility boundary and validation workflow.

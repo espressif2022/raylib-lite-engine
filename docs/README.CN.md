@@ -4,7 +4,7 @@
 
 第一次使用：按[快速入门](quickstart.CN.md)创建游戏并看到 Host 画面，再按游戏开发指南验证。引擎核心不绑定特定板卡；部分示例还提供显式依赖板级组件的原生固件工程。
 
-## 开发指南（按顺序读）
+## 使用指南（按顺序读）
 
 | 指南 | 解决的问题 |
 | --- | --- |
@@ -16,7 +16,10 @@
 
 | 资料 | 用途 |
 | --- | --- |
+| [自有接口使用边界](custom-api.CN.md) | 游戏、平台集成、低层工具、兼容入口和保留审查模块 |
+| [Scene/UI 使用契约](scene-ui.CN.md) | 场景生命周期、按钮命中、多指针和焦点规则 |
 | [公开 API 契约（English）](../API.md) | 生命周期、所有权、输入与后端契约 |
+| [Raylib 兼容层方向与状态](raylib-compat.CN.md) | 每个 raylib 名字映射的等价程度、冻结规则与上游迁移计划 |
 | [组件发布流程（English）](releasing.md) | 独立例程组装、包校验与 main 自动发布 |
 | [素材来源记录](../release/asset_provenance.json) | 维护例程的媒体来源 |
 | [示例索引（English）](../examples/README.md) | 示例与构建支持矩阵 |
@@ -30,6 +33,6 @@
 | [测试参考（English）](../tests/README.md) | Host 单元测试 |
 | [Mosaico 游戏开发 Skill 中文说明](skills/mosaico-game-development/SKILL.CN.md) | Agent 专用工作流 |
 
-仓库说明和文档索引使用 `README.md` 为英文正文、`README.CN.md` 为中文正文。贡献指南和详细双语指南使用 `.EN.md` 与 `.CN.md` 后缀；`SKILL.md` 保持工具兼容入口。只有单一语言的参考资料在索引中标明语言。
+仓库说明、文档索引和游戏示例的 README 使用 `README.md` 为英文正文、`README.CN.md` 为中文正文。贡献指南和详细双语指南使用 `.EN.md` 与 `.CN.md` 后缀；`SKILL.md` 保持工具兼容入口。只有单一语言的参考资料在索引中标明语言。
 
-Engine 公共 API 已统一为 `raylib_lite_*` 命名；Raylib-shaped compatibility 位于 `compat/raylib/`。见[API 的兼容性说明（English）](../API.md#installation-and-compatibility)。单轮测量与迁移记录不放进正式指南；本地 `docs/debug/` 已被 Git 忽略。
+Engine 公共 API 已统一为 `raylib_lite_*` 命名；Raylib-shaped compatibility 位于 `compat/raylib/`。见[API 的兼容性说明（English）](../API.md#installation-and-compatibility)。正式指南只描述当前使用方式与契约；开发计划和单轮测量不进入组件文档。

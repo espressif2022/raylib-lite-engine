@@ -1,10 +1,12 @@
 # 光栅内核契约
 
-[English](raster-kernels.EN.md) · [设计方法](reference-designs.CN.md) · [中性 Renderer](../include/raylib_lite/raylib_lite_renderer.h) · [Legacy 2D Facade](../compat/raylib/include/raylib_lite_2d.h)
+[English](raster-kernels.EN.md) · [设计方法](reference-designs.CN.md) · [中性 Renderer](../include/raylib_lite/raylib_lite_renderer_draw.h) · [Legacy 2D Facade](../compat/raylib/include/raylib_lite_2d.h)
 
 本页说明当前光栅契约。实现核心使用 `raylib_lite_renderer.h` 中与 Raylib 无关的类型和函数；`raylib_lite_2d.h` 提供 Raylib-shaped `raylib_lite_2d_*` compatibility API，并只在边界做类型转换。高频 draw wrapper 使用 `static inline`，因此 column/span/triangle 热路径不会因为兼容层多一次函数调用。先用 `raylib_lite_renderer_set_target()` 设置 RGB565 目标、像素 stride、宽和高；再用 `raylib_lite_renderer_set_clip()` 设置半开矩形裁剪区。下表的绘制还受目标范围约束。后提交的像素覆盖先提交的像素，没有通用 Z 缓冲。像素中心与固定点舍入的精确结果以 Host 独立 oracle 为验收依据。
 
 `Texture2D` 是通过 `raylib_lite_2d_load_texture()` 或 `raylib_lite_2d_register_rgb565()` 得到的有效句柄；其真实宽高由注册/资产决定，不要求是 2 的幂。`raylib_lite_wall_atlas_t` 需要有效的 INDEX8 数据、256 项每级的 RGB565 LUT、非零宽高和恰好 16 个光照级别。列主序适合墙柱；行主序适合水平行段。调用者必须保证借用的纹理、索引、LUT 和列数组在绘制期间有效；接口无法验证其实际分配长度。
+
+打包资源在加载时验证声明的 payload 长度、RGB565 字节数、alpha 平面（无 alpha，或每像素恰好一个字节），以及所有 frame 的非零宽高和图集范围。墙面资源也检查 frame 范围。失败返回空句柄，并释放此次打开的资源 view；不占用纹理槽位。元数据检查只发生在加载阶段，不加入每帧绘制循环。直接注册的借用内存仍由调用者保证长度和生命周期。
 
 | 函数 | 纹理/尺寸和采样 | 光照、覆盖与裁剪 |
 | --- | --- | --- |
@@ -24,3 +26,5 @@
 `raylib_lite_2d_copy_scanline` 不是 `Draw*`，只复制 clip 范围内的一行，不采样纹理；源行和目标行必须都在 clip 内。所有接口都不对坏指针或伪造纹理缓冲长度提供内存安全保证。
 
 入口参数导致整次 draw 被拒绝时会静默返回，并使独立拒绝计数加一；用 `raylib_lite_renderer_get_rejected_draw_calls()` 读取。它不改变既有光栅统计结构的布局。空批次、完全落在 clip 外、透明 tint 和被跳过的单个坏列不计为整次拒绝。计数便于定位问题，不改变现有 `void` API；调用者仍应在资源加载阶段检查错误。对候选快路径，先用逐像素 oracle 比较覆盖和颜色，再在板端分别比较内核与送屏时间。
+
+实心矩形、三角形与恒色 RGB565 色段使用 `src/renderer/raylib_lite_primitives_internal.h` 的内部 screen-space surface。它借用 framebuffer，保存半开裁剪和本帧统计；无需 Raylib 类型或逐帧分配。相机与坐标截断仍由兼容入口处理。此内部契约不作为游戏公共接口，游戏调用边界见[自有接口说明](custom-api.CN.md)。

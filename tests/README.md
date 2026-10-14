@@ -31,6 +31,22 @@ Runtime-boundary coverage also includes `tests.test_game_action` for Action Mapp
 `tests.test_game_assets` compiles the asset core without ESP-IDF and checks image aliases, bounded read backing, lazy materialization/refcounts, release, streaming, counters, checksum/bounds failures, embedded fallback, and the partition-backend seam.
 `tests.test_renderer_core` compiles `src/renderer/raylib_lite_renderer.c` without any Raylib include path, verifies neutral renderer types and texture/wall-asset lease release, and checks repeated unload behavior. `tests.test_platform_dependency_boundaries` additionally requires the Raylib-shaped hot draw wrappers to remain inline and the S31 assembly fast path to stay under `arch/esp32s31/`.
 
+## Test index
+
+Run one module with `python3 -m unittest tests.<module> -v`.
+
+| Area | Modules |
+| --- | --- |
+| Raster pixel oracles | `test_columns`, `test_primitives`, `test_rgb565`, `test_raster_fixed` (scanline rounding and texture sampling), `test_mtx2` (block-texture decoder), `test_compat_text` (default-font pixels and layout), `test_sample_row_step` (skipped rows leave displayed rows identical), `test_renderer_core`, `test_tilemap` |
+| Benchmarks and measurement tools | `test_render_benchmark`, `test_wall_benchmark`, `test_render_perf_tools`, `test_frame_compare` (compat layer vs upstream raylib + rlsw full frames) |
+| Raylib compatibility | `test_raylib_compat_policy` (every mapping registered), `test_raylib_compat_semantics` (time, input edges, helpers), `test_raylib_audit` (vendored sources and frozen names), `test_rcore_platform` (upstream raylib on the Raylib Lite platform), `test_audio_facade` |
+| Runtime and lifecycle | `test_runner`, `test_runtime_stats`, `test_game_action`, `test_game_app_first_frame`, `test_raylib_lite_video_port`, `test_game_save`, `test_game_assets`, `test_scene_ui_behavior` |
+| Audio service | `test_audio_mixer`, `test_audio_worker`, `test_audio_service_lifecycle` |
+| Host simulator and CLI | `test_host_runner`, `test_host_video_backend`, `test_game_cli`, `test_svg2vg` |
+| Boards | `test_board_display_contract`, `test_board_overrides`, `test_board_audio_codec`; BOX-3: `test_box3_strip`, `test_box3_transfer_cleanup`, `test_box3_viewport`; ESP-Mosaico: `test_mosaico_board_lifecycle`, `test_mosaico_panel_handoff`, `test_mosaico_video` |
+| Games | `test_examples` (loads each game's `examples/<game>/tests/`), `test_platform_game`, `test_gameplay_improvements`, `test_tower_overdraw` |
+| API, documentation and release | `test_api_catalog`, `test_renderer_headers`, `test_platform_dependency_boundaries`, `test_documentation_boundaries`, `test_release_packaging` |
+
 # RGB565 raster regression
 
 ## Generic solid primitives

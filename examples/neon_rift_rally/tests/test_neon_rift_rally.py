@@ -153,6 +153,79 @@ int main(void) {
     assert((rally_events(&near) & RALLY_EVENT_NEAR_MISS) != 0u);
     assert(near.score > 0 && near.combo > 0);
 
+    rally_game_t draft;
+    rally_reset(&draft);
+    tick_countdown(&draft);
+    draft.speed = 18.0f;
+    draft.lateral = 0.0f;
+    for (unsigned i = 1; i < RALLY_OPPONENT_COUNT; ++i)
+        draft.opponents[i].active = false;
+    draft.opponents[0].lateral = 0.0f;
+    bool draft_ready = false;
+    for (unsigned i = 0; i < 60 && !draft_ready; ++i) {
+        draft.lateral = 0.0f;
+        draft.lateral_velocity = 0.0f;
+        draft.heading_error = 0.0f;
+        draft.offtrack = false;
+        draft.speed = 18.0f;
+        draft.opponents[0].progress = draft.progress + 10.0f;
+        draft.opponents[0].speed = draft.speed;
+        draft.opponents[0].lateral = draft.lateral;
+        draft.opponents[0].lane = draft.lateral;
+        draft.opponents[0].target_lane = draft.lateral;
+        draft.opponents[0].decision_cooldown = 255U;
+        rally_set_controls(&draft, 1.0f, 0.0f, 0.0f, false, false);
+        rally_update(&draft);
+        draft_ready = (rally_events(&draft) & RALLY_EVENT_DRAFT_READY) != 0u;
+    }
+    if (!draft_ready) fprintf(stderr, "draft meter %.1f gap %.1f speed %.1f offtrack %d collision %u\n",
+                              draft.draft_meter, draft.gap_ahead, draft.speed,
+                              draft.offtrack, draft.collision_ticks);
+    assert(draft_ready && draft.draft_boost_ticks > 0U && draft.score >= 60U);
+    assert(draft.speed <= RALLY_MAX_SPEED + 0.001f);
+    draft.draft_meter = 50.0f;
+    draft.opponents[0].lateral = 4.0f;
+    rally_update(&draft);
+    assert(draft.draft_meter < 50.0f);
+    draft.draft_meter = 75.0f;
+    draft.opponents[0].progress = draft.progress;
+    draft.opponents[0].lateral = draft.lateral;
+    draft.opponents[0].collision_cooldown = 0;
+    rally_update(&draft);
+    assert((rally_events(&draft) & RALLY_EVENT_COLLISION) != 0u);
+    assert(draft.draft_meter == 0.0f);
+
+    rally_game_t ranks;
+    rally_reset(&ranks);
+    tick_countdown(&ranks);
+    ranks.progress = 100.0f;
+    ranks.previous_position = RALLY_OPPONENT_COUNT + 1U;
+    for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
+        ranks.opponents[i].progress = 0.0f;
+        ranks.opponents[i].speed = 0.0f;
+    }
+    rally_update(&ranks);
+    assert(ranks.position == 1U);
+    assert((rally_events(&ranks) & RALLY_EVENT_OVERTAKE) != 0u);
+    assert(ranks.score >= 75U);
+    rally_update(&ranks);
+    assert((rally_events(&ranks) & RALLY_EVENT_OVERTAKE) == 0u);
+
+    rally_game_t tactics;
+    rally_reset(&tactics);
+    assert(tactics.opponents[0].style == RALLY_OPPONENT_SPRINTER);
+    assert(tactics.opponents[1].style == RALLY_OPPONENT_DEFENDER);
+    assert(tactics.opponents[2].style == RALLY_OPPONENT_CHASER);
+    tick_countdown(&tactics);
+    float old_target = tactics.opponents[0].target_lane;
+    tactics.opponents[0].decision_cooldown = 2U;
+    rally_update(&tactics);
+    assert(tactics.opponents[0].target_lane == old_target);
+    rally_update(&tactics);
+    rally_update(&tactics);
+    assert(tactics.opponents[0].decision_cooldown == 30U);
+    assert(fabsf(tactics.opponents[0].lateral - old_target) < 1.0f);
+
     rally_fail(&near);
     assert(near.phase == RALLY_PHASE_FAILED);
     assert((rally_events(&near) & RALLY_EVENT_FAIL) != 0u);
@@ -171,8 +244,9 @@ int main(void) {
                 f"-I{PROJECT / 'main'}", str(source),
                 str(PROJECT / "main/rally_game.c"), "-lm", "-o", str(executable),
             ], check=True)
-            result = subprocess.run([str(executable)], check=True,
+            result = subprocess.run([str(executable)], check=False,
                                     text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.strip(), "neon rift rally model: ok")
 
 

@@ -19,9 +19,9 @@ component/
       main/, assets_src/
       shared/common_components/examples_common/
       shared/boards/esp-mosaico/
-    neon_rift_rally/           # seventh maintained game
+    neon_rift_rally/           # sixth released game
     ...                        # sky_hop, tower_defense, raylib_shooter,
-                               # living_worlds, last_zone_extraction, tomb_raycast
+                               # living_worlds, last_zone_extraction
 release-manifest.json          # outside component; all file hashes and provenance
 ```
 
@@ -29,11 +29,14 @@ Each game CMake entry references `shared/` inside its own directory. Its main
 manifest uses the Registry dependency and has no checkout-relative override.
 Board Git dependencies remain pinned. No sibling Engine checkout is required.
 Registry download still needs network access to resolve dependencies and Pillow/
-NumPy for asset preparation. Benchmarks and `*_dev` directories are not uploaded.
+NumPy for asset preparation. Benchmarks, the internal `tomb_raycast` preview and `*_dev` directories are not uploaded.
+Development plans, historical captures and review notes under `docs/development/`
+stay in the checkout and are excluded both by release assembly and the Registry
+manifest. The package includes current usage documentation only.
 
 ## Prepare and validate locally
 
-Use an ESP-IDF 6.2 environment with `compote` and Python 3.10 or newer, plus the asset tooling:
+Use an ESP-IDF 6.1 or newer environment (the manifests declare `idf >=6.1`) with `compote` and Python 3.10 or newer, plus the asset tooling:
 
 ```sh
 python3 -m pip install Pillow numpy PyYAML
@@ -78,8 +81,8 @@ IDF_TARGET=esp32s31 idf.py --preview bmgr -c ./shared/boards/esp-mosaico/bmgr -b
 IDF_TARGET=esp32s31 idf.py --preview -B /tmp/raylib-consumer-build -DIDF_TARGET=esp32s31 build
 ```
 
-It also builds assembled `raylib_shooter` on ESP32-S3-BOX-3. Living Worlds stays
-off that Board. From the same kind of consumer directory:
+It also builds every assembled game on ESP32-S3-BOX-3. From the same kind of
+consumer directory:
 
 ```sh
 IDF_TARGET=esp32s3 idf.py bmgr -c ./shared/boards -b esp32_s3_box_3 \
@@ -112,10 +115,9 @@ The changelog records the namespace migration from historical `mosaico_*` APIs.
 The release workflow assembles and checks artifacts on PRs, pushes to `main`
 and manual runs. After packaging, it compiles `minimal` for `esp32s3`, every
 assembled game for `esp32s31` after generating the ESP-Mosaico Board Manager
-profile, and assembled `raylib_shooter` for `esp32s3` after generating the
-ESP32-S3-BOX-3 profile. Living Worlds is not built for BOX-3. These are compile
-checks, not device acceptance. Each of the nine consumer configurations builds
-with both `latest` and `v6.1` (18 builds). Packaging uses `latest`; upload waits
+profile, and every assembled game for `esp32s3` after generating the
+ESP32-S3-BOX-3 profile. These are compile checks, not device acceptance. Each of
+the thirteen consumer configurations builds with both `latest` and `v6.1` (26 builds). Packaging uses `latest`; upload waits
 for the complete consumer matrix. Only a push to `main`
 enables the dependent `upload_components`
 job. It verifies the checked archive SHA-256, unpacks it and uploads the assembled
@@ -137,18 +139,20 @@ See [official component publishing](https://docs.espressif.com/projects/idf-comp
 ## Validation evidence and support scope
 
 Record chip, board, IDF revision, build commands, startup/input/present/shutdown
-results and unexercised paths. Host timing is not device FPS. Current verified
-Board path is ESP-Mosaico/ESP32-S31 with IDF revision
-`7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe`. That revision is device evidence.
-The release workflow image is `latest`, not that commit, until a 6.2 release
-image exists. Portability to other chips is subject to focused IDF builds. The minimal consumer has no display/audio/input device
+results and unexercised paths. Host timing is not device FPS. The latest device
+evidence (2026-10-14) covers ESP-Mosaico/ESP32-S31 and ESP32-S3-BOX-3 built with
+ESP-IDF v6.1 (`fff9895c82d744c7237be8847347bdd1b07c6643`): each of the six released
+Games started and presented without display errors in a no-input 70-second run.
+Touch play, audible output and the heaviest scenes were not accepted per Game.
+The release workflow compiles with the `latest` image and `v6.1`; those are compile
+checks, not device evidence. The minimal consumer has no display/audio/input device
 claims. Consult the per-release evidence rather than inferring support from
-`idf >=6.2` alone.
+`idf >=6.1` alone.
 
 ## Assets and dependencies
 
 [Asset provenance](../release/asset_provenance.json) records the owner's confirmation
-that maintained media was generated with Codex. Assembly emits exact media names
+that maintained images were generated with Codex and unscripted audio was AI-generated. Assembly emits exact media names
 and SHA-256 hashes into each example's `ASSET_PROVENANCE.json`. Procedural Python
 scripts and screenshots are kept with their source examples. New third-party
 media/fonts require their own source and notice entries before release.

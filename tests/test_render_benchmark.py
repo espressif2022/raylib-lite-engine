@@ -18,10 +18,13 @@ class RenderExampleTests(unittest.TestCase):
         registry=json.loads((bench.EXAMPLE/'config/techniques.json').read_text())
         self.assertEqual(len({x['id'] for x in registry['entries']}),len(registry['entries']))
         for entry in registry['entries']:
-            if entry['source']:self.assertTrue((ROOT/entry['source']).is_file(),entry['source'])
+            if entry['source']:
+                for path in entry['source'].split(','):
+                    path=path.strip()
+                    self.assertTrue((ROOT/path).is_file(),path)
         plan=bench.plan(Path('/tmp/render-plan-fixture'))
-        self.assertEqual(len(plan['entries']),22)
-        self.assertEqual(len({x['name'] for x in plan['entries']}),22)
+        self.assertEqual(len(plan['entries']),23)
+        self.assertEqual(len({x['name'] for x in plan['entries']}),23)
         self.assertTrue(all(x['captures'] in (1,3) for x in plan['entries']))
 
     def test_real_core_example_and_rejected_captures(self):
@@ -51,6 +54,30 @@ class RenderExampleTests(unittest.TestCase):
             changed=copy.deepcopy(report);changed['config']['pie']=1
             with self.assertRaises(ValueError):bench.compare(report,changed,'implementation')
             self.assertEqual(len(bench.compare(report,changed,'pie')),12)
+
+    def test_real_stack_example_and_rejected_captures(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder=Path(temp);build=folder/'build'
+            subprocess.run(['cmake','-S',str(bench.EXAMPLE),'-B',str(build),
+                            '-DRENDER_BENCH_HOST=ON','-DRENDER_BENCH_SUITE=stack'],
+                           check=True,stdout=subprocess.DEVNULL)
+            subprocess.run(['cmake','--build',str(build),'-j','2'],check=True,stdout=subprocess.DEVNULL)
+            logs=[]
+            for i in range(3):
+                path=folder/f'{i}.log';path.write_bytes(subprocess.check_output([str(build/'render_benchmark')]))
+                logs.append(path)
+            report=bench.summarize(logs)
+            self.assertEqual(list(report['cases']),list(bench.STACK_CASES))
+            self.assertEqual(report['config']['suite'],'stack')
+            text=logs[0].read_text()
+            dropped=''.join(line+'\n' for line in text.splitlines() if 'rounded_rect_alpha' not in line)
+            for malformed in (dropped,text.replace('"errors":0','"errors":7',1),
+                              text.replace('"pixels":57600','"pixels":4096',1),
+                              text.replace('"status":0','"status":1')):
+                with self.assertRaises(ValueError):bench.read_log(malformed)
+            changed=copy.deepcopy(report);changed['config']['workload_sha256']='e'*64
+            with self.assertRaises(ValueError):bench.compare(report,changed,'implementation')
+            self.assertEqual(len(bench.compare(report,copy.deepcopy(report),'implementation')),17)
 
 
 if __name__=='__main__':unittest.main()

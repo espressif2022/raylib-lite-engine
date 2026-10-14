@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "raylib_lite_game_module_contract.h"
-/* One module entry for Host, direct native, and lobby ELF builds. */
+/* One module entry for Host and native builds. */
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>

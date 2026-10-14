@@ -15,7 +15,7 @@ Raylib Lite Engine 当前支持 PC Host 和原生 ESP-IDF Board 固件；不支�
 
 Game 只拥有可移植 model/view/module source。其 `main/idf_component.yml` 声明 `espressif2022/raylib-lite-engine: ^0.1.0`；仅仓库内联调时，额外用 `override_path` 把这一版本依赖指向当前 checkout。Game 的 Application CMake 层选择应用侧 Board component，并与 `examples_common` 一起注册。Game 顶层 CMake 不 include Engine 仓库 helper，也不通过 `EXTRA_COMPONENT_DIRS` 发现 Engine。
 
-Host 的 `game.sim.json` 和 Board build 编译同一个 `main/game_module.c`。Board-neutral 的共享示例 glue 由 [`examples/common_components/examples_common`](../examples/common_components/examples_common/) IDF component 拥有：generic native launcher、抽象 Board contract、haptic helper 和共享游戏模块契约；具体 Board 代码只放在 `examples/boards/<board>/`。Game 若需要仅设备侧使用的实现，可隔离在自身的 `main/native/` 目录；它仍由 Game `main` component 编译，可以使用板卡无关的 ESP-IDF / Engine 服务和 example-Board contract，但不能包含具体 Board API。Living Worlds 的 ESP-IDF JPEG decode 位于 `examples/living_worlds/main/native/`，资源仍由通用 native asset helper 嵌入；Host/native 继续共用同一个 `game_module.c`。这些都属于 example/Application 层而不是 Engine public API。
+Host 的 `game.sim.json` 和 Board build 编译同一个 `main/game_module.c`。Board-neutral 的共享示例 glue 由 [`examples/common_components/examples_common`](../examples/common_components/examples_common/) IDF component 拥有：generic native launcher、抽象 Board contract、haptic helper 和共享游戏模块契约；具体 Board 代码只放在 `examples/boards/<board>/`。Game 若需要仅设备侧使用的实现，可隔离在自身的 `main/native/` 目录；它仍由 Game `main` component 编译，可以使用板卡无关的 ESP-IDF / Engine 服务和 example-Board contract，但不能包含具体 Board API。Living Worlds 的 JPEG 解码（S31 硬件引擎、ESP32-S3 ROM TJpgDec）位于 `examples/living_worlds/main/native/`，资源仍由通用 native asset helper 嵌入；Host/native 继续共用同一个 `game_module.c`。这些都属于 example/Application 层而不是 Engine public API。
 
 查询支持矩阵：
 
@@ -31,8 +31,9 @@ python3 tools/game_cli.py list --json --target esp-mosaico
 - `sky_hop`
 - `living_worlds`
 - `last_zone_extraction`
-- `tomb_raycast`
 - `neon_rift_rally`
+
+`tomb_raycast` 为内测版本：可在仓库中为两块 Board 构建，但不属于发布集合。
 
 可选择的第二块 Board：[`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md) 使用 `espressif/esp_board_manager`，物理 LCD 为 320×240。Game 保留自己的逻辑分辨率，由 Board adapter 等比缩放并反向映射触摸。此 Board 必须使用包含 GPIO47 与设备初始化修订的 `bmgr_amend` 配置，为每个 Game 独立生成 Board Manager 代码。从仓库根目录进入 Game 目录后执行（下方以 `raylib_shooter` 为例）：
 
@@ -42,7 +43,7 @@ idf.py bmgr -c ../boards -b esp32_s3_box_3 -a ../boards/esp32-s3-box-3/bmgr_amen
 IDF_TARGET=esp32s3 idf.py -B /tmp/rle-box3-shooter build
 ```
 
-此 Board 使用自身的 `examples/boards/esp32-s3-box-3/partitions.csv`，默认 16 MB Flash，factory 应用分区为 15 MiB。已在 BOX-3 实机验证 `raylib_shooter` 运行与 TT21100 触摸方向，`neon_rift_rally` 的 ES8311 初始化与非静音 PCM 提交；扬声器听音及其他 Game 仍待逐项验收。**Board 可选择不等于所有 Game 已通过实机验收。**
+此 Board 使用自身的 `examples/boards/esp32-s3-box-3/partitions.csv`，默认 16 MB Flash，factory 应用分区为 15 MiB。已在 BOX-3 实机验证 `raylib_shooter` 运行与 TT21100 触摸方向，`neon_rift_rally` 的 ES8311 初始化与非静音 PCM 提交；六个发布 Game 均已在 BOX-3 无输入运行 70 秒、显示错误为 0。触摸游玩、扬声器听音与最重场景仍待逐个 Game 验收。**Board 可选择不等于所有 Game 已通过实机验收。**
 
 ## 原生固件
 
