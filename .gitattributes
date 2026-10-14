@@ -1,0 +1,2 @@
+# Vendored upstream sources and license texts must stay byte-identical.
+third_party/** -whitespace
