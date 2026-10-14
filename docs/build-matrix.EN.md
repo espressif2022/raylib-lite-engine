@@ -43,7 +43,7 @@ idf.py bmgr -c ../boards -b esp32_s3_box_3 -a ../boards/esp32-s3-box-3/bmgr_amen
 IDF_TARGET=esp32s3 idf.py -B /tmp/rle-box3-shooter build
 ```
 
-BOX-3 selects `examples/boards/esp32-s3-box-3/partitions.csv` by default: a 15 MiB factory app partition on the standard 16 MB Flash device. `raylib_shooter` has passed initial real-device rendering and TT21100 touch-direction checks; `neon_rift_rally` has demonstrated ES8311 initialization and non-silent PCM submission. Audible speaker output and other Games still need acceptance. **Selectable does not mean every Game has passed device acceptance.**
+BOX-3 selects `examples/boards/esp32-s3-box-3/partitions.csv` by default: a 15 MiB factory app partition on the standard 16 MB Flash device. `raylib_shooter` has passed initial real-device rendering and TT21100 touch-direction checks; `neon_rift_rally` has demonstrated ES8311 initialization and non-silent PCM submission. All six released Games start and present without display errors on BOX-3 (no-input 70-second runs); touch play, audible speaker output and heaviest scenes still need per-Game acceptance. **Selectable does not mean every Game has passed device acceptance.**
 
 ## Native firmware
 

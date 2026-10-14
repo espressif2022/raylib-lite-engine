@@ -1,65 +1,51 @@
 # Neon Rift Rally
 
-Neon Rift Rally 是第三人称霓虹摩托竞速游戏。三条赛道各进行三圈比赛，六名对手采用
-冲刺、防守和追赶三类策略。玩家可利用尾流、氮气和漂移争夺排名。
+[简体中文](README.CN.md) · [Examples](../README.md)
 
-## 玩法与操作
+Neon Rift Rally is a third-person neon motorcycle racer. Each of three courses runs a three-lap race against six rivals using sprint, defend and chase strategies. Use drafting, nitro and drifts to fight for position.
 
-### 真机
+## Play and controls
 
-- 倒计时期间保持设备水平，供 IMU 校准中心位置。
-- 左右倾斜设备控制转向；向左倾斜会左移并显示左倾姿态。
-- 左侧触摸拖动会暂时接管转向；第二根手指可按住右下角氮气区域。
-- 倒计时期间点击赛道名称两侧可切换赛道。
-- 加速自动进行；比赛结束后点击结果画面重新开始。
-- 速度达到 18 后，大幅转向持续约 0.27 秒会进入漂移；回正兑现短促加速。
-  出界、碰撞或离地会取消蓄力。短暂修正方向不会触发漂移。
+### Device
+
+- Hold the device level during the countdown so the IMU can calibrate its center.
+- Tilt the device left or right to steer; tilting left moves left and shows the left-lean pose.
+- Dragging on the left side temporarily takes over steering; a second finger can hold the nitro area at the bottom right.
+- During the countdown, tap either side of the course name to change course.
+- Throttle is automatic; after the race, tap the result screen to restart.
+- Above speed 18, holding a hard turn for about 0.27 s starts a drift; straightening out cashes it in as a short boost. Leaving the track, a collision or being airborne cancels the charge. Brief corrections do not start a drift.
 
 ### Host
 
-- `A`/`D`：转向；`W`：加速；`S`：刹车。
-- `Space`：氮气；`Shift`：漂移。
-- `P`：暂停或继续；`Enter`：重新开始。
-- 鼠标左侧拖动和右下角氮气区域沿用真机触摸规则。
+- `A`/`D`: steer; `W`: throttle; `S`: brake.
+- `Space`: nitro; `Shift`: drift.
+- `P`: pause or resume; `Enter`: restart.
+- Mouse drags on the left and the bottom-right nitro area follow the device touch rules.
 
-## 竞赛系统
+## Race systems
 
-- 摩托采用重左、轻左、正面、轻右、重右五档姿态，反向时逐档经过正面。
-- 六名对手采用有限的起步加速度和更紧凑的发车间距。前车占道时会减速，
-  有空间时平滑变道超车；冲刺型直道更快，防守型在接近并排时让出安全空间，
-  追赶型可向玩家车道靠拢保持追逐。三条赛道各自的弯道参与对手速度判断。
-- 对手车辆和路边精灵按实际相机深度缩放、排序，靠近时持续变大，驶离时自然
-  裁出画面；头盔和背部色块帮助辨认不同车手。
-- 霓虹海港、落日峡谷和极光雪山使用独立远景与路边物件；弯道标志按方向翻转。
-  接地阴影、漂移火花和随速度稍微变宽的视野提供驾驶反馈。
-- 海港赛道采用闭合的手工样条走向，前段依次经过港区、仓库弯道和桥面。
-  连续护栏、固定间距灯柱、仓库立面与桥架共用道路坐标；坡顶可遮挡后方物体。
-  三条赛道的远景缩到画面上方 184 行，路沿收窄，给道路和近景留出空间。
-- 峡谷路段以连续岩壁、低护墙和分组石柱围出道路；雪地以雪堤、沿路栅栏和
-  路桩组成不同路段。雪地弯道已放缓，避免宽路面在局部回折中相互覆盖。
-- 跟在前车后方且横向对齐会积累尾流，充满后获得短促速度奖励。
-- 比赛中 HUD 只留名次和氮气。前车距离、尾流条、排名变化和最后一圈提示不画在画面上；尾流和氮气仍由模型和音效处理。冲出赛道时显示 OFF TRACK。结算画面保留。
-- 碰撞、圈完成、超车、被超和尾流分别提供分层音效与震动。
+- The bike has five lean poses (hard left, light left, center, light right, hard right) and passes through center when reversing.
+- The six rivals have limited launch acceleration and a tighter starting grid. They slow behind an occupied lane and change lanes smoothly to overtake when there is room. Sprinters are faster on straights, defenders leave safe space when nearly alongside, and chasers close toward the player's lane. Each course's corners feed into rival speed decisions.
+- Rival bikes and roadside sprites scale and sort by actual camera depth, grow continuously as they approach and clip naturally as they leave; helmets and back panels help tell riders apart.
+- Neon Loop (harbor), Sunset Sprint (canyon) and Polar Rift (snow) have their own vistas and roadside objects; corner signs flip by direction. Ground shadows, drift sparks and a field of view that widens slightly with speed provide driving feedback.
+- The harbor course follows a closed hand-authored spline through the port, a warehouse corner and a bridge. Continuous rails, evenly spaced lamp posts, warehouse fronts and bridge trusses share road coordinates; crests can hide objects behind them. Vistas on all three courses are limited to the top 184 rows and curbs are narrower, leaving room for the road and near scenery.
+- Canyon sections are framed by continuous rock walls, low barriers and grouped pillars; snow sections use snowbanks, roadside fences and posts. Snow corners are gentler so the wide road does not overlap itself in tight turns.
+- Following a rider closely and aligned builds draft; a full meter grants a short speed bonus.
+- During a race the HUD shows only position and nitro. Gap to the rider ahead, the draft meter, position changes and the last-lap prompt are not drawn; draft and nitro are still handled by the model and audio. OFF TRACK appears when you leave the track. The results screen is kept.
+- Collisions, lap completion, overtaking, being overtaken and drafting each have layered sound and haptics.
 
-## Host 预览
+## Host preview
 
-在仓库根目录运行：
+From the repository root:
 
 ```sh
 python3 tools/game_cli.py sim examples/neon_rift_rally
 ```
 
-## 实现特点
+## Implementation
 
-Host 与真机共用 30 Hz 固定步长模型、程序化弯道和 RGB565 视图。游戏使用固定容量状态、
-单张摩托姿态贴图绘制和事件驱动反馈；设备仅保存三条赛道的最好圈速和比赛时间。
+Host and device share the 30 Hz fixed-step model, procedural corners and RGB565 view. The game uses fixed-capacity state, a single bike-pose texture and event-driven feedback; the device stores only the best lap and race times for each of the three courses.
 
-## Native 构建
+## Native build
 
-构建目标和 Board 选择见[构建路径](../../docs/build-matrix.CN.md)。转向调参和历史 Host
-测量保存在 [`performance/`](performance/)；本轮双板对照见
-[画面与玩法打磨](performance/polish-20261013.md)和
-[海港近景验收](performance/harbor-20261013.md)。后续 Host 改进见
-[对手与透视关系](performance/competition-20261013.md)及
-[峡谷与雪地近景](performance/biomes-20261013.md)。测试、回放和设备验收方法见
-[游戏开发指南](../../docs/game-development.CN.md)。
+See [build paths](../../docs/build-matrix.EN.md) for targets and Board selection. Development records such as steering tuning, Host measurements and two-board comparisons live in the repository under `docs/development/neon-rift-rally/` and are not shipped in the release package. See the [game development guide](../../docs/game-development.EN.md) for tests, replay and device acceptance.

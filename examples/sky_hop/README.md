@@ -1,41 +1,40 @@
 # Sky Hop
 
-Sky Hop 是四关横版平台跳跃游戏。收集金币、踩掉巡逻怪并抵达关卡终点；生命、分数和
-连续收集奖励会跨关保留，完成第四关即完成整局。
+[简体中文](README.CN.md) · [Examples](../README.md)
 
-## 玩法与操作
+Sky Hop is a four-level side-scrolling platformer. Collect coins, stomp patrolling enemies and reach the end of each level; lives, score and coin-chain bonuses carry across levels, and clearing the fourth level finishes the run.
 
-### 真机
+## Play and controls
 
-- 点击标题卡开始。
-- 屏幕底部 `<`、`>` 控制左右移动，`JUMP` 控制跳跃；短按与长按会形成不同跳跃高度。
-- 可同时按住移动和跳跃。右上角按钮用于暂停和继续。
-- Button、Joystick 和 IMU 输入会先映射为相同的游戏动作。
+### Device
+
+- Tap the title card to start.
+- The bottom `<` and `>` buttons move left and right, `JUMP` jumps; short and long presses give different jump heights.
+- Movement and jump can be held together. The top-right button pauses and resumes.
+- Button, joystick and IMU input map to the same game actions.
+- Jump, coin, stomp, hurt and level clear have sound effects, and music plays during a level.
 
 ### Host
 
-- `A`/`D` 或方向键：移动。
-- `Space`：跳跃。
-- `Enter`：开始或进入下一关。
-- `P`：暂停或继续。
+- `A`/`D` or arrow keys: move.
+- `Space`: jump.
+- `Enter`: start or go to the next level.
+- `P`: pause or resume.
 
-## Host 预览
+## Host preview
 
-在仓库根目录运行：
+From the repository root:
 
 ```sh
 python3 tools/game_cli.py sim examples/sky_hop
 ```
 
-Host 与真机共用玩法模型、Camera2D 世界视图和 RGB565 绘制代码；音频、物理输入和
-LCD 上屏仍需在设备上验证。
+Host and device share the gameplay model, Camera2D world view and RGB565 drawing code; audio, physical input and LCD output still need device verification.
 
-## 实现特点
+## Implementation
 
-游戏采用固定容量对象、四关连续进度、可变跳跃、连续金币奖励、场景滑入、粒子效果和
-最高分存档。资源优先从游戏资源分区读取，并保留只读恢复资源。
+The game uses fixed-capacity objects, four continuous levels, variable jump height, coin-chain bonuses, scene slide-ins and particles. The best score is kept only for the current session and is not saved. Native firmware embeds the assets in the application image.
 
-## Native 构建
+## Native build
 
-构建目标、Board 选择和独立例程说明见[构建路径](../../docs/build-matrix.CN.md)。Host
-测试、固定回放和设备验收流程见[游戏开发指南](../../docs/game-development.CN.md)。
+See [build paths](../../docs/build-matrix.EN.md) for targets, Board selection and standalone examples, and the [game development guide](../../docs/game-development.EN.md) for Host tests, fixed replay and device acceptance.

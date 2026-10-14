@@ -139,6 +139,7 @@ def assemble(destination, games=GAMES, root=ROOT):
             "IDF_TARGET=esp32s3 idf.py -B build-box3 -DIDF_TARGET=esp32s3 build\n```\n\n"
             "BOX-3 uses its own standalone partition table and does not install Mosaico Iris/Recovery.\n\n"
         )
+        (example / "README.CN.md").unlink(missing_ok=True)
         (example / "README.md").write_text(
             f"# {game}\n\nStandalone native example.\n\n"
             "This directory includes its own shared launcher and Board. The Engine\n"

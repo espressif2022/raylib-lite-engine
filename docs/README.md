@@ -33,6 +33,6 @@ First use: follow the [quickstart](quickstart.EN.md) to create a game and see it
 | [Tests](../tests/README.md) | Host unit tests |
 | [Mosaico game development skill](skills/mosaico-game-development/SKILL.EN.md) | Agent-specific workflow |
 
-Repository and documentation indexes use `README.md` for English and `README.CN.md` for Chinese. Contribution and detailed bilingual guides use `.EN.md` and `.CN.md`. `SKILL.md` remains the tool-compatible entry point. Single-language references are labelled in this index.
+Repository, documentation and game example READMEs use `README.md` for English and `README.CN.md` for Chinese. Contribution and detailed bilingual guides use `.EN.md` and `.CN.md`. `SKILL.md` remains the tool-compatible entry point. Single-language references are labelled in this index.
 
 Public Engine APIs use the `raylib_lite_*` namespace; Raylib-shaped compatibility lives under `compat/raylib/`. See [versioning](../API.md#installation-and-compatibility). This index contains current usage and contracts. Development plans and one-off measurements are not component documentation.

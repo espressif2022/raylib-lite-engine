@@ -55,10 +55,10 @@ RGB565 帧缓冲的借出、提交、释放必须明确所有权；繁忙、失�
 
 | 场景条件 | 路径 | 参考示例 | 必须验证 |
 |---|---|---|---|
-| 正交格子、水平射线 | DDA 墙柱与地板行 | [Last Zone](../examples/last_zone_extraction/README.md) | 命中格子/侧面的边界、列深度与精灵遮挡 |
-| 真实俯仰、斜墙或门户 | 近平面裁剪后的平面 Quad/三角形 | [Tomb Raycast](../examples/tomb_raycast/README.md) | 透视 UV、门户与交叠面的覆盖 |
-| 环视深度网格和体积面 | RGB565 Quad 与 Triangle | [Living Worlds](../examples/living_worlds/README.md) | 深度层、动画缓存失效、全屏覆盖与清屏条件 |
-| 2D 精灵、tilemap、HUD | Atlas 与基础图元 | [Sky Hop](../examples/sky_hop/README.md)、[Tower Defense](../examples/tower_defense/README.md) | 源裁剪、缩放、旋转、tint、alpha 与叠加顺序 |
+| 正交格子、水平射线 | DDA 墙柱与地板行 | [Last Zone](../examples/last_zone_extraction/README.CN.md) | 命中格子/侧面的边界、列深度与精灵遮挡 |
+| 真实俯仰、斜墙或门户 | 近平面裁剪后的平面 Quad/三角形 | [Tomb Raycast](../examples/tomb_raycast/README.CN.md)（内测，不发布） | 透视 UV、门户与交叠面的覆盖 |
+| 环视深度网格和体积面 | RGB565 Quad 与 Triangle | [Living Worlds](../examples/living_worlds/README.CN.md) | 深度层、动画缓存失效、全屏覆盖与清屏条件 |
+| 2D 精灵、tilemap、HUD | Atlas 与基础图元 | [Sky Hop](../examples/sky_hop/README.CN.md)、[Tower Defense](../examples/tower_defense/README.CN.md) | 源裁剪、缩放、旋转、tint、alpha 与叠加顺序 |
 
 **当前三维路径的约束。** INDEX8 三角形和 Quad 的顶点 `q > 0` 表示 `1/z`，会在水平段端点进行透视 UV 校正；`q == 0` 保留仿射采样。RGB565 三角形和 Quad 当前忽略 `q`，不能把这条能力推广到所有纹理格式。[光栅配置](../include/raylib_lite/raylib_lite_wall_config.h)有 legacy、逐像素、固定段长、误差约束四种编译模式；legacy 模式才使用 `1/z` 比值 1.15 的分段启发式，专用 benchmark 默认尝试误差约束模式，不代表产品已采用它。新游戏应先设 UV 误差预算，再用相同场景分别验证画质、内核耗时和完整帧率。
 

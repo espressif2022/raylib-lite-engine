@@ -1,36 +1,35 @@
 # Mosaico Raylib Shooter
 
-Raylib Shooter 是纵向街机射击参考游戏。玩家拖动飞船躲避弹幕，武器自动开火；连续击破
-编队和精英敌人可获得额外奖励。
+[简体中文](README.CN.md) · [Examples](../README.md)
 
-## 玩法与操作
+Raylib Shooter is a vertical arcade shooter reference game. Drag the ship to dodge bullet patterns while the weapon fires automatically; breaking formations and elite enemies in a row earns bonuses.
 
-### 真机
+## Play and controls
 
-- 点击标题画面开始。
-- 在屏幕上拖动飞船；射击自动进行。
-- 触摸、音效和暂停状态由共享游戏模块处理。
+### Device
+
+- Tap the title screen to start.
+- Drag the ship on screen; firing is automatic.
+- The shared game module handles touch and pause state; the game has no sound effects yet.
 
 ### Host
 
-- 鼠标按下并拖动飞船。
-- 方向键或 `A`/`D`/`W`/`S` 可移动。
-- `Enter` 开始或重新开始，`P` 暂停或继续。
+- Press and drag the mouse to move the ship.
+- Arrow keys or `A`/`D`/`W`/`S` move it as well.
+- `Enter` starts or restarts; `P` pauses or resumes.
 
-## Host 预览
+## Host preview
 
-在仓库根目录运行：
+From the repository root:
 
 ```sh
 python3 tools/game_cli.py sim examples/raylib_shooter
 ```
 
-## 实现特点
+## Implementation
 
-游戏以 30 Hz 固定步长运行，敌人、弹丸和特效均使用固定容量池。绘制代码使用 Raylib
-兼容入口，但直接写入 480×480 RGB565 帧缓冲；Host 与真机编译同一套模型和视图源码。
+The game runs a 30 Hz fixed step; enemies, bullets and effects use fixed-capacity pools. Drawing uses the Raylib-compatible entry points but writes straight into a 480×480 RGB565 framebuffer. Host and device compile the same model and view sources.
 
-## Native 构建
+## Native build
 
-构建目标和 Board 选择见[构建路径](../../docs/build-matrix.CN.md)。兼容层边界与游戏验证
-流程见[游戏开发指南](../../docs/game-development.CN.md)。
+See [build paths](../../docs/build-matrix.EN.md) for targets and Board selection, and the [game development guide](../../docs/game-development.EN.md) for the compatibility boundary and validation workflow.

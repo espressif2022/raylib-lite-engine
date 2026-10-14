@@ -63,7 +63,7 @@ CloseWindow();
 
 [冻结名单](../compat/raylib/frozen-mappings.json)另外检查现有 105 个名字：只修改映射和状态表不能绕过冻结规则。退役或其他经审阅的名单变更需要同步更新基线，并记录消费者、验证和迁移证据。
 
-`python3 tools/audit_raylib.py --output /tmp/raylib-audit.json` 校验冻结名单和 vendored 源码清单，并导出七个维护游戏的静态引用位置。可加 `--reference-component <解包后的 georgik/raylib 组件目录>`，核对来源版本、提交、组件路径及逐字节内容。报告分别列出声明/定义与源码引用，保留条件编译分支，区分游戏、共享适配、测试和基准；并检查[接口使用边界](custom-api.CN.md)。静态引用不是运行时调用次数或帧率。
+`python3 tools/audit_raylib.py --output /tmp/raylib-audit.json` 校验冻结名单和 vendored 源码清单，并导出发布游戏的静态引用位置。可加 `--reference-component <解包后的 georgik/raylib 组件目录>`，核对来源版本、提交、组件路径及逐字节内容。报告分别列出声明/定义与源码引用，保留条件编译分支，区分游戏、共享适配、测试和基准；并检查[接口使用边界](custom-api.CN.md)。静态引用不是运行时调用次数或帧率。
 
 ## 映射状态
 

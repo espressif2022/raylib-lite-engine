@@ -56,7 +56,7 @@ The raster core is deliberately Raylib-neutral: `raylib_lite_renderer.h` owns re
 | Scene | Rendering path | Reference example | Validate |
 | --- | --- | --- | --- |
 | Orthogonal grid and horizontal rays | DDA wall columns and floor rows | [Last Zone](../examples/last_zone_extraction/README.md) | Cell and side boundaries, per-column depth, sprite occlusion |
-| True pitch, slanted walls, or portals | Near-plane-clipped planar quads and triangles | [Tomb Raycast](../examples/tomb_raycast/README.md) | Perspective UVs, portals, overlapping surface coverage |
+| True pitch, slanted walls, or portals | Near-plane-clipped planar quads and triangles | [Tomb Raycast](../examples/tomb_raycast/README.md) (internal preview, not released) | Perspective UVs, portals, overlapping surface coverage |
 | Panoramic depth meshes and volume surfaces | RGB565 quads and triangles | [Living Worlds](../examples/living_worlds/README.md) | Depth order, animation cache invalidation, full-screen coverage and clear conditions |
 | 2D sprites, tilemaps, and HUD | Atlases and basic shapes | [Sky Hop](../examples/sky_hop/README.md), [Tower Defense](../examples/tower_defense/README.md) | Source clipping, scale, rotation, tint, alpha, and layer order |
 

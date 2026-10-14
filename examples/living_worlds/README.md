@@ -1,39 +1,37 @@
 # Living Worlds
 
-Living Worlds 是四场景 360° 环视体验。玩家可浏览 Aurora、Ocean、Sunrise 和 Jungle；
-停止操作约三秒后，自动巡游会继续运行。
+[简体中文](README.CN.md) · [Examples](../README.md)
+
+Living Worlds is a four-scene 360° look-around experience. Browse Aurora, Ocean, Sunrise and Jungle; about three seconds after you stop interacting, the automatic tour resumes.
 
 ![Living Worlds Sunrise](docs/screenshot.png)
 
-上图为 Sunrise 场景的真机截图。
+The image is a device capture of the Sunrise scene.
 
-## 玩法与操作
+## Play and controls
 
-### 真机
+### Device
 
-- 水平拖动旋转视角，垂直拖动仰视或俯视。
-- 底部按钮切换四个场景。
-- 顶部 FX 按钮在 `Living`、`Mid`、`Low` 效果档之间切换。
+- Drag horizontally to turn and vertically to look up or down.
+- The bottom buttons switch between the four scenes.
+- The top FX button cycles the `Living`, `Mid` and `Low` effect levels.
 
 ### Host
 
-鼠标拖动和真机触摸使用相同的视角规则，场景和 FX 按钮也可直接点击。
+Mouse drags follow the same view rules as device touch, and the scene and FX buttons are clickable.
 
-## Host 预览
+## Host preview
 
-在仓库根目录运行：
+From the repository root:
 
 ```sh
 python3 tools/game_cli.py sim examples/living_worlds
 ```
 
-## 实现特点
+## Implementation
 
-场景使用确定性的 2.5D RGB565 路径绘制透视地面、体积网格和光照，不依赖 OpenGL、
-Camera3D 或 shader。Host 与真机共用世界模型和视图；设备 JPEG 适配保留在 native
-实现中。
+Scenes draw perspective ground, volume meshes and lighting through a deterministic 2.5D RGB565 path, without OpenGL, Camera3D or shaders. Host and device share the world model and view; device JPEG decoding stays in the native implementation (S31 hardware JPEG engine, ESP32-S3 ROM TJpgDec).
 
-## Native 构建
+## Native build
 
-构建目标和 Board 选择见[构建路径](../../docs/build-matrix.CN.md)。历史设备记录保存在
-[历史真机记录](HISTORICAL_PERFORMANCE.md)，不代表当前版本的性能结论。
+See [build paths](../../docs/build-matrix.EN.md) for targets and Board selection. Historical device records live in the repository under `docs/development/living-worlds/` (not shipped in the release package) and are not current performance claims.

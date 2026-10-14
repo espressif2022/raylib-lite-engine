@@ -1,38 +1,37 @@
 # Circuit Keep
 
-Circuit Keep 是 480×480 RGB565 塔防游戏。玩家在固定基座上建造和改造三类防御塔，
-阻止敌人沿道路进入右侧核心。
+[简体中文](README.CN.md) · [Examples](../README.md)
 
-## 玩法与操作
+Circuit Keep is a 480×480 RGB565 tower defense game. Build and convert three tower types on fixed pads to stop enemies walking the road into the core on the right.
 
-### 真机
+## Play and controls
 
-1. 点击开始。
-2. 在底部选择 `PULSE`、`RAPID` 或 `FROST`。
-3. 点击地图上的 `+` 基座建塔。
-4. 选中同类塔再点已有塔可升级；选择不同类型可改造，旧投入按 50% 折抵。
-5. 右上角按钮暂停或继续；失败后点击结果面板重新开始。
+### Device
 
-三类塔分别侧重均衡伤害、高射速和减速控制。相邻不同类型的塔还能形成组合增益。
+1. Tap to start.
+2. Pick `PULSE`, `RAPID` or `FROST` at the bottom.
+3. Tap a `+` pad on the map to build.
+4. With the same type selected, tap an existing tower to upgrade it; a different type converts it and refunds 50% of the previous investment.
+5. The top-right button pauses or resumes; after a defeat, tap the result panel to restart.
+
+The three towers focus on balanced damage, fire rate and slowing. Adjacent towers of different types grant combo bonuses. Start, build, shot, kill, new wave, leak and defeat have sound effects, and background music plays (quieter while paused).
 
 ### Host
 
-鼠标点击和真机触摸使用同一套界面与放置规则。浏览器工具栏可暂停、单步和重新开始。
+Mouse clicks follow the same interface and placement rules as device touch. The browser toolbar can pause, single-step and restart.
 
-## Host 预览
+## Host preview
 
-在仓库根目录运行：
+From the repository root:
 
 ```sh
 python3 tools/game_cli.py sim examples/tower_defense
 ```
 
-## 实现特点
+## Implementation
 
-地图来自 Tiled，角色和防御塔使用 RGB565+A8 Atlas。游戏模型采用固定对象池，运行时
-不分配敌人、弹丸或特效对象。设备和 Host 共用资源、模型和 C 绘制代码。
+The map comes from Tiled; units and towers use RGB565+A8 atlases. The game model uses fixed pools and allocates no enemy, projectile or effect objects at runtime. Device and Host share assets, model and C drawing code.
 
-## Native 构建
+## Native build
 
-构建目标和 Board 选择见[构建路径](../../docs/build-matrix.CN.md)。Host 测试、回放和
-设备验收方法见[游戏开发指南](../../docs/game-development.CN.md)。
+See [build paths](../../docs/build-matrix.EN.md) for targets and Board selection, and the [game development guide](../../docs/game-development.EN.md) for Host tests, replay and device acceptance.

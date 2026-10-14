@@ -1,55 +1,54 @@
 # Last Zone: Extraction
 
-Last Zone 是轻量战术射击游戏。玩家依次完成五个训练任务，搜索补给、清除敌人并抵达
-撤离点。任务越靠后，弹药和护甲越少，精英敌人越多。
+[简体中文](README.CN.md) · [Examples](../README.md)
+
+Last Zone is a lightweight tactical shooter. Complete five training missions in order: search for supplies, clear enemies and reach the extraction point. Later missions give less ammunition and armor and more elite enemies.
 
 ![Last Zone: Extraction](docs/screenshot.png)
 
-上图为 Dock 任务的 Host RGB565 画面。
+The image is the Host RGB565 frame of the Dock mission.
 
-## 玩法与操作
+## Play and controls
 
-### 真机
+### Device
 
-- 点击简报部署或重新部署。
-- 左摇杆移动，推到外环前方可冲刺。
-- 右侧拖动控制转向和俯仰。
-- 点击射击键开火或打开面对的门；按住射击可稳住枪机。
-- 雷达面板可以拖动，避免遮挡战场。
+- Tap the briefing to deploy or redeploy.
+- The left stick moves; push to the outer ring ahead to sprint.
+- Drag on the right side to turn and pitch.
+- Tap the fire button to shoot or open the door you face; hold fire to steady the weapon.
+- The radar panel can be dragged out of the way.
 
 ### Host
 
-- `W`/`S`：前进和后退；`Q`/`E`：横移。
-- `A`/`D`：转向；`Shift`：冲刺。
-- `F` 或 `Ctrl`：射击或交互。
-- 鼠标右侧拖动：调整视角。
+- `W`/`S`: forward and back; `Q`/`E`: strafe.
+- `A`/`D`: turn; `Shift`: sprint.
+- `F` or `Ctrl`: fire or interact.
+- Drag on the right side with the mouse: adjust the view.
 
-## 战役
+## Campaign
 
-| 任务 | 定位 | 敌人 |
+| Mission | Focus | Enemies |
 | --- | --- | ---: |
-| Dock | 观察教学 | 5 |
-| Depot | 区域控制 | 7 |
-| Command | 侧翼突破 | 8，含 2 名精英 |
-| Ghost | 伏击 | 8 |
-| Run | 强攻 | 9，含 3 名精英 |
+| Dock | Observation tutorial | 5 |
+| Depot | Area control | 7 |
+| Command | Flank breakthrough | 8, including 2 elites |
+| Ghost | Ambush | 8 |
+| Run | Assault | 9, including 3 elites |
 
-设备 NVS 保存战役进度和各任务最好成绩。
+Device NVS stores campaign progress and each mission's best result.
 
-## Host 预览
+## Host preview
 
-在仓库根目录运行：
+From the repository root:
 
 ```sh
 python3 tools/game_cli.py sim examples/last_zone_extraction
 ```
 
-## 实现特点
+## Implementation
 
-Host 与真机共用固定步长模型、透视场景和 RGB565 视图。玩法包括掩体、窗洞、门、弹药、
-护甲、精英敌人和撤离判定；音效与震动由语义事件驱动。
+Host and device share the fixed-step model, perspective scene and RGB565 view. Gameplay includes cover, window openings, doors, ammunition, armor, elite enemies and extraction checks; sound and haptics are driven by semantic events.
 
-## Native 构建
+## Native build
 
-构建目标和 Board 选择见[构建路径](../../docs/build-matrix.CN.md)。直接烧录独立工程会替换
-设备当前固件；测试和设备验收流程见[游戏开发指南](../../docs/game-development.CN.md)。
+See [build paths](../../docs/build-matrix.EN.md) for targets and Board selection. Flashing a standalone project replaces the device's current firmware; see the [game development guide](../../docs/game-development.EN.md) for tests and device acceptance.
