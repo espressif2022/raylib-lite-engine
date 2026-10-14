@@ -5,6 +5,11 @@
       "config": "atlas.json",
       "source": "shooter_atlas.png",
       "output": "shooter.atlas"
+    },
+    {
+      "config": "nebula.json",
+      "source": "shooter_nebula.png",
+      "output": "nebula.atlas"
     }
   ]
 }

@@ -4,6 +4,9 @@ devices:
   - name: display_lcd
     config:
       io_spi_config:
+        # ILI9341 at the 40 MHz pixel clock used by the esp-bsp BOX-3 package;
+        # the board-pack 20 MHz caps a full 320x240 frame at about 16 fps.
+        pclk_hz: 40000000
         trans_queue_depth: 2
   - name: fs_sdcard
     init_skip: true

@@ -100,7 +100,7 @@ bool sky_hop_view_render(const sky_hop_view_t *view)
         {142,208,239,255},{91,31,54,255}};
     static const Color haze[]={{170,224,245,255},{103,119,151,255},
         {215,242,250,255},{220,91,62,255}};
-    ClearBackground(sky[game->level]);
+    DrawRectangle(0,0,480,300,sky[game->level]);
     DrawRectangle(0,300,480,180,haze[game->level]);
     if(game->level==1){
         for(int i=0;i<7;++i){int x=(i*83+(int)game->tick*3)%520-20;
@@ -115,8 +115,15 @@ bool sky_hop_view_render(const sky_hop_view_t *view)
     }
     for (int i = 0; i < 8; ++i) {
         int x = i * 210 - (camera / 3) % 210;
-        DrawRectangle(x, 155 + (i % 2) * 28, 105, 18, (Color){235, 248, 250, 255});
-        DrawRectangle(x + 20, 143 + (i % 2) * 28, 62, 24, (Color){235, 248, 250, 255});
+        if (x > 480 || x + 120 < 0) continue;
+        int y = 155 + (i % 2) * 28;
+        DrawRectangleRounded((Rectangle){x, y - 2, 112, 22}, 1.0f, 6,
+                             (Color){200, 226, 240, 255});
+        DrawCircle(x + 32, y - 2, 17, (Color){235, 248, 250, 255});
+        DrawCircle(x + 62, y - 10, 22, (Color){244, 252, 253, 255});
+        DrawCircle(x + 88, y, 14, (Color){235, 248, 250, 255});
+        DrawRectangleRounded((Rectangle){x + 6, y - 4, 100, 18}, 1.0f, 6,
+                             (Color){235, 248, 250, 255});
     }
 
     BeginMode2D(world_camera);

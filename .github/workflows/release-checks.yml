@@ -69,7 +69,25 @@ jobs:
           - example: neon_rift_rally
             chip: esp32s31
             board: esp-mosaico
+          - example: sky_hop
+            chip: esp32s3
+            board: esp32-s3-box-3
+          - example: tower_defense
+            chip: esp32s3
+            board: esp32-s3-box-3
           - example: raylib_shooter
+            chip: esp32s3
+            board: esp32-s3-box-3
+          - example: living_worlds
+            chip: esp32s3
+            board: esp32-s3-box-3
+          - example: last_zone_extraction
+            chip: esp32s3
+            board: esp32-s3-box-3
+          - example: tomb_raycast
+            chip: esp32s3
+            board: esp32-s3-box-3
+          - example: neon_rift_rally
             chip: esp32s3
             board: esp32-s3-box-3
     steps:

@@ -89,8 +89,8 @@ static raylib_lite_result_t surface_info(void *context, raylib_lite_video_info_t
 {
     frame_surface_t *surface = context;
     *out = (raylib_lite_video_info_t){
-        (uint16_t)surface->width, (uint16_t)surface->height, surface->stride,
-        RAYLIB_LITE_PIXEL_RGB565_NATIVE,
+        .width = (uint16_t)surface->width, .height = (uint16_t)surface->height,
+        .stride_pixels = surface->stride, .format = RAYLIB_LITE_PIXEL_RGB565_NATIVE,
     };
     return RAYLIB_LITE_OK;
 }

@@ -35,6 +35,9 @@ Keep callbacks bounded.
 
 `get_info` describes a fixed native-endian RGB565 surface. Stride is in pixels
 and must be at least width. The backend performs any transfer byte swapping.
+A backend that only ever displays rows `y % sample_row_step == 0` (power of
+two) may report that step; the Raylib-compatible facade and renderer then leave
+the other rows unwritten, and the backend must not show or snapshot them as-is.
 A successful `acquire` lends one exclusively writable frame; its opaque token
 belongs to the backend. The Engine holds at most one acquired frame.
 

@@ -26,6 +26,8 @@ struct box3_video {
     uint16_t view_y;
     uint16_t view_width;
     uint16_t view_height;
+    /* Worker-owned: the last commit fully succeeded, so the panel holds the bars. */
+    bool bars_on_panel;
     raylib_lite_example_async_video_t *queue;
     esp_display_presenter_t *presenter;
 };
@@ -38,10 +40,9 @@ static raylib_lite_result_t result_from_esp(esp_err_t err)
     return RAYLIB_LITE_PLATFORM_ERROR;
 }
 
-static void fill_strip(box3_video_t *video, const uint16_t *frame,
-                       uint16_t *pixels, uint16_t top, uint16_t count)
+static box3_viewport_t viewport_of(const box3_video_t *video)
 {
-    const box3_viewport_t view = {
+    return (box3_viewport_t) {
         .logical_width = video->logical_width,
         .logical_height = video->logical_height,
         .lcd_width = BOX3_LCD_WIDTH,
@@ -51,25 +52,33 @@ static void fill_strip(box3_video_t *video, const uint16_t *frame,
         .view_width = video->view_width,
         .view_height = video->view_height,
     };
-    box3_fill_strip_pixels(&view, frame, pixels,
-                           top, count, false);
 }
 
 static raylib_lite_result_t submit(void *ctx, const uint16_t *pixels)
 {
     box3_video_t *video = ctx;
+    const box3_viewport_t view = viewport_of(video);
+    /* Once a full frame has painted the constant bars, only the viewport
+     * changes; a letterboxed square game then moves 25% fewer SPI bytes. */
+    const bool view_only = video->bars_on_panel &&
+        (video->view_width < BOX3_LCD_WIDTH || video->view_height < BOX3_LCD_HEIGHT);
+    const uint16_t x1 = view_only ? video->view_x : 0;
+    const uint16_t width = view_only ? video->view_width : BOX3_LCD_WIDTH;
+    const uint16_t top = view_only ? video->view_y : 0;
+    const uint16_t bottom = view_only ? video->view_y + video->view_height : BOX3_LCD_HEIGHT;
+    const size_t stride = (size_t)width * sizeof(uint16_t);
     size_t areas = 0;
     bool full = false;
+    video->bars_on_panel = false;
     esp_err_t err = esp_display_presenter_begin_next_frame(
         video->presenter, NULL, NULL, 0, &areas, &full);
     if (err != ESP_OK) goto failed;
-    for (uint16_t y = 0; y < BOX3_LCD_HEIGHT;) {
+    for (uint16_t y = top; y < bottom;) {
         esp_display_presenter_buffer_t lease = {0};
         err = esp_display_presenter_acquire_buffer(video->presenter, &lease);
         if (err != ESP_OK) goto cancel;
-        const size_t stride = BOX3_LCD_WIDTH * sizeof(uint16_t);
         size_t rows = 0;
-        size_t remaining = BOX3_LCD_HEIGHT - y;
+        size_t remaining = bottom - y;
         if (!lease.lease_id || !lease.surface.pixels || !lease.resolve_rows ||
                 lease.capacity_bytes < stride) {
             err = ESP_FAIL;
@@ -82,20 +91,34 @@ static raylib_lite_result_t submit(void *ctx, const uint16_t *pixels)
             err = ESP_FAIL;
             goto cancel;
         }
-        fill_strip(video, pixels, lease.surface.pixels, y, (uint16_t)rows);
+        if (view_only)
+            box3_fill_view_pixels(&view, pixels, lease.surface.pixels,
+                                  (uint16_t)(y - top), (uint16_t)rows, false);
+        else
+            box3_fill_strip_pixels(&view, pixels, lease.surface.pixels,
+                                   y, (uint16_t)rows, false);
         const esp_display_present_area_t area = {
-            .x1 = 0, .y1 = y, .x2 = BOX3_LCD_WIDTH - 1,
+            .x1 = x1, .y1 = y, .x2 = x1 + width - 1,
             .y2 = y + rows - 1,
         };
         err = esp_display_presenter_submit_buffer(video->presenter, &lease, &area, stride);
         if (err != ESP_OK) goto cancel;
         y += (uint16_t)rows;
     }
-    const esp_display_presenter_submit_t done = {
-        .coverage = ESP_DISPLAY_PRESENT_COVERAGE_FULL,
+    const esp_display_present_area_t covered = {
+        .x1 = x1, .y1 = top, .x2 = x1 + width - 1, .y2 = bottom - 1,
     };
+    const esp_display_presenter_submit_t done = view_only ?
+        (esp_display_presenter_submit_t) {
+            .coverage = ESP_DISPLAY_PRESENT_COVERAGE_AREAS,
+            .areas = &covered, .area_count = 1,
+        } :
+        (esp_display_presenter_submit_t) {
+            .coverage = ESP_DISPLAY_PRESENT_COVERAGE_FULL,
+        };
     err = esp_display_presenter_commit_frame(video->presenter, &done);
     /* commit owns the transfer tail even when its completion wait times out. */
+    video->bars_on_panel = err == ESP_OK;
     return result_from_esp(err);
 cancel:
     esp_display_presenter_cancel_frame(video->presenter);
@@ -157,9 +180,16 @@ raylib_lite_result_t box3_video_open(
         heap_caps_free(video);
         return result_from_esp(err);
     }
+    /* An exact power-of-two vertical downscale samples only every step-th
+     * logical row (box3_sample_view_row), so the renderer may skip the rest. */
+    uint16_t row_step = 1;
+    if (height % video->view_height == 0) {
+        const uint16_t ratio = height / video->view_height;
+        if (!(ratio & (ratio - 1))) row_step = ratio;
+    }
     const raylib_lite_example_async_video_config_t queue_config = {
-        .width = width, .height = height, .context = video,
-        .submit = submit, .drain = drain,
+        .width = width, .height = height, .sample_row_step = row_step,
+        .context = video, .submit = submit, .drain = drain,
     };
     raylib_lite_result_t result = raylib_lite_example_async_video_open(&queue_config, &video->queue);
     if (result != RAYLIB_LITE_OK) {
@@ -167,9 +197,9 @@ raylib_lite_result_t box3_video_open(
         heap_caps_free(video);
         return result;
     }
-    ESP_LOGI("box3_video", "Game %ux%u to LCD 320x240, viewport (%u,%u) %ux%u",
+    ESP_LOGI("box3_video", "Game %ux%u to LCD 320x240, viewport (%u,%u) %ux%u, row step %u",
              width, height, video->view_x, video->view_y,
-             video->view_width, video->view_height);
+             video->view_width, video->view_height, row_step);
     *out = video;
     return RAYLIB_LITE_OK;
 }
@@ -182,16 +212,7 @@ raylib_lite_video_backend_t box3_video_backend(box3_video_t *video)
 bool box3_video_map_touch(const box3_video_t *video, int32_t *x, int32_t *y)
 {
     if (!video) return false;
-    box3_viewport_t viewport = {
-        .logical_width = video->logical_width,
-        .logical_height = video->logical_height,
-        .lcd_width = BOX3_LCD_WIDTH,
-        .lcd_height = BOX3_LCD_HEIGHT,
-        .view_x = video->view_x,
-        .view_y = video->view_y,
-        .view_width = video->view_width,
-        .view_height = video->view_height,
-    };
+    box3_viewport_t viewport = viewport_of(video);
     return box3_viewport_map_touch(&viewport, x, y);
 }
 

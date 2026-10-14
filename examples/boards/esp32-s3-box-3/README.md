@@ -36,8 +36,11 @@ Explicit Board `drawbuf_lines` / `drawbuf_count` values must be 34 / 2; zero
 selects this profile.
 
 BOX-3 retains CPU scaling and letterboxing; Mosaico can use DMA2D for one-to-one
-strip copies. Panel clocks and wiring remain the respective hardware profiles:
-BOX-3 single-line SPI at 20 MHz, Mosaico QSPI at 40 MHz. Uniform scheduling does
+strip copies. The BOX-3 amend raises the single-line SPI pixel clock from the
+board-pack 20 MHz to the 40 MHz used by the esp-bsp BOX-3 package; Mosaico keeps
+QSPI at 40 MHz. After one full frame has painted the black bars, BOX-3 sends
+only the viewport (240x240 for a square Game, 25% fewer bytes than 320x240);
+any failed frame falls back to a full-screen frame. Uniform scheduling does
 not imply equal panel throughput or eliminate every transfer gap.
 
 ## Build a native Game
@@ -100,7 +103,7 @@ display, input, audio and cleanup separately from compilation.
 ## Current limitations
 
 - The video adapter uses a full logical framebuffer and presenter-owned
-  double-buffered 8-row physical strips; a successful presentation waits for LCD DMA transfer completion,
+  double-buffered 34-row physical strips; a successful presentation waits for LCD DMA transfer completion,
   not for an independent display scan-out signal. Measure board FPS on hardware.
 - RGB565 panel and TT21100 X-axis touch orientation passed an initial BOX-3
   visual/input acceptance; verify additional panel variants independently.
@@ -111,6 +114,6 @@ display, input, audio and cleanup separately from compilation.
   device acceptance.
 - The standard BOX-3 board profile retains its 16 MB flash defaults; any
   atypical Octal-flash development boards require local build overrides.
-- Games requiring ESP32-S31-only hardware services (for example, the current
-  Living Worlds hardware JPEG decode path) still need an explicit S3-compatible
-  provider or fallback; they are not automatically portable to BOX-3.
+- Games requiring ESP32-S31-only hardware services need an explicit
+  S3-compatible fallback. Living Worlds decodes its panoramas with the ESP32-S3
+  ROM TJpgDec decoder instead of the S31 JPEG engine.

@@ -31,6 +31,8 @@ raylib_lite_result_t raylib_lite_raylib_port_flush(uint32_t timeout_ms);
 raylib_lite_result_t raylib_lite_raylib_port_copy_latest(
     uint16_t *out_pixels, size_t pixel_capacity);
 void raylib_lite_raylib_port_get_dimensions(uint16_t *width, uint16_t *height);
+/* Backend sample_row_step reduced to a usable power of two; 1 = every row. */
+uint16_t raylib_lite_raylib_port_sample_row_step(void);
 
 #ifdef __cplusplus
 }

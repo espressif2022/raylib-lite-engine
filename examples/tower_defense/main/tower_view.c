@@ -265,7 +265,10 @@ void tower_view_render(const tower_view_t *view)
         EndDrawing();
         return;
     }
-    ClearBackground(C_GRASS);
+    /* The opaque HUD (rows 0-68), the fully tiled terrain layer (69-388) and
+     * the shop (392-479) cover the screen; only the gap above the shop shows
+     * background. tests/test_tower_overdraw.py checks the map has no empty tile. */
+    DrawRectangle(0, 389, 480, 3, C_GRASS);
     raylib_lite_tilemap_draw_layer(view->map, 0,
         (raylib_lite_renderer_rect_t){0, 0, 480, 320},
         (raylib_lite_renderer_vec2_t){0, 69});

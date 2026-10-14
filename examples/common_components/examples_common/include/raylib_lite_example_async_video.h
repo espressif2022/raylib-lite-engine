@@ -10,6 +10,8 @@
 typedef struct raylib_lite_example_async_video raylib_lite_example_async_video_t;
 typedef struct {
     uint16_t width, height;
+    /* Power of two: only rows y % step == 0 are consumed by submit (0/1 = all). */
+    uint16_t sample_row_step;
     void *context;
     /* Must finish consuming pixels before returning, including DMA fencing. */
     raylib_lite_result_t (*submit)(void *context, const uint16_t *pixels);

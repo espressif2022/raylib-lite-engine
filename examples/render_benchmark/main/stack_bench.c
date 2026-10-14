@@ -42,7 +42,7 @@ static raylib_lite_tilemap_t tilemap;
 
 /* Memory-backed video backend: the benchmark measures drawing, not a display. */
 static raylib_lite_result_t info(void *context,raylib_lite_video_info_t *out)
-{(void)context;*out=(raylib_lite_video_info_t){W,H,S,RAYLIB_LITE_PIXEL_RGB565_NATIVE};return RAYLIB_LITE_OK;}
+{(void)context;*out=(raylib_lite_video_info_t){.width=W,.height=H,.stride_pixels=S,.format=RAYLIB_LITE_PIXEL_RGB565_NATIVE};return RAYLIB_LITE_OK;}
 static raylib_lite_result_t acquire(void *context,raylib_lite_frame_t *out)
 {(void)context;*out=(raylib_lite_frame_t){frame,W,H,S,1};return RAYLIB_LITE_OK;}
 static raylib_lite_result_t present(void *context,raylib_lite_frame_t *f)

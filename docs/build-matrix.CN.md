@@ -15,7 +15,7 @@ Raylib Lite Engine 当前支持 PC Host 和原生 ESP-IDF Board 固件；不支�
 
 Game 只拥有可移植 model/view/module source。其 `main/idf_component.yml` 声明 `espressif2022/raylib-lite-engine: ^0.1.0`；仅仓库内联调时，额外用 `override_path` 把这一版本依赖指向当前 checkout。Game 的 Application CMake 层选择应用侧 Board component，并与 `examples_common` 一起注册。Game 顶层 CMake 不 include Engine 仓库 helper，也不通过 `EXTRA_COMPONENT_DIRS` 发现 Engine。
 
-Host 的 `game.sim.json` 和 Board build 编译同一个 `main/game_module.c`。Board-neutral 的共享示例 glue 由 [`examples/common_components/examples_common`](../examples/common_components/examples_common/) IDF component 拥有：generic native launcher、抽象 Board contract、haptic helper 和共享游戏模块契约；具体 Board 代码只放在 `examples/boards/<board>/`。Game 若需要仅设备侧使用的实现，可隔离在自身的 `main/native/` 目录；它仍由 Game `main` component 编译，可以使用板卡无关的 ESP-IDF / Engine 服务和 example-Board contract，但不能包含具体 Board API。Living Worlds 的 ESP-IDF JPEG decode 位于 `examples/living_worlds/main/native/`，资源仍由通用 native asset helper 嵌入；Host/native 继续共用同一个 `game_module.c`。这些都属于 example/Application 层而不是 Engine public API。
+Host 的 `game.sim.json` 和 Board build 编译同一个 `main/game_module.c`。Board-neutral 的共享示例 glue 由 [`examples/common_components/examples_common`](../examples/common_components/examples_common/) IDF component 拥有：generic native launcher、抽象 Board contract、haptic helper 和共享游戏模块契约；具体 Board 代码只放在 `examples/boards/<board>/`。Game 若需要仅设备侧使用的实现，可隔离在自身的 `main/native/` 目录；它仍由 Game `main` component 编译，可以使用板卡无关的 ESP-IDF / Engine 服务和 example-Board contract，但不能包含具体 Board API。Living Worlds 的 JPEG 解码（S31 硬件引擎、ESP32-S3 ROM TJpgDec）位于 `examples/living_worlds/main/native/`，资源仍由通用 native asset helper 嵌入；Host/native 继续共用同一个 `game_module.c`。这些都属于 example/Application 层而不是 Engine public API。
 
 查询支持矩阵：
 

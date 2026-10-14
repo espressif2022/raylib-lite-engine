@@ -14,15 +14,14 @@ static void draw_centered(const char *text,int y,int size,Color color)
     DrawText(text,(GetScreenWidth()-MeasureText(text,size))/2,y,size,color);
 }
 
-static void draw_background(const shooter_game_t *game)
+static void draw_background(const shooter_game_t *game,raylib_lite_atlas_t backdrop)
 {
-    static const Color sky[]={
-        {2,5,24,255},{3,6,27,255},{4,7,30,255},{5,7,32,255},
-        {7,8,34,255},{8,8,35,255},{9,8,36,255},{10,8,37,255}
-    };
-    for(int band=0;band<8;++band)DrawRectangle(0,band*60,480,60,sky[band]);
-    DrawRectangle(0,104,184,72,(Color){12,17,51,255});
-    DrawRectangle(296,218,184,92,(Color){17,10,47,255});
+    const raylib_lite_sprite_frame_t *field=
+        raylib_lite_atlas_get_frame(backdrop,RAYLIB_LITE_ASSET_ID_NEBULA_FIELD);
+    /* Opaque 240x195 vista at exactly 2x over the play field above the ground strip. */
+    if(field)DrawTexturePro(backdrop.texture,(Rectangle){field->source.x,field->source.y,240,195},
+                            (Rectangle){0,0,480,390},(Vector2){0,0},0,WHITE);
+    else DrawRectangle(0,0,480,390,(Color){4,7,30,255});
     DrawRectangle(0,390,480,90,(Color){4,8,25,255});
     for(int i=0;i<68;++i){
         int depth=i%3+1;
@@ -175,18 +174,22 @@ static void draw_status_card(const shooter_game_t *game,const char *title,Color 
     }
 }
 
-void shooter_view_render(const shooter_game_t *game,raylib_lite_atlas_t atlas)
+void shooter_view_render(const shooter_game_t *game,raylib_lite_atlas_t atlas,
+                         raylib_lite_atlas_t backdrop)
 {
     if(!game)return;
     BeginDrawing();
-    draw_background(game);
-    if(game->phase!=SHOOTER_START)draw_ship(game,atlas,game->player.x,game->player.y);
-    draw_projectiles(game);
-    for(size_t i=0;i<SHOOTER_MAX_ENEMIES;++i)if(game->enemies[i].active)
-        draw_enemy(atlas,&game->enemies[i]);
-    draw_danger_cues(game);
-    draw_particles(game);
-    draw_hud(game);
+    /* Status cards repaint the whole screen opaquely; skip the hidden scene. */
+    if(game->phase!=SHOOTER_PAUSED&&game->phase!=SHOOTER_GAME_OVER){
+        draw_background(game,backdrop);
+        if(game->phase!=SHOOTER_START)draw_ship(game,atlas,game->player.x,game->player.y);
+        draw_projectiles(game);
+        for(size_t i=0;i<SHOOTER_MAX_ENEMIES;++i)if(game->enemies[i].active)
+            draw_enemy(atlas,&game->enemies[i]);
+        draw_danger_cues(game);
+        draw_particles(game);
+        draw_hud(game);
+    }
     if(game->phase==SHOOTER_START)draw_start_card();
     else if(game->phase==SHOOTER_PAUSED)draw_status_card(game,"PAUSED",C_GOLD);
     else if(game->phase==SHOOTER_GAME_OVER)draw_status_card(game,"MISSION LOST",C_PINK);

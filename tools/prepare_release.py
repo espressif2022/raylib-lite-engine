@@ -138,8 +138,6 @@ def assemble(destination, games=GAMES, root=ROOT):
             'IDF_TARGET=esp32s3 idf.py bmgr -c ./shared/boards -b esp32_s3_box_3 -a "$PWD/shared/boards/esp32-s3-box-3/bmgr_amend"\n'
             "IDF_TARGET=esp32s3 idf.py -B build-box3 -DIDF_TARGET=esp32s3 build\n```\n\n"
             "BOX-3 uses its own standalone partition table and does not install Mosaico Iris/Recovery.\n\n"
-        ) if game != "living_worlds" else (
-            "Living Worlds currently requires S31 hardware JPEG decoding; BOX-3 needs a software fallback.\n\n"
         )
         (example / "README.md").write_text(
             f"# {game}\n\nStandalone native example.\n\n"

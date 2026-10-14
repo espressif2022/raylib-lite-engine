@@ -132,6 +132,8 @@ raylib_lite_result_t raylib_lite_example_async_video_open(
         return RAYLIB_LITE_NO_MEMORY;
     }
     video->config = *config;
+    if (config->sample_row_step & (config->sample_row_step - 1))
+        video->config.sample_row_step = 1;
     video->width = width;
     video->height = height;
     /* Keep stripe I/O off the game loop's core. The worker owns
@@ -168,6 +170,7 @@ static raylib_lite_result_t video_get_info(void *ctx, raylib_lite_video_info_t *
         .height = video->height,
         .stride_pixels = video->width,
         .format = RAYLIB_LITE_PIXEL_RGB565_NATIVE,
+        .sample_row_step = video->config.sample_row_step,
     };
     return RAYLIB_LITE_OK;
 }
@@ -271,6 +274,17 @@ static raylib_lite_result_t video_copy_latest(
     }
     memcpy(out_pixels, video->frames[video->latest], pixels * sizeof(uint16_t));
     xSemaphoreGive(video->mutex);
+    /* Rows the panel never shows are left unrendered; repeat the shown row
+     * above each so the snapshot matches what is displayed. */
+    const unsigned step = video->config.sample_row_step;
+    if (step > 1) {
+        const size_t row_bytes = (size_t)video->width * sizeof(uint16_t);
+        for (unsigned y = 0; y < video->height; ++y) {
+            if (y % step)
+                memcpy(out_pixels + (size_t)y * video->width,
+                       out_pixels + (size_t)(y - y % step) * video->width, row_bytes);
+        }
+    }
     return RAYLIB_LITE_OK;
 }
 

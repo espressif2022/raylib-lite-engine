@@ -30,7 +30,8 @@ static void sleep_for_us(void *context, uint64_t us) { (void)context; s.slept_us
 static raylib_lite_result_t get_info(void *context, raylib_lite_video_info_t *out)
 {
     (void)context;
-    *out = (raylib_lite_video_info_t){ W, H, STRIDE, RAYLIB_LITE_PIXEL_RGB565_NATIVE };
+    *out = (raylib_lite_video_info_t){ .width = W, .height = H, .stride_pixels = STRIDE,
+        .format = RAYLIB_LITE_PIXEL_RGB565_NATIVE };
     return RAYLIB_LITE_OK;
 }
 

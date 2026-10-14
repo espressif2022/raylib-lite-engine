@@ -81,8 +81,8 @@ IDF_TARGET=esp32s31 idf.py --preview bmgr -c ./shared/boards/esp-mosaico/bmgr -b
 IDF_TARGET=esp32s31 idf.py --preview -B /tmp/raylib-consumer-build -DIDF_TARGET=esp32s31 build
 ```
 
-It also builds assembled `raylib_shooter` on ESP32-S3-BOX-3. Living Worlds stays
-off that Board. From the same kind of consumer directory:
+It also builds every assembled game on ESP32-S3-BOX-3. From the same kind of
+consumer directory:
 
 ```sh
 IDF_TARGET=esp32s3 idf.py bmgr -c ./shared/boards -b esp32_s3_box_3 \
@@ -115,10 +115,9 @@ The changelog records the namespace migration from historical `mosaico_*` APIs.
 The release workflow assembles and checks artifacts on PRs, pushes to `main`
 and manual runs. After packaging, it compiles `minimal` for `esp32s3`, every
 assembled game for `esp32s31` after generating the ESP-Mosaico Board Manager
-profile, and assembled `raylib_shooter` for `esp32s3` after generating the
-ESP32-S3-BOX-3 profile. Living Worlds is not built for BOX-3. These are compile
-checks, not device acceptance. Each of the nine consumer configurations builds
-with both `latest` and `v6.1` (18 builds). Packaging uses `latest`; upload waits
+profile, and every assembled game for `esp32s3` after generating the
+ESP32-S3-BOX-3 profile. These are compile checks, not device acceptance. Each of
+the fifteen consumer configurations builds with both `latest` and `v6.1` (30 builds). Packaging uses `latest`; upload waits
 for the complete consumer matrix. Only a push to `main`
 enables the dependent `upload_components`
 job. It verifies the checked archive SHA-256, unpacks it and uploads the assembled

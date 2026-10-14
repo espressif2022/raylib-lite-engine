@@ -62,6 +62,9 @@ typedef struct { float x, y, u, v, q; } raylib_lite_textured_vertex_t;
 
 void raylib_lite_renderer_set_target(uint16_t *pixels, size_t stride,
                                 int width, int height);
+/* Rows with y % step != 0 are never displayed (step a power of two; 0/1 = all
+ * rows). Drawing then leaves those rows unwritten; displayed rows are exact. */
+void raylib_lite_renderer_set_row_step(unsigned step);
 void raylib_lite_renderer_set_clip(int x, int y, int width, int height);
 
 

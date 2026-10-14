@@ -55,6 +55,10 @@ class BoardDisplayContractTest(unittest.TestCase):
                 self.assertEqual(maximum, width * lines * 2)
                 self.assertEqual(queue, depth)
 
+    def test_box3_amend_uses_bsp_pixel_clock(self):
+        device = (ROOT / "examples/boards/esp32-s3-box-3/bmgr_amend/devices.yaml").read_text()
+        self.assertEqual(int(re.search(r"pclk_hz:\s*(\d+)", device)[1]), 40_000_000)
+
     def test_present_copies_and_submits_each_strip_with_full_coverage(self):
         for fragment in (
             "lease.resolve_rows(",

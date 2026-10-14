@@ -14,6 +14,8 @@ typedef struct {
     int width, height;
     int clip_x0, clip_y0, clip_x1, clip_y1;
     bool clip_active;
+    /* Rows with (y & row_mask) set are never displayed; spans skip them. */
+    int row_mask;
     uint32_t pixel_count, run_count;
 } raylib_lite_primitive_surface_t;
 
@@ -48,6 +50,7 @@ static inline void raylib_lite_primitive_write_span(
     raylib_lite_primitive_surface_t *surface, int y, int x0, int x1,
     const raylib_lite_primitive_paint_t *paint)
 {
+    if (y & surface->row_mask) return;
     uint16_t *dst = surface->pixels + (size_t)y*surface->stride + x0;
     int count = x1-x0;
     surface->pixel_count+=(uint32_t)count;++surface->run_count;

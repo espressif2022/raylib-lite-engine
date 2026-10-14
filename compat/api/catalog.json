@@ -652,6 +652,7 @@
         "raylib_lite_raylib_port_last_present_us",
         "raylib_lite_raylib_port_now_us",
         "raylib_lite_raylib_port_present_frame",
+        "raylib_lite_raylib_port_sample_row_step",
         "raylib_lite_raylib_port_set_clock"
       ],
       "implementation": [
@@ -754,6 +755,7 @@
         "raylib_lite_renderer_load_texture",
         "raylib_lite_renderer_register_rgb565",
         "raylib_lite_renderer_set_clip",
+        "raylib_lite_renderer_set_row_step",
         "raylib_lite_renderer_set_target",
         "raylib_lite_renderer_unload_atlas",
         "raylib_lite_renderer_unload_texture",
@@ -777,7 +779,8 @@
       "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
       "usage_role": "game",
       "entry_roles": {
-        "raylib_lite_renderer_set_target": "integration"
+        "raylib_lite_renderer_set_target": "integration",
+        "raylib_lite_renderer_set_row_step": "integration"
       }
     },
     "renderer_stats": {

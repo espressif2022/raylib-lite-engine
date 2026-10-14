@@ -32,6 +32,8 @@ static raylib_lite_result_t s_last_acquire = RAYLIB_LITE_NOT_READY;
 static raylib_lite_result_t s_last_present = RAYLIB_LITE_NOT_READY;
 static bool s_scissor_active;
 static int s_scissor_x0, s_scissor_y0, s_scissor_x1, s_scissor_y1;
+/* Rows with (y & s_row_mask) set are never displayed by the video backend. */
+static int s_row_mask;
 #define RAYLIB_LITE_RAYLIB_KEY_COUNT 512
 #define RAYLIB_LITE_RAYLIB_POINTER_COUNT 2
 typedef struct {
@@ -106,6 +108,7 @@ static inline void put_pixel(int x, int y, Color color)
             (unsigned)y >= (unsigned)s_screen_height) return;
     if (s_scissor_active && (x < s_scissor_x0 || y < s_scissor_y0 ||
             x >= s_scissor_x1 || y >= s_scissor_y1)) return;
+    if (y & s_row_mask) return;
     if(color.a){++s_primitive_pixels;++s_primitive_runs;}
     uint16_t *dst = &s_pixels[(size_t)y*s_stride + x];
     if (color.a == 255) {
@@ -281,6 +284,9 @@ void raylib_lite_raylib_begin_drawing(void)
     }
     raylib_lite_renderer_set_target(s_pixels, s_stride, s_screen_width,
                                s_screen_height);
+    const int row_step = raylib_lite_raylib_port_sample_row_step();
+    s_row_mask = row_step - 1;
+    raylib_lite_renderer_set_row_step((unsigned)row_step);
     raylib_lite_renderer_reset_raster_stats();
     s_primitive_pixels=s_primitive_runs=s_clear_pixels=0;
     s_primitive_surface=(raylib_lite_primitive_surface_t){
@@ -289,7 +295,8 @@ void raylib_lite_raylib_begin_drawing(void)
         .clip_x0=s_scissor_active?s_scissor_x0:0,
         .clip_y0=s_scissor_active?s_scissor_y0:0,
         .clip_x1=s_scissor_active?s_scissor_x1:s_screen_width,
-        .clip_y1=s_scissor_active?s_scissor_y1:s_screen_height};
+        .clip_y1=s_scissor_active?s_scissor_y1:s_screen_height,
+        .row_mask=s_row_mask};
 }
 
 bool raylib_lite_raylib_frame_available(void) { return s_pixels != NULL; }
@@ -415,12 +422,12 @@ void raylib_lite_raylib_clear_background(Color color)
     if (!s_pixels) return;
     s_clear_pixels+=(uint32_t)s_screen_width*(uint32_t)s_screen_height;
     uint16_t px = rgb565(color);
-    if (s_stride == (size_t)s_screen_width) {
+    if (s_stride == (size_t)s_screen_width && !s_row_mask) {
         raylib_lite_rgb565_fill(s_pixels, px,
             (size_t)s_screen_width * (size_t)s_screen_height);
         return;
     }
-    for (int y = 0; y < s_screen_height; ++y)
+    for (int y = 0; y < s_screen_height; y += s_row_mask + 1)
         raylib_lite_rgb565_fill(s_pixels + (size_t)y * s_stride, px,
             (size_t)s_screen_width);
 }
@@ -669,6 +676,7 @@ void raylib_lite_raylib_draw_rectangle_rounded(Rectangle r,float roundness,int s
     int top_cy=y+rad,bottom_cy=y+height-rad-1;
     span_paint_t paint=span_paint(color);
     for(int row=y;row<y+height;++row){
+        if(row&s_row_mask)continue;
         int lo[4],hi[4],count=0,span=-1;
         if(height>2*rad&&row>=y+rad&&row<y+height-rad){lo[0]=x;hi[0]=x+width;count=1;}
         else{
@@ -875,6 +883,7 @@ void raylib_lite_raylib_draw_text(const char *text, int x, int y, int font_size,
             int cached_sy=-1,run_count=0;
             int run_start[5],run_end[5];
             for(int row=y0;row<y1;++row){
+                if(row&s_row_mask)continue;
                 int sy=s_camera_active?(int)((row+.5f-(float)top)*inverse_scale):
                     ((2*row+1)*5-top_tenths)/font_size;
                 if((unsigned)sy>=10)continue;
