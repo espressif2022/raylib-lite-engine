@@ -31,8 +31,9 @@ The following reference games passed Host tests and native ESP-Mosaico builds. D
 - `sky_hop`
 - `living_worlds`
 - `last_zone_extraction`
-- `tomb_raycast`
 - `neon_rift_rally`
+
+`tomb_raycast` is an internal preview: it builds from the checkout on both Boards but is not part of the released set.
 
 A second selectable Board, [`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md), uses `espressif/esp_board_manager` with a physical 320x240 LCD. Games retain their logical resolution; the Board adapter scales the display and maps touch coordinates back. Every Game must generate its Board Manager configuration with the required `bmgr_amend` profile, which removes the conflicting GPIO47 owner and controls optional device initialization. From the repository root, enter the Game directory before running BMGR (shown for `raylib_shooter`):
 

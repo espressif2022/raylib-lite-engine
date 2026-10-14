@@ -12,7 +12,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 GAMES = ("sky_hop", "tower_defense", "raylib_shooter", "living_worlds",
-         "last_zone_extraction", "tomb_raycast", "neon_rift_rally")
+         "last_zone_extraction", "neon_rift_rally")
 CORE_FILES = {"CMakeLists.txt", "Kconfig", "idf_component.yml", "LICENSE", "VERSION",
               "README.md", "README.EN.md", "README.CN.md", "API.md", "CHANGELOG.md",
               "THIRD_PARTY_NOTICES.md"}

@@ -15,13 +15,13 @@ IDF_TARGET=esp32s31 idf.py --preview -C examples/raylib_shooter -B /tmp/rle-shoo
 | [sky_hop](sky_hop/README.md) | Platform physics and scrolling | ✓ | ✓ | ✓ |
 | [living_worlds](living_worlds/README.md) | Panoramic scenes and volume meshes | ✓ | ✓ | ✓ |
 | [last_zone_extraction](last_zone_extraction/README.md) | DDA wall columns and campaign shooter | ✓ | ✓ | ✓ |
-| [tomb_raycast](tomb_raycast/README.md) | Portal rooms and INDEX8 textured planes | ✓ | ✓ | ✓ |
 | [neon_rift_rally](neon_rift_rally/README.md) | Racing, steering, procedural track and feedback | ✓ | ✓ | ✓ |
+| [tomb_raycast](tomb_raycast/README.md) | Internal preview: portal rooms and INDEX8 textured planes; not released | ✓ | ✓ | ✓ |
 | [render_benchmark](render_benchmark/README.md) | Raster acceptance and optional display preview | Dedicated Host test | Dedicated device project | — |
 
-The seven reference games support Host and native ESP-Mosaico and ESP32-S3-BOX-3 builds. `python3 tools/game_cli.py list --json` reports each game's `host` flag and `boards[]`. ELF game builds, packaging and loading are currently unsupported. The Iris native adapter (`mosaico.py game build --target iris`), Gateway, flashing, and updates are maintained by `esp-mosaico-vibe`. `render_benchmark` uses its own Host/CMake and ESP-IDF entry points, not `game.sim.json`.
+The six released reference games support Host and native ESP-Mosaico and ESP32-S3-BOX-3 builds. `python3 tools/game_cli.py list --json` reports each game's `host` flag and `boards[]`. ELF game builds, packaging and loading are currently unsupported. The Iris native adapter (`mosaico.py game build --target iris`), Gateway, flashing, and updates are maintained by `esp-mosaico-vibe`. `render_benchmark` uses its own Host/CMake and ESP-IDF entry points, not `game.sim.json`. `tomb_raycast` is an internal preview kept in the checkout as a raster workload; it builds on both Boards but is not assembled into the Registry package.
 
-Shared board-neutral native-example glue lives in [examples_common](common_components/examples_common/README.md): the firmware launcher, abstract Board contract, haptic helper, and game-module bridge. Concrete Board implementation remains under `boards/<board>/`. These are example/application layers rather than Engine public APIs; Registry packaging copies the shared launcher and Board into each maintained game under `shared/`, rewrites local paths, and excludes `render_benchmark` and unfinished `*_dev` directories. See [release preparation](../docs/releasing.md).
+Shared board-neutral native-example glue lives in [examples_common](common_components/examples_common/README.md): the firmware launcher, abstract Board contract, haptic helper, and game-module bridge. Concrete Board implementation remains under `boards/<board>/`. These are example/application layers rather than Engine public APIs; Registry packaging copies the shared launcher and Board into each maintained game under `shared/`, rewrites local paths, and excludes `render_benchmark`, the internal `tomb_raycast` preview and unfinished `*_dev` directories. See [release preparation](../docs/releasing.md).
 
 From the engine root, a game with `game.sim.json` can run in the Host simulator:
 
@@ -36,7 +36,7 @@ The browser preview is `http://127.0.0.1:8460/`; use `--listen 0.0.0.0` for LAN.
 
 The [BOX-3 Board guide](boards/esp32-s3-box-3/README.md) describes per-project
 Board Manager generation and native builds. The adapter is selectable for all
-seven reference games above; device acceptance remains per game. Living Worlds
+reference games above; device acceptance remains per game. Living Worlds
 decodes its panoramas with the ESP32-S3 ROM TJpgDec decoder on this Board. A
 game can still restrict its Boards with a `native_boards` list in `game.sim.json`;
 the CLI honors it.

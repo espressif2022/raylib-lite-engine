@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Tomb Raycast is an internal preview: it is no longer assembled into the
+  Registry examples or built by release CI. The checkout keeps it as a raster
+  workload for Host tests and benchmarks.
 - `raylib_lite_video_info_t` gains an optional trailing `sample_row_step`. A
   backend that never displays some rows (for example a 2:1 vertical downscale)
   reports it, and the renderer and Raylib-compatible facade skip writing those
@@ -15,7 +18,7 @@
   with `-O2`, 64 KiB/64-byte data cache, 32 KiB instruction cache and code/rodata
   executed from PSRAM. Existing BOX-3 projects must re-run `idf.py bmgr`.
 - Living Worlds runs on ESP32-S3-BOX-3, decoding its panoramas with the ROM
-  TJpgDec decoder; release CI compiles all seven games on both Boards.
+  TJpgDec decoder; release CI compiles every released game on both Boards.
 - Raylib Shooter has an authored nebula backdrop and Sky Hop rounded clouds.
   Tower Defense, Sky Hop and Shooter no longer paint background that opaque
   layers fully cover.

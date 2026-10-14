@@ -19,9 +19,9 @@ component/
       main/, assets_src/
       shared/common_components/examples_common/
       shared/boards/esp-mosaico/
-    neon_rift_rally/           # seventh maintained game
+    neon_rift_rally/           # sixth released game
     ...                        # sky_hop, tower_defense, raylib_shooter,
-                               # living_worlds, last_zone_extraction, tomb_raycast
+                               # living_worlds, last_zone_extraction
 release-manifest.json          # outside component; all file hashes and provenance
 ```
 
@@ -29,7 +29,7 @@ Each game CMake entry references `shared/` inside its own directory. Its main
 manifest uses the Registry dependency and has no checkout-relative override.
 Board Git dependencies remain pinned. No sibling Engine checkout is required.
 Registry download still needs network access to resolve dependencies and Pillow/
-NumPy for asset preparation. Benchmarks and `*_dev` directories are not uploaded.
+NumPy for asset preparation. Benchmarks, the internal `tomb_raycast` preview and `*_dev` directories are not uploaded.
 Development plans, historical captures and review notes under `docs/development/`
 stay in the checkout and are excluded both by release assembly and the Registry
 manifest. The package includes current usage documentation only.
