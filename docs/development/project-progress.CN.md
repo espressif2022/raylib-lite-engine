@@ -180,4 +180,6 @@ Living Worlds 的历史实验记录了以下板端 A/B：
 
 | 2026-10-14 | `60ed39a` 后工作区 | [发布游戏闭环](release-games-20261014.CN.md)：BOX-3 40 MHz 与只送视口、`-O2`/缓存/PSRAM 执行、`sample_row_step` 跳过不上屏行、三款游戏去过绘制、Living Worlds 上 BOX-3、Shooter/Sky Hop 美术 | 七游戏 600 帧显示行逐字节一致；153 项 Host 回归；两板七游戏构建通过；S3 七游戏 70 秒同条件：Shooter/Tower/Sky Hop/Neon 12–15→30 fps，Last Zone 12.6→24.4，Tomb 14.3→25.2（22–34），Living Worlds 新增 16.7 | S31 设备本轮跳过；40 MHz 画面未目视；触摸、音频、最重关卡与逐帧 P95 未验收；未发布 |
 
+| 2026-10-14 | 同一工作区续 | [S31 补测与功能补齐](release-games-20261014.CN.md#续s31-设备实测与功能补齐)：S31 七游戏同条件 A/B；Sky Hop/Tower 接通已打包但未播放的音效；S31 触摸探测失败不再让游戏退出 | 154 项回归、Board 生命周期新增两例通过；S31 Shooter 23.8→15.1 ms、Tomb 28.6→33.2 fps、Tower 28→30 fps，Last Zone +1.3%；两板音效固件运行 0 显示错误 | 音效未人耳确认；S31 Tower 背景音乐使 render +2.7 ms；Shooter/Tomb 无音效资源；最重关卡与 P95 未测 |
+
 后续新增记录写明：改动目的、代码/固件标识、测试结果、设备与场景、画质变化、性能变化，以及未验证路径。历史功能可能已被重构、回退或退出当前支持范围，以当前 API 和指南为准。

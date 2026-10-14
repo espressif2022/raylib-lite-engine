@@ -16,3 +16,4 @@ typedef enum {
 raylib_lite_result_t tower_audio_init(void);
 raylib_lite_result_t tower_audio_play(tower_audio_cue_t cue);
 void tower_audio_set_music(bool paused, bool game_over);
+void tower_audio_shutdown(void);

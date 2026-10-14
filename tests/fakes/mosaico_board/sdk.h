@@ -18,6 +18,7 @@
 #define portMAX_DELAY UINT32_MAX
 #define pdMS_TO_TICKS(ms) (ms)
 #define taskYIELD() ((void)0)
+#define ESP_LOGW(tag, ...) ((void)(tag))
 typedef uint32_t TickType_t;
 typedef void *TaskHandle_t;
 typedef void *SemaphoreHandle_t;
