@@ -1,8 +1,8 @@
 # Raylib 整帧与像素对照开发记录
 
-[正式兼容契约](../raylib-compat.CN.md)
+[开发记录索引](README.CN.md) · [正式兼容契约](../raylib-compat.CN.md)
 
-以下保留历史测量和当时的修正计划，不作为最新接口说明或游戏 FPS 承诺。
+测量于 2026-10-10，2026-10-12 入库。以下保留历史测量和当时的修正计划，不作为最新接口说明或游戏 FPS 承诺。
 
 2026-10-13 的当前 S31/S3 三场离屏重测见[双板闭环结果](performance-convergence-20261013.CN.md)。以下“当前”保留各段原测量日期的语境。
 
@@ -25,7 +25,7 @@
 
 复现：Host 用 `python3 tools/frame_compare.py --width 480 --height 480 --output artifacts/frame-compare`。设备先加载 IDF 6.1，再分别构建 `examples/frame_compare`，`-DFRAME_COMPARE_IMPL=compat` 与 `upstream` 使用不同的构建目录。`IDF_TARGET=esp32s3` 时使用 `sdkconfig.defaults.esp32s3`（CPU 240 MHz、八线 PSRAM 80 MHz）；未指定时仍是 S31 的 320 MHz / 250 MHz。烧录后看到 `FRAMECOMPARE_END` 为止。哈希对照的是 Host 输出的 `.raw` 帧，不是 `report.json`。
 
-### ESP32-S3，当前固件
+### ESP32-S3，2026-10-10 固件
 
 2026-10-10，同一份 480×480 离屏程序烧到 ESP32-S3（CPU 240 MHz，八线 PSRAM 80 MHz，帧和 rlsw 缓冲都在 PSRAM）。这是和 S31 同分辨率的算力对照，不是 BOX-3 的 320×240 上屏，也不含面板 DMA。每场 3 次取样的中位数，计时从 `BeginDrawing` 到 `EndDrawing`。
 
@@ -53,7 +53,7 @@ Host 480×480 同场景、同上游版本的逐像素对照（不是设备性能
 
 默认字体以只读字形数据保存，224 个字形的行掩码和宽度合计 4,704 字节，不分配字体纹理或堆内存。`python3 tools/generate_compat_font.py --check` 验证它和 benchmark 的独立 atlas oracle 均来自当前 vendored `rtext.c`。未知 Unicode 字符显示为 `?`；这不等于支持中文字体。文字与纹理继续登记为「差异」，其余图元、相机、输入和音频行为保持。
 
-当前固件的 S3 离屏整帧见上一节。S31 还没有用修正后的固件重测整帧，面板送数两边都没有测。
+2026-10-10 固件的 S3 离屏整帧见上一节。截至 2026-10-14，S31 还没有用修正后的固件重测整帧，面板送数两边都没有测。
 
 ## 下一步
 

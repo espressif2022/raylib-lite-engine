@@ -1,6 +1,6 @@
 # 兼容接口与自有接口管理
 
-[文档索引](../README.CN.md) · [收敛计划](compat-core-plan.CN.md) · [开发记录](project-progress.CN.md) · [契约目录](../../compat/api/catalog.json)
+[开发记录索引](README.CN.md) · [文档索引](../README.CN.md) · [收敛计划](compat-core-plan.CN.md) · [开发记录](project-progress.CN.md) · [契约目录](../../compat/api/catalog.json)
 
 日期：2026-10-12。本轮只增加管理、审计和验证，不改公共 API、资源格式或光栅行为。
 
@@ -20,7 +20,7 @@
 
 ## 当前消费者矩阵
 
-30 个模块、417 个去重的具名入口。入口数按模块内名称去重；共享、测试、基准列为该类直接引用涉及的入口数，不是调用次数。共享列包含模块内部调用，不保证存在某个游戏的可达路径。
+2026-10-14 按 `84ceb6c` 重跑 `tools/audit_raylib.py` 刷新（Tomb Raycast 已改为内测，不再计入维护游戏）：33 个模块、419 个去重的具名入口。renderer 已拆为 draw、stats、benchmark 三个头，聚合头 `renderer` 本身不再声明入口。入口数按模块内名称去重；共享、测试、基准列为该类直接引用涉及的入口数，不是调用次数。共享列包含模块内部调用，不保证存在某个游戏的可达路径。
 
 | 头文件模块 | 入口数 | 游戏直接引用 | 共享入口数 | 测试入口数 | 基准入口数 |
 | --- | --- | --- | --- | --- | --- |
@@ -28,7 +28,7 @@
 | `assets` | 16 | living_worlds, tower_defense | 6 | 15 | 0 |
 | `audio` | 2 | — | 1 | 1 | 0 |
 | `audio_mixer` | 19 | — | 17 | 14 | 0 |
-| `clock` | 1 | last_zone_extraction, living_worlds, neon_rift_rally, tomb_raycast | 0 | 0 | 0 |
+| `clock` | 1 | last_zone_extraction, living_worlds, neon_rift_rally | 0 | 0 | 0 |
 | `debug` | 1 | — | 1 | 0 | 0 |
 | `fx` | 6 | sky_hop | 1 | 0 | 0 |
 | `game_app` | 1 | — | 1 | 1 | 0 |
@@ -36,24 +36,27 @@
 | `mtx2` | 6 | — | 3 | 4 | 1 |
 | `native_services` | 1 | — | 1 | 0 | 0 |
 | `platform` | 0 | — | 0 | 0 | 0 |
-| `raylib_port` | 15 | — | 12 | 14 | 2 |
+| `raylib_port` | 16 | — | 13 | 14 | 2 |
 | `rcore` | 4 | — | 0 | 4 | 0 |
-| `renderer` | 34 | last_zone_extraction, living_worlds, tomb_raycast, tower_defense | 24 | 14 | 9 |
+| `renderer` | 0 | — | 0 | 0 | 0 |
+| `renderer_benchmark` | 1 | — | 0 | 0 | 0 |
+| `renderer_draw` | 29 | last_zone_extraction, tower_defense | 21 | 12 | 6 |
+| `renderer_stats` | 5 | last_zone_extraction, living_worlds | 4 | 2 | 3 |
 | `result` | 0 | — | 0 | 0 | 0 |
 | `rgb565` | 5 | last_zone_extraction | 5 | 5 | 3 |
 | `runner` | 1 | — | 1 | 1 | 0 |
-| `runtime_stats` | 11 | last_zone_extraction, tomb_raycast | 9 | 10 | 0 |
+| `runtime_stats` | 11 | last_zone_extraction | 9 | 10 | 0 |
 | `save` | 5 | last_zone_extraction, neon_rift_rally | 0 | 4 | 0 |
 | `scene` | 7 | — | 0 | 7 | 0 |
 | `tilemap` | 7 | tower_defense | 0 | 4 | 3 |
 | `ui` | 5 | — | 0 | 5 | 0 |
 | `video` | 0 | — | 0 | 0 | 0 |
-| `wall_config` | 4 | — | 2 | 0 | 0 |
-| `compat.2d` | 22 | last_zone_extraction, living_worlds, neon_rift_rally, raylib_shooter, sky_hop, tomb_raycast, tower_defense | 7 | 9 | 6 |
+| `wall_config` | 6 | — | 2 | 0 | 0 |
+| `compat.2d` | 22 | last_zone_extraction, living_worlds, neon_rift_rally, raylib_shooter, sky_hop, tower_defense | 7 | 9 | 6 |
 | `compat.game_audio` | 17 | last_zone_extraction, living_worlds | 0 | 1 | 0 |
-| `compat.raylib` | 90 | last_zone_extraction, living_worlds, neon_rift_rally, raylib_shooter, sky_hop, tomb_raycast, tower_defense | 2 | 41 | 21 |
-| `compat.raylib_audio` | 15 | neon_rift_rally, tower_defense | 0 | 10 | 0 |
-| `compat.raylib_impl` | 105 | sky_hop, tower_defense | 36 | 8 | 1 |
+| `compat.raylib` | 90 | last_zone_extraction, living_worlds, neon_rift_rally, raylib_shooter, sky_hop, tower_defense | 2 | 41 | 21 |
+| `compat.raylib_audio` | 15 | neon_rift_rally, sky_hop, tower_defense | 0 | 10 | 0 |
+| `compat.raylib_impl` | 105 | neon_rift_rally, sky_hop, tower_defense | 36 | 8 | 1 |
 
 模块级契约和关联测试位于机器目录；完整入口引用位置及消费者状态位于审计 JSON。矩阵是本次快照，源码变化后重新运行审计并更新本页。
 
@@ -88,6 +91,6 @@ S3 最终候选已经三轮通过，结果见[收敛计划](compat-core-plan.CN.
 
 ## 本轮验证记录
 
-相关 focused 检查 21 项通过，完整 Host 回归 137 项通过；来源/冻结清单审计、78 份 Markdown 的本地链接检查、`git diff --check` 和包含七游戏/69 项资源的隔离发包检查通过。只验证隔离 staging，未新增 compote 归档或发布组件。
+以下为 2026-10-12 批次的验证（当时七游戏）。相关 focused 检查 21 项通过，完整 Host 回归 137 项通过；来源/冻结清单审计、78 份 Markdown 的本地链接检查、`git diff --check` 和包含七游戏/69 项资源的隔离发包检查通过。只验证隔离 staging，未新增 compote 归档或发布组件。
 
 本地证据在被 Git 忽略的 `artifacts/interface-management-20261012/`，包括完整审计、源码 SHA256 与快照、工作区补丁和验证日志。接口管理批次当时的光栅与 v3 哈希一致；后续设备恢复后的圆角修正与最终 v4 双板验收另外记录在收敛计划，不能用接口静态引用推导游戏性能。

@@ -1,6 +1,6 @@
 # 兼容层与自有接口收敛计划
 
-[开发历程](project-progress.CN.md) · [首轮验证记录](convergence-20261012.CN.md)
+[开发记录索引](README.CN.md) · [开发历程](project-progress.CN.md) · [首轮验证记录](convergence-20261012.CN.md)
 
 日期：2026-10-12。沿用工作区中的来源校验、105 个冻结映射和资源加载修正，不覆盖或回退它们。
 

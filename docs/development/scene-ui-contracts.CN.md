@@ -1,6 +1,6 @@
 # Scene 与 UI 行为验证
 
-[接口管理](api-management.CN.md) · [收敛计划](compat-core-plan.CN.md) · [开发记录](project-progress.CN.md)
+[开发记录索引](README.CN.md) · [接口管理](api-management.CN.md) · [收敛计划](compat-core-plan.CN.md) · [开发记录](project-progress.CN.md)
 
 本批为没有维护游戏消费者的 Scene/UI 补行为证据，并修正 UI 焦点与瞬态状态问题。公共函数签名、结构布局、105 个兼容映射均不变；新增测试引用不构成维护消费者，两模块继续待审查。
 

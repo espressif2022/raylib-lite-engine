@@ -19,7 +19,7 @@
 
 ```yaml
 dependencies:
-  idf: ">=6.2"
+  idf: ">=6.1"
   espressif2022/raylib-lite-engine: "^0.1.0"
 ```
 
@@ -50,3 +50,5 @@ python3 tools/game_cli.py sim examples/sky_hop
 ## 许可
 
 源码采用 [Apache-2.0](LICENSE) 许可；外部依赖见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，例程素材来源见[素材记录](release/asset_provenance.json)。
+
+Raylib Lite Engine 是独立项目，不是 raylib 官方项目，与 raylib 及其作者 Ramon Santamaria（@raysan5）没有隶属或背书关系；随附的 raylib 源码保持其 zlib/libpng 许可。

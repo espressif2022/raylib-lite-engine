@@ -19,7 +19,7 @@ Once the component is published, add it to your application's `main/idf_componen
 
 ```yaml
 dependencies:
-  idf: ">=6.2"
+  idf: ">=6.1"
   espressif2022/raylib-lite-engine: "^0.1.0"
 ```
 
@@ -50,3 +50,5 @@ Host currently covers game modules, rendering, input replay and effects. Scene, 
 ## License
 
 Source code is licensed under [Apache-2.0](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for external dependencies and the [asset record](release/asset_provenance.json) for example media origins.
+
+Raylib Lite Engine is an independent project. It is not an official raylib project and is not affiliated with or endorsed by raylib or its author, Ramon Santamaria (@raysan5); the vendored raylib sources keep their zlib/libpng license.

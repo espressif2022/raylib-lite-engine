@@ -31,6 +31,6 @@
 | --- | --- |
 | [Neon Rift Rally](neon-rift-rally/) | [早期实现历程（09-26 快照）](neon-rift-rally/history-20260926.CN.md)、[Host 绘制优化](neon-rift-rally/host-optimization.md)、[转向调参](neon-rift-rally/steering-tuning.md)、[画面与玩法打磨](neon-rift-rally/polish-20261013.md)、[海港近景](neon-rift-rally/harbor-20261013.md)、[对手与透视](neon-rift-rally/competition-20261013.md)、[峡谷与雪地](neon-rift-rally/biomes-20261013.md)、[远景过渡](neon-rift-rally/horizon-20261013.md)；截图与 JSON 原始数据同目录 |
 | [Living Worlds](living-worlds/) | [Ocean 瓶颈分析（09-22 快照）](living-worlds/optimization-20260922.CN.md)、[性能历史](living-worlds/performance-history.md)（早期基线、2026-09-26 实验与后续读数） |
-| [Tomb Raycast](tomb-raycast/) | [早期真机测量](tomb-raycast/historical-measurements.md)（内测游戏） |
+| [Tomb Raycast](tomb-raycast/) | [早期真机测量](tomb-raycast/historical-measurements.CN.md)（内测游戏） |
 
 新增正式契约写入正式指南；执行过程、候选数据、固件身份和未验证路径写入本目录。正式指南不链接开发记录，避免发布后指向未打包内容。

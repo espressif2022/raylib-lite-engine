@@ -51,7 +51,7 @@ Optional top-level fields include `wall_atlases` (`config`, `source`, `.wall` ou
 
 The game view owns view-space clipping, projection, occlusion, and submission order. The rasterizer owns screen clipping, texture sampling, blending, and pixel output. The platform owns display submission.
 
-The raster core is deliberately Raylib-neutral: `raylib_lite_renderer.h` owns renderer texture/rectangle/vector/color contracts, while the `raylib_lite_2d_*` API is a Raylib-shaped compatibility adapter. Supported upstream Raylib names are exposed separately through `compat/raylib/raylib_lite_raylib.h`. SoC-specific RGB565 acceleration is isolated under `src/arch/<soc>/`; the generic C implementation remains available on every target.
+The raster core is deliberately Raylib-neutral: `raylib_lite_renderer.h` owns renderer texture/rectangle/vector/color contracts, while the `raylib_lite_2d_*` API is a Raylib-shaped compatibility adapter. Supported upstream Raylib names are exposed separately through `compat/raylib/include/raylib_lite_raylib.h`. SoC-specific RGB565 acceleration is isolated under `src/arch/<soc>/`; the generic C implementation remains available on every target.
 
 | Scene | Rendering path | Reference example | Validate |
 | --- | --- | --- | --- |

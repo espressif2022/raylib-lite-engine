@@ -36,7 +36,7 @@ manifest. The package includes current usage documentation only.
 
 ## Prepare and validate locally
 
-Use an ESP-IDF 6.2 environment with `compote` and Python 3.10 or newer, plus the asset tooling:
+Use an ESP-IDF 6.1 or newer environment (the manifests declare `idf >=6.1`) with `compote` and Python 3.10 or newer, plus the asset tooling:
 
 ```sh
 python3 -m pip install Pillow numpy PyYAML
@@ -117,7 +117,7 @@ and manual runs. After packaging, it compiles `minimal` for `esp32s3`, every
 assembled game for `esp32s31` after generating the ESP-Mosaico Board Manager
 profile, and every assembled game for `esp32s3` after generating the
 ESP32-S3-BOX-3 profile. These are compile checks, not device acceptance. Each of
-the fifteen consumer configurations builds with both `latest` and `v6.1` (30 builds). Packaging uses `latest`; upload waits
+the thirteen consumer configurations builds with both `latest` and `v6.1` (26 builds). Packaging uses `latest`; upload waits
 for the complete consumer matrix. Only a push to `main`
 enables the dependent `upload_components`
 job. It verifies the checked archive SHA-256, unpacks it and uploads the assembled
@@ -139,18 +139,20 @@ See [official component publishing](https://docs.espressif.com/projects/idf-comp
 ## Validation evidence and support scope
 
 Record chip, board, IDF revision, build commands, startup/input/present/shutdown
-results and unexercised paths. Host timing is not device FPS. Current verified
-Board path is ESP-Mosaico/ESP32-S31 with IDF revision
-`7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe`. That revision is device evidence.
-The release workflow image is `latest`, not that commit, until a 6.2 release
-image exists. Portability to other chips is subject to focused IDF builds. The minimal consumer has no display/audio/input device
+results and unexercised paths. Host timing is not device FPS. The latest device
+evidence (2026-10-14) covers ESP-Mosaico/ESP32-S31 and ESP32-S3-BOX-3 built with
+ESP-IDF v6.1 (`fff9895c82d744c7237be8847347bdd1b07c6643`): each of the six released
+Games started and presented without display errors in a no-input 70-second run.
+Touch play, audible output and the heaviest scenes were not accepted per Game.
+The release workflow compiles with the `latest` image and `v6.1`; those are compile
+checks, not device evidence. The minimal consumer has no display/audio/input device
 claims. Consult the per-release evidence rather than inferring support from
-`idf >=6.2` alone.
+`idf >=6.1` alone.
 
 ## Assets and dependencies
 
 [Asset provenance](../release/asset_provenance.json) records the owner's confirmation
-that maintained media was generated with Codex. Assembly emits exact media names
+that maintained images were generated with Codex and unscripted audio was AI-generated. Assembly emits exact media names
 and SHA-256 hashes into each example's `ASSET_PROVENANCE.json`. Procedural Python
 scripts and screenshots are kept with their source examples. New third-party
 media/fonts require their own source and notice entries before release.

@@ -51,7 +51,7 @@ RGB565 帧缓冲的借出、提交、释放必须明确所有权；繁忙、失�
 
 项目视图负责视空间裁剪、投影、遮挡和提交顺序；光栅器负责屏幕裁剪、纹理采样、混合和像素输出；平台负责送屏。
 
-光栅核心刻意保持 Raylib-neutral：`raylib_lite_renderer.h` 定义 renderer 的纹理、矩形、向量和颜色 contract，`raylib_lite_2d_*` API 作为 Raylib-shaped compatibility adapter；支持的上游 Raylib 名称则独立由 `compat/raylib/raylib_lite_raylib.h` 提供。SoC-specific RGB565 加速统一隔离在 `src/arch/<soc>/`，所有目标始终保留 generic C 实现。
+光栅核心刻意保持 Raylib-neutral：`raylib_lite_renderer.h` 定义 renderer 的纹理、矩形、向量和颜色 contract，`raylib_lite_2d_*` API 作为 Raylib-shaped compatibility adapter；支持的上游 Raylib 名称则独立由 `compat/raylib/include/raylib_lite_raylib.h` 提供。SoC-specific RGB565 加速统一隔离在 `src/arch/<soc>/`，所有目标始终保留 generic C 实现。
 
 | 场景条件 | 路径 | 参考示例 | 必须验证 |
 |---|---|---|---|
