@@ -193,6 +193,16 @@ static void note_presented_frame(void)
 static bool valid_key(int key)
 { return key >= 0 && key < RAYLIB_LITE_RAYLIB_KEY_COUNT; }
 
+void raylib_lite_raylib_cancel_input(void)
+{
+    memset(s_key_down, 0, sizeof(s_key_down));
+    memset(s_key_pressed, 0, sizeof(s_key_pressed));
+    memset(s_key_released, 0, sizeof(s_key_released));
+    memset(s_pointers, 0, sizeof(s_pointers));
+    s_imu_xy = (Vector2){0};
+    s_imu_z = 0;
+}
+
 void raylib_lite_raylib_inject_key(int key, bool pressed)
 {
     if (!valid_key(key) || s_key_down[key] == pressed) return;

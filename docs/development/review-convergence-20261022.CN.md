@@ -31,7 +31,7 @@
 | --- | --- | --- |
 | FONT-01 原生 FNT | 真实 FNT/PNG 加载、绘制、测量和释放测试；确认并修复多页 FNT use-after-free | Host 原生路径验证，不等于所有设备字体场景验收 |
 | FONT-02 离线中文子集 | `pack_font.py` 接收 TTF/OTF/TTC 与 UTF-8 字符清单，生成 metrics、atlas、覆盖/来源报告；manifest 可直接构建字体 | 必需字符缺失报错；不把回退字形视为覆盖成功；字体授权由输入方提供 |
-| FONT-03 轻量自定义文字 | 新中性 `raylib_lite_font` 模块，拥有/借用加载、卸载、测量、绘制；真实 Host preview 消费者 | 原冻结 105 个 Raylib 映射不扩展；六款界面尚未全部中文化 |
+| FONT-03 轻量自定义文字 | 新中性 `raylib_lite_font` 模块，拥有/借用加载、卸载、测量、绘制；真实 Host preview 消费者，UI 新增借用字体绘制入口 | 原冻结 105 个 Raylib 映射不扩展；六款界面尚未全部中文化 |
 | FONT-04 布局 | 共用 UTF-8、advance、基线、换行/折行规则；非法序列与缺字统计明确 | 当前原生字号绘制；不承诺 shaping、bidi、kerning、任意缩放或完整富文本 |
 | FONT-05 动态 TTF | 采用离线子集作为当前路线，运行时解析继续关闭 | 动态字号/未知用户文本须另有消费者、来源和 RAM 验收，不直接开启缺依赖的宏 |
 | FONT-06 文本输入 | 中文显示和文字输入保持分离；不把 key code 宣称为字符输入 | 已提交 Unicode/IME 事件尚未新增，仍是明确缺口 |
@@ -51,10 +51,10 @@ manifest 的 `files` 可保留原始 PNG/QOI/FNT/JPG；原生构建按 report �
 | 单实例与 generation handle | 保留现有单实例契约；完成可重复释放。没有在无多实例消费者时引入 context 大改；纹理 generation handle 仍未新增。 |
 | Board 边界 | 游戏模型和共享视图仍无 ESP-IDF/BSP 依赖，具体板 API 留在 `examples/boards/`。两个板独立 staging/build。 |
 | Host 存档/声音 | 共享 save/mixer 可以链接使用；现有游戏自己的存档路径继续有效。未新增通用 Host storage backend 或可听 PCM sink，不把“模块已链接”当成端到端服务已具备。 |
-| 输入取消/断开 | 本轮解决来源覆盖和边沿丢失；统一 source/device 身份、断开取消和满队列恢复仍需独立 ABI 方案。 |
-| Scene/UI | 保留现有有限契约；本轮不将 deferred transitions、模态栈、重叠控件 capture 等候选能力冒充已实现。 |
+| 输入取消/断开 | action 新增无释放边沿的 cancel；game_app 的 DETACHED 同步清空 action 与兼容输入，UI 提供显式取消。当前断开取消整个流；逐设备身份、满队列恢复，以及 Host 模块独立 pointer-cancel 仍需 ABI 方案。 |
+| Scene/UI | 第二批实现有界 FIFO 延迟切换、生命周期回调重入保护、UI 取消与点击回调失效控制，以及 UTF-8 位图字体绘制。模态栈、重叠控件 capture 仍未实现。 |
 
-新增公共契约只针对已实现的资源和文字能力。动态纹理、RenderTexture、复杂相机、鼠标滚轮/gamepad、音频 voice/seek/流解码，均需要具体消费者和逐项行为验证。3D、shader、桌面系统功能不纳入本轮支持承诺。原生 demo 通用 CLI profile 和能力预检尚未形成统一工作流；当前可用的是独立原生测试和轻量 game CLI。
+新增公共契约覆盖已实现的资源、文字、回调切换及输入取消能力。动态纹理、RenderTexture、复杂相机、鼠标滚轮/gamepad、音频 voice/seek/流解码，均需要具体消费者和逐项行为验证。3D、shader、桌面系统功能不纳入本轮支持承诺。原生 demo 通用 CLI profile 和能力预检尚未形成统一工作流；当前可用的是独立原生测试和轻量 game CLI。
 
 ## 4 六款游戏的实际变化
 
@@ -73,11 +73,11 @@ GAME-01/02/03/05 对应功能已落地；GAME-04 的模型/Host 双指原型已�
 
 ## 5 验证记录
 
-最终检查：`python3 -m unittest discover -s tests -v` 全部 **191 项通过**（312.094 秒，仅测试耗时）；独立 columns/primitives、tilemap 像素 oracle、受影响 benchmark 测试随完整回归通过。字体、原生 FNT/资源桥、输入、地图、原生 replay 与玩法模型另有 focused/sanitizer 验证。`prepare_release.py` + `check_release.py` 组装检查通过，包含 6 款游戏和 66 个运行时资源；API catalog、平台边界、维护 Markdown 链接与 `git diff --check` 通过。完整日志、固件备份、隔离构建和图像保存在本地 `artifacts/convergence-20261022/`；它们不进入发布包。Host 测试耗时不作为设备帧率。
+第一批检查（提交 `eed10aa`）：`python3 -m unittest discover -s tests -v` 全部 **191 项通过**（312.094 秒，仅测试耗时）；独立 columns/primitives、tilemap 像素 oracle、受影响 benchmark 测试随完整回归通过。字体、原生 FNT/资源桥、输入、地图、原生 replay 与玩法模型另有 focused/sanitizer 验证。`prepare_release.py` + `check_release.py` 组装检查通过，包含 6 款游戏和 66 个运行时资源；API catalog、平台边界、维护 Markdown 链接与 `git diff --check` 通过。完整日志、固件备份、隔离构建和图像保存在本地 `artifacts/convergence-20261022/`；它们不进入发布包。Host 测试耗时不作为设备帧率。
 
 原生回放操作与字段说明见 [有限输入回放](native-replay.CN.md)。回放会启动真实 Board 输入服务但忽略现场输入，以便确定性采集；它验证输入 ABI 注入和服务启动/关闭，不验证人的手指、真实 IMU 姿态或听觉/震感。
 
-### Box-3 真机结果
+### 第一批 Box-3 真机结果
 
 环境：ESP32-S3 BOX-3、320×240 RGB565、CPU 240 MHz、PSRAM 80 MHz、性能优化构建；ESP-IDF `7b9cc1ac79f8`（完整身份见证据 JSON）。逻辑目标 30 Hz，设备统计每 2 秒采样。显示速率来自异步输出完成后的 release 计数，并非 Host 耗时换算，也不是屏幕光学刷新测量。
 
@@ -105,3 +105,26 @@ render 指标是周期采样的单次尝试耗时分布，不是逐帧完整直�
 设备恢复：Box-3 的测试前完整 16 MiB flash 已备份，测试结束后完整写回，esptool 验证写入哈希一致并复位。备份仅留本地忽略目录，不提交 GitHub。
 
 塔防额外探索：使用默认种子 `0x544f5745`、正常起始 190 资金/20 HP 和实际击杀/波次奖励，RAPID/PULSE/FROST 混合策略可合法完成六波，剩 14 HP、511 资金；没有额外发钱或修改敌人。两个其他策略在默认种子下分别止于第 3/4 波；种子 43 下混合与纯 PULSE 均可通关。这证明至少存在合法完成路径，不证明新手可发现该策略或整体平衡。驱动与逐波记录保存在本地 `artifacts/convergence-20261022/tower-legal-strategies/`。
+
+
+## 6 第二批：公共模块与 Host 交互收敛
+
+第二批在 `eed10aa` 基础上继续处理可复现的 API 和生命周期缺口，具体行为见 [Scene/UI 契约](../scene-ui.CN.md)、[公共 API](../../API.md)及 [Host 预览协议](../../host/README.md)。
+
+| 问题 | 实现结果 | 验证与保留边界 |
+| --- | --- | --- |
+| Scene 在自身回调中退出，可能提前释放 context；render 中切栈改变遍历对象 | push/pop/replace 在外层回调结束后按 FIFO 提交，以预计栈深校验；每轮最多 8 个请求，包含生命周期回调继续提交的请求 | 回调退出前访问 context、exit 实际释放、原栈 render、生命周期重入及无限切换防护；同栈递归 dispatch 不派发，无跨线程保证 |
+| UI 无独立取消；click 回调重建 UI 后旧事件继续传播 | 显式 cancel 清除 track/焦点/pressed，不合成 click；释放先提交状态，重建、添加节点、取消或递归输入使旧派发停止 | 双指、重叠按钮、重复释放与回调重入；旧的“上次采样与释放都命中”规则保留，没有新增模态捕获 |
+| 新中文字库尚未接 UI 消费者 | 新增 ui_draw_font，按真实字体 metrics 居中、可折行，沿用 renderer clip；字体仅借用本次调用 | 中文像素、折行、裁剪、隐藏节点及释放生命周期测试；没有将六款界面全部中文化，也没有额外文本输入/IME |
+| 断开后引擎输入残留 | action_cancel 清除 held/边沿并保留配置；game_app 收到 DETACHED 同时清空兼容按键、触点、IMU | 不生成 released；应用自己的手势需处理 DETACHED 并取消 UI。事件无设备 ID，不能选择性取消来源 |
+| 浏览器请求并发导致边沿乱序、失焦不发送释放、坐标硬编码 480 | 输入和控制快照按 FIFO 提交，失焦主动发送空状态；画面与截图跟随实际尺寸；服务端完整校验后统一加锁应用 | 实际内嵌 JS 在 Node DOM/fetch mock 中执行，并覆盖真实 HTTP handler；自定义 preview 页面须自行遵守相同规则 |
+| 录制缺动作/帧号不从零开始；异常退出漏清理 | 全部标准动作及游戏自定义 numeric code 可回放，同 tick 边沿不折叠；录制保存初始 held、相对 tick 和诊断状态，异常总是 close | initial_state 不能恢复模型快照；应从相同初始状态录制。Host pointercancel 仍按普通释放处理，对松手开火玩法尚有语义缺口 |
+| 存档迁移写到一半失败会污染默认值；去抖时间溢出 | 迁移在对齐 scratch 中完成，成功才提交；支持配置/输出别名，deadline 饱和处理 | 失败迁移、重复初始化、极端时间和写失败重试；迁移成功不自动写回存储 |
+
+Scene/UI 公共结构增加内部字段，所有消费者必须重新编译；不宣称旧二进制对象布局兼容。Host 模块 ABI 与冻结 Raylib 映射没有扩展。
+
+本批验证：完整 `python3 -m unittest discover -s tests -v` **198 项通过**（319.023 秒，仅测试耗时，无跳过）；其中包含独立 columns/primitives、字体像素、Scene/UI、Host 浏览器脚本与发布契约。action/save/game_app/兼容输入 4 项 focused、catalog/平台边界/Scene/UI 38 项 focused 通过；action、save、Scene 和 UI 的 ASan/UBSan 验证通过。发布组装与检查通过，6 款游戏、66 个运行时资源；90 份维护 Markdown 的本地链接检查与 `git diff --check` 通过。
+
+Box-3 Shooter（ESP32-S3）和 Mosaico Sky Hop（ESP32-S31）分别在原隔离构建目录增量编译成功，使用上述同一 ESP-IDF；本批公共模块均参与编译。完整测试、构建和发布日志保存在本地 `artifacts/convergence-20261022/followup-validation/`，发布检查目录为 `artifacts/convergence-20261022/followup-release/`。
+
+本批没有再次烧录；遵循“烧录失败跳过、先完善代码”的要求继续完成代码和本地验证。前面的 Box-3 FPS 仅对应第一批固件，不是这批变更的真机结果。新的 Scene/UI 交互、中文字库显示与断开取消未在设备实测；Mosaico 仍只有构建证据，没有 FPS 捕获。

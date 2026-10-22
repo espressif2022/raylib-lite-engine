@@ -59,6 +59,8 @@ static void poll_input(void *context)
                                  input.value / 1000.0f);
         else if (input.type == RAYLIB_LITE_INPUT_BUTTON)
             raylib_lite_raylib_inject_action(input.value, input.pressed);
+        else if (input.type == RAYLIB_LITE_INPUT_DETACHED)
+            raylib_lite_raylib_cancel_input();
         raylib_lite_action_apply_event(&input);
         if (runtime->app->on_event)
             runtime->app->on_event(runtime->app->user, &input);

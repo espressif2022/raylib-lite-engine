@@ -60,6 +60,12 @@ function's specific ownership and return behavior.
   discards stale credits after stalls. The clock must be monotonic.
 - The launcher owns input producers and shutdown ordering. Gameplay consumes
   queued events on its own thread. Define a policy for queue overflow.
+  `raylib_lite_action_cancel()` clears held state and both pending/published
+  edges without synthesizing releases; configured zones and thresholds survive.
+  `DETACHED` cancels the entire action stream because events have no source ID.
+  The game app also clears compatibility keys, pointers and IMU before forwarding
+  that event. Applications must cancel their own gestures and UI explicitly;
+  the separate Host module pointer ABI still cannot distinguish cancel from release.
 - Mounted/registered asset memory must remain valid while loaded resources or
   streams reference it. Close streams and unload textures before unmounting.
   Do not mutate backing data while it is being rendered. Memory registrations
@@ -71,6 +77,10 @@ function's specific ownership and return behavior.
 - The IDF save backend uses NVS. The application owns NVS initialization and
   its partition choice. Handle save failures; Engine installation does not
   create or replace the application's partition table.
+  A failed load or migration leaves the requested defaults in the output.
+  Migration writes aligned scratch memory and commits only on success; it does
+  not automatically persist the upgraded payload. Failed flushes remain dirty
+  for retry, and debounce deadlines saturate instead of wrapping.
 
 ## Bitmap text
 
@@ -82,6 +92,27 @@ fallback statistics, explicit line breaks and optional character wrapping.
 The default compatibility `DrawText` remains unchanged. Runtime TTF, kerning,
 shaping and bidi are outside this bitmap API. See
 [font assets (Chinese)](docs/font-assets.CN.md) for generation and native FNT loading.
+
+`raylib_lite_ui_draw_font` borrows a bitmap font for one draw call and centers
+UTF-8 node text using those same metrics, with optional wrapping and the existing
+renderer clip. The caller owns font loading, frame setup and error handling.
+
+## Scene and UI callbacks
+
+Scene push/pop/replace execute immediately outside callbacks. Requests made
+inside scene dispatch or lifecycle callbacks are deferred in FIFO order until
+the outer traversal completes. Acceptance uses projected stack depth; at most
+eight deferred requests are accepted per outer call, including requests made
+while draining. Check the boolean result and retain accepted scenes/contexts
+until their exit callback completes. Same-stack recursive dispatch is ignored.
+
+UI release state is committed before click callbacks. Reinitializing, adding
+nodes, cancelling or recursively dispatching input stops the previous click
+dispatch. `raylib_lite_ui_cancel_input` clears pointers, focus and pressed state
+without clicks. Keep the UI object alive until dispatch returns. Scene and UI
+public structs gained internal fields; rebuild consumers rather than mixing
+old binary layouts. Full behavior is documented in the
+[Scene/UI contract](docs/scene-ui.CN.md).
 
 ## Product integrations
 

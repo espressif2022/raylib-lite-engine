@@ -7,6 +7,7 @@ import ctypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -22,6 +23,67 @@ from PIL import Image
 GENERIC_EVENT_TYPES = {
     "tap", "pause", "resume", "step", "reset", "pointer", "action", "imu",
 }
+
+ACTION_CODES = {"left": 0, "right": 1, "jump": 2, "pause": 3, "restart": 4,
+                "back": 5, "fire": 6, "sprint": 7, "strafe_left": 8,
+                "strafe_right": 9}
+HELD_ACTIONS = tuple(name for name in ACTION_CODES if name not in {"pause", "restart"})
+
+
+def _action_code(value: object) -> int:
+    if isinstance(value, str) and value in ACTION_CODES:
+        return ACTION_CODES[value]
+    if isinstance(value, str) and value.isdecimal():
+        value = int(value)
+    if type(value) is not int or not 0 <= value < 2**31:
+        raise ValueError(f"unsupported action code: {value}")
+    return value
+
+
+def _preview_input(value: object, max_pointers: int) -> dict[str, object]:
+    """Validate the entire request before any game or recording mutation."""
+    if not isinstance(value, dict):
+        raise ValueError("input must be an object")
+    def boolean(item: object) -> bool:
+        if type(item) is not bool:
+            raise ValueError("pressed/held values must be boolean")
+        return item
+    def number(item: object, integer: bool = False) -> float | int:
+        if type(item) not in (int, float) or not math.isfinite(item):
+            raise ValueError("coordinates must be finite numbers")
+        if integer and (int(item) != item or not -(2**31) <= item < 2**31):
+            raise ValueError("pointer values must be signed 32-bit integers")
+        if not integer and abs(item) > 3.4028235e38:
+            raise ValueError("IMU value exceeds float32 range")
+        return int(item) if integer else float(item)
+    actions = {name: boolean(value.get(name, False)) for name in HELD_ACTIONS}
+    points = value.get("pointers", [])
+    if not isinstance(points, list) or len(points) > max_pointers:
+        raise ValueError("too many pointers or invalid pointer array")
+    pointers = {}
+    for point in points:
+        if not isinstance(point, dict) or boolean(point.get("pressed", True)) is not True:
+            raise ValueError("pointers must contain the currently held contacts")
+        track = number(point.get("track", 0), True)
+        if track in pointers:
+            raise ValueError("duplicate pointer track")
+        # Browser coordinates may be fractional; C input is integer pixels.
+        x, y = number(point.get("x")), number(point.get("y"))
+        pointers[track] = {"x": number(int(x), True), "y": number(int(y), True)}
+    explicit = value.get("actions", [])
+    if not isinstance(explicit, list) or len(explicit) > 16:
+        raise ValueError("invalid action array")
+    events = []
+    for item in explicit:
+        if not isinstance(item, dict):
+            raise ValueError("action must be an object")
+        events.append((_action_code(item.get("code")), boolean(item.get("pressed", True))))
+    imu = value.get("imu")
+    if imu is not None:
+        if not isinstance(imu, dict):
+            raise ValueError("IMU must be an object")
+        imu = {axis: number(imu.get(axis, 0)) for axis in ("x", "y", "z")}
+    return {"actions": actions, "pointers": pointers, "explicit": events, "imu": imu}
 
 ENGINE_ROOT = Path(__file__).resolve().parents[1]
 
@@ -115,7 +177,8 @@ def load_replay(path: Path | None) -> list[dict[str, object]]:
         previous = frame
         normalized.append({
             "frame": frame, "type": str(item["type"]),
-            "code": item.get("code", item.get("action", 0)),
+            "code": (_action_code(item.get("code", item.get("action", 0)))
+                     if item["type"] == "action" else item.get("code", 0)),
             "pressed": bool(item.get("pressed", True)),
             "track_id": int(item.get("track_id", item.get("track", 0))),
             "x": float(item.get("x", 0)), "y": float(item.get("y", 0)),
@@ -377,61 +440,59 @@ class ReloadableHostRuntime:
 def run_generic(project: Path, directory: Path, frames: int, output: Path,
                 replay: list[dict[str, object]] | None = None) -> dict[str, object]:
     runtime = GenericHostRuntime(project, directory)
-    events = replay or []
-    next_event = 0
-    paused = False
-    actions = {"left": False, "right": False, "jump": False}
-    if not replay:
-        runtime.action(4, True)
-        runtime.action(4, False)
-    for frame_index in range(max(0, frames)):
-        tap_releases: list[tuple[int, int, int]] = []
-        single_step = False
-        while next_event < len(events) and int(events[next_event]["frame"]) == frame_index:
-            event = events[next_event]
-            kind = str(event["type"])
-            if kind == "tap":
-                track = int(event["track_id"]); x = int(float(event["x"])); y = int(float(event["y"]))
-                runtime.pointer(track, x, y, True)
-                tap_releases.append((track, x, y))
-            elif kind == "pointer":
-                runtime.pointer(int(event["track_id"]), int(float(event["x"])),
-                                int(float(event["y"])), bool(event["pressed"]))
-            elif kind == "action":
-                codes = {"left": 0, "right": 1, "jump": 2,
-                         "pause": 3, "restart": 4}
-                raw_code = event["code"]
-                code = codes.get(str(raw_code), int(raw_code) if str(raw_code).lstrip("-").isdigit() else -1)
-                if code < 0: raise ValueError(f"unsupported action code: {raw_code}")
-                pressed = bool(event["pressed"])
-                if code < 3:
-                    actions[("left", "right", "jump")[code]] = pressed
-                else:
+    try:
+        events = replay or []
+        next_event = 0
+        paused = False
+        actions = {"left": False, "right": False, "jump": False}
+        if not replay:
+            runtime.action(4, True)
+            runtime.action(4, False)
+        for frame_index in range(max(0, frames)):
+            tap_releases: list[tuple[int, int, int]] = []
+            single_step = False
+            while next_event < len(events) and int(events[next_event]["frame"]) == frame_index:
+                event = events[next_event]
+                kind = str(event["type"])
+                if kind == "tap":
+                    track = int(event["track_id"]); x = int(float(event["x"])); y = int(float(event["y"]))
+                    runtime.pointer(track, x, y, True)
+                    tap_releases.append((track, x, y))
+                elif kind == "pointer":
+                    runtime.pointer(int(event["track_id"]), int(float(event["x"])),
+                                    int(float(event["y"])), bool(event["pressed"]))
+                elif kind == "action":
+                    code = _action_code(event["code"])
+                    pressed = bool(event["pressed"])
+                    # Deliver every edge, including a quick down/up within one tick.
                     runtime.action(code, pressed)
-            elif kind == "imu":
-                runtime.imu(float(event["x"]), float(event["y"]), float(event["z"]))
-            elif kind == "pause":
-                runtime.control(1); paused = True
-            elif kind == "resume":
-                runtime.control(2); paused = False
-            elif kind == "reset":
-                runtime.control(3)
-            elif kind == "step":
-                single_step = True
-            next_event += 1
-        if single_step and paused:
-            runtime.control(2)
-            runtime.step(actions["left"], actions["right"], actions["jump"])
-            runtime.control(1)
-        else:
-            runtime.step(actions["left"], actions["right"], actions["jump"])
-        for track, x, y in tap_releases:
-            runtime.pointer(track, x, y, False)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_bytes(runtime.frame())
-    result = {**runtime.metadata(), "frame": str(output)}
-    runtime.close()
-    return result
+                    if code < 3:
+                        actions[("left", "right", "jump")[code]] = pressed
+                elif kind == "imu":
+                    runtime.imu(float(event["x"]), float(event["y"]), float(event["z"]))
+                elif kind == "pause":
+                    runtime.control(1); paused = True
+                elif kind == "resume":
+                    runtime.control(2); paused = False
+                elif kind == "reset":
+                    runtime.control(3)
+                elif kind == "step":
+                    single_step = True
+                next_event += 1
+            if single_step and paused:
+                runtime.control(2)
+                runtime.step(actions["left"], actions["right"], actions["jump"])
+                runtime.control(1)
+            else:
+                runtime.step(actions["left"], actions["right"], actions["jump"])
+            for track, x, y in tap_releases:
+                runtime.pointer(track, x, y, False)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(runtime.frame())
+        result = {**runtime.metadata(), "frame": str(output)}
+        return result
+    finally:
+        runtime.close()
 
 def serve_interactive_preview(listen: str, port: int, runtime: object,
                               preview_html: Path | None = None) -> None:
@@ -441,18 +502,24 @@ def serve_interactive_preview(listen: str, port: int, runtime: object,
                               "strafe_left": False, "strafe_right": False},
                   "pointers": {},
                   "recording": False, "events": [], "started": time.monotonic(),
-                  "ticks": 0}
-    tick_hz = max(1, int(runtime.metadata().get("tick_hz", 30)))
+                  "ticks": 0, "recording_start": 0, "recording_end": 0}
+    with runtime.lock:
+        initial_metadata = runtime.metadata()
+    tick_hz = max(1, int(initial_metadata.get("tick_hz", 30)))
+    max_pointers = max(0, int(initial_metadata.get("max_pointers", 2)))
     def simulation_loop() -> None:
         deadline = time.monotonic()
         while True:
-            if simulation["paused"]:
-                time.sleep(.01); deadline = time.monotonic(); continue
             with runtime.lock:
-                actions = simulation["actions"]
-                runtime.step(actions["left"], actions["right"], actions["jump"])
-                simulation["ticks"] += 1
-            deadline += 1.0 / (tick_hz * float(simulation["speed"]))
+                paused = simulation["paused"]
+                speed = float(simulation["speed"])
+                if not paused:
+                    actions = simulation["actions"]
+                    runtime.step(actions["left"], actions["right"], actions["jump"])
+                    simulation["ticks"] += 1
+            if paused:
+                time.sleep(.01); deadline = time.monotonic(); continue
+            deadline += 1.0 / (tick_hz * speed)
             time.sleep(max(0.0, deadline - time.monotonic()))
     threading.Thread(target=simulation_loop, daemon=True).start()
     default_page = """<!doctype html><html><head><meta charset=utf-8>
@@ -460,14 +527,16 @@ def serve_interactive_preview(listen: str, port: int, runtime: object,
 <title>Mosaico game simulator</title><style>
 body{margin:0;background:#07111c;color:#dff;font:14px system-ui;display:grid;place-items:center;min-height:100vh}
 main{position:relative;padding:16px;background:#0c2030;border:1px solid #299fad;border-radius:16px;box-shadow:0 18px 80px #000;width:min(512px,calc(100vw - 24px))}
-img{width:480px;height:480px;max-width:100%;aspect-ratio:1/1;object-fit:contain;display:block;image-rendering:pixelated;touch-action:none;background:#000;border-radius:60px;clip-path:inset(0 round 60px)}
+img{width:100%;height:auto;aspect-ratio:1/1;object-fit:contain;display:block;image-rendering:pixelated;touch-action:none;background:#000}
 #state{margin-top:10px;color:#9ee;white-space:pre-wrap;height:4.8em;overflow:hidden;line-height:1.35}
 .hint{color:#fff;margin-top:8px}.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}button,select{background:#17364b;color:#dff;border:1px solid #299fad;border-radius:6px;padding:6px 10px}
 </style></head><body><main><div class=tools><button id=pause>Pause</button><button id=step>Step</button><button id=reset>Reset</button><button id=shot>Screenshot</button><button id=record>Record</button><select id=speed><option>.25</option><option>.5</option><option selected>1</option><option>2</option></select></div><img id=screen tabindex=0 draggable=false><div id=state></div>
 <div class=hint id=hint>Keyboard controls depend on the running game.</div></main>
 <script>
 const held=new Set(), pointers=new Map(), img=document.querySelector('#screen'), state=document.querySelector('#state'), sfxCache={};
-let busy=false, phase='start',paused=false,armedSfx='';
+let busy=false, phase='start',paused=false,armedSfx='',surfaceWidth=__WIDTH__,surfaceHeight=__HEIGHT__,posts=Promise.resolve();
+img.style.aspectRatio=`${surfaceWidth}/${surfaceHeight}`;
+function post(path,value){const body=JSON.stringify(value);const request=posts.then(async()=>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body});if(!response.ok)throw new Error(`Input HTTP ${response.status}`)});posts=request.catch(error=>{state.textContent=error.message});return posts}
 function playSfx(name){if(!name)return;let a=sfxCache[name];if(!a){a=new Audio('/sfx/'+name+'.wav');a.preload='auto';sfxCache[name]=a}a.currentTime=0;a.volume=name.startsWith('step')?.35:.7;a.play().catch(()=>{})}
 function unlockAudio(){if(sfxCache._on)return;sfxCache._on=1;['rifle','step_l','alert','hurt','confirm'].forEach(n=>{const a=new Audio('/sfx/'+n+'.wav');a.preload='auto';sfxCache[n]=a})}
 function key(e,down){unlockAudio();const k=e.key.toLowerCase();if(['arrowleft','arrowright','arrowup','arrowdown',' ','a','d','w','s','f','control','p','enter','shift','q','e'].includes(k))e.preventDefault();
@@ -475,25 +544,26 @@ function key(e,down){unlockAudio();const k=e.key.toLowerCase();if(['arrowleft','
  if(down&&!held.has(k)&&k==='enter')control('continue'); down?held.add(k):held.delete(k);sendInput()}
 addEventListener('keydown',e=>key(e,true));addEventListener('keyup',e=>key(e,false));
 function pointer(e,down){e.preventDefault();const r=img.getBoundingClientRect();
- const p={x:(e.clientX-r.left)*480/r.width,y:(e.clientY-r.top)*480/r.height};down?pointers.set(e.pointerId,p):pointers.delete(e.pointerId)}
+ const p={x:(e.clientX-r.left)*surfaceWidth/r.width,y:(e.clientY-r.top)*surfaceHeight/r.height};down?pointers.set(e.pointerId,p):pointers.delete(e.pointerId)}
 img.onpointerdown=e=>{unlockAudio();img.focus();img.setPointerCapture(e.pointerId);pointer(e,true);sendInput()};
 img.onpointermove=e=>{if(pointers.has(e.pointerId)){pointer(e,true);sendInput()}};
 img.onpointerup=img.onpointercancel=e=>{pointer(e,false);sendInput()};
-addEventListener('blur',()=>{held.clear();pointers.clear()});
+addEventListener('blur',()=>{held.clear();pointers.clear();sendInput()});
 async function sendInput(){let left=held.has('a')||held.has('arrowleft'),right=held.has('d')||held.has('arrowright'),jump=held.has(' ')||held.has('w')||held.has('arrowup'),back=held.has('s')||held.has('arrowdown'),fire=held.has('f')||held.has('control'),sprint=held.has('shift'),strafe_left=held.has('q'),strafe_right=held.has('e');
- await fetch('/api/v1/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({left,right,jump,back,fire,sprint,strafe_left,strafe_right,pointers:[...pointers].map(([track,p])=>({track,...p,pressed:true}))})})}
-async function control(command){await fetch('/api/v1/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command})})}
+ return post('/api/v1/input',{left,right,jump,back,fire,sprint,strafe_left,strafe_right,pointers:[...pointers].map(([track,p])=>({track,...p,pressed:true}))})}
+function control(command){return post('/api/v1/control',{command})}
 async function tick(){if(busy)return;busy=true;
  try{const res=await fetch('/api/v1/frame');const meta=JSON.parse(res.headers.get('X-Mosaico-State'));const blob=await res.blob();
- phase=meta.phase;if(meta.sfx&&meta.sfx!==armedSfx)playSfx(meta.sfx);armedSfx=meta.sfx||'';const old=img.src,url=URL.createObjectURL(blob);img.onload=()=>{if(old.startsWith('blob:'))URL.revokeObjectURL(old);img.onload=null};img.src=url;
+ surfaceWidth=meta.width;surfaceHeight=meta.height;img.style.aspectRatio=`${surfaceWidth}/${surfaceHeight}`;phase=meta.phase;if(meta.sfx&&meta.sfx!==armedSfx)playSfx(meta.sfx);armedSfx=meta.sfx||'';const old=img.src,url=URL.createObjectURL(blob);img.onload=()=>{if(old.startsWith('blob:'))URL.revokeObjectURL(old);img.onload=null};img.src=url;
  document.querySelector('#hint').textContent=meta.game_id==='neon_rift_rally'?'Keyboard: A/D steer · W throttle · S brake · Space nitro · Shift drift · Enter restart':'Keyboard: A/D move · W/Space action · S back · Shift sprint · Q/E strafe · F fire';
  paused=meta.simulation.paused;const fields=Object.entries(meta).filter(([k])=>!['simulation','reload_error','title'].includes(k)).map(([k,v])=>`${k}=${v}`).join('  ');
  state.textContent=`${meta.title||meta.game_id||'Mosaico game'}\nLogic ${meta.simulation.logic_fps.toFixed(1)} Hz  Raster ${meta.host_render_ms.toFixed(2)} ms  PNG ${meta.host_encode_ms.toFixed(2)} ms\n${fields}`}
  finally{busy=false}}
-pause.onclick=()=>control(paused?'resume':'pause');step.onclick=()=>control('step');reset.onclick=()=>control('reset');speed.onchange=()=>control('speed:'+speed.value);shot.onclick=()=>{const canvas=document.createElement('canvas'),c=canvas.getContext('2d');canvas.width=canvas.height=480;c.beginPath();c.roundRect(0,0,480,480,60);c.clip();c.drawImage(img,0,0,480,480);const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download='mosaico-game.png';a.click()};record.onclick=async()=>{if(!metaRecording()){await control('record');record.textContent='Stop record'}else{await control('record');const a=document.createElement('a');a.href='/api/v1/recording';a.download='scenario.json';a.click();record.textContent='Record'}};
+pause.onclick=()=>control(paused?'resume':'pause');step.onclick=()=>control('step');reset.onclick=()=>control('reset');speed.onchange=()=>control('speed:'+speed.value);shot.onclick=()=>{const canvas=document.createElement('canvas'),c=canvas.getContext('2d');canvas.width=surfaceWidth;canvas.height=surfaceHeight;c.drawImage(img,0,0,surfaceWidth,surfaceHeight);const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download='mosaico-game.png';a.click()};record.onclick=async()=>{if(!metaRecording()){await control('record');record.textContent='Stop record'}else{await control('record');const a=document.createElement('a');a.href='/api/v1/recording';a.download='scenario.json';a.click();record.textContent='Record'}};
 function metaRecording(){return record.textContent==='Stop record'}
 let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()}requestAnimationFrame(animate)}requestAnimationFrame(animate);
-</script></body></html>""".encode("utf-8")
+</script></body></html>""".replace("__WIDTH__", str(int(initial_metadata["width"]))).replace(
+        "__HEIGHT__", str(int(initial_metadata["height"]))).encode("utf-8")
     def page_bytes() -> bytes:
         if preview_html is not None and preview_html.is_file():
             return preview_html.read_bytes()
@@ -505,6 +575,9 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                 "paused": simulation["paused"], "speed": simulation["speed"],
                 "logic_fps": simulation["ticks"] / elapsed,
                 "recording": simulation["recording"]}}
+        def locked_metadata(self) -> dict[str, object]:
+            with runtime.lock:
+                return self.metadata()
         def do_GET(self) -> None:
             if self.path.startswith("/api/v1/frame") or self.path.startswith("/frame"):
                 with runtime.lock:
@@ -512,17 +585,23 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                     metadata = self.metadata()
                 encode_started = time.perf_counter_ns()
                 body = _rgb565_png_bytes(pixels, width, height)
-                runtime.note_encode_ns(time.perf_counter_ns() - encode_started)
+                with runtime.lock:
+                    runtime.note_encode_ns(time.perf_counter_ns() - encode_started)
                 content_type = "image/png"
             elif self.path.startswith("/api/v1/info"):
                 body = json.dumps({"abi": 1, "endpoints": ["info","state","frame","input","control","recording"],
                     "controls": ["pause","resume","step","reset","speed","record"]}).encode()
-                metadata, content_type = self.metadata(), "application/json"
+                metadata, content_type = self.locked_metadata(), "application/json"
             elif self.path.startswith("/api/v1/state"):
-                metadata = self.metadata(); body = json.dumps(metadata).encode(); content_type="application/json"
+                metadata = self.locked_metadata(); body = json.dumps(metadata).encode(); content_type="application/json"
             elif self.path.startswith("/api/v1/recording"):
-                metadata = self.metadata()
-                body = json.dumps({"events": simulation["events"]}, indent=2).encode()
+                with runtime.lock:
+                    metadata = self.metadata()
+                    body = json.dumps({"events": simulation["events"],
+                        "initial_state": simulation.get("recording_initial_state"),
+                        "duration_ticks": (simulation["ticks"] if simulation["recording"]
+                            else simulation["recording_end"]) - simulation["recording_start"]},
+                        indent=2).encode()
                 content_type = "application/json"
             elif self.path.startswith("/sfx/"):
                 from urllib.parse import unquote
@@ -531,11 +610,11 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                 wav = Path(project) / "assets_src" / name if project else Path()
                 if (name.endswith(".wav") and name.replace("_", "").removesuffix(".wav").isalnum()
                         and wav.is_file()):
-                    body, metadata, content_type = wav.read_bytes(), self.metadata(), "audio/wav"
+                    body, metadata, content_type = wav.read_bytes(), self.locked_metadata(), "audio/wav"
                 else:
                     self.send_error(404); return
             else:
-                body, metadata, content_type = page_bytes(), self.metadata(), "text/html; charset=utf-8"
+                body, metadata, content_type = page_bytes(), self.locked_metadata(), "text/html; charset=utf-8"
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
@@ -546,84 +625,99 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
             except (BrokenPipeError, ConnectionResetError):
                 return
         def do_POST(self) -> None:
-            length = min(int(self.headers.get("Content-Length", "0")), 65536)
-            try: value = json.loads(self.rfile.read(length) or b"{}")
-            except (ValueError, TypeError): self.send_error(400); return
-            if self.path == "/api/v1/input":
-                previous_actions = simulation["actions"]
-                simulation["actions"] = {key: bool(value.get(key, False))
-                    for key in ("left", "right", "jump", "back", "fire",
-                                "sprint", "strafe_left", "strafe_right")}
-                incoming = {int(item.get("track", 0)): item
-                            for item in value.get("pointers", [])[:2]}
-                if hasattr(runtime, "pointer"):
-                    with runtime.lock:
-                        for track, old in simulation["pointers"].items():
-                            if track not in incoming:
-                                runtime.pointer(track, int(old["x"]), int(old["y"]), False)
-                        for track, point in incoming.items():
-                            runtime.pointer(track, int(point["x"]), int(point["y"]), True)
-                        imu = value.get("imu")
-                        if isinstance(imu, dict) and hasattr(runtime, "imu"):
-                            runtime.imu(float(imu.get("x", 0)), float(imu.get("y", 0)),
-                                        float(imu.get("z", 0)))
-                        for item in value.get("actions", [])[:16]:
-                            runtime.action(int(item.get("code", 0)),
-                                           bool(item.get("pressed", True)))
-                        runtime.action(5, simulation["actions"]["back"])
-                        runtime.action(6, simulation["actions"]["fire"])
-                        runtime.action(7, simulation["actions"]["sprint"])
-                        runtime.action(8, simulation["actions"]["strafe_left"])
-                        runtime.action(9, simulation["actions"]["strafe_right"])
-                if simulation["recording"]:
-                    for name, pressed in simulation["actions"].items():
-                        if pressed != previous_actions.get(name, False):
-                            simulation["events"].append({"frame": simulation["ticks"],
-                                "type": "action", "code": name, "pressed": pressed})
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= 65536:
+                    raise ValueError("invalid request length")
+                value = json.loads(self.rfile.read(length))
+                if not isinstance(value, dict):
+                    raise ValueError("request must be an object")
+                if self.path == "/api/v1/input":
+                    value = _preview_input(value, max_pointers)
+                elif self.path == "/api/v1/control":
+                    command = value.get("command")
+                    if command not in {"pause", "resume", "step", "reset", "continue", "record",
+                                       "speed:.25", "speed:0.25", "speed:.5", "speed:0.5",
+                                       "speed:1", "speed:1.0", "speed:2", "speed:2.0"}:
+                        raise ValueError("unsupported control")
+                else:
+                    self.send_error(404); return
+            except (ValueError, TypeError, OverflowError):
+                self.send_error(400); return
+
+            with runtime.lock:
+                def record(event: dict[str, object]) -> None:
+                    if simulation["recording"]:
+                        simulation["events"].append({
+                            "frame": simulation["ticks"] - simulation["recording_start"], **event})
+                def action(code: int, pressed: bool) -> None:
+                    runtime.action(code, pressed)
+                    record({"type": "action", "code": code, "pressed": pressed})
+                if self.path == "/api/v1/input":
+                    incoming = value["pointers"]
+                    for name, pressed in value["actions"].items():
+                        if pressed != simulation["actions"][name]:
+                            action(ACTION_CODES[name], pressed)
+                    simulation["actions"] = value["actions"]
+                    for code, pressed in value["explicit"]:
+                        action(code, pressed)
+                        for name in HELD_ACTIONS:
+                            if ACTION_CODES[name] == code:
+                                simulation["actions"][name] = pressed
                     for track, old in simulation["pointers"].items():
                         if track not in incoming:
-                            simulation["events"].append({"frame": simulation["ticks"],
-                                "type": "pointer", "track": track, "x": int(old["x"]),
-                                "y": int(old["y"]), "pressed": False})
+                            runtime.pointer(track, old["x"], old["y"], False)
+                            record({"type": "pointer", "track": track, **old, "pressed": False})
                     for track, point in incoming.items():
-                        old = simulation["pointers"].get(track)
-                        if old != point:
-                            simulation["events"].append({"frame": simulation["ticks"],
-                                "type": "pointer", "track": track, "x": int(point["x"]),
-                                "y": int(point["y"]), "pressed": True})
-                    if isinstance(value.get("imu"), dict):
-                        simulation["events"].append({"frame": simulation["ticks"],
-                            "type": "imu", **value["imu"]})
-                simulation["pointers"] = incoming
-            elif self.path == "/api/v1/control":
-                command = str(value.get("command", ""))
-                if command == "pause": simulation["paused"] = True
-                elif command == "resume": simulation["paused"] = False
-                elif command == "step":
-                    with runtime.lock: runtime.step(False, False, False)
-                elif command == "reset":
-                    with runtime.lock:
-                        if hasattr(runtime, "control"): runtime.control(3)
-                        else: runtime.step(False,False,False,restart=True)
-                elif command == "continue":
-                    with runtime.lock: runtime.step(False,False,False,restart=True)
-                elif command.startswith("speed:"):
-                    speed=float(command.split(":",1)[1])
-                    if speed in (.25,.5,1.0,2.0): simulation["speed"] = speed
-                elif command == "record":
-                    if not simulation["recording"]: simulation["events"] = []
-                    simulation["recording"] = not simulation["recording"]
-                else: self.send_error(400); return
-                if simulation["recording"] and command not in {"record"}:
-                    event = command.split(":", 1)[0]
-                    if event in {"pause", "resume", "step", "reset"}:
-                        simulation["events"].append({"frame": simulation["ticks"],
-                                                     "type": event})
-            else: self.send_error(404); return
-            body=json.dumps(self.metadata()).encode();self.send_response(200)
-            self.send_header("Content-Type","application/json");self.send_header("Content-Length",str(len(body)))
+                        if point != simulation["pointers"].get(track):
+                            runtime.pointer(track, point["x"], point["y"], True)
+                            record({"type": "pointer", "track": track, **point, "pressed": True})
+                    simulation["pointers"] = incoming
+                    if value["imu"] is not None:
+                        imu = value["imu"]
+                        runtime.imu(imu["x"], imu["y"], imu["z"])
+                        record({"type": "imu", **imu})
+                else:
+                    if command in {"pause", "resume"}:
+                        simulation["paused"] = command == "pause"
+                        runtime.control(1 if command == "pause" else 2)
+                        record({"type": command})
+                    elif command == "step":
+                        record({"type": "step"})
+                        if simulation["paused"]:
+                            runtime.control(2)
+                        actions = simulation["actions"]
+                        runtime.step(actions["left"], actions["right"], actions["jump"])
+                        simulation["ticks"] += 1
+                        if simulation["paused"]:
+                            runtime.control(1)
+                    elif command == "reset":
+                        runtime.control(3)
+                        record({"type": "reset"})
+                    elif command == "continue":
+                        action(4, True); action(4, False)
+                    elif command.startswith("speed:"):
+                        simulation["speed"] = float(command.split(":", 1)[1])
+                    elif command == "record":
+                        simulation["recording"] = not simulation["recording"]
+                        simulation["recording_end"] = simulation["ticks"]
+                        if simulation["recording"]:
+                            simulation["events"] = []
+                            simulation["recording_start"] = simulation["ticks"]
+                            simulation["recording_initial_state"] = runtime.metadata()
+                            if simulation["paused"]:
+                                record({"type": "pause"})
+                            for name, pressed in simulation["actions"].items():
+                                if pressed:
+                                    record({"type": "action", "code": ACTION_CODES[name], "pressed": True})
+                            for track, point in simulation["pointers"].items():
+                                record({"type": "pointer", "track": track, **point, "pressed": True})
+                body = json.dumps(self.metadata()).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
             try:
-                self.end_headers();self.wfile.write(body)
+                self.end_headers(); self.wfile.write(body)
             except (BrokenPipeError, ConnectionResetError):
                 return
         def finish(self) -> None:
@@ -633,7 +727,7 @@ let lastFrame=0;function animate(now){if(now-lastFrame>=32){lastFrame=now;tick()
                 return
         def log_message(self, fmt: str, *args: object) -> None:
             return
-    print(json.dumps({"preview_url": f"http://{listen}:{port}/", **runtime.metadata()}), flush=True)
+    print(json.dumps({"preview_url": f"http://{listen}:{port}/", **initial_metadata}), flush=True)
     ThreadingHTTPServer((listen, port), Handler).serve_forever()
 
 def main() -> int:

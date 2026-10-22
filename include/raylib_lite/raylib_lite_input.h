@@ -18,6 +18,9 @@ typedef enum {
     RAYLIB_LITE_INPUT_JOYSTICK,
     RAYLIB_LITE_INPUT_IMU,
     RAYLIB_LITE_INPUT_ATTACHED,
+    /* Whole input stream detached: game_app clears its facade/action states.
+     * There is no per-device identity in this ABI; applications cancel their
+     * own gesture state in on_event. Not an ordinary pointer-up/click. */
     RAYLIB_LITE_INPUT_DETACHED,
 } raylib_lite_input_type_t;
 

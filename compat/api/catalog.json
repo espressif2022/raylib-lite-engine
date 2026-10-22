@@ -7,6 +7,7 @@
       "entries": [
         "raylib_lite_action_apply_event",
         "raylib_lite_action_begin_frame",
+        "raylib_lite_action_cancel",
         "raylib_lite_action_contact",
         "raylib_lite_action_contact_count",
         "raylib_lite_action_down",
@@ -21,7 +22,7 @@
       ],
       "ownership": "静态动作状态；事件与 zones 在调用时读取/复制，不拥有设备。",
       "failure": "动作越界返回 false；超过配置容量的区域不会扩大静态存储。",
-      "cleanup": "reset 清除状态；边沿按 begin_frame 消费。",
+      "cleanup": "reset 清除状态和配置；cancel/DETACHED 立即取消整个输入流的 held/边沿，保留 bindings，不伪造 release。",
       "boundary": "输入映射，不承接 Board 生命周期。",
       "tests": [
         "tests/test_game_action.py"
@@ -373,6 +374,7 @@
         "raylib_lite_raylib_begin_drawing",
         "raylib_lite_raylib_begin_mode2_d",
         "raylib_lite_raylib_begin_scissor_mode",
+        "raylib_lite_raylib_cancel_input",
         "raylib_lite_raylib_check_collision_circle_rec",
         "raylib_lite_raylib_check_collision_circles",
         "raylib_lite_raylib_check_collision_point_circle",
@@ -914,7 +916,7 @@
         "src/idf/raylib_lite_save_nvs.c"
       ],
       "ownership": "对象拥有 pending payload；storage、namespace/key 与回调 context 借用。",
-      "failure": "init/load/request/flush 返回 result；失败不得视为已持久化。",
+      "failure": "read/CRC/version/migration 错误返回 result 并保留 defaults；写失败保留 dirty 可重试；迁移仅成功才提交到输出。",
       "cleanup": "退出前 force flush，成功或明确处理失败后再释放 storage context。",
       "boundary": "便携 save 核心与 NVS backend 分离。",
       "tests": [
@@ -939,9 +941,9 @@
         "src/scene/raylib_lite_scene.c"
       ],
       "ownership": "固定容量栈借用 scene 回调表与 context。",
-      "failure": "push/pop/replace/event 返回 bool；空栈与满栈按入口处理。",
-      "cleanup": "pop/replace 回调 exit；所有借用 context 在场景退出前有效。",
-      "boundary": "通用场景栈与游戏自有场景切换可能重复，需先证明替代生命周期。",
+      "failure": "非法栈深/满栈/每轮延迟队列预算满时返回 false；回调内 true 表示请求已接受并将在本次最外层 dispatch 返回前提交。",
+      "cleanup": "exit 在当前 event/update/render 回调全部返回后执行；外部 pop/replace 即时执行；生命周期重入延迟且有界。",
+      "boundary": "串行单 owner；同栈嵌套 dispatch 忽略，init/直接改栈不允许发生在回调期间；结构变化要求重新编译调用者。",
       "tests": [
         "tests/test_scene_ui_behavior.py",
         "tests/test_scene_behavior.c",
@@ -982,7 +984,9 @@
       "entries": [
         "raylib_lite_ui_action",
         "raylib_lite_ui_add",
+        "raylib_lite_ui_cancel_input",
         "raylib_lite_ui_draw",
+        "raylib_lite_ui_draw_font",
         "raylib_lite_ui_init",
         "raylib_lite_ui_pointer"
       ],
@@ -990,13 +994,14 @@
         "src/ui/raylib_lite_ui.c"
       ],
       "ownership": "ui 对象拥有固定容量节点；text/click context 借用。",
-      "failure": "add/pointer/action 返回 bool；容量与指针数受限；action 只选择可见按钮，失效焦点清除，方向参数按符号解释。",
-      "cleanup": "无析构；停止事件/绘制后释放借用 text/context。",
+      "failure": "容量不足 add 返回 false；字体绘制返回 result。输入 callback 通过 init/add/cancel/递归输入重建 UI 时终止旧分发；UI 对象须存活到函数返回。",
+      "cleanup": "节点字符串/context 借用；draw_font 仅在调用期间借用字体；cancel_input 清空捕获、焦点和 pressed，不触发 click。",
       "boundary": "模型节点中性；现有 draw 实现仍依赖兼容 renderer，需审查边界。",
       "tests": [
+        "tests/test_platform_dependency_boundaries.py",
         "tests/test_scene_ui_behavior.py",
         "tests/test_ui_behavior.c",
-        "tests/test_platform_dependency_boundaries.py"
+        "tests/test_ui_font.py"
       ],
       "test_gaps": "已验证半开命中、多指针释放/容量复用、重复释放、隐藏/失效焦点、方向符号/极值、重置和 facade 绘制调用；实际像素、设备输入及真实游戏迁移未验证。点击仍按上次采样和释放点，不保证原始按下点捕获。",
       "usage_role": "review",

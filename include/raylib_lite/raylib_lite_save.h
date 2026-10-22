@@ -49,8 +49,14 @@ typedef struct {
 
 raylib_lite_result_t raylib_lite_save_init(
     raylib_lite_save_t *save, const raylib_lite_save_config_t *config);
+/* Missing data returns OK with defaults (or zeros). Read/validation/migration
+ * failures return their error and retain defaults. Migration receives an
+ * aligned temporary destination initialized from defaults, committed only on
+ * success; old_data is a byte blob and must be decoded/copied before casting.
+ * Loading does not persist migration automatically. Call request/flush to save. */
 raylib_lite_result_t raylib_lite_save_load(
     raylib_lite_save_t *save, void *payload, const void *defaults);
+/* The debounce deadline saturates at UINT64_MAX instead of wrapping early. */
 raylib_lite_result_t raylib_lite_save_request(
     raylib_lite_save_t *save, const void *payload, uint64_t now_ms);
 raylib_lite_result_t raylib_lite_save_flush(

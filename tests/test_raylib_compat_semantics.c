@@ -145,6 +145,26 @@ static void text_format_keeps_four_recent_results(void)
 
 }
 
+static void cancelled_input_never_becomes_a_click(void)
+{
+    raylib_lite_raylib_inject_key(KEY_SPACE,true);
+    raylib_lite_raylib_inject_key(KEY_ENTER,true);
+    raylib_lite_raylib_inject_key(KEY_ENTER,false);
+    raylib_lite_raylib_inject_pointer(7,2,3,true);
+    raylib_lite_raylib_inject_imu(1,2,3);
+    raylib_lite_raylib_cancel_input();
+    assert(!IsKeyDown(KEY_SPACE) && !IsKeyPressed(KEY_SPACE) && !IsKeyReleased(KEY_SPACE));
+    assert(!IsKeyPressed(KEY_ENTER) && !IsKeyReleased(KEY_ENTER));
+    assert(!IsMouseButtonDown(MOUSE_BUTTON_LEFT));
+    assert(!IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !IsMouseButtonReleased(MOUSE_BUTTON_LEFT));
+    assert(GetTouchPointCount()==0);
+    Vector3 imu=raylib_lite_raylib_get_imu_acceleration();
+    assert(imu.x==0 && imu.y==0 && imu.z==0);
+    raylib_lite_raylib_inject_pointer(7,2,3,true);
+    assert(IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
+    raylib_lite_raylib_cancel_input();
+}
+
 int main(void)
 {
     raylib_lite_clock_t clock = {.monotonic_us = fake_now, .sleep_for_us = fake_sleep};
@@ -153,6 +173,7 @@ int main(void)
     standalone_loop_ends_one_tick_per_frame();
     attached_runtime_owns_ticks_and_edges();
     fps_is_measured_from_presented_frames();
+    cancelled_input_never_becomes_a_click();
     helpers_match_raylib();
     text_format_keeps_four_recent_results();
     primitive_clip_and_stats_survive_core_migration();

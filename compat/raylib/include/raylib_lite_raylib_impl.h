@@ -55,6 +55,9 @@ int raylib_lite_raylib_get_touch_point_id(int index);
 int raylib_lite_raylib_get_touch_point_count(void);
 Vector3 raylib_lite_raylib_get_imu_acceleration(void);
 
+/* Cancel held keys, contacts, IMU and all edges, without a synthetic release.
+ * The application must separately cancel its own gesture/action state. */
+void raylib_lite_raylib_cancel_input(void);
 /* Platform adapters feed the same state queried through the Raylib API. */
 void raylib_lite_raylib_inject_key(int key, bool pressed);
 void raylib_lite_raylib_inject_action(int action, bool pressed);

@@ -37,6 +37,12 @@ typedef struct {
  * Touch and pointer events never imply a restart: bind a zone or button
  * explicitly. Invalid button actions are ignored. */
 void raylib_lite_action_reset(void);
+/* Cancel all current contacts, held input and pending/published edges without
+ * synthesizing releases. Bindings and threshold remain configured. This takes
+ * effect immediately, including between begin_frame calls. DETACHED applies
+ * the same cancellation to the whole stream (events have no source identity).
+ * Application-owned gesture state must also be cancelled by its event owner. */
+void raylib_lite_action_cancel(void);
 /* Replacing or clearing zones immediately remaps active contacts. */
 void raylib_lite_action_set_zones(const raylib_lite_action_zone_t *zones, size_t count);
 void raylib_lite_action_set_axis_threshold(int32_t threshold);

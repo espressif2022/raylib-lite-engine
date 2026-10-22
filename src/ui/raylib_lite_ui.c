@@ -2,6 +2,7 @@
 #include "raylib_lite_ui.h"
 #include "raylib_lite_raylib_impl.h"
 
+#include <math.h>
 #include <string.h>
 
 static bool hit(raylib_lite_renderer_rect_t rect, float x, float y)
@@ -25,6 +26,7 @@ void raylib_lite_ui_init(raylib_lite_ui_t *ui)
 bool raylib_lite_ui_add(raylib_lite_ui_t *ui, raylib_lite_ui_node_t node)
 {
     if (!ui || ui->count == RAYLIB_LITE_UI_CAPACITY) return false;
+    ui->input_dispatch = NULL;
     node.visible = true;
     ui->nodes[ui->count++] = node;
     return true;
@@ -52,26 +54,26 @@ bool raylib_lite_ui_pointer(raylib_lite_ui_t *ui, int32_t track_id,
     }
 
     bool used = false;
+    uint32_t eligible = 0;
+    float previous_x = pointer ? pointer->x : 0;
+    float previous_y = pointer ? pointer->y : 0;
+    size_t count = ui->count;
+    /* Compute eligibility from the previous sample, then release the track
+     * before callbacks. A callback may reset the entire UI or send new input. */
     if (pointer) {
-        for (size_t i = 0; i < ui->count; ++i) {
+        for (size_t i = 0; i < count; ++i) {
             raylib_lite_ui_node_t *node = &ui->nodes[i];
             if (node->visible && node->type == RAYLIB_LITE_UI_BUTTON &&
                     hit(node->bounds, x, y)) {
                 used = true;
-                if (!down && hit(node->bounds, pointer->x, pointer->y) &&
-                        node->click) {
-                    node->click(node->id, node->context);
-                }
+                if (!down && hit(node->bounds, previous_x, previous_y))
+                    eligible |= UINT32_C(1) << i;
             }
         }
         *pointer = (raylib_lite_ui_pointer_t) {
-            .track_id = track_id,
-            .x = x,
-            .y = y,
-            .active = down,
+            .track_id = track_id, .x = x, .y = y, .active = down,
         };
     }
-
     for (size_t i = 0; i < ui->count; ++i) {
         raylib_lite_ui_node_t *node = &ui->nodes[i];
         if (node->type != RAYLIB_LITE_UI_BUTTON) continue;
@@ -85,12 +87,34 @@ bool raylib_lite_ui_pointer(raylib_lite_ui_t *ui, int32_t track_id,
             }
         }
     }
+    const char dispatch = 0;
+    ui->input_dispatch = &dispatch;
+    for (size_t i = 0; i < count && i < ui->count; ++i) {
+        raylib_lite_ui_node_t *node = &ui->nodes[i];
+        if ((eligible & (UINT32_C(1) << i)) && node->visible &&
+                node->type == RAYLIB_LITE_UI_BUTTON && node->click &&
+                hit(node->bounds, x, y) && hit(node->bounds, previous_x, previous_y)) {
+            node->click(node->id, node->context);
+            if (ui->input_dispatch != &dispatch) return used;
+        }
+    }
+    ui->input_dispatch = NULL;
     return used;
+}
+
+void raylib_lite_ui_cancel_input(raylib_lite_ui_t *ui)
+{
+    if (!ui) return;
+    ui->input_dispatch = NULL;
+    ui->focused = -1;
+    memset(ui->pointers, 0, sizeof(ui->pointers));
+    for (size_t i = 0; i < ui->count; ++i) ui->nodes[i].pressed = false;
 }
 
 bool raylib_lite_ui_action(raylib_lite_ui_t *ui, int direction, bool confirm)
 {
     if (!ui) return false;
+    ui->input_dispatch = NULL;
     if (direction && ui->count) {
         /* Direction is a sign, not a raw index offset. Normalize before
          * addition so extreme values cannot overflow or produce a negative
@@ -147,4 +171,43 @@ void raylib_lite_ui_draw(raylib_lite_ui_t *ui, int font_size)
                 font_size, to_raylib_color(node->text_color));
         }
     }
+}
+
+raylib_lite_result_t raylib_lite_ui_draw_font(raylib_lite_ui_t *ui,
+    const raylib_lite_font_t *font, uint32_t wrap_width)
+{
+    if (!ui || !font) return RAYLIB_LITE_INVALID_ARGUMENT;
+    for (size_t i = 0; i < ui->count; ++i) {
+        const raylib_lite_ui_node_t *node = &ui->nodes[i];
+        if (!node->visible) continue;
+        /* Validate before float-to-int conversion; keep the font coordinate
+         * limit for rectangles as well, including non-finite user bounds. */
+        const float limit = 8388608.0f;
+        raylib_lite_renderer_rect_t b = node->bounds;
+        if (!isfinite(b.x) || !isfinite(b.y) || !isfinite(b.width) ||
+                !isfinite(b.height) || fabsf(b.x) > limit || fabsf(b.y) > limit ||
+                b.width < 0 || b.height < 0 || b.width > limit || b.height > limit)
+            return RAYLIB_LITE_INVALID_SIZE;
+        raylib_lite_text_metrics_t metrics = {0};
+        size_t bytes = node->text ? strlen(node->text) : 0;
+        raylib_lite_result_t result = raylib_lite_font_measure(font,
+            node->text, bytes, wrap_width, &metrics);
+        if (result != RAYLIB_LITE_OK) return result;
+        double x = (double)b.x + ((double)b.width - metrics.width) / 2;
+        double y = (double)b.y + ((double)b.height - metrics.height) / 2;
+        if (x < -limit || x > limit || y < -limit || y > limit)
+            return RAYLIB_LITE_INVALID_SIZE;
+        Color color = to_raylib_color(node->color);
+        if (node->pressed)
+            color = (Color){color.r / 2, color.g / 2, color.b / 2, color.a};
+        if (node->type != RAYLIB_LITE_UI_LABEL)
+            raylib_lite_raylib_draw_rectangle((int)b.x, (int)b.y,
+                (int)b.width, (int)b.height, color);
+        if (bytes) {
+            result = raylib_lite_font_draw(font, node->text, bytes,
+                (int)x, (int)y, wrap_width, node->text_color, NULL);
+            if (result != RAYLIB_LITE_OK) return result;
+        }
+    }
+    return RAYLIB_LITE_OK;
 }

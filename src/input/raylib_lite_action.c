@@ -60,11 +60,10 @@ static raylib_lite_input_contact_t *contact_for(
     return NULL;
 }
 
-void raylib_lite_action_reset(void)
+void raylib_lite_action_cancel(void)
 {
     memset(s_contacts, 0, sizeof(s_contacts));
     memset(s_contact_types, 0, sizeof(s_contact_types));
-    memset(s_zones, 0, sizeof(s_zones));
     memset(s_sources, 0, sizeof(s_sources));
     memset(s_pending_pressed, 0, sizeof(s_pending_pressed));
     memset(s_pending_released, 0, sizeof(s_pending_released));
@@ -72,6 +71,12 @@ void raylib_lite_action_reset(void)
     memset(s_down, 0, sizeof(s_down));
     memset(s_pressed, 0, sizeof(s_pressed));
     memset(s_released, 0, sizeof(s_released));
+}
+
+void raylib_lite_action_reset(void)
+{
+    raylib_lite_action_cancel();
+    memset(s_zones, 0, sizeof(s_zones));
     s_zone_count = 0;
     s_axis_threshold = 250;
 }
@@ -107,6 +112,10 @@ void raylib_lite_action_begin_frame(void)
 void raylib_lite_action_apply_event(const raylib_lite_input_event_t *event)
 {
     if (!event) return;
+    if (event->type == RAYLIB_LITE_INPUT_DETACHED) {
+        raylib_lite_action_cancel();
+        return;
+    }
     if (event->type == RAYLIB_LITE_INPUT_TOUCH ||
             event->type == RAYLIB_LITE_INPUT_POINTER) {
         int32_t track = event->type == RAYLIB_LITE_INPUT_TOUCH ? event->value : 0;

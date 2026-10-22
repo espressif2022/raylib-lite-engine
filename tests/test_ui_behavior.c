@@ -104,6 +104,79 @@ static void focus_navigation_and_invalidation(void)
     assert(raylib_lite_ui_action(&ui,0,true));assert(clicks[1]==0);
 }
 
+static raylib_lite_ui_t *callback_ui;
+static int callback_mode;
+static void mutate_ui(uint16_t id, void *context)
+{
+    (void)id; (void)context;
+    assert(!callback_ui->nodes[0].pressed);
+    ++clicks[0];
+    if (callback_mode == 0) {
+        raylib_lite_ui_init(callback_ui);
+        assert(raylib_lite_ui_add(callback_ui, button(2, 10)));
+        assert(raylib_lite_ui_add(callback_ui, button(3, 10)));
+    } else if (callback_mode == 1) {
+        raylib_lite_ui_cancel_input(callback_ui);
+    } else if (callback_mode == 2) {
+        callback_ui->nodes[1].visible = false;
+    } else if (callback_mode == 3) {
+        assert(raylib_lite_ui_pointer(callback_ui, 77, 15, 15, true));
+    } else {
+        assert(raylib_lite_ui_add(callback_ui, button(2, 10)));
+    }
+}
+static void cancellation_and_callback_mutation(void)
+{
+    raylib_lite_ui_t ui; init_buttons(&ui);
+    assert(raylib_lite_ui_pointer(&ui, 1, 15, 15, true));
+    assert(raylib_lite_ui_pointer(&ui, 2, 35, 15, true));
+    assert(raylib_lite_ui_action(&ui, 1, false));
+    raylib_lite_ui_cancel_input(&ui);
+    assert(ui.focused == -1 && !ui.nodes[0].pressed && !ui.nodes[1].pressed);
+    assert(!raylib_lite_ui_pointer(&ui, 1, 15, 15, false));
+    assert(!raylib_lite_ui_pointer(&ui, 2, 35, 15, false));
+    assert(clicks[0] == 0 && clicks[1] == 0);
+    assert(ui.count == 2 && ui.nodes[0].click == click);
+    assert(raylib_lite_ui_pointer(&ui, 1, 15, 15, true));
+    assert(raylib_lite_ui_pointer(&ui, 1, 15, 15, false));
+    assert(clicks[0] == 1);
+    raylib_lite_ui_cancel_input(NULL);
+    // Overlapping buttons retain their established multi-click behavior.
+    init_buttons(&ui); ui.nodes[1].bounds = ui.nodes[0].bounds;
+    assert(raylib_lite_ui_pointer(&ui, 1, 15, 15, true));
+    assert(raylib_lite_ui_pointer(&ui, 1, 15, 15, false));
+    assert(clicks[0] == 1 && clicks[1] == 1);
+    for (callback_mode = 0; callback_mode < 5; ++callback_mode) {
+        init_buttons(&ui); clicks[2] = clicks[3] = 0;
+        ui.nodes[1].bounds = ui.nodes[0].bounds;
+        ui.nodes[0].click = mutate_ui; callback_ui = &ui;
+        assert(raylib_lite_ui_pointer(&ui, 1, 15, 15, true));
+        assert(raylib_lite_ui_pointer(&ui, 1, 15, 15, false));
+        assert(clicks[0] == 1 && clicks[1] == 0 && clicks[2] == 0 && clicks[3] == 0);
+        assert(ui.input_dispatch == NULL);
+        if (callback_mode == 3) {
+            assert(ui.pointers[0].active && ui.pointers[0].track_id == 77);
+            assert(ui.nodes[0].pressed && ui.nodes[1].pressed);
+        } else if (callback_mode == 0 || callback_mode == 1) {
+            assert(!ui.pointers[0].active && !ui.pointers[1].active);
+        }
+    }
+    init_buttons(&ui); callback_ui = &ui; callback_mode = 0;
+    ui.nodes[0].click = mutate_ui;
+    assert(raylib_lite_ui_action(&ui, 1, true));
+    assert(ui.focused == -1 && ui.nodes[0].id == 2);
+}
+
+/* Font integration has a separate real-renderer pixel oracle. This fixture
+ * retains the existing facade-only checks for the default drawing contract. */
+raylib_lite_result_t raylib_lite_font_measure(const raylib_lite_font_t *font,
+    const char *text, size_t bytes, uint32_t wrap, raylib_lite_text_metrics_t *out)
+{ (void)font; (void)text; (void)bytes; (void)wrap; (void)out; return RAYLIB_LITE_NOT_READY; }
+raylib_lite_result_t raylib_lite_font_draw(const raylib_lite_font_t *font,
+    const char *text, size_t bytes, int x, int y, uint32_t wrap,
+    raylib_lite_renderer_color_t color, raylib_lite_text_metrics_t *out)
+{ (void)font; (void)text; (void)bytes; (void)x; (void)y; (void)wrap; (void)color; (void)out; return RAYLIB_LITE_NOT_READY; }
+
 // Observe facade calls, without claiming glyph pixels or device rendering.
 typedef struct {char kind;int x,y,w,h,size;Color color;const char *text;} draw_t;
 static draw_t draws[8];static size_t draw_count;
@@ -138,5 +211,6 @@ int main(void)
 {
     pointer_edges_and_lifecycle();multi_pointer_capacity_and_reuse();
     focus_navigation_and_invalidation();draw_contract_and_capacity();
+    cancellation_and_callback_mutation();
     puts("ui behavior: ok");return 0;
 }

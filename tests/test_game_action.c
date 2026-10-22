@@ -156,6 +156,34 @@ static void test_contacts_and_zone_replacement(void)
     assert_action(RAYLIB_LITE_ACTION_PAUSE, false, false, false);
 }
 
+static void test_cancel_preserves_bindings_without_release(void)
+{
+    raylib_lite_action_reset();
+    raylib_lite_action_set_zones(direction_zones, 2);
+    raylib_lite_action_set_axis_threshold(700);
+    apply(RAYLIB_LITE_INPUT_TOUCH, 20, 7, true);
+    apply(RAYLIB_LITE_INPUT_BUTTON, 0, RAYLIB_LITE_ACTION_JUMP, true);
+    raylib_lite_action_begin_frame();
+    assert_action(RAYLIB_LITE_ACTION_LEFT, true, true, false);
+    apply(RAYLIB_LITE_INPUT_BUTTON, 0, RAYLIB_LITE_ACTION_JUMP, false);
+    raylib_lite_action_cancel();
+    for (int i=0;i<RAYLIB_LITE_ACTION_COUNT;++i) assert_action(i,false,false,false);
+    assert(raylib_lite_action_contact_count()==0);
+    raylib_lite_action_begin_frame();
+    for (int i=0;i<RAYLIB_LITE_ACTION_COUNT;++i) assert_action(i,false,false,false);
+    apply(RAYLIB_LITE_INPUT_IMU, -500, 0, false);
+    apply(RAYLIB_LITE_INPUT_TOUCH, 120, 9, true);
+    raylib_lite_action_begin_frame();
+    assert_action(RAYLIB_LITE_ACTION_LEFT,false,false,false);
+    assert_action(RAYLIB_LITE_ACTION_RIGHT,true,true,false);
+    apply(RAYLIB_LITE_INPUT_DETACHED, 0, 0, false);
+    raylib_lite_action_begin_frame();
+    assert_action(RAYLIB_LITE_ACTION_RIGHT,false,false,false);
+    apply(RAYLIB_LITE_INPUT_TOUCH, 20, 11, true);
+    raylib_lite_action_begin_frame();
+    assert_action(RAYLIB_LITE_ACTION_LEFT,true,true,false);
+}
+
 int main(void)
 {
     const raylib_lite_action_zone_t zones[] = {
@@ -221,6 +249,7 @@ int main(void)
     raylib_lite_action_begin_frame();
     assert(raylib_lite_action_down(RAYLIB_LITE_ACTION_RIGHT));
 
+    test_cancel_preserves_bindings_without_release();
     test_source_aggregation();
     test_short_taps_and_moves();
     test_contacts_and_zone_replacement();

@@ -56,6 +56,16 @@ static raylib_lite_result_t migrate_v1(uint16_t version, const void *old_data,
     return RAYLIB_LITE_OK;
 }
 
+static raylib_lite_result_t failed_migration(uint16_t version, const void *old_data,
+    size_t old_size, void *new_data, size_t new_size)
+{
+    (void)version; (void)old_data; (void)old_size;
+    payload_v2_t *out=new_data;
+    assert(new_size==sizeof(*out) && out->value==1 && out->extra==2);
+    out->value=999;
+    return RAYLIB_LITE_INVALID_VERSION;
+}
+
 int main(void)
 {
     fake_store_t store = {0};
@@ -109,6 +119,19 @@ int main(void)
     memset(&out, 0, sizeof(out));
     assert(raylib_lite_save_load(&new_save, &out, NULL) == RAYLIB_LITE_OK);
     assert(out.value == 42 && out.extra == 77);
+
+    config.migrate = failed_migration;
+    assert(raylib_lite_save_init(&new_save, &config) == RAYLIB_LITE_OK);
+    assert(raylib_lite_save_load(&new_save, &out, &defaults) == RAYLIB_LITE_INVALID_VERSION);
+    assert(out.value==1 && out.extra==2);
+    assert(raylib_lite_save_init(&new_save, &new_save.config) == RAYLIB_LITE_OK);
+    assert(new_save.config.storage==&storage && new_save.config.payload_size==sizeof(out));
+    unsigned writes=store.writes;
+    assert(raylib_lite_save_request(&new_save,&value,UINT64_MAX-50)==RAYLIB_LITE_OK);
+    assert(raylib_lite_save_flush(&new_save,UINT64_MAX-1,false)==RAYLIB_LITE_OK);
+    assert(new_save.dirty && (unsigned)store.writes==writes);
+    assert(raylib_lite_save_flush(&new_save,UINT64_MAX,false)==RAYLIB_LITE_OK);
+    assert(!new_save.dirty && (unsigned)store.writes==writes+1);
 
     store.fail_write = 1;
     value.value = 99;
