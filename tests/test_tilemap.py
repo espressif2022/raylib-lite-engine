@@ -20,7 +20,7 @@ class TilemapTests(unittest.TestCase):
                 f"-I{ROOT / 'include/raylib_lite'}",
                 str(ROOT / "tests/test_tilemap.c"),
                 str(ROOT / "src/renderer/raylib_lite_tilemap.c"),
-                "-o", str(executable),
+                "-lm", "-o", str(executable),
             ]
             subprocess.run(command, check=True)
             result = subprocess.run(

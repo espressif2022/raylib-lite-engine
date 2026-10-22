@@ -5,6 +5,7 @@
 #include "raylib_lite_game_module.h"
 #include "raylib_lite_raylib_impl.h"
 #include "raylib_lite_host_video.h"
+#include "raylib_lite_assets.h"
 
 _Static_assert(RAYLIB_LITE_HOST_GAME_ABI_V1 == RAYLIB_LITE_GAME_MODULE_ABI_V1,
                "Host and example module ABI versions must match");
@@ -70,6 +71,9 @@ void *raylib_lite_host_game_create_v1(const char *asset_root)
     if (!instance->state) { free(instance); return NULL; }
     instance->module = module;
     if (module->initialize && module->initialize(instance->state, asset_root)) {
+        if (module->shutdown) module->shutdown(instance->state);
+        raylib_lite_host_video_shutdown();
+        raylib_lite_assets_unmount();
         free(instance->state); free(instance); return NULL;
     }
     uint16_t width = module->descriptor.width, height = module->descriptor.height;
@@ -85,6 +89,7 @@ void raylib_lite_host_game_destroy_v1(void *value)
     if (!instance) return;
     if (instance->module->shutdown) instance->module->shutdown(instance->state);
     raylib_lite_host_video_shutdown();
+    raylib_lite_assets_unmount();
     free(instance->state);
     free(instance);
 }

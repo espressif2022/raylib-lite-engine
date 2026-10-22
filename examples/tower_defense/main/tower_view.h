@@ -26,4 +26,4 @@ void tower_view_add_explosion(tower_effect_t *effects, size_t count, float x, fl
 void tower_view_tick_effects(tower_effect_t *effects, size_t count);
 void tower_view_render(const tower_view_t *view);
 /* Screen pixels to the model's 480x480 field coordinates for the current layout. */
-void tower_view_map_pointer(float x, float y, float *field_x, float *field_y);
+void tower_view_map_pointer(const tower_game_t *game, float x, float y, float *field_x, float *field_y);

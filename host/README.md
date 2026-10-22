@@ -43,7 +43,7 @@ Host 显示实现通过 `raylib_lite_video_backend_t` 接入通用 framebuffer p
 2. 若有 `assets_src/game_assets.json`，调用 `tools/pack_game_assets.py`；
 3. 把清单里的源码、`host/host_module_bridge.c`、Host 视频/时钟、Raylib port、渲染器、tilemap 和 fx 编成 `.so` / `.dll`。
 
-这次链接不包含音频混音、scene、UI、save、runner 和 mmap 资源后端。游戏模块若调用这些入口，Host 链接会缺符号；设备固件编的是完整组件。模块头在 `examples_common`，Host ABI 头在 `host/include/`，都不在组件公开的 `include/raylib_lite/`。发布包不含 `host/`，`game_cli.py sim` 只能在 git checkout 里运行。
+Host 与设备从 `src/portable_sources.json` 共用 portable 服务清单，包含 action、资源核心、音频混音、scene、UI、save 和 runner。Host 使用文件目录资源后端，按名称/ID 加载、内存注册和 stream 复用相同核心；生成目录为扁平命名空间，卸载前必须释放所有使用者。物理音频输出、NVS、板级 mmap 仍由平台提供，编入 mixer 不代表 Host 已有扬声器输出。模块头在 `examples_common`，Host ABI 头在 `host/include/`，都不在组件公开的 `include/raylib_lite/`。发布包不含 `host/`，`game_cli.py sim` 只能在 git checkout 里运行。
 
 不要写 `asset_prepare` 或 `tick_hz`：Host 会忽略它们。
 

@@ -18,7 +18,7 @@ CORE_FILES = {"CMakeLists.txt", "Kconfig", "idf_component.yml", "LICENSE", "VERS
               "THIRD_PARTY_NOTICES.md"}
 DEVELOPMENT_DOCS = "docs/development/"
 CORE_TREES = ("src/", "include/", "compat/", "docs/", "third_party/raylib/")
-TOOLS = {"tools/pack_game_assets.py", "tools/mtx2_codec.py",
+TOOLS = {"tools/pack_game_assets.py", "tools/pack_font.py", "tools/mtx2_codec.py",
          "tools/cmake/raylib_lite_native_assets.cmake"}
 
 

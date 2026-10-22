@@ -156,13 +156,24 @@ void living_world_reset(living_world_t *world)
 {
     memset(world,0,sizeof(*world));
     world->effects_level=1;
+    world->auto_pan=true;
     enter_scene(world,LIVING_SCENE_OCEAN);
 }
 
 void living_world_pointer(living_world_t *world,float x,float y,bool pressed)
 {
     if(!world)return;
-    if(pressed&&!world->dragging&&y<=60.0f&&x<=310.0f){
+    /* A UI gesture owns the contact until release; motion must not toggle again. */
+    if(world->ui_touch){
+        if(!pressed){world->ui_touch=false;world->dragging=false;}
+        return;
+    }
+    if(pressed&&!world->dragging&&y>=12.0f&&y<=60.0f&&x>=330.0f&&x<=464.0f){
+        world->auto_pan=!world->auto_pan;
+        world->yaw_velocity=0;world->pitch_velocity=0;
+        world->ui_touch=true;world->idle_ticks=0;return;
+    }
+    if(pressed&&!world->dragging&&y>=12.0f&&y<=60.0f&&x>=16.0f&&x<=310.0f){
         world->effects_level=(uint8_t)((world->effects_level+1U)%3U);
         world->ui_touch=true;world->dragging=false;
         world->last_x=x;world->last_y=y;world->idle_ticks=0;return;
@@ -177,7 +188,9 @@ void living_world_pointer(living_world_t *world,float x,float y,bool pressed)
         world->ui_touch=true;world->dragging=false;
         world->last_x=x;world->last_y=y;world->idle_ticks=0;return;
     }
-    if(!pressed&&world->ui_touch){world->ui_touch=false;world->dragging=false;return;}
+    if(!pressed&&!world->auto_pan){
+        world->yaw_velocity=0;world->pitch_velocity=0;
+    }
     if(!pressed&&world->dragging&&!world->ui_touch){
         /* Device release events may arrive as (0,0). Tap at the last contact. */
         float tap_x=world->last_x,tap_y=world->last_y;
@@ -243,7 +256,7 @@ void living_world_update(living_world_t *world)
         if(world->pitch_velocity<.01f&&world->pitch_velocity>-.01f)world->pitch_velocity=0;
         if(world->scene==LIVING_SCENE_SUNRISE){
             clamp_sunrise_cone(world);
-            if(world->idle_ticks>90&&world->yaw_velocity==0){
+            if(world->auto_pan&&world->idle_ticks>90&&world->yaw_velocity==0){
                 float phase=(float)(world->tick%400U)/100.0f;
                 float triangle=phase<2.0f?phase-1.0f:3.0f-phase;
                 world->yaw=triangle*SUNRISE_YAW_LIMIT*.72f;
@@ -252,7 +265,7 @@ void living_world_update(living_world_t *world)
         }else if(world->scene==LIVING_SCENE_AURORA){
             living_aurora_look(&world->yaw,&world->pitch,&world->yaw_velocity,
                                    &world->pitch_velocity,0,0);
-            if(world->idle_ticks>90&&world->yaw_velocity==0){
+            if(world->auto_pan&&world->idle_ticks>90&&world->yaw_velocity==0){
                 float phase=(float)(world->tick%400U)/100.0f;
                 float triangle=phase<2.0f?phase-1.0f:3.0f-phase;
                 world->yaw=triangle*AURORA_YAW_LIMIT*.72f;
@@ -262,7 +275,7 @@ void living_world_update(living_world_t *world)
         }else if(world->scene==LIVING_SCENE_OCEAN){
             living_ocean_look(&world->yaw,&world->pitch,&world->yaw_velocity,
                                   &world->pitch_velocity,0,0);
-            if(world->idle_ticks>90&&world->yaw_velocity==0){
+            if(world->auto_pan&&world->idle_ticks>90&&world->yaw_velocity==0){
                 float phase=(float)(world->tick%400U)/100.0f;
                 float triangle=phase<2.0f?phase-1.0f:3.0f-phase;
                 world->yaw=triangle*OCEAN_YAW_LIMIT*.72f;
@@ -272,7 +285,7 @@ void living_world_update(living_world_t *world)
         }else{
             if(world->pitch < -28.0f)world->pitch=-28.0f;
             if(world->pitch > 24.0f)world->pitch=24.0f;
-            if(world->idle_ticks>90)world->yaw=wrap_degrees(world->yaw+0.08f);
+            if(world->auto_pan&&world->idle_ticks>90)world->yaw=wrap_degrees(world->yaw+0.08f);
         }
     }else if(world->scene==LIVING_SCENE_RAINFOREST)world->yaw=wrap_degrees(world->yaw);
 }

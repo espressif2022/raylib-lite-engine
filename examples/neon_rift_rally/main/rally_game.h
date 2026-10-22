@@ -28,6 +28,12 @@
 #define RALLY_NITRO_MAX 100.0f
 
 typedef enum {
+    RALLY_CONTROL_TOUCH = 0,
+    RALLY_CONTROL_TILT,
+    RALLY_CONTROL_KEYBOARD,
+} rally_control_mode_t;
+
+typedef enum {
     RALLY_PHASE_COUNTDOWN = 0,
     RALLY_PHASE_PLAYING,
     RALLY_PHASE_FINISHED,
@@ -160,6 +166,7 @@ typedef struct {
 typedef struct {
     /* Track-local motion state.  progress wraps at RALLY_TRACK_LENGTH. */
     uint8_t course_id;
+    rally_control_mode_t control_mode;
     float progress;
     float lateral;
     float lateral_velocity;

@@ -17,6 +17,11 @@
 #include "raylib_lite_native_services.h"
 #include "platform_esp_audio.h"
 
+#ifdef RAYLIB_LITE_NATIVE_REPLAY_ENABLED
+#include "raylib_lite_native_replay.h"
+#include "raylib_lite_debug.h"
+#endif
+
 #ifndef RAYLIB_LITE_NATIVE_SERVICES_ENABLED
 #define RAYLIB_LITE_NATIVE_SERVICES_ENABLED 0
 #endif
@@ -62,6 +67,10 @@ typedef struct {
     void *state;
     raylib_lite_example_board_t *board;
     uint32_t last_render_error_log;
+#ifdef RAYLIB_LITE_NATIVE_REPLAY_ENABLED
+    uint32_t replay_tick;
+    bool replay_finished;
+#endif
 } native_game_t;
 
 static raylib_lite_result_t to_runner_result(esp_err_t error)
@@ -112,6 +121,13 @@ static raylib_lite_result_t game_start(void *user)
     }
     if (GetScreenWidth() != width || GetScreenHeight() != height)
         InitWindow(width, height, game->module->descriptor.title);
+#ifdef RAYLIB_LITE_NATIVE_REPLAY_ENABLED
+    ESP_LOGI(TAG, "replay source_sha256=%s events_sha256=%s duration_ticks=%lu events=%lu",
+             raylib_lite_native_replay_info.source_sha256,
+             raylib_lite_native_replay_info.events_sha256,
+             (unsigned long)raylib_lite_native_replay_info.duration_ticks,
+             (unsigned long)raylib_lite_native_replay_info.event_count);
+#endif
     return RAYLIB_LITE_OK;
 }
 
@@ -123,6 +139,9 @@ static raylib_lite_result_t first_present(void *user)
         ESP_LOGE(TAG, "start board input: %s", esp_err_to_name(error));
         return to_runner_result(error);
     }
+#ifdef RAYLIB_LITE_NATIVE_REPLAY_ENABLED
+    ESP_LOGI(TAG, "replay first_present=ok input_start=ok live_input=ignored");
+#endif
     return s_services ? s_services->first_present() : RAYLIB_LITE_OK;
 }
 
@@ -159,19 +178,46 @@ static void game_event(void *user, const raylib_lite_input_event_t *event)
     game->module->input(game->state, &input);
 }
 
+static void game_stats(void *user);
+
 static void game_update(void *user)
 {
     native_game_t *game = user;
+#ifdef RAYLIB_LITE_NATIVE_REPLAY_ENABLED
+    if (game->replay_finished) return;
+    bool finished = raylib_lite_native_replay_tick(game->replay_tick,
+                                                   game->module, game->state);
+#endif
     if (game->module->update) game->module->update(game->state);
+#ifdef RAYLIB_LITE_NATIVE_REPLAY_ENABLED
+    ++game->replay_tick;
+    if (finished) game->replay_finished = true;
+#endif
 }
 
 static void game_render(void *user)
 {
     native_game_t *game = user;
+#ifdef RAYLIB_LITE_NATIVE_REPLAY_ENABLED
+    if (game->replay_finished && WindowShouldClose()) return;
+#endif
     if (!game->module->render) return;
     int result = game->module->render(game->state);
     if (result != 0 && game->last_render_error_log++ == 0)
         ESP_LOGE(TAG, "game module render returned %d", result);
+#ifdef RAYLIB_LITE_NATIVE_REPLAY_ENABLED
+    if (game->replay_finished) {
+        ESP_LOGI(TAG, "replay complete ticks=%lu", (unsigned long)game->replay_tick);
+        game_stats(game);
+        if (game->module->state_json) {
+            char json[1024] = {0};
+            int count = game->module->state_json(game->state, json, sizeof(json));
+            if (count > 0 && (size_t)count < sizeof(json)) ESP_LOGI(TAG, "replay state_json=%s", json);
+            else ESP_LOGW(TAG, "replay state_json unavailable or exceeds log capacity");
+        }
+        CloseWindow();
+    }
+#endif
 }
 
 static void game_stats(void *user)
@@ -186,6 +232,10 @@ static void game_stats(void *user)
 static void game_stop(void *user)
 {
     native_game_t *game = user;
+#ifdef RAYLIB_LITE_NATIVE_REPLAY_ENABLED
+    /* on_stop runs after game_app records the final rendered frame. */
+    raylib_lite_debug_log(game->module->descriptor.game_id);
+#endif
     if (game->state && game->module->shutdown)
         game->module->shutdown(game->state);
     /* State and embedded assets remain owned by app_main until the Audio
@@ -276,7 +326,13 @@ void app_main(void)
         .target_fps = target_fps,
         .stats_interval = logic_hz * RAYLIB_LITE_NATIVE_STATS_SECONDS,
         .platform = *services,
+#ifdef RAYLIB_LITE_NATIVE_REPLAY_ENABLED
+        /* Keep input workers alive for lifecycle coverage, but only replay may
+         * alter module/facade input state during a comparable capture. */
+        .input = NULL,
+#else
         .input = raylib_lite_example_board_input(board),
+#endif
         .user = &game,
         .on_start = game_start,
         .on_first_present = first_present,
@@ -308,4 +364,9 @@ void app_main(void)
     esp_err_t cleanup = cleanup_board(board);
     if (cleanup != ESP_OK)
         ESP_LOGE(TAG, "board cleanup failed: %s", esp_err_to_name(cleanup));
+#ifdef RAYLIB_LITE_NATIVE_REPLAY_ENABLED
+    ESP_LOGI(TAG, "replay shutdown game_result=%d board_cleanup=%d ticks=%lu complete=%d",
+             (int)error, (int)cleanup, (unsigned long)game.replay_tick,
+             (int)game.replay_finished);
+#endif
 }

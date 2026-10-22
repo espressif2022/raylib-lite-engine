@@ -16,21 +16,12 @@ if(RAYLIB_LITE_WALL_AUDIT AND NOT RAYLIB_LITE_WALL_BENCHMARK)
 endif()
 
 set(_platform_sources "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/clock_esp.c")
-set(_runner_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/runner/raylib_lite_runner.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/runner/raylib_lite_input_queue.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/runner/raylib_lite_runtime_stats.c")
 set(_runtime_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/input/raylib_lite_action.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_debug.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/runtime/raylib_lite_game_app.c"
 )
 set(_asset_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/assets/raylib_lite_assets.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/raylib_lite_assets_mmap.c")
-set(_audio_sources
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/audio/raylib_lite_audio_decode.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/audio/raylib_lite_audio_mixer.c")
 set(_renderer_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_esp.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_raylib.c"
@@ -53,19 +44,29 @@ set(_upstream_raylib_sources
     "${_upstream_raylib_dir}/src/rshapes.c"
     "${_upstream_raylib_dir}/src/rtextures.c"
     "${_upstream_raylib_dir}/src/rtext.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/rcore/raylib_lite_rcore.c")
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/rcore/raylib_lite_rcore.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/rcore/raylib_lite_rcore_assets.c")
 list(APPEND _platform_sources "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/raylib_lite_rcore_posix.c")
 set(_feature_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_tilemap.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/scene/raylib_lite_scene.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/ui/raylib_lite_ui.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/fx/raylib_lite_fx.c"
-    "${RAYLIB_LITE_ENGINE_ROOT}/src/save/raylib_lite_save.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/raylib_lite_save_nvs.c")
 
+# One portable service inventory is shared by Host and ESP-IDF builds.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/portable_sources.json")
+file(READ "${RAYLIB_LITE_ENGINE_ROOT}/src/portable_sources.json" _portable_json)
+string(JSON _portable_count LENGTH "${_portable_json}")
+math(EXPR _portable_last "${_portable_count} - 1")
+set(_portable_sources)
+foreach(_index RANGE 0 ${_portable_last})
+    string(JSON _source GET "${_portable_json}" ${_index})
+    list(APPEND _portable_sources "${RAYLIB_LITE_ENGINE_ROOT}/${_source}")
+endforeach()
+
 idf_component_register(
-    SRCS ${_platform_sources} ${_runner_sources} ${_runtime_sources}
-         ${_asset_sources} ${_audio_sources} ${_renderer_sources}
+    SRCS ${_portable_sources} ${_platform_sources} ${_runtime_sources}
+         ${_asset_sources} ${_renderer_sources}
          ${_raylib_sources} ${_feature_sources} ${_upstream_raylib_sources}
     INCLUDE_DIRS
         "${RAYLIB_LITE_ENGINE_ROOT}/include/raylib_lite"

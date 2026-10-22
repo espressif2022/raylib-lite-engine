@@ -33,3 +33,14 @@ if(DEFINED RAYLIB_LITE_EXAMPLE_STATS_SECONDS)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE
         RAYLIB_LITE_NATIVE_STATS_SECONDS=${RAYLIB_LITE_EXAMPLE_STATS_SECONDS})
 endif()
+
+# Replay is a build-local instrumentation input, never a production default.
+if(RAYLIB_LITE_EXAMPLE_REPLAY)
+    get_filename_component(_native_replay "${RAYLIB_LITE_EXAMPLE_REPLAY}" ABSOLUTE
+                           BASE_DIR "${CMAKE_SOURCE_DIR}")
+    if(NOT EXISTS "${_native_replay}" OR NOT _native_replay MATCHES "\\.c$")
+        message(FATAL_ERROR "RAYLIB_LITE_EXAMPLE_REPLAY must name generated replay C")
+    endif()
+    target_sources(${COMPONENT_LIB} PRIVATE "${_native_replay}")
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE RAYLIB_LITE_NATIVE_REPLAY_ENABLED=1)
+endif()

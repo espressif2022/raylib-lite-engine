@@ -82,11 +82,12 @@ static void draw_enemy(raylib_lite_atlas_t atlas,const shooter_actor_t *enemy)
     static const Color colors[]={
         {255,105,62,255},{255,54,173,255},{72,238,170,255}
     };
-    float size=enemy->elite?72.0f:(enemy->kind==0?43.0f:(enemy->kind==1?49.0f:55.0f));
-    DrawEllipse((int)enemy->x+14,(int)enemy->y+17,size*.43f,size*.31f,
+    float size=enemy->boss?96.0f:enemy->elite?72.0f:(enemy->kind==0?43.0f:(enemy->kind==1?49.0f:55.0f));
+    float hit_size=enemy->boss?68.0f:28.0f;
+    DrawEllipse((int)(enemy->x+hit_size*.5f),(int)(enemy->y+hit_size*.5f+3),size*.43f,size*.31f,
                 (Color){12,10,36,255});
-    draw_sprite(atlas,ids[enemy->kind],enemy->x+(28.0f-size)*.5f,
-                enemy->y+(28.0f-size)*.5f,size,size);
+    draw_sprite(atlas,ids[enemy->kind],enemy->x+(hit_size-size)*.5f,
+                enemy->y+(hit_size-size)*.5f,size,size);
     if(enemy->elite)
         draw_text("ACE",(int)enemy->x+3,(int)enemy->y-22,10,C_GOLD);
     if(enemy->kind>0&&enemy->hp){
@@ -110,6 +111,19 @@ static void draw_danger_cues(const shooter_game_t *game)
 
 static void draw_projectiles(const shooter_game_t *game)
 {
+    for(unsigned i=0;i<SHOOTER_MAX_ENEMY_BULLETS;++i) if(game->enemy_bullets[i].active) {
+        const shooter_actor_t *b=&game->enemy_bullets[i];
+        DrawCircle((int)b->x+4,(int)b->y+4,6,C_GOLD);
+        DrawCircle((int)b->x+4,(int)b->y+4,3,(Color){80,25,10,255});
+    }
+    for(unsigned i=0;i<SHOOTER_MAX_ENEMIES;++i) {
+        const shooter_actor_t *e=&game->enemies[i];
+        if(e->active && e->y>35 && e->y<250 && e->attack_ticks<=20)
+            DrawCircleLines((int)e->x+(e->boss?34:14),(int)e->y+(e->boss?34:14),
+                            14+(20-e->attack_ticks)*.5f,C_GOLD);
+    }
+    if(game->phase==SHOOTER_PLAYING)
+        DrawCircleLines((int)game->player.x+18,(int)game->player.y+18,6,RAYWHITE);
     for(size_t i=0;i<SHOOTER_MAX_BULLETS;++i)if(game->bullets[i].active){
         const shooter_actor_t *b=&game->bullets[i];
         int x=(int)b->x,y=(int)b->y;
@@ -134,6 +148,10 @@ static void draw_particles(const shooter_game_t *game)
 
 static void draw_hud(const shooter_game_t *game)
 {
+    DrawRectangle(s_w-68,72,56,56,(Color){9,15,43,255});
+    DrawRectangleLines(s_w-68,72,56,56,C_CYAN);
+    DrawRectangle(s_w-52,86,8,28,RAYWHITE);
+    DrawRectangle(s_w-36,86,8,28,RAYWHITE);
     const int right=s_w-480;
     DrawRectangle(12,12,s_w-24,52,(Color){9,15,43,255});
     DrawRectangle(12,12,92,3,C_CYAN);
@@ -169,7 +187,7 @@ static void draw_start_card(void)
     draw_centered("MOSAICO",164,20,(Color){97,160,202,255});
     draw_centered("STRIKE",190,52,RAYWHITE);
     DrawRectangle(107+s_cx,250,266,2,(Color){38,86,121,255});
-    draw_centered("ARCADE DEFENSE // S-31",266,15,C_CYAN);
+    draw_centered("DODGE SHOTS / DEFEAT THE ACE",266,15,C_CYAN);
     DrawRectangleRounded((Rectangle){126.0f+s_cx,302,228,42},0.18f,4,C_CYAN);
     draw_centered("TOUCH TO DEPLOY",314,17,(Color){3,22,35,255});
     draw_centered("DRAG TO STEER  /  AUTO FIRE",379,15,(Color){91,139,180,255});
@@ -180,7 +198,7 @@ static void draw_status_card(const shooter_game_t *game,const char *title,Color 
     DrawRectangle(0,0,s_w,480,(Color){3,6,22,255});
     draw_corner_frame(accent);
     draw_centered(title,181,39,RAYWHITE);
-    if(game->phase==SHOOTER_GAME_OVER){
+    if(game->phase==SHOOTER_GAME_OVER || game->phase==SHOOTER_WON){
         draw_centered(TextFormat("SCORE %07lu",(unsigned long)game->score),242,19,accent);
         draw_centered(TextFormat("%u KILLS  /  MAX LINK x%u",game->kills,game->max_combo),274,14,
                       (Color){126,165,197,255});
@@ -209,7 +227,7 @@ void shooter_view_render(const shooter_game_t *game,raylib_lite_atlas_t atlas,
     }
     raylib_lite_design_field_begin(s_view,field_w,FIELD);
     /* Status cards repaint the whole screen opaquely; skip the hidden scene. */
-    if(game->phase!=SHOOTER_PAUSED&&game->phase!=SHOOTER_GAME_OVER){
+    if(game->phase!=SHOOTER_PAUSED&&game->phase!=SHOOTER_GAME_OVER&&game->phase!=SHOOTER_WON){
         draw_background(game,backdrop);
         if(game->phase!=SHOOTER_START)draw_ship(game,atlas,game->player.x,game->player.y);
         draw_projectiles(game);
@@ -222,10 +240,11 @@ void shooter_view_render(const shooter_game_t *game,raylib_lite_atlas_t atlas,
     if(game->phase==SHOOTER_START)draw_start_card();
     else if(game->phase==SHOOTER_PAUSED)draw_status_card(game,"PAUSED",C_GOLD);
     else if(game->phase==SHOOTER_GAME_OVER)draw_status_card(game,"MISSION LOST",C_PINK);
+    else if(game->phase==SHOOTER_WON)draw_status_card(game,"MISSION CLEAR",C_MINT);
     else if(game->wave_banner){
         int width=game->wave_banner>54?250:(int)game->wave_banner*4;
         DrawRectangle((s_w-width)/2,82,width,28,(Color){8,27,52,255});
-        draw_centered(TextFormat("SECTOR %02u // ENGAGED",game->wave),89,14,C_CYAN);
+        draw_centered((game->finale_spawned?"FINAL ACE // DODGE AND FIRE":TextFormat("SECTOR %02u // ENGAGED",game->wave)),89,14,C_CYAN);
     }
     if(game->hit_flash){
         Color color=game->hit_flash&1U?C_PINK:C_GOLD;

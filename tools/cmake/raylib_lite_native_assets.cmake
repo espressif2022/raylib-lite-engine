@@ -14,7 +14,8 @@ function(raylib_lite_native_embed_assets example_root)
     set(output_dir "${CMAKE_CURRENT_BINARY_DIR}/native_assets")
     file(GLOB original_sources "${original_source_dir}/*")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-        ${original_sources} "${RAYLIB_LITE_ENGINE_ROOT}/tools/pack_game_assets.py")
+        ${original_sources} "${RAYLIB_LITE_ENGINE_ROOT}/tools/pack_game_assets.py"
+        "${RAYLIB_LITE_ENGINE_ROOT}/tools/pack_font.py")
     # Hooks write generated sprites/audio next to __file__. Run them against a
     # private copy so parallel direct/Iris builds never race on source assets.
     file(REMOVE_RECURSE "${stage_root}")
@@ -50,8 +51,18 @@ function(raylib_lite_native_embed_assets example_root)
     if(NOT pack_result EQUAL 0)
         message(FATAL_ERROR "Asset pack failed for ${example_root}: ${pack_error}")
     endif()
-    file(GLOB packed_assets "${output_dir}/*.atlas" "${output_dir}/*.wall"
-        "${output_dir}/*.map" "${output_dir}/*.sound" "${output_dir}/*.jpg")
+    # Only declared runtime products are embedded; font PNG previews and source
+    # reports remain development evidence, not accidental firmware resources.
+    file(READ "${output_dir}/assets-report.json" packed_report)
+    string(JSON packed_count LENGTH "${packed_report}" files)
+    set(packed_assets)
+    if(packed_count GREATER 0)
+        math(EXPR packed_last "${packed_count} - 1")
+        foreach(index RANGE 0 ${packed_last})
+            string(JSON packed_name GET "${packed_report}" files ${index} file)
+            list(APPEND packed_assets "${output_dir}/${packed_name}")
+        endforeach()
+    endif()
     set(filtered_assets)
     foreach(asset IN LISTS packed_assets)
         get_filename_component(asset_name "${asset}" NAME)

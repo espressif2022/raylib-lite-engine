@@ -14,7 +14,7 @@ CLI = PROJECT.parents[1] / "tools" / "game_cli.py"
 
 
 def replay(tilt: float, touch: bool = False) -> dict:
-    events = [{"frame": 0, "type": "action", "code": 2, "pressed": True}]
+    events = [{"frame": 0, "type": "action", "code": 11, "pressed": True}]
     events.extend({"frame": frame, "type": "imu", "x": .25, "y": 0, "z": 1}
                   for frame in range(0, 90))
     events.extend({"frame": frame, "type": "imu", "x": tilt, "y": 0, "z": 1}

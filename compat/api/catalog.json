@@ -42,6 +42,7 @@
         "raylib_lite_asset_stream_close",
         "raylib_lite_asset_stream_open",
         "raylib_lite_asset_stream_read",
+        "raylib_lite_asset_unregister_memory",
         "raylib_lite_assets_is_mounted",
         "raylib_lite_assets_materialized_bytes",
         "raylib_lite_assets_materialized_peak",
@@ -52,15 +53,17 @@
       ],
       "implementation": [
         "src/assets/raylib_lite_assets.c",
-        "src/idf/raylib_lite_assets_mmap.c"
+        "src/idf/raylib_lite_assets_mmap.c",
+        "host/host_asset_runtime.c"
       ],
       "ownership": "直接注册数据与 backing context 为借用；open view 可持有读取缓存/租约。",
       "failure": "加载与读写返回 result；find 可返回 NULL。",
-      "cleanup": "每个成功 open 配对 release；销毁 backing 前关闭租约并 unmount。",
+      "cleanup": "每个成功 open 配对 release；关闭所有 view/stream/纹理使用者后 unregister 或 unmount，unmount 同时清除借用内存注册。",
       "boundary": "资源服务，不承诺任意文件系统路径。",
       "tests": [
         "tests/test_game_assets.py",
-        "tests/test_renderer_core.py"
+        "tests/test_renderer_core.py",
+        "tests/test_host_assets.py"
       ],
       "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
       "usage_role": "game",
@@ -1037,6 +1040,50 @@
       "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
       "usage_role": "integration",
       "entry_roles": {}
+    },
+    "font": {
+      "header": "include/raylib_lite/raylib_lite_font.h",
+      "entries": [
+        "raylib_lite_font_draw",
+        "raylib_lite_font_from_memory",
+        "raylib_lite_font_load",
+        "raylib_lite_font_measure",
+        "raylib_lite_font_unload"
+      ],
+      "implementation": [
+        "src/text/raylib_lite_font.c"
+      ],
+      "ownership": "from_memory 借用 immutable metrics 与 atlas；load 拥有资产 view 和纹理；opaque handle 由调用者唯一拥有。",
+      "failure": "result + NULL 输出；非法 metrics/UTF-8 和缺字有确定行为与统计；不静默回退默认字体。",
+      "cleanup": "unload 后释放 metrics/atlas 使用者；必须早于 asset store unmount；帧内不加载字库。",
+      "boundary": "中性 bitmap 字体、严格 UTF-8、显式换行/按字换行；不支持 shaping、bidi、kerning、运行时 TTF。",
+      "tests": [
+        "tests/test_font.py"
+      ],
+      "test_gaps": "新字体 focused 测试集成中；物理屏幕和字库峰值待设备验收。",
+      "usage_role": "game",
+      "entry_roles": {}
+    },
+    "rcore_assets": {
+      "header": "include/raylib_lite/raylib_lite_rcore_assets.h",
+      "entries": [
+        "raylib_lite_rcore_assets_attach",
+        "raylib_lite_rcore_assets_detach",
+        "raylib_lite_rcore_assets_last_result"
+      ],
+      "implementation": [
+        "src/rcore/raylib_lite_rcore_assets.c"
+      ],
+      "ownership": "独占原生文件读取回调；加载时复制资产到 MemAlloc，立即释放借用 view。",
+      "failure": "返回 result；原生 LoadFont 可能回退默认字体，应用需检查 last_result。",
+      "cleanup": "原生 UnloadFileData/Text 释放复制内存；detach 恢复 NULL 回调，可重复调用。",
+      "boundary": "仅原生 raylib；不接收轻量 MSA1/RLF1 句柄；逻辑命名空间拒绝绝对路径和越根访问。",
+      "tests": [
+        "tests/test_rcore_assets.py"
+      ],
+      "test_gaps": "Host 原生 FNT/PNG 与像素、生命周期测试；设备字体路径未独立验证。",
+      "usage_role": "integration",
+      "entry_roles": {}
     }
   },
   "compatibility": {
@@ -1202,6 +1249,7 @@
   "checkout_only_evidence": [
     "examples/common_components/examples_audio/game_audio.c",
     "examples/common_components/examples_common/native_module_main.c",
+    "host/host_asset_runtime.c",
     "host/host_clock.c"
   ]
 }

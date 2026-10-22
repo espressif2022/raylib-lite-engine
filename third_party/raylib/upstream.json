@@ -26,5 +26,24 @@
     "src/rshapes.c": "1dc7e4bca33f7083d11dcdf21c8973bf08fa3b9321bce7c10d4232ca0456bb0e",
     "src/rtext.c": "a98a5b0b62128ac76fa493aed59a7f283cb7a9de0c8c86a8da73ac84984f36b3",
     "src/rtextures.c": "90e41879349d58a779c101dbf78e5b5cf8d46241590268a74e6156ad33312e4c"
-  }
+  },
+  "local_patches": [
+    {
+      "file": "src/rtext.c",
+      "id": "bmfont-page-lifetime",
+      "reason": "Keep additional BMFont atlas pages alive until ImageDraw finishes composing the merged atlas.",
+      "upstream_sha256": "a98a5b0b62128ac76fa493aed59a7f283cb7a9de0c8c86a8da73ac84984f36b3",
+      "patched_sha256": "08f54104368daac1ce2e10bc3c4d4e5eb48be2bdc1938f69e17169ddaa8d863c",
+      "replacements": [
+        {
+          "before": "    Image fullFont = imFonts[0];\n    for (int i = 1; i < pageCount; i++) UnloadImage(imFonts[i]);\n",
+          "after": "    Image fullFont = imFonts[0];\n"
+        },
+        {
+          "before": "    RL_FREE(imFonts);\n",
+          "after": "    // Release additional pages only after their pixels have been composited.\n    for (int i = 1; i < pageCount; i++) UnloadImage(imFonts[i]);\n    RL_FREE(imFonts);\n"
+        }
+      ]
+    }
+  ]
 }

@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -10,7 +11,7 @@ ENGINE = Path(__file__).resolve().parents[1]
 
 
 class GameplayImprovementTests(unittest.TestCase):
-    def test_tower_synergy_and_shooter_elite_cycle(self) -> None:
+    def test_campaigns_projectiles_gestures_and_purchases(self) -> None:
         compiler = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
         self.assertIsNotNone(compiler, "a C compiler is required")
         with tempfile.TemporaryDirectory() as directory:
@@ -19,6 +20,7 @@ class GameplayImprovementTests(unittest.TestCase):
             )
             subprocess.run([
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
+                *shlex.split(os.environ.get("CFLAGS", "")),
                 f"-I{ENGINE / 'examples/tower_defense/main'}",
                 f"-I{ENGINE / 'examples/raylib_shooter/main'}",
                 str(ENGINE / "tests/test_gameplay_improvements.c"),

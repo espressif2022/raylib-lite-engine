@@ -37,14 +37,14 @@ class ColumnTests(unittest.TestCase):
             source = os.environ.get('M2D_TEST_SOURCE', str(ROOT / 'src/renderer/raylib_lite_renderer.c'))
             command = [os.environ.get('CC', 'cc'), '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror']
             command += shlex.split(os.environ.get('CFLAGS', ''))
-            command += [str(ROOT / 'tests/test_columns.c'), str(ROOT / 'host/host_asset_runtime.c'), source]
+            command += [str(ROOT / 'tests/test_columns.c'), str(ROOT / 'host/host_asset_runtime.c'), str(ROOT / 'src/assets/raylib_lite_assets.c'), source]
             current = ROOT / 'src/renderer/raylib_lite_renderer.c'
             if Path(source).resolve() == current.resolve():
                 command.append(str(ROOT / 'src/renderer/raylib_lite_renderer_raylib.c'))
             rgb565 = ROOT / 'src/renderer/raylib_lite_rgb565.c'
             if Path(source).resolve() != rgb565.resolve():
                 command.append(str(rgb565))
-            for include in ['host/include', 'host', 'include/raylib_lite',
+            for include in ['src/assets', 'host/include', 'host', 'include/raylib_lite',
                             'compat/raylib/include']:
                 command += ['-I', str(ROOT / include)]
             command += ['-lm', '-o', str(temp / 'columns')]

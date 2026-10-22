@@ -102,6 +102,8 @@ typedef struct {
 
 typedef struct {
     float x, y, angle;
+    float objective_x, objective_y;
+    bool objective_collected, interact_pending;
     float look_pitch,look_kick,weapon_recoil,move_phase,display_hp,vel_x,vel_y;
     uint32_t tick,best_ticks,layout_best[LAST_ZONE_LAYOUTS];
     uint16_t cells_reached,score,shots_fired,shots_hit,kills;
@@ -142,6 +144,7 @@ void last_zone_settle_look(last_zone_game_t *game);
 void last_zone_set_performance(last_zone_game_t *game,float logic_fps,
                                float display_fps,float render_ms);
 void last_zone_update(last_zone_game_t *game);
+bool last_zone_interact(last_zone_game_t *game);
 last_zone_fire_result_t last_zone_fire(last_zone_game_t *game);
 uint8_t last_zone_cell(const last_zone_game_t *game,int x,int y);
 bool last_zone_blocks(const last_zone_game_t *game,int x,int y);

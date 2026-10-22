@@ -84,6 +84,7 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     sky_hop_module_state_t *state = value;
     if (!state || !event) return;
+    platform_game_set_view_width(&state->game,raylib_lite_design_view(480.0f).width);
     if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION && event->code >= 0 && event->code <= 4)
         platform_game_set_action(&state->game, (platform_action_t)event->code, event->pressed);
     else if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER) {
@@ -146,10 +147,10 @@ static int state_json(const void *value, char *output, size_t capacity)
     return snprintf(output, capacity,
         "{\"level\":%u,\"levels\":%u,\"level_name\":\"%s\",\"score\":%lu,\"lives\":%u,"
         "\"coins\":%u,\"coin_total\":%u,\"stomps\":%u,\"phase\":\"%s\","
-        "\"tick\":%lu,\"event_serial\":%lu,\"state_hash\":\"%08lx\"}",
+        "\"player_x\":%.2f,\"player_y\":%.2f,\"tick\":%lu,\"event_serial\":%lu,\"state_hash\":\"%08lx\"}",
         game->level + 1, PLATFORM_LEVEL_COUNT, platform_game_level_name(game),
         (unsigned long)game->score, game->lives, game->coins_collected, game->coin_count,
-        game->stomps, phase, (unsigned long)game->tick, (unsigned long)game->event_serial,
+        game->stomps, phase, game->player_x, game->player_y, (unsigned long)game->tick, (unsigned long)game->event_serial,
         (unsigned long)platform_game_state_hash(game));
 }
 

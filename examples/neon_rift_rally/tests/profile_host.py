@@ -98,6 +98,7 @@ def main() -> int:
             current = runtime.metadata()["course_id"]
             for _ in range((course - current) % 3):
                 runtime.action(9, True)
+            runtime.action(12, True)
             runtime.action(2, True)
             captured_collision = False
             for frame in range(1, 601):

@@ -27,7 +27,7 @@ typedef struct {
     raylib_lite_atlas_t enemies, weapon, environment, floor, controls, props;
     raylib_lite_wall_atlas_t walls;
     bool paused, left, right, forward, backward, fire, sprint, strafe_left, strafe_right;
-    int32_t joystick_track, look_track, fire_track, radar_track, look_x, look_y;
+    int32_t joystick_track, look_track, fire_track, radar_track, interact_track, look_x, look_y;
     int32_t radar_dx, radar_dy, stick_x, stick_y;
     float move_forward, move_strafe;
     uint8_t contact_mask;
@@ -69,11 +69,12 @@ static void begin_joystick(last_zone_module_t *state, int track, int x, int y)
 
 static void clear_tracks(last_zone_module_t *state)
 {
-    state->joystick_track = state->look_track = state->fire_track = state->radar_track = -1;
+    state->joystick_track = state->look_track = state->fire_track = state->radar_track = state->interact_track = -1;
     state->move_forward = state->move_strafe = 0;
     state->stick_x = LAST_ZONE_MOVE_X;
     state->stick_y = LAST_ZONE_MOVE_Y;
-    last_zone_set_fire_held(&state->game, false);
+    state->game.fire_held = state->game.fire_pressed = state->game.fire_released = false;
+    state->game.breath_hold = 0;
 }
 
 #if defined(RAYLIB_LITE_GAME_NATIVE)
@@ -155,7 +156,6 @@ static void shutdown(void *value)
     raylib_lite_atlas_unload(state->props);
 }
 
-#if defined(RAYLIB_LITE_GAME_NATIVE)
 static void note_contact(last_zone_module_t *state, const raylib_lite_game_input_v1_t *event)
 {
     if (event->type != RAYLIB_LITE_GAME_INPUT_POINTER) return;
@@ -171,14 +171,13 @@ static bool tap_event(const raylib_lite_game_input_v1_t *event)
     return event->pressed && (event->type == RAYLIB_LITE_GAME_INPUT_ACTION ||
                               event->type == RAYLIB_LITE_GAME_INPUT_POINTER);
 }
-#endif
 
 static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     last_zone_module_t *state = value;
     if (!state || !event) return;
     if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
-        if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) state->paused = true;
+        if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) { state->paused = true; clear_tracks(state); }
         else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESUME) state->paused = false;
         else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESET) {
             last_zone_reset(&state->game);
@@ -190,40 +189,29 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         }
         return;
     }
-#if defined(RAYLIB_LITE_GAME_NATIVE)
     note_contact(state, event);
-    if (!state->deploy_ready) {
-        clear_tracks(state);
-        return;
-    }
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    if (!state->deploy_ready) { clear_tracks(state); return; }
+#endif
+    if (state->paused) return;
     if (state->game.phase != LAST_ZONE_PHASE_PLAYING) {
-        if (tap_event(event)) {
+        if (tap_event(event) && !state->block_until_up) {
             last_zone_confirm(&state->game);
+#if defined(RAYLIB_LITE_GAME_NATIVE)
             last_zone_feedback_reset(&state->feedback, &state->game);
+#endif
             state->block_until_up = true;
         }
+        if(!event->pressed && state->contact_mask==0)state->block_until_up=false;
         clear_tracks(state);
         return;
     }
     if (state->block_until_up) {
-        bool action_down = event->type == RAYLIB_LITE_GAME_INPUT_ACTION && event->pressed;
-        if (state->contact_mask == 0 && !action_down) state->block_until_up = false;
-        if (state->block_until_up) {
-            clear_tracks(state);
-            return;
-        }
+        bool action_down=event->type==RAYLIB_LITE_GAME_INPUT_ACTION&&event->pressed;
+        if(state->contact_mask==0&&!action_down)state->block_until_up=false;
+        clear_tracks(state);
+        return;
     }
-#else
-    if (state->game.phase != LAST_ZONE_PHASE_PLAYING) {
-        if (event->pressed && (event->type == RAYLIB_LITE_GAME_INPUT_ACTION ||
-                               event->type == RAYLIB_LITE_GAME_INPUT_POINTER))
-            last_zone_confirm(&state->game);
-        if (state->game.phase != LAST_ZONE_PHASE_PLAYING || !event->pressed) {
-            clear_tracks(state);
-            return;
-        }
-    }
-#endif
     if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION) {
         if (event->code == 0) state->left = event->pressed;
         else if (event->code == 1) state->right = event->pressed;
@@ -233,8 +221,14 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         else if (event->code == 7) state->sprint = event->pressed;
         else if (event->code == 8) state->strafe_left = event->pressed;
         else if (event->code == 9) state->strafe_right = event->pressed;
+        else if (event->code == 10 && event->pressed) last_zone_interact(&state->game);
+        if (event->code == 6) last_zone_set_fire_held(&state->game, state->fire || state->fire_track >= 0);
     } else if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER) {
         int track = event->track_id;
+        if(track==state->interact_track){
+            if(!event->pressed)state->interact_track=-1;
+            return;
+        }
         /* Screen pixels to the 480x480 HUD field; the stick and fire controls
          * are pinned to the panel edges, so they test with the margin removed. */
         const raylib_lite_design_view_t view = raylib_lite_design_view(480.0f);
@@ -243,16 +237,12 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         const int margin =
             (int)fmaxf(0.0f, raylib_lite_design_field_origin(view, 480.0f, 480.0f).x);
         const int fx = (int)floorf(field.x), fy = (int)floorf(field.y);
-        const int lx = fx + margin, rx = fx - margin;
+        const int lx = fx + margin;
         if (!event->pressed) {
             /* A release can arrive on a different track id than the press.
              * Once nothing is touching, drop every capture so a mismatched
              * id cannot leave the stick deflected. */
-#if defined(RAYLIB_LITE_GAME_NATIVE)
             bool none = state->contact_mask == 0;
-#else
-            bool none = false;
-#endif
             if (track == state->joystick_track || none) {
                 state->joystick_track = -1;
                 state->move_forward = state->move_strafe = 0;
@@ -276,15 +266,18 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
             state->radar_track = track;
             state->radar_dx = fx - state->game.radar_x;
             state->radar_dy = fy - state->game.radar_y;
-        } else if (last_zone_in_fire_zone(rx, fy) && state->fire_track < 0)
-            state->fire_track = track;
-        else if (last_zone_in_move_capture(lx, fy) && state->joystick_track < 0)
+        } else if (fx >= 190 && fx < 290 && fy >= 276 && fy < 324 &&
+                   last_zone_door_ahead(&state->game)) {
+            last_zone_interact(&state->game);
+            state->interact_track=track;
+        } else if (last_zone_in_move_capture(lx, fy) && state->joystick_track < 0)
             begin_joystick(state, track, lx, fy);
         else if (lx >= LAST_ZONE_LOOK_MIN_X && state->look_track < 0) {
-            state->look_track = track;
+            state->look_track = state->fire_track = track;
             state->look_x = fx;
             state->look_y = fy;
         }
+        last_zone_set_fire_held(&state->game, state->fire || state->fire_track >= 0);
     }
 }
 
@@ -401,13 +394,14 @@ static int state_json(const void *value, char *output, size_t capacity)
     return snprintf(output, capacity,
         "{\"phase\":\"%s\",\"x\":%.2f,\"y\":%.2f,"
         "\"heading\":%d,\"pitch\":%.1f,\"score\":%u,\"hp\":%u,\"armor\":%u,\"ammo\":%u,\"alive\":%d,\"gate_open\":%s,"
-        "\"target_visible\":%s,\"target_x\":%.2f,\"target_y\":%.2f,\"best\":%lu,\"tick\":%lu,\"layout\":%u,"
+        "\"objective_collected\":%s,\"objective_x\":%.2f,\"objective_y\":%.2f,\"shots\":%u,\"target_visible\":%s,\"target_x\":%.2f,\"target_y\":%.2f,\"best\":%lu,\"tick\":%lu,\"layout\":%u,"
         "\"sfx\":\"%s\",\"state_hash\":\"%08lx\",\"sky_us\":%u,\"floor_us\":%u,\"wall_us\":%u,"
         "\"enemy_us\":%u,\"hud_us\":%u,\"acquire_us\":%u,\"raycast_us\":%u,"
         "\"grade_us\":%u,\"submit_us\":%u,\"frame_us\":%u,\"rays\":%u,\"refined\":%u}",
         phase, g->x, g->y, (int)(g->angle * 57.29578f), g->look_pitch,
         g->score, g->hp, g->armor, g->ammo, last_zone_enemies_alive(g),
-        gate_open ? "true" : "false", target_visible ? "true" : "false",
+        gate_open ? "true" : "false", g->objective_collected ? "true" : "false",
+        g->objective_x, g->objective_y, g->shots_fired, target_visible ? "true" : "false",
         target >= 0 ? g->enemies[target].x : g->x,
         target >= 0 ? g->enemies[target].y : g->y,
         (unsigned long)g->best_ticks, (unsigned long)g->tick,

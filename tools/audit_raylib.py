@@ -48,9 +48,42 @@ def check_upstream(root=ROOT, reference=None):
     if manifest["schema"] != "raylib-lite-upstream-1":
         raise ValueError("Unsupported upstream manifest schema")
     expected = manifest["files"]
-    actual = {str(p.relative_to(vendor)): hashlib.sha256(p.read_bytes()).hexdigest()
-              for p in vendor.rglob("*") if p.is_file()
-              and str(p.relative_to(vendor)) not in ("upstream.json", "src/config.h")}
+    actual_bytes = {str(p.relative_to(vendor)): p.read_bytes()
+                    for p in vendor.rglob("*") if p.is_file()
+                    and str(p.relative_to(vendor)) not in ("upstream.json", "src/config.h")}
+    # Registered local patches must reverse exactly to the pinned source hash.
+    # Original upstream hashes stay immutable; arbitrary vendor edits still fail.
+    upstream_bytes = dict(actual_bytes)
+    patched_files = set()
+    for patch in manifest.get("local_patches", []):
+        name = patch["file"]
+        if (name not in expected or name not in actual_bytes or name in patched_files or
+                patch.get("upstream_sha256") != expected[name] or
+                not patch.get("id") or not patch.get("reason") or not patch.get("replacements")):
+            raise ValueError(f"Invalid local patch metadata: {name}")
+        patched_files.add(name)
+        patched = actual_bytes[name]
+        if hashlib.sha256(patched).hexdigest() != patch.get("patched_sha256"):
+            raise ValueError(f"Patched vendored source hash changed: {name}")
+        reconstructed = patched
+        for replacement in reversed(patch["replacements"]):
+            before, after = replacement["before"].encode(), replacement["after"].encode()
+            if not before or not after or reconstructed.count(after) != 1:
+                raise ValueError(f"Local patch cannot be uniquely reversed: {name}")
+            reconstructed = reconstructed.replace(after, before, 1)
+        if hashlib.sha256(reconstructed).hexdigest() != expected[name]:
+            raise ValueError(f"Local patch does not reconstruct pinned upstream source: {name}")
+        # Forward replay must also be deterministic and restore exactly the file.
+        replayed = reconstructed
+        for replacement in patch["replacements"]:
+            before, after = replacement["before"].encode(), replacement["after"].encode()
+            if replayed.count(before) != 1:
+                raise ValueError(f"Local patch cannot be uniquely applied: {name}")
+            replayed = replayed.replace(before, after, 1)
+        if replayed != patched:
+            raise ValueError(f"Local patch replay differs: {name}")
+        upstream_bytes[name] = reconstructed
+    actual = {name: hashlib.sha256(content).hexdigest() for name, content in upstream_bytes.items()}
     if actual != expected:
         changed = sorted(name for name in set(actual) | set(expected)
                          if actual.get(name) != expected.get(name))
@@ -68,10 +101,11 @@ def check_upstream(root=ROOT, reference=None):
             raise ValueError("Reference component does not match the pinned version/commit/path")
         for name in expected:
             other = reference / "raylib" / name
-            if not other.is_file() or other.read_bytes() != (vendor / name).read_bytes():
+            if not other.is_file() or other.read_bytes() != upstream_bytes[name]:
                 raise ValueError(f"Reference component source differs: {name}")
     return {"component": manifest["component"], "verified_files": len(expected),
-            "reference_checked": reference is not None, "local_files": manifest["local_files"]}
+            "reference_checked": reference is not None, "local_files": manifest["local_files"],
+            "local_patches": sorted(patched_files)}
 
 
 def release_games(root=ROOT):

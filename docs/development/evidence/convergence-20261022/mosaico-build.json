@@ -1,0 +1,8 @@
+{
+  "target": "esp32s31",
+  "board": "esp-mosaico",
+  "game": "sky_hop",
+  "status": "build passed; device not exercised",
+  "bin_bytes": 1407440,
+  "bin_sha256": "96d89850ce4e02d5e8bf8b620f70dc21681494afd4d5dae49d04fc04b5804737"
+}

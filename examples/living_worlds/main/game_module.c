@@ -165,8 +165,8 @@ static int state_json(const void *value, char *output, size_t capacity)
     const module_state_t *module = value;
     const living_world_t *world = &module->session.world;
     return snprintf(output, capacity,
-        "{\"scene\":%u,\"yaw\":%.2f,\"pitch\":%.2f,\"dragging\":%s,\"tick\":%lu,\"state_hash\":\"%08lx\"}",
-        world->scene, world->yaw, world->pitch, world->dragging ? "true" : "false",
+        "{\"scene\":%u,\"yaw\":%.2f,\"pitch\":%.2f,\"dragging\":%s,\"auto_pan\":%s,\"tick\":%lu,\"state_hash\":\"%08lx\"}",
+        world->scene, world->yaw, world->pitch, world->dragging ? "true" : "false", world->auto_pan ? "true" : "false",
         (unsigned long)world->tick, (unsigned long)living_world_hash(world));
 }
 

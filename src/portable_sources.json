@@ -1,0 +1,13 @@
+[
+  "src/runner/raylib_lite_runner.c",
+  "src/runner/raylib_lite_input_queue.c",
+  "src/runner/raylib_lite_runtime_stats.c",
+  "src/input/raylib_lite_action.c",
+  "src/assets/raylib_lite_assets.c",
+  "src/audio/raylib_lite_audio_decode.c",
+  "src/audio/raylib_lite_audio_mixer.c",
+  "src/scene/raylib_lite_scene.c",
+  "src/ui/raylib_lite_ui.c",
+  "src/save/raylib_lite_save.c",
+  "src/text/raylib_lite_font.c"
+]

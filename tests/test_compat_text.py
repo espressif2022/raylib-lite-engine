@@ -60,13 +60,13 @@ int main(int argc,char **argv){
 }
 ''')
             sources = ['host/host_video_backend.c', 'src/runtime/raylib_lite_raylib_port.c',
-                       'host/host_asset_runtime.c', 'src/renderer/raylib_lite_renderer.c',
+                       'host/host_asset_runtime.c', 'src/assets/raylib_lite_assets.c', 'src/renderer/raylib_lite_renderer.c',
                        'src/renderer/raylib_lite_renderer_raylib.c',
                        'src/renderer/raylib_lite_rgb565.c', 'src/renderer/raylib_lite_raylib_impl.c']
             command = [os.environ.get('CC', 'cc'), '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror']
             command += shlex.split(os.environ.get('CFLAGS', ''))
             command += [str(temp / 'text.c')] + [str(ROOT / p) for p in sources]
-            for include in ['host/include', 'host', 'include/raylib_lite', 'compat/raylib/include']:
+            for include in ['src/assets', 'host/include', 'host', 'include/raylib_lite', 'compat/raylib/include']:
                 command += ['-I', str(ROOT / include)]
             subprocess.run(command + ['-lm', '-o', str(temp / 'text')], check=True)
             cases = [(size, "Aa iW!?\nabc") for size in [1, 10, 13, 20, 27]]

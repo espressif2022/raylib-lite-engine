@@ -82,9 +82,9 @@ int main(void) {
             p = Path(directory)
             (p / "test.c").write_text(source)
             command = [os.environ.get("CC", "cc"), "-O2", "-std=c11", "-Wall", "-Wextra", "-Werror", str(p / "test.c"),
-                       str(ROOT / "host/host_asset_runtime.c"), str(ROOT / "src/renderer/raylib_lite_rgb565.c")]
+                       str(ROOT / "host/host_asset_runtime.c"), str(ROOT / "src/assets/raylib_lite_assets.c"), str(ROOT / "src/renderer/raylib_lite_rgb565.c")]
             command += shlex.split(os.environ.get("CFLAGS", ""))
-            for include in ["host", "host/include", "include/raylib_lite",
+            for include in ["host", "src/assets", "host/include", "include/raylib_lite",
                             "compat/raylib/include",
                             "src/renderer", "include/raylib_lite"]:
                 command += ["-I", str(ROOT / include)]

@@ -8,12 +8,18 @@
 #define TOWER_MAX_PROJECTILES 64
 #define TOWER_PAD_COUNT 9
 #define TOWER_MAX_PATH_POINTS 16
+#define TOWER_CAMPAIGN_WAVES 6
+#define TOWER_WAVE_X 164
+#define TOWER_WAVE_Y 70
+#define TOWER_WAVE_W 152
+#define TOWER_WAVE_H 52
 
 typedef enum {
     TOWER_START,
     TOWER_PLAYING,
     TOWER_PAUSED,
     TOWER_GAME_OVER,
+    TOWER_WON,
 } tower_phase_t;
 
 typedef enum {
@@ -31,6 +37,19 @@ typedef enum {
     TOWER_FEEDBACK_MAX_LEVEL,
     TOWER_FEEDBACK_NO_CREDITS,
 } tower_feedback_t;
+
+/* Confirmation controls use model coordinates; the view maps wide panels. */
+#define TOWER_CONFIRM_X 112
+#define TOWER_CONFIRM_Y 70
+#define TOWER_CONFIRM_W 240
+#define TOWER_CONFIRM_H 52
+#define TOWER_CANCEL_X 360
+#define TOWER_CANCEL_W 96
+
+typedef struct {
+    tower_feedback_t action;
+    uint16_t cost, refund; /* net debit, and credit applied to a replacement */
+} tower_purchase_t;
 
 typedef struct {
     float x, y;
@@ -71,7 +90,7 @@ typedef struct {
     uint16_t feedback_value;
     uint8_t base_hp, selected_type, feedback, feedback_ticks;
     int8_t selected_pad;
-    bool pointer_down;
+    bool pointer_down, awaiting_wave;
 } tower_game_t;
 
 typedef struct {
@@ -82,6 +101,7 @@ typedef struct {
 
 bool tower_game_configure_level(const tower_level_t *level);
 void tower_game_reset(tower_game_t *game, uint32_t seed);
+tower_purchase_t tower_game_purchase(const tower_game_t *game);
 void tower_game_set_pointer(tower_game_t *game, float x, float y, bool pressed);
 void tower_game_update(tower_game_t *game);
 uint32_t tower_game_state_hash(const tower_game_t *game);

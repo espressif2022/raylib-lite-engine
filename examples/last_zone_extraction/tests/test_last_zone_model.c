@@ -29,6 +29,7 @@ static void assert_mission_reachable(last_zone_game_t *game)
     if (!seen[(int)last_zone_extract_y(game)][(int)last_zone_extract_x(game)])
         fprintf(stderr, "mission %u extract is unreachable\n", (unsigned)game->layout);
     assert(seen[(int)last_zone_extract_y(game)][(int)last_zone_extract_x(game)]);
+    assert(seen[(int)game->objective_y][(int)game->objective_x]);
     for (int i = 0; i < LAST_ZONE_ENEMIES; ++i) {
         if (!game->enemies[i].active) continue;
         int cx = (int)game->enemies[i].x, cy = (int)game->enemies[i].y;
@@ -68,8 +69,66 @@ static void stage_sentries(last_zone_game_t *game)
     last_zone_set_sprint(game, false);
 }
 
+static void test_data_objective_in_every_mission(void)
+{
+    last_zone_game_t game;
+    for(unsigned layout=0;layout<LAST_ZONE_LAYOUTS;++layout){
+        last_zone_reset(&game);
+        game.layout=(uint8_t)layout;
+        last_zone_confirm(&game);
+        assert(!game.objective_collected);
+        for(unsigned i=0;i<LAST_ZONE_ENEMIES;++i)game.enemies[i].active=false;
+        game.enemies[0].active=true;game.enemies[0].hp=2;
+        game.enemies[0].x=last_zone_spawn_x(&game);game.enemies[0].y=last_zone_spawn_y(&game);
+        game.x=last_zone_extract_x(&game);game.y=last_zone_extract_y(&game);
+        last_zone_update(&game);
+        assert(game.phase==LAST_ZONE_PHASE_PLAYING);
+        game.x=game.objective_x;game.y=game.objective_y;
+        game.ammo=LAST_ZONE_AMMO_MAX;
+        unsigned score=game.score;
+        last_zone_update(&game);
+        assert(game.objective_collected&&game.score>=score+100);
+        score=game.score;last_zone_update(&game);assert(game.score==score);
+        game.x=last_zone_extract_x(&game);game.y=last_zone_extract_y(&game);
+        last_zone_update(&game);
+        assert(game.phase==LAST_ZONE_PHASE_WON&&last_zone_enemies_alive(&game)>0);
+        assert(last_zone_grade(&game)=='S');
+    }
+}
+
+static void test_door_interaction_separate_from_fire(void)
+{
+    last_zone_game_t game;
+    last_zone_reset(&game);last_zone_confirm(&game);
+    for(int i=0;i<LAST_ZONE_ENEMIES;++i)game.enemies[i].active=false;
+    bool found=false;
+    static const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
+    for(int y=1;y<LAST_ZONE_HEIGHT-1&&!found;++y)
+        for(int x=1;x<LAST_ZONE_WIDTH-1&&!found;++x){
+            if(last_zone_cell(&game,x,y)!=4)continue;
+            for(int side=0;side<4&&!found;++side){
+                int px=x-dx[side],py=y-dy[side];
+                if(last_zone_blocks(&game,px,py))continue;
+                game.x=px+.5f;game.y=py+.5f;game.angle=atan2f(dy[side],dx[side]);
+                assert(last_zone_door_ahead(&game));
+                unsigned ammo=game.ammo;
+                last_zone_fire(&game);
+                assert(!game.door_open[y][x]&&game.ammo==ammo-1);
+                unsigned shots=game.shots_fired;
+                assert(last_zone_interact(&game));
+                assert(game.door_open[y][x]&&game.shots_fired==shots&&game.ammo==ammo-1);
+                last_zone_update(&game);assert(game.last_fire==NEON_FIRE_DOOR);
+                last_zone_update(&game);assert(game.last_fire==NEON_FIRE_NONE);
+                found=true;
+            }
+        }
+    assert(found);
+}
+
 int main(void)
 {
+    test_data_objective_in_every_mission();
+    test_door_interaction_separate_from_fire();
     {
         last_zone_game_t a={0},b={0};last_zone_reset(&a);last_zone_reset(&b);
         int stalled=0,longest=0,moving=0;
@@ -212,6 +271,15 @@ int main(void)
     game.x = last_zone_extract_x(&game);
     game.y = last_zone_extract_y(&game);
     last_zone_update(&game);
+    assert(game.phase == LAST_ZONE_PHASE_PLAYING); /* Clearing guards alone never completes the objective. */
+    game.x=game.objective_x;game.y=game.objective_y;
+    last_zone_update(&game);
+    assert(game.objective_collected);
+    game.enemies[0].active=true;game.enemies[0].hp=2;
+    game.enemies[0].x=2.5f;game.enemies[0].y=3.5f;
+    game.x=last_zone_extract_x(&game);game.y=last_zone_extract_y(&game);
+    last_zone_update(&game);
+    assert(last_zone_enemies_alive(&game)>0);
     assert(game.phase == LAST_ZONE_PHASE_WON);
     assert(last_zone_on_extract(&game));
 

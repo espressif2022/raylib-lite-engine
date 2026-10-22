@@ -22,7 +22,7 @@ jobs:
           path: '.'
           command: |
             set -euo pipefail
-            python -m pip install Pillow numpy PyYAML
+            python -m pip install Pillow numpy PyYAML fontTools
             python tools/prepare_release.py --output /tmp/raylib-release
             compote component pack --project-dir /tmp/raylib-release/component --name raylib-lite-engine --dest-dir /tmp/raylib-release/archives
             python tools/check_release.py --stage /tmp/raylib-release > /tmp/raylib-release/package-check.json
@@ -103,7 +103,7 @@ jobs:
             EXAMPLE='${{ matrix.build.example }}'
             BOARD='${{ matrix.build.board }}'
             CHIP='${{ matrix.build.chip }}'
-            python -m pip install Pillow numpy PyYAML
+            python -m pip install Pillow numpy PyYAML fontTools
             if [ "$BOARD" != none ]; then
               python -m pip install esp-bmgr-assist
             fi

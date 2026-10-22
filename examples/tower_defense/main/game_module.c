@@ -76,11 +76,21 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
     if (!state || !event) return;
     if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER) {
         float x, y;
-        tower_view_map_pointer((float)event->x, (float)event->y, &x, &y);
+        tower_view_map_pointer(&state->game, (float)event->x, (float)event->y, &x, &y);
         tower_game_set_pointer(&state->game, x, y, event->pressed);
-    } else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION)
-        tower_game_set_pointer(&state->game, 240, 220, event->pressed);
-    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION) {
+        if (event->pressed && event->code == 4 &&
+            (state->game.phase == TOWER_START || state->game.phase == TOWER_GAME_OVER ||
+             state->game.phase == TOWER_WON)) {
+            bool down = state->game.pointer_down;
+            tower_game_reset(&state->game, state->game.rng);
+            state->game.phase = TOWER_PLAYING;
+            state->game.pointer_down = down;
+        } else if (event->pressed && event->code == 3) {
+            if (state->game.phase == TOWER_PLAYING) state->game.phase = TOWER_PAUSED;
+            else if (state->game.phase == TOWER_PAUSED) state->game.phase = TOWER_PLAYING;
+        }
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
              event->code == RAYLIB_LITE_GAME_CONTROL_RESET)
         tower_game_reset(&state->game, 0x544f5745U);
     else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
@@ -96,7 +106,7 @@ static void update(void *value)
     tower_module_state_t *state = value;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
     if (state) tower_audio_set_music(state->paused || state->game.phase == TOWER_PAUSED,
-                                     state->game.phase == TOWER_GAME_OVER);
+                                     state->game.phase == TOWER_GAME_OVER || state->game.phase == TOWER_WON);
 #endif
     if (!state || state->paused) return;
     uint8_t hp_before = state->game.base_hp;
@@ -163,13 +173,13 @@ static uint32_t state_hash(const void *value)
 static int state_json(const void *value, char *output, size_t capacity)
 {
     const tower_game_t *game = &((const tower_module_state_t *)value)->game;
-    static const char *phases[] = {"start", "playing", "paused", "game_over"};
-    const char *phase = (unsigned)game->phase < 4 ? phases[game->phase] : "unknown";
+    static const char *phases[] = {"start", "playing", "paused", "game_over", "won"};
+    const char *phase = (unsigned)game->phase < 5 ? phases[game->phase] : "unknown";
     return snprintf(output, capacity,
         "{\"wave\":%u,\"score\":%lu,\"credits\":%u,\"base_hp\":%u,\"kills\":%lu,"
-        "\"phase\":\"%s\",\"tick\":%lu,\"state_hash\":\"%08lx\"}",
+        "\"awaiting_wave\":%s,\"phase\":\"%s\",\"tick\":%lu,\"state_hash\":\"%08lx\"}",
         game->wave, (unsigned long)game->score, game->credits, game->base_hp,
-        (unsigned long)game->kills, phase, (unsigned long)game->tick,
+        (unsigned long)game->kills, game->awaiting_wave?"true":"false", phase, (unsigned long)game->tick,
         (unsigned long)tower_game_state_hash(game));
 }
 

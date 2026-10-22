@@ -59,7 +59,6 @@ typedef struct {
     int32_t course_select_track;
     float touch_steer;
     float touch_origin_x;
-    bool touch_throttle;
     bool touch_nitro;
     float imu_roll;
     float imu_center_roll;
@@ -114,7 +113,6 @@ static void clear_touch(neon_rift_rally_module_t *state)
     state->nitro_track = -1;
     state->touch_steer = 0.0f;
     state->touch_origin_x = 0.0f;
-    state->touch_throttle = false;
     state->touch_nitro = false;
 }
 
@@ -123,7 +121,9 @@ static void reset_run(neon_rift_rally_module_t *state)
 #if defined(RAYLIB_LITE_GAME_NATIVE)
     rally_feedback_reset(&state->feedback);
 #endif
+    rally_control_mode_t mode=state->game.control_mode;
     rally_reset(&state->game);
+    state->game.control_mode=mode;
     state->game.course_id = state->course_id;
     state->game.progress = COURSES[state->course_id].start_progress;
     rally_set_seed(&state->game, 0x9e3779b9u * ++state->race_serial + state->course_id);
@@ -186,8 +186,8 @@ static const char *start_hint(const rally_game_t *game)
 {
     if (!game || game->phase != RALLY_PHASE_COUNTDOWN) return "race_live";
     return game->countdown_ticks > 90U ? "select_course" :
-           (game->countdown_ticks > 60U ? "throttle_ready" :
-            (game->countdown_ticks > 30U ? "hold_drift" : "nitro_go"));
+           (game->countdown_ticks > 60U ? "choose_control_mode" :
+            (game->countdown_ticks > 30U ? (game->control_mode==RALLY_CONTROL_KEYBOARD?"hold_throttle":"auto_throttle") : "nitro_go"));
 }
 
 #if defined(RAYLIB_LITE_GAME_NATIVE)
@@ -253,10 +253,7 @@ static void update_touch_steer(neon_rift_rally_module_t *state, int x, int y)
     float dx = (float)x - state->touch_origin_x;
     state->touch_steer = fabsf(dx) <= 10.0f ? 0.0f :
         clamp_unit((dx - copysignf(10.0f, dx)) / 84.0f);
-    /* A steering touch always requests throttle. Requiring the player to
-       discover a narrow upward-drag threshold made the native game appear
-       frozen; vertical displacement is retained only for future braking. */
-    state->touch_throttle = true;
+    /* Acceleration is selected by control mode, independently of contact. */
     (void)y;
 }
 
@@ -298,6 +295,23 @@ static void shutdown(void *value)
 #endif
 }
 
+static void recenter(neon_rift_rally_module_t *state)
+{
+    state->imu_center_roll=state->imu_roll;
+    state->imu_steer=0;
+    state->touch_origin_x=0;
+    clear_touch(state);
+    rally_drift_assist_reset(&state->drift_assist);
+}
+
+static void select_control(neon_rift_rally_module_t *state,rally_control_mode_t mode)
+{
+    state->game.control_mode=mode;
+    state->steer_left=state->steer_right=state->throttle=state->brake=false;
+    state->nitro=state->drift=false;
+    recenter(state);
+}
+
 static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     neon_rift_rally_module_t *state = value;
@@ -321,7 +335,8 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
     if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION) {
         /* Stable action map shared with browser replays:
            0 left, 1 right, 2 throttle, 3 pause, 4 restart,
-           5 brake, 6 nitro, 7 drift. */
+           5 brake, 6 nitro, 7 drift, 8/9 course, 10 touch, 11 tilt,
+           12 keyboard, 13 recenter. Mode is explicit and shared across targets. */
         if (event->code == 0) state->steer_left = event->pressed;
         else if (event->code == 1) state->steer_right = event->pressed;
         else if (event->code == 2) state->throttle = event->pressed;
@@ -336,6 +351,9 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
 #endif
         }
         else if (event->code == 4 && event->pressed) reset_run(state);
+        else if (event->pressed && event->code >= 10 && event->code <= 12)
+            select_control(state,(rally_control_mode_t)(event->code-10));
+        else if (event->pressed && event->code == 13) recenter(state);
         else if (event->pressed && event->code == 8 &&
                  state->game.phase == RALLY_PHASE_COUNTDOWN)
             select_course(state, -1);
@@ -372,9 +390,23 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
     const Vector2 point = raylib_lite_design_field_point(raylib_lite_design_view(480.0f), 480.0f,
                                                          480.0f, (float)event->x, (float)event->y);
     const int x = (int)floorf(point.x), y = (int)floorf(point.y);
-    if (!event->pressed && event->track_id == state->course_select_track)
-        state->course_select_track = -1;
-    if (event->pressed && state->game.phase == RALLY_PHASE_COUNTDOWN &&
+    const bool fresh=event->track_id!=state->steer_track&&event->track_id!=state->nitro_track;
+    if(event->track_id==state->course_select_track){
+        if(!event->pressed)state->course_select_track=-1;
+        return;
+    }
+    if(event->pressed&&fresh&&y>=70&&y<110&&x>=12&&x<158){
+        select_control(state,(rally_control_mode_t)((state->game.control_mode+1)%3));
+        state->course_select_track=event->track_id;
+        return;
+    }
+    if(event->pressed&&fresh&&state->game.control_mode==RALLY_CONTROL_TILT&&
+       y>=70&&y<110&&x>=338&&x<468){
+        recenter(state);
+        state->course_select_track=event->track_id;
+        return;
+    }
+    if (event->pressed && fresh && state->game.phase == RALLY_PHASE_COUNTDOWN &&
         y >= 70 && y <= 230 &&
         (x < 160 || x >= 320)) {
         if (state->course_select_track != event->track_id) {
@@ -393,7 +425,6 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         if (event->track_id == state->steer_track) {
             state->steer_track = -1;
             state->touch_steer = 0.0f;
-            state->touch_throttle = false;
         }
         if (event->track_id == state->nitro_track) {
             state->nitro_track = -1;
@@ -401,6 +432,7 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         }
         return;
     }
+    if(state->game.control_mode==RALLY_CONTROL_KEYBOARD)return;
     if (event->track_id == state->steer_track)
         update_touch_steer(state, x, y);
     else if (event->track_id == state->nitro_track)
@@ -439,18 +471,15 @@ static void update(void *value)
     }
     float imu_response = fabsf(tilt) < fabsf(state->imu_steer) ? .65f : .30f;
     state->imu_steer += (tilt - state->imu_steer) * imu_response;
-    float steer = state->steer_track >= 0 ? state->touch_steer : state->imu_steer;
-    if (state->steer_left || state->steer_right)
-        steer = (state->steer_right ? 1.0f : 0.0f) -
-                (state->steer_left ? 1.0f : 0.0f);
-    bool drive_throttle = state->throttle || state->touch_throttle;
-    bool drive_drift = state->drift;
-#if defined(RAYLIB_LITE_GAME_NATIVE)
-    /* Touch-first kart controls: native play auto-accelerates so one finger
-       steers and the second can boost. Host/replay controls remain explicit. */
-    drive_throttle = true;
-    drive_drift |= rally_drift_assist_update(&state->drift_assist, &state->game, steer);
-#endif
+    const rally_control_mode_t mode=state->game.control_mode;
+    float steer=mode==RALLY_CONTROL_TILT?state->imu_steer:0;
+    if(mode!=RALLY_CONTROL_KEYBOARD&&state->steer_track>=0)steer=state->touch_steer;
+    if(mode==RALLY_CONTROL_KEYBOARD)
+        steer=(state->steer_right?1.0f:0.0f)-(state->steer_left?1.0f:0.0f);
+    bool drive_throttle=mode==RALLY_CONTROL_KEYBOARD?state->throttle:true;
+    bool drive_drift=state->drift;
+    if(mode!=RALLY_CONTROL_KEYBOARD)
+        drive_drift|=rally_drift_assist_update(&state->drift_assist,&state->game,steer);
     rally_set_controls(&state->game,
         drive_throttle,
         state->brake, steer, drive_drift,
@@ -502,7 +531,7 @@ static int state_json(const void *value, char *output, size_t capacity)
          game->phase == RALLY_PHASE_FAILED ? "failed" : "playing");
     return snprintf(output, capacity,
         "{\"phase\":\"%s\",\"course_id\":%u,\"course\":\"%s\","
-        "\"course_name\":\"%s\",\"theme\":\"%s\",\"start_hint\":\"%s\","
+        "\"control_mode\":\"%s\",\"auto_throttle\":%s,\"course_name\":\"%s\",\"theme\":\"%s\",\"start_hint\":\"%s\","
         "\"progress\":%.2f,\"lateral\":%.2f,"
         "\"lateral_velocity\":%.3f,\"steering\":%.3f,\"heading_error\":%.4f,"
         "\"speed\":%.2f,\"lap\":%u,\"checkpoint\":%u,\"nitro\":%.2f,"
@@ -515,6 +544,8 @@ static int state_json(const void *value, char *output, size_t capacity)
         "\"best_race_ticks\":%lu,\"tick\":%lu,\"event_flags\":%lu,"
         "\"state_hash\":\"%08lx\"}",
         phase, (unsigned)state->course_id, COURSES[state->course_id].id,
+        game->control_mode==RALLY_CONTROL_TOUCH?"touch":game->control_mode==RALLY_CONTROL_TILT?"tilt":"keyboard",
+        game->control_mode==RALLY_CONTROL_KEYBOARD?"false":"true",
         COURSES[state->course_id].name, COURSES[state->course_id].theme,
         start_hint(game),
         game->progress, game->lateral, game->lateral_velocity,

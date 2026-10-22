@@ -2,8 +2,8 @@
 
 [English](README.md) · [示例索引（English）](../README.md)
 
-Living Worlds 是四场景 360° 环视体验。玩家可浏览 Aurora、Ocean、Sunrise 和 Jungle；
-停止操作约三秒后，自动巡游会继续运行。
+Living Worlds 是四场景互动观景体验。Aurora、Ocean、Sunrise 提供有边界的视差视角，Jungle 支持水平 360° 环视；
+`AUTO` 模式下停止操作约三秒后，自动巡游会继续运行。
 
 ![Living Worlds Sunrise](docs/screenshot.png)
 
@@ -19,7 +19,7 @@ Living Worlds 是四场景 360° 环视体验。玩家可浏览 Aurora、Ocean�
 
 ### Host
 
-鼠标拖动和真机触摸使用相同的视角规则，场景和 FX 按钮也可直接点击。
+鼠标拖动和真机触摸使用相同的视角规则，场景和 FX 按钮也可直接点击。右上角 `AUTO` / `HOLD` 切换自动巡游与固定视角；`HOLD` 下拖动仍可重新构图，松手即停，场景动画继续。该选择在切换场景时保留，重新开始时恢复 `AUTO`。
 
 ## Host 预览
 

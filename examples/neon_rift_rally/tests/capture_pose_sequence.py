@@ -15,6 +15,7 @@ from run_game import GenericHostRuntime  # noqa: E402
 
 def start(runtime: GenericHostRuntime) -> None:
     runtime.control(3)
+    runtime.action(12, True)
     runtime.action(2, True)
     for _ in range(92):
         runtime.api.raylib_lite_host_game_update_v1(runtime.context)

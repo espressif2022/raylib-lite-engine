@@ -14,12 +14,12 @@ The image is a Host RGB565 frame of the first level with its level banner.
 
 ### Device
 
-- Tap the title card to start.
+- Tap the title card to start, then release before controlling the hero. Resume gestures are also consumed until release.
 - The two arrow buttons at the bottom move left and right, and the `JUMP` button jumps; a short press gives a hop, a long press a full jump.
-- Movement and jump can be held together. The top-right button pauses and resumes.
+- Movement and jump can be held together. Only the visible button rectangles respond; the ground and gaps between controls do not. Tap the top-right button to pause, then release and make a fresh tap to resume. Touch and keyboard are independent, so releasing one does not cancel the other.
 - Button, joystick and IMU input map to the same game actions.
 - Stomping enemies without touching the ground chains the reward: 250, 500, 1000, then 2000 points. After a hit the hero blinks and is briefly invulnerable.
-- The HUD shows hearts, collected coins, score, best score, the level name and a progress bar. Short tips appear at the start of the first level.
+- The HUD shows hearts, collected coins, score, best score, the level name and a progress bar. The first level teaches jumping over a safe step; its approach hint stays visible until you pass it, without requiring a dangerous pit crossing.
 - Every event has its own chiptune cue and haptic pattern: jump, landing, coin, stomp, spring, checkpoint, hurt, level clear, game over and start. Levels 1 and 3 play the day theme, levels 2 and 4 the night theme, and music ducks while paused.
 
 ### Host

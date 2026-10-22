@@ -1,0 +1,37 @@
+{
+  "samples": 31,
+  "display": {
+    "mean": 30.03,
+    "p50": 30.0,
+    "p95": 30.0
+  },
+  "logic": {
+    "mean": 30.03,
+    "p50": 30.0,
+    "p95": 30.0
+  },
+  "render": {
+    "mean": 12235.29,
+    "p50": 12846.0,
+    "p95": 14714.0
+  },
+  "frame": 1800,
+  "dropped": 0,
+  "busy": 0,
+  "errors": 0,
+  "min_heap_bytes": 214059,
+  "min_psram_bytes": 15322200,
+  "surface": [
+    320,
+    240
+  ],
+  "cpu_mhz": 240,
+  "psram_mhz": 80,
+  "idf_commit": "7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe",
+  "binaries": {
+    "raylib_shooter.bin": "41d055bea8841f8a21a89da3b12889500ca30ccbc71fcbf22b61735328993c75"
+  },
+  "config_header_sha256": "fe302c5c81b957f1be66a5b0c81fed8573db5315bd30c6727d2eb761b4df35fc",
+  "source_log_sha256": "f7e1efa1b2ebef926626ad2f28b05a5fc79849bb99f47fa96f5eee81a57fcadd",
+  "scope": "single Box-3 deterministic replay; no before/after performance claim"
+}

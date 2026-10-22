@@ -28,7 +28,7 @@ def main() -> int:
                     runtime.control(3)
                     for _ in range((course - runtime.metadata()["course_id"]) % 3):
                         runtime.action(9, True)
-                    runtime.action(2, True)
+                    runtime.action(11, True)
                     for _ in range(90):
                         runtime.imu(.25, 0, 1)
                         runtime.api.raylib_lite_host_game_update_v1(runtime.context)

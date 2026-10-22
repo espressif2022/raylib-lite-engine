@@ -25,10 +25,13 @@ class TowerHostRunnerTests(unittest.TestCase):
             replay.write_text(json.dumps({"events": [
                 {"frame": 0, "type": "tap", "x": 240, "y": 220},
                 {"frame": 1, "type": "tap", "x": 58, "y": 154},
-                {"frame": 2, "type": "tap", "x": 200, "y": 435},
-                {"frame": 3, "type": "tap", "x": 195, "y": 130},
-                {"frame": 4, "type": "tap", "x": 350, "y": 435},
-                {"frame": 5, "type": "tap", "x": 414, "y": 218},
+                {"frame": 2, "type": "tap", "x": 200, "y": 90},
+                {"frame": 3, "type": "tap", "x": 200, "y": 435},
+                {"frame": 4, "type": "tap", "x": 195, "y": 130},
+                {"frame": 5, "type": "tap", "x": 200, "y": 90},
+                {"frame": 6, "type": "tap", "x": 350, "y": 435},
+                {"frame": 7, "type": "tap", "x": 414, "y": 218},
+                {"frame": 8, "type": "tap", "x": 200, "y": 90},
             ]}), encoding="utf-8")
             command = [sys.executable, str(RUNNER), "--project", str(TOWER),
                        "--headless", "--frames", "300", "--replay", str(replay)]
@@ -48,7 +51,9 @@ class TowerHostRunnerTests(unittest.TestCase):
             self.assertEqual(first["state_hash"], second["state_hash"])
             self.assertEqual(first_hash, second_hash)
             self.assertEqual(first["game_id"], "tower_defense")
-            self.assertEqual(first["state_hash"], "0931f3d1")
+            self.assertTrue(first["awaiting_wave"])
+            self.assertEqual(first["base_hp"], 20)
+            self.assertEqual(first["kills"], 0)
             self.assertEqual(first_size, (480, 480))
 
     def test_replay_supports_pause_single_step_and_state_output(self) -> None:

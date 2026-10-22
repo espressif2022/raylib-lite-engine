@@ -12,19 +12,20 @@ The image is a Host RGB565 frame on Neon Loop: a slipstream banner, speedometer,
 
 ### Device
 
-- Hold the device level during the countdown so the IMU can calibrate its center.
-- Tilt the device left or right to steer; tilting left moves left and shows the left-lean pose.
-- Dragging on the left side temporarily takes over steering; a second finger can hold the nitro area at the bottom right.
+- Tap the top-left `TOUCH >` / `TILT >` / `KEYS >` control to cycle modes. TOUCH is the default; restarting retains the selected mode.
+- TOUCH uses left-side drag steering. TILT uses device tilt with temporary touch takeover. A second finger can hold the bottom-right nitro area.
+- TILT calibrates during countdown. Hold the device comfortably and tap `CENTER` to recenter during a race. TOUCH and KEYS ignore tilt steering.
 - During the countdown, tap either side of the course name to change course.
-- Throttle is automatic; after the race, tap the result screen to restart.
+- TOUCH and TILT auto-accelerate on both Host and device; KEYS accelerates only while the throttle action is held. After the race, tap the result screen to restart.
 - Above speed 18, holding a hard turn for about 0.27 s starts a drift; straightening out cashes it in as a short boost. Leaving the track, a collision or being airborne cancels the charge. Brief corrections do not start a drift.
 
 ### Host
 
-- `A`/`D`: steer; `W`: throttle; `S`: brake.
+- Select KEYS first: `A`/`D` steer, `W` is throttle and `S` is brake.
 - `Space`: nitro; `Shift`: drift.
 - `P`: pause or resume; `Enter`: restart.
-- Mouse drags on the left and the bottom-right nitro area follow the device touch rules.
+- In TOUCH / TILT, mouse drags on the left and the bottom-right nitro area follow the device touch rules.
+- Replay actions `10` / `11` / `12` select TOUCH / TILT / KEYS; `13` recenters. State output includes `control_mode` and `auto_throttle`. Keyboard scenarios should declare action `12` first.
 
 ## Race systems
 

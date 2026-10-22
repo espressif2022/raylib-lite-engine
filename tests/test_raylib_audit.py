@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
+import hashlib
+import json
 from pathlib import Path
 import shutil
 import re
@@ -28,6 +30,31 @@ class RaylibAuditTests(unittest.TestCase):
             check_upstream(root)
             (vendor / "src/extra.c").write_text("/* unexpected source */")
             with self.assertRaisesRegex(ValueError, "src/extra.c"):
+                check_upstream(root)
+
+    def test_local_patch_preserves_upstream_hash_and_rejects_metadata_tampering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            vendor = root / "third_party/raylib"
+            shutil.copytree(ROOT / "third_party/raylib", vendor)
+            manifest_path = vendor / "upstream.json"
+            manifest = json.loads(manifest_path.read_text())
+            patch = manifest["local_patches"][0]
+            self.assertEqual(patch["upstream_sha256"], manifest["files"][patch["file"]])
+            self.assertIn(patch["file"], check_upstream(root)["local_patches"])
+            # Even recomputing the patched-file hash cannot conceal unrelated edits.
+            source = vendor / patch["file"]
+            original = source.read_bytes()
+            source.write_bytes(original + b"\n/* extra change */\n")
+            patch["patched_sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+            manifest_path.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError, "reconstruct pinned upstream"):
+                check_upstream(root)
+            source.write_bytes(original)
+            patch["patched_sha256"] = hashlib.sha256(original).hexdigest()
+            patch["replacements"][0]["before"] += "wrong upstream text"
+            manifest_path.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError, "reconstruct pinned upstream"):
                 check_upstream(root)
 
     def test_new_mapping_is_rejected_even_when_documentation_could_be_updated(self):

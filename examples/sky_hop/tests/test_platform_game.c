@@ -13,15 +13,18 @@ static void place(platform_game_t *game, float x, float y)
 
 static void test_movement_levels_and_coin_chain(void)
 {
-    platform_game_t game;
+    platform_game_t game = {0};
     platform_game_reset(&game);
     assert(game.phase == PLATFORM_START && game.lives == 3 && game.level == 0);
     assert(game.coin_count == 12 && game.enemy_count == 4);
     size_t block_count = 0;
-    assert(platform_game_blocks(&game, &block_count) != NULL && block_count == 12);
+    assert(platform_game_blocks(&game, &block_count) != NULL && block_count == 13);
     assert(strcmp(platform_game_level_name(&game), "SUNNY MEADOW") == 0);
     platform_game_set_pointer(&game, 220, 430, true, 1);
-    assert(game.phase == PLATFORM_PLAYING && game.move_right && !game.facing_left);
+    assert(game.phase == PLATFORM_PLAYING && !game.move_right);
+    platform_game_set_pointer(&game,220,430,false,1);
+    platform_game_set_pointer(&game,220,430,true,1);
+    assert(game.move_right&&!game.facing_left);
     assert(platform_game_take_events(&game) & PLATFORM_EVENT_START);
     for (int i = 0; i < 20; ++i) platform_game_update(&game);
     assert(game.player_x > 42);
@@ -138,7 +141,7 @@ static void drop_on_enemy(platform_game_t *game, size_t index)
 
 static void test_stomp_chain_and_invulnerability(void)
 {
-    platform_game_t game;
+    platform_game_t game = {0};
     platform_game_reset(&game);
     platform_game_set_action(&game, PLATFORM_ACTION_RESTART, true);
     (void)platform_game_take_events(&game);
@@ -179,8 +182,46 @@ static void test_stomp_chain_and_invulnerability(void)
     assert(platform_game_take_events(&game) == 0);
 }
 
+static void test_controls_and_first_jump_route(void)
+{
+    platform_game_t game={0};
+    platform_game_reset(&game);
+    platform_game_set_action(&game,PLATFORM_ACTION_RESTART,true);
+    platform_game_set_pointer(&game,220,380,true,1);
+    assert(!game.move_right); /* The ground is never an invisible control. */
+    platform_game_set_pointer(&game,220,380,false,1);
+    platform_game_set_pointer(&game,220,430,true,1);
+    platform_game_set_action(&game,PLATFORM_ACTION_RIGHT,false);
+    assert(game.move_right); /* Neutral keyboard cannot cancel a touch. */
+    platform_game_set_action(&game,PLATFORM_ACTION_RIGHT,true);
+    platform_game_set_pointer(&game,220,430,false,1);
+    assert(game.move_right); /* Releasing touch cannot cancel a held keyboard key. */
+    for(int i=0;i<200;++i)platform_game_update(&game);
+    assert(game.player_x<=412.1f&&game.player_x>=400);
+    platform_game_set_action(&game,PLATFORM_ACTION_JUMP,true);
+    for(int i=0;i<40;++i)platform_game_update(&game);
+    assert(game.player_x>476&&game.lives==3);
+    platform_game_set_action(&game,PLATFORM_ACTION_RIGHT,false);
+    platform_game_set_action(&game,PLATFORM_ACTION_JUMP,false);
+    platform_game_set_view_width(&game,640);
+    platform_game_set_pointer(&game,400,430,true,1);
+    assert(!game.move_left&&!game.move_right&&!game.jump_held);
+    platform_game_set_pointer(&game,400,430,false,1);
+    platform_game_set_pointer(&game,550,430,true,1);
+    assert(game.jump_held);
+    platform_game_set_pointer(&game,550,430,false,1);
+    platform_game_set_pointer(&game,620,30,true,1);
+    assert(game.phase==PLATFORM_PAUSED);
+    platform_game_set_pointer(&game,620,30,true,1);
+    assert(game.phase==PLATFORM_PAUSED);
+    platform_game_set_pointer(&game,620,30,false,1);
+    platform_game_set_pointer(&game,220,430,true,1);
+    assert(game.phase==PLATFORM_PLAYING&&!game.move_right);
+}
+
 int main(void)
 {
+    test_controls_and_first_jump_route();
     test_movement_levels_and_coin_chain();
     test_stomp_chain_and_invulnerability();
     puts("platform game model: ok");

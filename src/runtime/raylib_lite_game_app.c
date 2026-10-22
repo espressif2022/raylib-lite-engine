@@ -57,6 +57,8 @@ static void poll_input(void *context)
         else if (input.type == RAYLIB_LITE_INPUT_IMU)
             raylib_lite_raylib_inject_imu(input.x / 1000.0f, input.y / 1000.0f,
                                  input.value / 1000.0f);
+        else if (input.type == RAYLIB_LITE_INPUT_BUTTON)
+            raylib_lite_raylib_inject_action(input.value, input.pressed);
         raylib_lite_action_apply_event(&input);
         if (runtime->app->on_event)
             runtime->app->on_event(runtime->app->user, &input);

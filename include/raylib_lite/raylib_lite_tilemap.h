@@ -19,6 +19,9 @@ typedef struct {
 } raylib_lite_map_object_t;
 
 raylib_lite_tilemap_t raylib_lite_tilemap_load(const char *asset_path);
+/* viewport selects intersecting tiles in map-pixel coordinates (whole tiles
+ * are drawn). origin is the screen position of map (0,0), independent of the
+ * viewport. Use origin = screen_anchor - camera * scale for camera scrolling. */
 void raylib_lite_tilemap_draw_layer(raylib_lite_tilemap_t map,
     uint32_t layer_id, raylib_lite_renderer_rect_t viewport,
     raylib_lite_renderer_vec2_t origin);

@@ -149,11 +149,11 @@ typedef struct {
 } last_zone_layout_info_t;
 
 static const last_zone_layout_info_t s_layouts[LAST_ZONE_LAYOUTS]={
-    {2.5f,3.5f,0.00f,20.5f,20.5f,5,20,2,0x000,"OBSERVE. CLEAR. OPEN THE GATE."},
-    {2.5f,20.5f,-1.05f,20.5f,2.5f,7,18,2,0x000,"CONTROL THE ROOM. USE THE BARRELS."},
-    {2.5f,11.5f,0.00f,20.5f,11.5f,8,17,1,0x0c0,"COUNT THEM. CHOOSE A FLANK."},
-    {2.5f,2.5f,0.78f,20.5f,21.5f,8,17,1,0x000,"WALK QUIET. STRIKE FIRST."},
-    {2.5f,21.5f,-0.78f,20.5f,2.5f,9,16,0,0x1c0,"THE PAD IS AHEAD. EARN THE EXIT."},
+    {2.5f,3.5f,0.00f,20.5f,20.5f,5,20,2,0x000,"FIND THE DATA. REACH THE EXIT."},
+    {2.5f,20.5f,-1.05f,20.5f,2.5f,7,18,2,0x000,"TAKE THE DATA. AVOID THE CROSSFIRE."},
+    {2.5f,11.5f,0.00f,20.5f,11.5f,8,17,1,0x0c0,"FIND THE DATA. CHOOSE A FLANK."},
+    {2.5f,2.5f,0.78f,20.5f,21.5f,8,17,1,0x000,"WALK QUIET. TAKE THE DATA."},
+    {2.5f,21.5f,-0.78f,20.5f,2.5f,9,16,0,0x1c0,"SECURE THE DATA. GET OUT ALIVE."},
 };
 
 static const last_zone_layout_info_t *layout_info(const last_zone_game_t *game)
@@ -450,6 +450,7 @@ float last_zone_extract_bearing(const last_zone_game_t *game)
 char last_zone_grade(const last_zone_game_t *game)
 {
     if(!game||game->phase==LAST_ZONE_PHASE_DEAD)return 'D';
+    if(game->phase==LAST_ZONE_PHASE_WON&&!game->spotted&&!game->damage_taken)return 'S';
     unsigned seconds=game->tick/30U;
     bool mission_s=false;
     switch(game->layout){
@@ -544,6 +545,7 @@ static void repair_layout(last_zone_game_t *game)
 {
     uint8_t seen[LAST_ZONE_HEIGHT][LAST_ZONE_WIDTH];
     flood_layout(game,seen,(int)last_zone_spawn_x(game),(int)last_zone_spawn_y(game));
+    snap_reachable(&game->objective_x,&game->objective_y,seen);
     for(int i=0;i<LAST_ZONE_ENEMIES;++i)
         snap_reachable(&game->enemies[i].x,&game->enemies[i].y,seen);
     for(int i=0;i<LAST_ZONE_PICKUPS;++i)
@@ -628,6 +630,9 @@ static void place_layout(last_zone_game_t *game,uint8_t layout)
         game->pickups[i].kind=pickup_kind[layout][i];
         game->pickups[i].taken=false;
     }
+    game->objective_x=pickup_xy[layout][3][0];
+    game->objective_y=pickup_xy[layout][3][1];
+    game->objective_collected=false;
     static const float prop_xy[LAST_ZONE_LAYOUTS][LAST_ZONE_PROPS][2]={
         {{14.5f,12.5f},{3.5f,5.5f},{9.5f,8.5f},{19.5f,15.5f},{3.5f,21.5f},{6.5f,21.5f},
          {9.5f,21.5f},{12.5f,21.5f},{15.5f,21.5f},{18.5f,21.5f},{21.5f,21.5f},{2.5f,18.5f}},
@@ -759,6 +764,14 @@ void last_zone_set_performance(last_zone_game_t *game,float logic_fps,
 
 static void collect_pickups(last_zone_game_t *game)
 {
+    float ox=game->objective_x-game->x,oy=game->objective_y-game->y;
+    if(!game->objective_collected&&ox*ox+oy*oy<.42f&&
+       line_clear(game,game->x,game->y,game->objective_x,game->objective_y)){
+        game->objective_collected=true;
+        game->score+=100;
+        game->last_pickup=true;
+        game->pickup_flash=30;
+    }
     for(int i=0;i<LAST_ZONE_PICKUPS;++i){
         last_zone_pickup_t *item=&game->pickups[i];
         if(item->taken)continue;
@@ -788,7 +801,8 @@ void last_zone_update(last_zone_game_t *game)
 {
     if(!game||game->phase!=LAST_ZONE_PHASE_PLAYING)return;
     const float turn=.085f;
-    game->last_fire=NEON_FIRE_NONE;
+    game->last_fire=game->interact_pending?NEON_FIRE_DOOR:NEON_FIRE_NONE;
+    game->interact_pending=false;
     game->last_pickup=false;
     game->last_alert=false;
     game->last_blast=false;
@@ -1113,7 +1127,7 @@ void last_zone_update(last_zone_game_t *game)
     }
     if(!game->sfx&&game->last_pickup)emit_sfx(game,6);
     if(!game->sfx&&game->last_alert)emit_sfx(game,5);
-    if(last_zone_enemies_alive(game)==0&&last_zone_on_extract(game)){
+    if(game->phase==LAST_ZONE_PHASE_PLAYING&&game->objective_collected&&last_zone_on_extract(game)){
         game->cells_reached=1;
         game->phase=LAST_ZONE_PHASE_WON;
         emit_sfx(game,11);
@@ -1141,17 +1155,21 @@ static float angle_delta(float value)
     return value;
 }
 
+bool last_zone_interact(last_zone_game_t *game)
+{
+    if(!game||game->phase!=LAST_ZONE_PHASE_PLAYING)return false;
+    int x=0,y=0;
+    if(!door_cell_ahead(game,&x,&y))return false;
+    open_door_cluster(game,x,y);
+    game->interact_pending=true;
+    return true;
+}
+
 last_zone_fire_result_t last_zone_fire(last_zone_game_t *game)
 {
     if(!game)return NEON_FIRE_NONE;
     if(game->phase!=LAST_ZONE_PHASE_PLAYING){last_zone_confirm(game);return NEON_FIRE_NONE;}
     if(game->fire_cooldown)return NEON_FIRE_NONE;
-    int door_x=0,door_y=0;
-    if(door_cell_ahead(game,&door_x,&door_y)){
-        open_door_cluster(game,door_x,door_y);
-        game->fire_cooldown=LAST_ZONE_DOOR_COOLDOWN;
-        return NEON_FIRE_DOOR;
-    }
     if(!game->ammo){
         game->fire_cooldown=LAST_ZONE_DRY_COOLDOWN;
         game->dry_flash=10;
@@ -1236,7 +1254,7 @@ uint32_t last_zone_state_hash(const last_zone_game_t *game)
         game->tick,game->cells_reached,game->score,
         (uint32_t)game->phase,(uint32_t)game->hp,(uint32_t)game->armor,(uint32_t)game->ammo,
         (uint32_t)game->layout,(uint32_t)game->spotted,(uint32_t)game->holding_breath,
-        (uint32_t)game->unlocked};
+        (uint32_t)game->unlocked,(uint32_t)game->objective_collected};
     for(unsigned i=0;i<sizeof(values)/sizeof(values[0]);++i){hash^=values[i];hash*=16777619U;}
     for(int i=0;i<LAST_ZONE_ENEMIES;++i){
         const last_zone_enemy_t *enemy=&game->enemies[i];

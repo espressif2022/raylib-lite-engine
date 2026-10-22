@@ -28,7 +28,7 @@ typedef struct {
     uint8_t sunrise_seed_count;
     uint16_t idle_ticks;
     uint8_t scene,effects_level;
-    bool dragging,ui_touch;
+    bool dragging,ui_touch,auto_pan;
 } living_world_t;
 
 enum { LIVING_SCENE_AURORA=0, LIVING_SCENE_OCEAN=1,

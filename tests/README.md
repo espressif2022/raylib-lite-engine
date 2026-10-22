@@ -205,3 +205,5 @@ It checks all sampled UVs and framebuffer coverage against independent plane
 equations, then runs interleaved timings. Failed quality or unstable timings
 cannot receive a total score. The versioned scoring policy is defined in `tools/wall_benchmark.py`;
 record its policy version with each Host or device result.
+
+Bitmap font tests require Pillow and fontTools (`python3 -m pip install Pillow fontTools`). They generate original geometric glyph fixtures; no system font is required or redistributed. Native BMFont tests exercise actual rcore/rlsw pages.

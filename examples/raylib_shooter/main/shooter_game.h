@@ -5,13 +5,17 @@
 
 #define SHOOTER_MAX_BULLETS 64
 #define SHOOTER_MAX_ENEMIES 32
+#define SHOOTER_MAX_ENEMY_BULLETS 96
+#define SHOOTER_FINALE_TICK 2400U
 #define SHOOTER_MAX_PARTICLES 72
 
 typedef enum { SHOOTER_START, SHOOTER_PLAYING, SHOOTER_PAUSED,
-               SHOOTER_GAME_OVER } shooter_phase_t;
+               SHOOTER_GAME_OVER, SHOOTER_WON } shooter_phase_t;
 typedef struct {
     float x, y, vx, vy;
     uint8_t kind, hp, max_hp;
+    uint16_t attack_ticks;
+    bool boss;
     bool elite;
     bool active;
 } shooter_actor_t;
@@ -25,6 +29,7 @@ typedef struct {
     shooter_actor_t player;
     shooter_actor_t bullets[SHOOTER_MAX_BULLETS];
     shooter_actor_t enemies[SHOOTER_MAX_ENEMIES];
+    shooter_actor_t enemy_bullets[SHOOTER_MAX_ENEMY_BULLETS];
     shooter_particle_t particles[SHOOTER_MAX_PARTICLES];
     uint32_t score, tick, rng, shots_fired;
     uint16_t fire_cooldown, spawn_cooldown, combo_timer;
@@ -32,12 +37,15 @@ typedef struct {
     uint8_t lives, combo, max_combo, wave;
     uint8_t invulnerable, hit_flash, wave_banner;
     uint8_t formation_step;
+    bool pointer_down, pointer_consumed, finale_spawned;
+    float pointer_x, pointer_y;
     float width; /* arena width; the height is always 480 */
 } shooter_game_t;
 
 /* Keeps the current arena width (480 when unset). */
 void shooter_game_reset(shooter_game_t *game, uint32_t seed);
 void shooter_game_set_width(shooter_game_t *game, float width);
+void shooter_game_start(shooter_game_t *game);
 void shooter_game_set_pointer(shooter_game_t *game, float x, float y, bool pressed);
 void shooter_game_move(shooter_game_t *game, float dx, float dy);
 void shooter_game_toggle_pause(shooter_game_t *game);

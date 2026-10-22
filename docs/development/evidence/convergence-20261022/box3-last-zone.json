@@ -1,0 +1,37 @@
+{
+  "samples": 16,
+  "display": {
+    "mean": 29.97,
+    "p50": 30.0,
+    "p95": 30.0
+  },
+  "logic": {
+    "mean": 30.06,
+    "p50": 30.0,
+    "p95": 30.0
+  },
+  "render": {
+    "mean": 16776.62,
+    "p50": 14586.0,
+    "p95": 23224.0
+  },
+  "frame": 900,
+  "dropped": 1,
+  "busy": 1,
+  "errors": 0,
+  "min_heap_bytes": 139559,
+  "min_psram_bytes": 14460996,
+  "surface": [
+    320,
+    240
+  ],
+  "cpu_mhz": 240,
+  "psram_mhz": 80,
+  "idf_commit": "7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe",
+  "binaries": {
+    "last_zone_extraction.bin": "550d1205592e2423b534964791763c672768c6ff1c1e96f816eea13972f36347"
+  },
+  "config_header_sha256": "fe302c5c81b957f1be66a5b0c81fed8573db5315bd30c6727d2eb761b4df35fc",
+  "source_log_sha256": "5d819b10a6ef9a2b89eb399e5afb24acf7c968479b127b456aecfa2e738c6cfe",
+  "scope": "single Box-3 deterministic replay; no before/after performance claim"
+}

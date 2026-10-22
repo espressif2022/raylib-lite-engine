@@ -233,6 +233,29 @@ static void check_errors(fake_backing_t *source)
         &backing, 32, CHECKSUM) == RAYLIB_LITE_INVALID_ARGUMENT);
 }
 
+static void check_registration_lifetime(void)
+{
+    static const uint8_t bytes[] = {1, 2, 3};
+    raylib_lite_asset_view_t view = {0};
+    assert(raylib_lite_asset_register_memory("", bytes, sizeof(bytes)) == RAYLIB_LITE_INVALID_ARGUMENT);
+    for (int i = 0; i < 100; ++i) {
+        assert(raylib_lite_asset_register_memory("live", bytes, sizeof(bytes)) == RAYLIB_LITE_OK);
+        assert(raylib_lite_asset_register_memory("live", bytes, sizeof(bytes)) == RAYLIB_LITE_INVALID_STATE);
+        assert(raylib_lite_asset_open_id(raylib_lite_asset_id("live"), &view) == RAYLIB_LITE_OK);
+        assert(view.data == bytes);
+        raylib_lite_asset_release(&view);
+        assert(!view.data && !view.size && !view.name);
+        assert(raylib_lite_asset_unregister_memory("live") == RAYLIB_LITE_OK);
+        assert(raylib_lite_asset_open("live", &view) == RAYLIB_LITE_NOT_FOUND);
+    }
+    assert(raylib_lite_asset_unregister_memory("live") == RAYLIB_LITE_NOT_FOUND);
+    assert(raylib_lite_asset_register_memory("live", bytes, sizeof(bytes)) == RAYLIB_LITE_OK);
+    raylib_lite_assets_unmount();
+    assert(raylib_lite_asset_open("live", &view) == RAYLIB_LITE_NOT_FOUND);
+    assert(raylib_lite_asset_register_memory("live", bytes, sizeof(bytes)) == RAYLIB_LITE_OK);
+    raylib_lite_assets_unmount();
+}
+
 int main(void)
 {
     fake_backing_t source;
@@ -240,6 +263,7 @@ int main(void)
     check_read_backing(&source);
     check_image_and_partition(&source);
     check_errors(&source);
+    check_registration_lifetime();
     puts("game assets: ok");
     return 0;
 }

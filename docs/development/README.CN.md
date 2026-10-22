@@ -14,5 +14,10 @@
 | [Sky Hop 原生适配](sky-hop-rcore-20261012.CN.md) | S31 同板实测、性能不达标与兼容路径回退 |
 | [示例渲染技术提取审查](render-extraction-review.CN.md) | 共享与公开门槛、候选归属和未实施的处理顺序 |
 | [Raylib 历史对照](raylib-comparison-history.CN.md) | 历史整帧及像素测量，保留当时计划 |
+| [引擎修改方案与原生 Demo 能力补齐](engine-improvement-plan-20261022.CN.md) | 实现缺陷、字体与中文、资源链路、Host 一致性及分阶段验收 |
+| [六款发布游戏体验审查与改造方案](games-product-redesign-plan-20261022.CN.md) | 玩法目标、双尺寸画面、触屏交互、素材替换、可选重做方向与验收清单 |
 
 新增正式契约写入正式指南；关键决策与验证范围写入本目录。正式指南不链接开发记录，避免发布后指向未打包内容。
+
+- [原生有限回放与设备性能证据](native-replay.CN.md)
+- [2026-10-22 审查实施、升级与验证收敛](review-convergence-20261022.CN.md)

@@ -486,8 +486,10 @@ static void draw_pickups(const last_zone_game_t *game, raylib_lite_atlas_t props
 
 static void draw_extract(const last_zone_game_t *game)
 {
-    /* Keep the locked objective from competing with last-hostile guidance. */
-    if (last_zone_enemies_alive(game) != 0) return;
+    if (!game->objective_collected) {
+        draw_billboard_box(game,game->objective_x,game->objective_y,(Color){255,214,75,255},8);
+        return;
+    }
     int center, size, ground;
     float distance;
     project_sprite(game, last_zone_extract_x(game), last_zone_extract_y(game),
@@ -1118,7 +1120,7 @@ static void draw_radar(const last_zone_game_t *game)
             DrawRectangle(left + x * scale, top + y * scale, scale - 1, scale - 1, color);
         }
     int alive = last_zone_enemies_alive(game);
-    bool extract_open = alive == 0;
+    bool extract_open = game->objective_collected;
     for (int i = 0; i < LAST_ZONE_PICKUPS; ++i) {
         if (game->pickups[i].taken) continue;
         int mx = (int)game->pickups[i].x, my = (int)game->pickups[i].y;
@@ -1276,25 +1278,17 @@ static void draw_status_hud(const last_zone_game_t *game)
 static void draw_guidance(const last_zone_game_t *game)
 {
     int alive = last_zone_enemies_alive(game);
-    int last = last_zone_last_enemy_index(game);
-    if (alive == 0) {
-        float dx = last_zone_extract_x(game) - game->x;
-        float dy = last_zone_extract_y(game) - game->y;
-        unsigned meters = (unsigned)sqrtf(dx * dx + dy * dy);
-        draw_bearing_marker(last_zone_extract_bearing(game), (Color){72, 255, 214, 255},
-                            TextFormat("EX %um", meters));
-        draw_text("EXTRACT OPEN", hud_x("EXTRACT OPEN", 14, 176), 104, 14,
-                  (Color){72, 255, 214, 255});
-    } else if (last >= 0) {
-        float dx = game->enemies[last].x - game->x, dy = game->enemies[last].y - game->y;
-        unsigned meters = (unsigned)sqrtf(dx * dx + dy * dy);
-        float bearing = atan2f(dy, dx) - game->angle;
-        while (bearing > 3.1415927f) bearing -= 6.2831853f;
-        while (bearing < -3.1415927f) bearing += 6.2831853f;
-        draw_bearing_marker(bearing, (Color){255, 92, 140, 255}, TextFormat("EN %um", meters));
-        draw_text("LAST HOSTILE INBOUND", hud_x("LAST HOSTILE INBOUND", 14, 132), 104, 14,
-                  (Color){255, 92, 140, 255});
-    }
+    float tx=game->objective_collected?last_zone_extract_x(game):game->objective_x;
+    float ty=game->objective_collected?last_zone_extract_y(game):game->objective_y;
+    float dx=tx-game->x,dy=ty-game->y;
+    float bearing=atan2f(dy,dx)-game->angle;
+    while(bearing>3.1415927f)bearing-=6.2831853f;
+    while(bearing<-3.1415927f)bearing+=6.2831853f;
+    Color objective_color=game->objective_collected?(Color){72,255,214,255}:(Color){255,214,75,255};
+    draw_bearing_marker(bearing,objective_color,
+        TextFormat("%s %um",game->objective_collected?"EXIT":"DATA",(unsigned)sqrtf(dx*dx+dy*dy)));
+    const char *goal=game->objective_collected?"DATA SECURED - EXTRACT":"FIND THE DATA";
+    draw_text(goal,hud_x(goal,14,176),104,14,objective_color);
     if (!game->ammo && alive > 1) {
         int nearest = -1;
         float best = 1e9f;
@@ -1381,7 +1375,7 @@ static void draw_controls(const last_zone_game_t *game, raylib_lite_atlas_t cont
         (Vector2){0, 0}, 0, WHITE);
     if (game->fire_held)
         DrawCircle(LAST_ZONE_FIRE_X, LAST_ZONE_FIRE_Y, 16, (Color){255, 220, 72, 255});
-    const char *fire_label = !game->ammo ? "DRY" : (game->fire_cooldown ? "BOLT" : "FIRE");
+    const char *fire_label = !game->ammo ? "DRY" : (game->fire_cooldown ? "BOLT" : "AIM/FIRE");
     Color fire_color = !game->ammo ? (Color){255, 92, 70, 255} : (Color){255, 220, 72, 255};
     draw_text(fire_label, 376, 338, 10, fire_color);
     pin_hud(0);
@@ -1428,10 +1422,13 @@ static void draw_controls(const last_zone_game_t *game, raylib_lite_atlas_t cont
         callout("GATE OPEN", 246, 16, (Color){255, 220, 72, 255});
     if (game->dry_flash)
         callout("NO AMMO", 266, 16, (Color){255, 92, 70, 255});
-    if (last_zone_door_ahead(game))
-        callout("FIRE TO OPEN GATE", 290, 14, (Color){255, 220, 72, 255});
+    if (last_zone_door_ahead(game)) {
+        DrawRectangle(190,276,100,48,(Color){8,20,28,240});
+        DrawRectangleLines(190,276,100,48,(Color){255,220,72,255});
+        callout("OPEN",290,14,(Color){255,220,72,255});
+    }
     else if (last_zone_near_closed_door(game))
-        callout("FACE GATE, THEN FIRE", 290, 14, (Color){255, 220, 72, 255});
+        callout("FACE GATE TO OPEN", 290, 14, (Color){255, 220, 72, 255});
     if (game->hp == 1 && game->phase == LAST_ZONE_PHASE_PLAYING) {
         int pulse = 5 + (int)(sinf((float)game->tick * 0.28f) * 3.0f);
         draw_damage_frame(pulse, (Color){120, 18, 28, 255});
@@ -1490,11 +1487,11 @@ static void draw_phase_overlay(const last_zone_game_t *game)
         const char *briefing=last_zone_briefing(game);
         int briefing_x=240-measure_text(briefing,14)/2;
         overlay_text(briefing, briefing_x, 156, 14, (Color){192, 235, 214, 255});
-        overlay_text(compact() ? "FIRE: SHOOT / OPEN GATE" : "TAP FIRE TO SHOOT / OPEN GATE",
+        overlay_text("LEFT: MOVE / RIGHT: DRAG AIM",
                      82, 178, 16, (Color){192, 235, 214, 255});
-        overlay_text(compact() ? "HOLD FIRE TO STEADY" : "HOLD FIRE TO STEADY, STAND SILENT",
+        overlay_text("RELEASE RIGHT TO FIRE",
                      78, 200, 14, (Color){192, 235, 214, 255});
-        overlay_text("CLEAR ALL, THEN THE EXTRACT PAD", 86, 222, 14, (Color){255, 220, 72, 255});
+        overlay_text("TAKE DATA, THEN REACH EXIT", 86, 222, 14, (Color){255, 220, 72, 255});
         char best_buf[8];
         format_clock_buf(game->best_ticks, best_buf);
         overlay_text(TextFormat("MISSION %u/%u %s", (unsigned)game->layout + 1U,

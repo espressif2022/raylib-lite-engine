@@ -613,10 +613,14 @@ static void draw_button(Rectangle bounds, Color accent, bool pressed, int icon)
 static void draw_controls(const platform_game_t *game)
 {
     Color steel = {38, 62, 96, 255};
-    draw_button((Rectangle){8, 408, 138, 64}, steel, game->move_left, -1);
-    draw_button((Rectangle){154, 408, 138, 64}, steel, game->move_right, 1);
-    draw_button((Rectangle){(float)SCREEN_W - 180, 408, 172, 64}, (Color){236, 104, 63, 255},
-                game->jump_held, 0);
+    DrawRectangle(0,400,SCREEN_W,80,(Color){14,26,46,255});
+    for(unsigned action=0;action<3;++action){
+        platform_block_t r=platform_game_control_rect(game,(platform_action_t)action);
+        bool held=action==0?game->move_left:action==1?game->move_right:game->jump_held;
+        draw_button((Rectangle){r.x,r.y,r.width,r.height},
+                    action==2?(Color){236,104,63,255}:steel,held,
+                    action==0?-1:action==1?1:0);
+    }
 }
 
 static void draw_banner(const platform_game_t *game, const sky_hop_fx_t *fx,
@@ -637,10 +641,8 @@ static void draw_banner(const platform_game_t *game, const sky_hop_fx_t *fx,
 
 static void draw_hint(const platform_game_t *game)
 {
-    if (game->phase != PLATFORM_PLAYING || game->level != 0 || game->tick >= 240U ||
-        game->tick < 84U) return;
-    const char *hint = game->tick < 160U ? "HOLD A DIRECTION TO RUN"
-                                         : "TAP JUMP / HOLD FOR HEIGHT";
+    if(game->phase!=PLATFORM_PLAYING||game->level!=0||game->player_x>600||game->tick<84U)return;
+    const char *hint=game->player_x<300?"HOLD A DIRECTION TO RUN":"HOLD JUMP TO CLEAR THE STEP";
     int width = measure_text(hint, 13) + 24;
     DrawRectangleRounded((Rectangle){(float)(SCREEN_W - width) / 2, 76, (float)width, 25}, .4f, 4,
                          (Color){14, 26, 46, 210});

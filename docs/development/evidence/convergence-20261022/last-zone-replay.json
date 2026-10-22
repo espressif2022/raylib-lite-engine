@@ -1,0 +1,220 @@
+{
+  "schema": "raylib-lite-native-replay-v1",
+  "duration_ticks": 900,
+  "events": [
+    {
+      "tick": 3,
+      "type": "action",
+      "code": 4,
+      "pressed": true
+    },
+    {
+      "tick": 4,
+      "type": "action",
+      "code": 4,
+      "pressed": false
+    },
+    {
+      "tick": 20,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "tick": 75,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "tick": 80,
+      "type": "action",
+      "code": 1,
+      "pressed": true
+    },
+    {
+      "tick": 105,
+      "type": "action",
+      "code": 1,
+      "pressed": false
+    },
+    {
+      "tick": 110,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "tick": 125,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "tick": 200,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "tick": 255,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "tick": 260,
+      "type": "action",
+      "code": 0,
+      "pressed": true
+    },
+    {
+      "tick": 285,
+      "type": "action",
+      "code": 0,
+      "pressed": false
+    },
+    {
+      "tick": 290,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "tick": 305,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "tick": 330,
+      "type": "control",
+      "code": "pause"
+    },
+    {
+      "tick": 360,
+      "type": "control",
+      "code": "resume"
+    },
+    {
+      "tick": 440,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "tick": 495,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "tick": 500,
+      "type": "action",
+      "code": 1,
+      "pressed": true
+    },
+    {
+      "tick": 525,
+      "type": "action",
+      "code": 1,
+      "pressed": false
+    },
+    {
+      "tick": 530,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "tick": 545,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "tick": 650,
+      "type": "action",
+      "code": 2,
+      "pressed": true
+    },
+    {
+      "tick": 705,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "tick": 710,
+      "type": "action",
+      "code": 0,
+      "pressed": true
+    },
+    {
+      "tick": 735,
+      "type": "action",
+      "code": 0,
+      "pressed": false
+    },
+    {
+      "tick": 740,
+      "type": "action",
+      "code": 6,
+      "pressed": true
+    },
+    {
+      "tick": 755,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "tick": 880,
+      "type": "action",
+      "code": 0,
+      "pressed": false
+    },
+    {
+      "tick": 880,
+      "type": "action",
+      "code": 1,
+      "pressed": false
+    },
+    {
+      "tick": 880,
+      "type": "action",
+      "code": 2,
+      "pressed": false
+    },
+    {
+      "tick": 880,
+      "type": "action",
+      "code": 5,
+      "pressed": false
+    },
+    {
+      "tick": 880,
+      "type": "action",
+      "code": 6,
+      "pressed": false
+    },
+    {
+      "tick": 880,
+      "type": "action",
+      "code": 7,
+      "pressed": false
+    },
+    {
+      "tick": 880,
+      "type": "action",
+      "code": 8,
+      "pressed": false
+    },
+    {
+      "tick": 880,
+      "type": "action",
+      "code": 9,
+      "pressed": false
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 [简体中文](README.CN.md) · [Examples](../README.md)
 
-Living Worlds is a four-scene 360° look-around experience. Browse Aurora, Ocean, Sunrise and Jungle; about three seconds after you stop interacting, the automatic tour resumes.
+Living Worlds is a four-scene interactive landscape experience. Aurora, Ocean and Sunrise offer bounded parallax views; Jungle supports horizontal 360° viewing. In `AUTO` mode the tour resumes about three seconds after interaction. Tap the top-right `AUTO` / `HOLD` control to hold your composition. Dragging still reframes the scene in `HOLD`, then stops immediately on release while scenery animation continues. This choice survives scene switches; restarting restores `AUTO`.
 
 ![Living Worlds Sunrise](docs/screenshot.png)
 

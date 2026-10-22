@@ -111,8 +111,15 @@ raylib_lite_result_t raylib_lite_assets_mount_backing(
             free(toc_copy);
             return RAYLIB_LITE_INVALID_SIZE;
         }
+        raylib_lite_asset_id_t id = raylib_lite_asset_id((const char *)entry);
+        for (uint32_t j = 0; j < i; ++j) {
+            if (s_backing.entries[j].id == id) {
+                free(toc_copy);
+                return RAYLIB_LITE_INVALID_ARGUMENT;
+            }
+        }
         s_backing.entries[i] = (backing_entry_t){
-            .id = raylib_lite_asset_id((const char *)entry),
+            .id = id,
             .name = (const char *)entry,
             .data = image ? data_base + offset + 2 : NULL,
             .backing_offset = 32U + (uint32_t)table_bytes + offset + 2U,
@@ -152,7 +159,7 @@ raylib_lite_result_t raylib_lite_assets_mount(const raylib_lite_asset_store_conf
 raylib_lite_result_t raylib_lite_asset_register_memory(const char *name,
                                               const void *data, size_t size)
 {
-    if (!name || !data || !size) return RAYLIB_LITE_INVALID_ARGUMENT;
+    if (!name || !*name || !data || !size) return RAYLIB_LITE_INVALID_ARGUMENT;
     raylib_lite_asset_id_t id=raylib_lite_asset_id(name);
     for(size_t i=0;i<s_embedded_count;++i)
         if(s_embedded[i].id==id)return RAYLIB_LITE_INVALID_STATE;
@@ -162,9 +169,24 @@ raylib_lite_result_t raylib_lite_asset_register_memory(const char *name,
     return RAYLIB_LITE_OK;
 }
 
+raylib_lite_result_t raylib_lite_asset_unregister_memory(const char *name)
+{
+    if (!name || !*name) return RAYLIB_LITE_INVALID_ARGUMENT;
+    for (size_t i = 0; i < s_embedded_count; ++i) {
+        if (strcmp(s_embedded[i].name, name) != 0) continue;
+        memmove(&s_embedded[i], &s_embedded[i + 1],
+                (s_embedded_count - i - 1) * sizeof(s_embedded[0]));
+        memset(&s_embedded[--s_embedded_count], 0, sizeof(s_embedded[0]));
+        return RAYLIB_LITE_OK;
+    }
+    return RAYLIB_LITE_NOT_FOUND;
+}
+
 void raylib_lite_assets_unmount(void)
 {
     raylib_lite_asset_mmap_unmount();
+    memset(s_embedded, 0, sizeof(s_embedded));
+    s_embedded_count = 0;
     for (size_t i = 0; i < s_backing.count; ++i)
         free(s_backing.entries[i].mat_buf);
     free(s_backing.toc_copy);
@@ -227,7 +249,7 @@ void raylib_lite_asset_release(raylib_lite_asset_view_t *view)
         }
         break;
     }
-    view->data = NULL;
+    *view = (raylib_lite_asset_view_t){0};
 }
 
 raylib_lite_result_t raylib_lite_asset_open(const char *name, raylib_lite_asset_view_t *out)

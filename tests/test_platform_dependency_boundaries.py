@@ -596,8 +596,10 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
         cmake = (ENGINE / "CMakeLists.txt").read_text()
         self.assertTrue((audio / "raylib_lite_audio_decode.c").is_file())
         self.assertTrue((audio / "raylib_lite_audio_mixer.c").is_file())
-        self.assertIn("src/audio/raylib_lite_audio_decode.c", cmake)
-        self.assertIn("src/audio/raylib_lite_audio_mixer.c", cmake)
+        self.assertIn("src/portable_sources.json", cmake)
+        portable = json.loads((ENGINE / "src/portable_sources.json").read_text())
+        self.assertIn("src/audio/raylib_lite_audio_decode.c", portable)
+        self.assertIn("src/audio/raylib_lite_audio_mixer.c", portable)
 
         board_cmake = (ENGINE / "examples/boards/esp-mosaico/CMakeLists.txt").read_text()
         board_manifest = (ENGINE / "examples/boards/esp-mosaico/idf_component.yml").read_text()

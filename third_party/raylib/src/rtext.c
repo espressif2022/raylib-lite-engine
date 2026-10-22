@@ -2655,7 +2655,6 @@ static Font LoadBMFont(const char *fileName)
     }
 
     Image fullFont = imFonts[0];
-    for (int i = 1; i < pageCount; i++) UnloadImage(imFonts[i]);
 
     // If multiple atlas, then merge atlas
     // NOTE: WARNING: This process could be really slow!
@@ -2672,6 +2671,8 @@ static Font LoadBMFont(const char *fileName)
         }
     }
 
+    // Release additional pages only after their pixels have been composited.
+    for (int i = 1; i < pageCount; i++) UnloadImage(imFonts[i]);
     RL_FREE(imFonts);
 
     font.texture = LoadTextureFromImage(fullFont);

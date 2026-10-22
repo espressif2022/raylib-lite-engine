@@ -2,7 +2,7 @@
 
 [简体中文](README.CN.md) · [Examples](../README.md)
 
-Last Zone is a lightweight tactical shooter. Complete five training missions in order: search for supplies, clear enemies and reach the extraction point. Later missions give less ammunition and armor and more elite enemies.
+Last Zone is a lightweight tactical shooter. Complete five training missions in order: search for supplies, collect the `DATA` case and reach extraction. Enemies may remain alive; an undetected, undamaged extraction earns an S grade. Later missions give less ammunition and armor and more elite enemies.
 
 ![Last Zone: Extraction](docs/screenshot.png)
 
@@ -14,16 +14,16 @@ The image is the Host RGB565 frame of the Dock mission.
 
 - Tap the briefing to deploy or redeploy.
 - The left stick moves; push to the outer ring ahead to sprint.
-- Drag on the right side to turn and pitch.
-- Tap the fire button to shoot or open the door you face; hold fire to steady the weapon.
+- Hold and drag on the right to aim; release to fire. The left finger can keep moving, so moving, aiming and firing need only two contacts. Holding still steadies the weapon.
+- Face a nearby door and tap the central `OPEN` button. Firing never opens doors.
 - The radar panel can be dragged out of the way.
 
 ### Host
 
 - `W`/`S`: forward and back; `Q`/`E`: strafe.
 - `A`/`D`: turn; `Shift`: sprint.
-- `F` or `Ctrl`: fire or interact.
-- Drag on the right side with the mouse: adjust the view.
+- `F` or `Ctrl`: hold to steady, release to fire.
+- Drag on the right with the mouse to aim and release to fire; click `OPEN` for doors. Replay action `10` invokes door interaction.
 
 ## Campaign
 
@@ -35,7 +35,7 @@ The image is the Host RGB565 frame of the Dock mission.
 | Ghost | Ambush | 8 |
 | Run | Assault | 9, including 3 elites |
 
-Device NVS stores campaign progress and each mission's best result.
+Device NVS keeps the existing save format, campaign progress and best times. Historical times earned under the clear-all rule remain stored and are not directly comparable to the new retrieval route.
 
 ## Hostiles
 

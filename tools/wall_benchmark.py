@@ -149,9 +149,9 @@ def main():
     out = args.output.resolve(); out.mkdir(parents=True, exist_ok=False)
     sources = [ROOT/'src/renderer'/name for name in
                ('raylib_lite_wall_bench.c', 'raylib_lite_renderer.c', 'raylib_lite_renderer_raylib.c', 'raylib_lite_rgb565.c')]
-    sources += [ROOT/'host/host_asset_runtime.c']
+    sources += [ROOT/'host/host_asset_runtime.c', ROOT/'src/assets/raylib_lite_assets.c']
     flags = ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-DWALL_BENCH_HOST=1']
-    for folder in ('host/include', 'host', 'include/raylib_lite',
+    for folder in ('src/assets', 'host/include', 'host', 'include/raylib_lite',
                    'include/raylib_lite'):
         flags += ['-I', str(ROOT/folder)]
     environment = {'platform': platform.platform(), 'machine': platform.machine(),

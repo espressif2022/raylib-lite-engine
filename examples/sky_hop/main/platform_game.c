@@ -42,6 +42,7 @@ static const platform_spring_t LEVEL_4_SPRINGS[] = {
 
 static const platform_block_t LEVEL_1_BLOCKS[] = {
     {0, FLOOR_Y, 2160, 90},
+    {440, 330, 36, 60}, /* Safe first obstacle: jump is required, no lethal pit. */
     {160, 330, 100, 20}, {310, 280, 90, 20}, {470, 330, 110, 20},
     {640, 275, 95, 20}, {820, 320, 100, 20}, {1000, 250, 110, 20},
     {1180, 305, 95, 20}, {1360, 260, 100, 20}, {1540, 315, 110, 20},
@@ -217,6 +218,7 @@ static void load_level(platform_game_t *game, uint8_t level_index)
     place_at_respawn(game);
     game->checkpoint_active = false;
     game->move_left = game->move_right = game->jump_held = game->facing_left = false;
+    game->key_actions = game->touch_actions = 0;
     game->coin_chain = 0;
     game->coin_chain_timer = 0;
     game->invulnerable_ticks = 0;
@@ -254,6 +256,27 @@ static void set_phase(platform_game_t *game, platform_phase_t phase)
     game->phase_tick = 0;
 }
 
+static void sync_actions(platform_game_t *game)
+{
+    if(game->phase != PLATFORM_PLAYING)return;
+    unsigned held=game->key_actions|game->touch_actions;
+    game->move_left=(held&(1U<<PLATFORM_ACTION_LEFT))!=0;
+    game->move_right=(held&(1U<<PLATFORM_ACTION_RIGHT))!=0;
+    if(game->move_left!=game->move_right)game->facing_left=game->move_left;
+    bool jump=(held&(1U<<PLATFORM_ACTION_JUMP))!=0;
+    if(jump&&!game->jump_held)game->jump_buffer=JUMP_BUFFER_FRAMES;
+    if(!jump&&game->jump_held&&game->velocity_y < -2.0f)game->velocity_y*=JUMP_RELEASE_SCALE;
+    game->jump_held=jump;
+}
+
+platform_block_t platform_game_control_rect(const platform_game_t *game, platform_action_t action)
+{
+    if(action==PLATFORM_ACTION_LEFT)return (platform_block_t){8,408,138,64};
+    if(action==PLATFORM_ACTION_RIGHT)return (platform_block_t){154,408,138,64};
+    if(action==PLATFORM_ACTION_JUMP)return (platform_block_t){game->view_width-180,408,172,64};
+    return (platform_block_t){0};
+}
+
 void platform_game_set_action(platform_game_t *game, platform_action_t action,
                               bool pressed)
 {
@@ -274,6 +297,8 @@ void platform_game_set_action(platform_game_t *game, platform_action_t action,
     if (action == PLATFORM_ACTION_PAUSE && pressed) {
         if (game->phase == PLATFORM_PLAYING) {
             game->move_left = game->move_right = game->jump_held = false;
+            game->key_actions=game->touch_actions=0;
+            for(unsigned i=0;i<PLATFORM_POINTER_COUNT;++i)game->pointers[i].consumed=true;
             set_phase(game, PLATFORM_PAUSED);
             emit(game, PLATFORM_EVENT_PAUSE);
         } else if (game->phase == PLATFORM_PAUSED) {
@@ -282,22 +307,11 @@ void platform_game_set_action(platform_game_t *game, platform_action_t action,
         }
         return;
     }
-    if (game->phase != PLATFORM_PLAYING) return;
-    if (action == PLATFORM_ACTION_LEFT) {
-        game->move_left = pressed;
-        if (pressed) game->facing_left = true;
-    }
-    if (action == PLATFORM_ACTION_RIGHT) {
-        game->move_right = pressed;
-        if (pressed) game->facing_left = false;
-    }
-    if (action == PLATFORM_ACTION_JUMP) {
-        if (pressed && !game->jump_held)
-            game->jump_buffer = JUMP_BUFFER_FRAMES;
-        if (!pressed && game->jump_held && game->velocity_y < -2.0f)
-            game->velocity_y *= JUMP_RELEASE_SCALE;
-        game->jump_held = pressed;
-    }
+    if (action < PLATFORM_ACTION_LEFT || action > PLATFORM_ACTION_JUMP) return;
+    unsigned mask=1U<<(unsigned)action;
+    if(pressed)game->key_actions|=mask;
+    else game->key_actions&=~mask;
+    sync_actions(game);
 }
 
 static void apply_jump(platform_game_t *game)
@@ -316,55 +330,44 @@ static void apply_jump(platform_game_t *game)
 
 static void sync_pointer_actions(platform_game_t *game)
 {
-    bool left = false, right = false, jump = false;
-    for (size_t i = 0; i < PLATFORM_POINTER_COUNT; ++i) {
-        const platform_pointer_t *pointer = &game->pointers[i];
-        if (!pointer->active || pointer->y < 360.0f) continue;
-        if (pointer->x < 150.0f) left = true;
-        else if (pointer->x < 300.0f) right = true;
-        else jump = true;
+    game->touch_actions=0;
+    for(size_t i=0;i<PLATFORM_POINTER_COUNT;++i){
+        const platform_pointer_t *p=&game->pointers[i];
+        if(!p->active||p->consumed)continue;
+        for(unsigned action=0;action<3;++action){
+            platform_block_t r=platform_game_control_rect(game,(platform_action_t)action);
+            if(p->x>=r.x&&p->x<r.x+r.width&&p->y>=r.y&&p->y<r.y+r.height)
+                game->touch_actions|=1U<<action;
+        }
     }
-    platform_game_set_action(game, PLATFORM_ACTION_LEFT, left);
-    platform_game_set_action(game, PLATFORM_ACTION_RIGHT, right);
-    platform_game_set_action(game, PLATFORM_ACTION_JUMP, jump);
+    sync_actions(game);
 }
 
 void platform_game_set_pointer(platform_game_t *game, float x, float y, bool pressed,
                               int32_t track_id)
 {
-    if (pressed && game->phase == PLATFORM_PAUSED) {
-        platform_game_set_action(game, PLATFORM_ACTION_PAUSE, true);
-        return;
-    }
-    if (pressed && game->phase != PLATFORM_PLAYING) {
-        platform_game_set_action(game, PLATFORM_ACTION_RESTART, true);
-        if (game->phase != PLATFORM_PLAYING) return;
-    }
-    if (pressed && y < 54 && x > game->view_width - 60) {
-        platform_game_set_action(game, PLATFORM_ACTION_PAUSE, true);
-        return;
-    }
-    platform_pointer_t *slot = NULL;
-    for (size_t i = 0; i < PLATFORM_POINTER_COUNT; ++i) {
-        if (game->pointers[i].active && game->pointers[i].track_id == track_id) {
-            slot = &game->pointers[i];
-            break;
+    platform_pointer_t *slot=NULL;
+    for(unsigned i=0;i<PLATFORM_POINTER_COUNT;++i)
+        if(game->pointers[i].active&&game->pointers[i].track_id==track_id)slot=&game->pointers[i];
+    bool fresh=pressed&&!slot,consumed=slot&&slot->consumed;
+    if(fresh){
+        if(game->phase==PLATFORM_PAUSED){
+            platform_game_set_action(game,PLATFORM_ACTION_PAUSE,true);
+            consumed=true;
+        }else if(game->phase!=PLATFORM_PLAYING){
+            platform_game_set_action(game,PLATFORM_ACTION_RESTART,true);
+            consumed=true;
+        }else if(y>=0&&y<54&&x>game->view_width-60&&x<game->view_width){
+            platform_game_set_action(game,PLATFORM_ACTION_PAUSE,true);
+            consumed=true;
         }
     }
-    if (!slot && pressed) {
-        for (size_t i = 0; i < PLATFORM_POINTER_COUNT; ++i) {
-            if (!game->pointers[i].active) {
-                slot = &game->pointers[i];
-                break;
-            }
-        }
-    }
-    if (!slot) return;
-    slot->track_id = track_id;
-    slot->x = x;
-    slot->y = y;
-    slot->active = pressed;
-    if (game->phase == PLATFORM_PLAYING) sync_pointer_actions(game);
+    if(!slot&&pressed)
+        for(unsigned i=0;i<PLATFORM_POINTER_COUNT;++i)
+            if(!game->pointers[i].active){slot=&game->pointers[i];break;}
+    if(!slot)return;
+    *slot=(platform_pointer_t){.active=pressed,.consumed=consumed,.track_id=track_id,.x=x,.y=y};
+    sync_pointer_actions(game);
 }
 
 static void award(platform_game_t *game, uint16_t points, float x, float y)

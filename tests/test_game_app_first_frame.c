@@ -20,6 +20,14 @@ typedef struct {
 
 static test_state_t s;
 static uint64_t s_now;
+static unsigned s_actions;
+void raylib_lite_raylib_inject_action(int action, bool pressed)
+{
+    assert(action == 2);
+    assert(pressed == (s_actions == 0));
+    ++s_actions;
+}
+
 
 static uint64_t monotonic_us(void *context)
 {
@@ -118,6 +126,8 @@ raylib_lite_result_t raylib_lite_runner_run(
     (void)clock; (void)out;
     assert(config && config->render && config->update);
     assert(s.healthy == 1 && s.flushes == 1 && s.accepted == 1);
+    config->poll_input(config->user);
+    assert(s_actions == 2);
     ++s.runner_calls;
     return RAYLIB_LITE_OK;
 }
@@ -165,7 +175,16 @@ static void run_case(raylib_lite_result_t acquire, raylib_lite_result_t present,
     s.acquire_result = acquire;
     s.present_result = present;
     s.flush_result = flush;
+    s_actions = 0;
+    raylib_lite_input_queue_t queue = {0};
+    raylib_lite_input_event_t storage[2];
+    assert(raylib_lite_input_queue_init(&queue, storage, 2, NULL) == RAYLIB_LITE_OK);
+    raylib_lite_input_event_t event = {.type=RAYLIB_LITE_INPUT_BUTTON, .value=2, .pressed=true};
+    assert(raylib_lite_input_push(&queue, &event) == RAYLIB_LITE_OK);
+    event.pressed=false;
+    assert(raylib_lite_input_push(&queue, &event) == RAYLIB_LITE_OK);
     const raylib_lite_game_app_t app = {
+        .input = &queue,
         .logic_hz = 30, .target_fps = 30, .window_title = "test",
         .platform = {
             .clock = {.monotonic_us = monotonic_us, .sleep_for_us = sleep_for_us},

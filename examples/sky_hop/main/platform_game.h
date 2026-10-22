@@ -59,7 +59,7 @@ typedef struct {
 } platform_enemy_t;
 
 typedef struct {
-    bool active;
+    bool active, consumed;
     int32_t track_id;
     float x, y;
 } platform_pointer_t;
@@ -72,6 +72,7 @@ typedef struct {
     float respawn_x;
     bool move_left, move_right, jump_held, grounded, facing_left;
     bool checkpoint_active;
+    uint8_t key_actions, touch_actions;
     uint8_t coyote_frames;
     uint8_t jump_buffer;
     uint8_t coin_chain;
@@ -103,6 +104,7 @@ typedef struct {
 typedef struct { float x, y, width, height; } platform_block_t;
 typedef struct { float x, y, width; } platform_spring_t;
 
+platform_block_t platform_game_control_rect(const platform_game_t *game, platform_action_t action);
 void platform_game_reset(platform_game_t *game);
 void platform_game_set_action(platform_game_t *game, platform_action_t action,
                               bool pressed);

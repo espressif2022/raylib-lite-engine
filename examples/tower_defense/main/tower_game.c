@@ -60,7 +60,8 @@ void tower_game_reset(tower_game_t *game, uint32_t seed)
     game->selected_pad = -1;
     game->wave = 1;
     game->wave_total = 9;
-    game->intermission = 45;
+    game->intermission = 30;
+    game->awaiting_wave = true;
     for (size_t i = 0; i < TOWER_PAD_COUNT; ++i) {
         game->towers[i].x = (int16_t)s_pads[i].x;
         game->towers[i].y = (int16_t)s_pads[i].y;
@@ -87,9 +88,55 @@ static void feedback(tower_game_t *game, tower_feedback_t value, uint16_t amount
     game->feedback_ticks = 45;
 }
 
+tower_purchase_t tower_game_purchase(const tower_game_t *game)
+{
+    tower_purchase_t purchase = {TOWER_FEEDBACK_NONE, 0, 0};
+    if (game->selected_pad < 0 || game->selected_pad >= TOWER_PAD_COUNT) return purchase;
+    const tower_slot_t *tower = &game->towers[(unsigned)game->selected_pad];
+    if (!tower->occupied) {
+        purchase.action = TOWER_FEEDBACK_BUILT;
+        purchase.cost = COST[game->selected_type];
+    } else if (tower->type != game->selected_type) {
+        purchase.action = TOWER_FEEDBACK_REPLACED;
+        purchase.refund = tower_investment(tower) / 2U;
+        if (purchase.refund > COST[game->selected_type]) purchase.refund = COST[game->selected_type];
+        purchase.cost = COST[game->selected_type] - purchase.refund;
+    } else if (tower->level < 3) {
+        purchase.action = TOWER_FEEDBACK_UPGRADED;
+        purchase.cost = UPGRADE_COST[tower->type] * tower->level;
+    } else purchase.action = TOWER_FEEDBACK_MAX_LEVEL;
+    return purchase;
+}
+
+static void confirm_purchase(tower_game_t *game)
+{
+    tower_purchase_t purchase = tower_game_purchase(game);
+    if (purchase.action == TOWER_FEEDBACK_NONE) return;
+    if (purchase.action == TOWER_FEEDBACK_MAX_LEVEL) {
+        feedback(game, purchase.action, 0);
+        return;
+    }
+    if (game->credits < purchase.cost) {
+        feedback(game, TOWER_FEEDBACK_NO_CREDITS, purchase.cost);
+        return;
+    }
+    tower_slot_t *tower = &game->towers[(unsigned)game->selected_pad];
+    game->credits -= purchase.cost;
+    if (purchase.action == TOWER_FEEDBACK_UPGRADED) ++tower->level;
+    else {
+        tower->occupied = true;
+        tower->type = game->selected_type;
+        tower->level = 1;
+        tower->cooldown = 0;
+    }
+    feedback(game, purchase.action, purchase.cost);
+    /* Dismiss after spending: a second tap cannot silently buy another level. */
+    game->selected_pad = -1;
+}
+
 static void handle_tap(tower_game_t *game, float x, float y)
 {
-    if (game->phase == TOWER_START || game->phase == TOWER_GAME_OVER) {
+    if (game->phase == TOWER_START || game->phase == TOWER_GAME_OVER || game->phase == TOWER_WON) {
         uint32_t seed = game->rng;
         tower_game_reset(game, seed);
         game->phase = TOWER_PLAYING;
@@ -100,6 +147,21 @@ static void handle_tap(tower_game_t *game, float x, float y)
         return;
     }
     if (game->phase != TOWER_PLAYING) return;
+    if (game->awaiting_wave && game->selected_pad < 0 &&
+        point_in(x,y,TOWER_WAVE_X,TOWER_WAVE_Y,TOWER_WAVE_W,TOWER_WAVE_H)) {
+        game->awaiting_wave=false;
+        return;
+    }
+    if (game->selected_pad >= 0) {
+        if (point_in(x,y,TOWER_CONFIRM_X,TOWER_CONFIRM_Y,TOWER_CONFIRM_W,TOWER_CONFIRM_H)) {
+            confirm_purchase(game);
+            return;
+        }
+        if (point_in(x,y,TOWER_CANCEL_X,TOWER_CONFIRM_Y,TOWER_CANCEL_W,TOWER_CONFIRM_H)) {
+            game->selected_pad = -1;
+            return;
+        }
+    }
     for (uint8_t type = 0; type < TOWER_TYPE_COUNT; ++type) {
         if (point_in(x, y, 12 + type*154, 407, 146, 61)) {
             game->selected_type = type;
@@ -107,41 +169,12 @@ static void handle_tap(tower_game_t *game, float x, float y)
         }
     }
     for (size_t i = 0; i < TOWER_PAD_COUNT; ++i) {
-        tower_slot_t *tower = &game->towers[i];
+        const tower_slot_t *tower = &game->towers[i];
         if (distance_sq(x, y, tower->x, tower->y) > 24.0f*24.0f) continue;
         game->selected_pad = (int8_t)i;
-        if (!tower->occupied) {
-            uint16_t cost = COST[game->selected_type];
-            if (game->credits >= cost) {
-                game->credits -= cost;
-                tower->occupied = true;
-                tower->type = game->selected_type;
-                tower->level = 1;
-                feedback(game, TOWER_FEEDBACK_BUILT, cost);
-            } else feedback(game, TOWER_FEEDBACK_NO_CREDITS, cost);
-        } else if (tower->type != game->selected_type) {
-            uint16_t cost = COST[game->selected_type];
-            uint16_t refund = tower_investment(tower) / 2U;
-            if (refund > cost) refund = cost;
-            if ((uint32_t)game->credits + refund >= cost) {
-                game->credits = (uint16_t)(game->credits + refund - cost);
-                tower->type = game->selected_type;
-                tower->level = 1;
-                tower->cooldown = 0;
-                feedback(game, TOWER_FEEDBACK_REPLACED,
-                         cost > refund ? cost - refund : 0);
-            } else feedback(game, TOWER_FEEDBACK_NO_CREDITS,
-                            cost > refund ? cost - refund : 0);
-        } else if (tower->level < 3) {
-            uint16_t cost = UPGRADE_COST[tower->type] * tower->level;
-            if (game->credits >= cost) {
-                game->credits -= cost;
-                ++tower->level;
-                feedback(game, TOWER_FEEDBACK_UPGRADED, cost);
-            } else feedback(game, TOWER_FEEDBACK_NO_CREDITS, cost);
-        } else feedback(game, TOWER_FEEDBACK_MAX_LEVEL, 0);
         return;
     }
+    game->selected_pad = -1;
 }
 
 void tower_game_set_pointer(tower_game_t *game, float x, float y, bool pressed)
@@ -299,6 +332,7 @@ void tower_game_update(tower_game_t *game)
         game->feedback = TOWER_FEEDBACK_NONE;
         game->feedback_value = 0;
     }
+    if (game->awaiting_wave) return;
     if (game->intermission) --game->intermission;
     else if (game->wave_spawned < game->wave_total) {
         if (game->spawn_cooldown) --game->spawn_cooldown;
@@ -307,12 +341,15 @@ void tower_game_update(tower_game_t *game)
     update_enemies(game);
     update_towers(game);
     update_projectiles(game);
-    if (game->wave_spawned >= game->wave_total && !any_enemy(game)) {
+    if (game->phase == TOWER_PLAYING && game->wave_spawned >= game->wave_total && !any_enemy(game)) {
+        if (game->wave >= TOWER_CAMPAIGN_WAVES) { game->phase=TOWER_WON; return; }
         ++game->wave;
         game->credits += (uint16_t)(35 + game->wave*4);
         game->wave_spawned=0;
         game->wave_total=(uint16_t)(7 + game->wave*3);
-        game->intermission=75;
+        game->intermission=30;
+        game->awaiting_wave=true;
+        memset(game->projectiles,0,sizeof(game->projectiles));
     }
 }
 

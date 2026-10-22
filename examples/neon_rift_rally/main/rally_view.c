@@ -1374,6 +1374,22 @@ static void draw_hud(const rally_game_t *g, const rally_view_motion_t *motion)
     pin_hud(0);
 }
 
+static void draw_control_mode(const rally_game_t *game)
+{
+    const char *mode=game->control_mode==RALLY_CONTROL_TOUCH?"TOUCH":
+        game->control_mode==RALLY_CONTROL_TILT?"TILT":"KEYS";
+    DrawRectangle(12,70,146,40,C_PANEL);
+    DrawRectangleLines(12,70,146,40,C_CYAN);
+    text_centered(TextFormat("%s >",mode),85,82,14,C_CYAN);
+    if(game->control_mode==RALLY_CONTROL_TILT){
+        DrawRectangle(338,70,130,40,C_PANEL);
+        DrawRectangleLines(338,70,130,40,C_GOLD);
+        text_centered("CENTER",403,82,14,C_GOLD);
+    }
+    if(game->phase==RALLY_PHASE_COUNTDOWN)
+        text_centered(game->control_mode==RALLY_CONTROL_KEYBOARD?"KEYS: W GAS / S BRAKE":"AUTO GAS - STEER + BOOST",240,276,12,RAYWHITE);
+}
+
 static void draw_start_banner(const rally_game_t *g, unsigned course_id)
 {
     if (g->phase == RALLY_PHASE_FINISHED || g->tick >= 120U) return;
@@ -1424,13 +1440,16 @@ static void draw_race_alert(const rally_game_t *g, const rally_view_motion_t *mo
 {
     if (g->phase != RALLY_PHASE_PLAYING) return;
     if (g->offtrack) {
-        if ((g->tick >> 2) & 1U) chip("OFF TRACK", 84, C_PINK, 1.0f);
-    } else if (motion && motion->alert_ticks) {
+        if ((g->tick >> 2) & 1U) chip("OFF TRACK", 118, C_PINK, 1.0f);
+        return;
+    } else if (motion && motion->alert_ticks && motion->callout != RALLY_CALLOUT_LAP &&
+               motion->callout != RALLY_CALLOUT_FINAL_LAP) {
         const float alpha = clampf((float)motion->alert_ticks / 10.0f, 0.0f, 1.0f);
-        const int y = 84 - (motion->alert_ticks > 30U ? (int)(motion->alert_ticks - 30U) * 3 : 0);
+        const int y = 118;
         if (motion->alert == 1U) chip("OVERTAKE  +1", y, C_MINT, alpha);
         else if (motion->alert == 2U) chip("OVERTAKEN", y, C_PINK, alpha);
         else if (motion->alert == 3U) chip("SLIPSTREAM", y, C_CYAN, alpha);
+        return; /* One central cue at a time; retain the road's vanishing point. */
     }
     if (!motion || !motion->callout_ticks) return;
     const float alpha = clampf((float)motion->callout_ticks / 10.0f, 0.0f, 1.0f);
@@ -1447,7 +1466,7 @@ static void draw_race_alert(const rally_game_t *g, const rally_view_motion_t *mo
                           240, 138, 30, Fade(accent, alpha));
         return;
     }
-    const int y = 122 - (motion->callout_ticks > 26U ? (int)(motion->callout_ticks - 26U) * 2 : 0);
+    const int y = 118;
     if (motion->callout == RALLY_CALLOUT_NEAR_MISS)
         chip(motion->callout_value ? TextFormat("NEAR MISS +%lu", (unsigned long)motion->callout_value)
                                    : "NEAR MISS", y, C_GOLD, alpha);
@@ -1552,6 +1571,7 @@ int rally_view_render(const rally_game_t *state, raylib_lite_atlas_t rally_art,
     draw_speed_lines(g);
     PROFILE_PHASE(3);
     draw_hud(g, motion);
+    draw_control_mode(g);
     draw_race_alert(g, motion);
     draw_start_banner(g, s_course_id);
     draw_result(g);

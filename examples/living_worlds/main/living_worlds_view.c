@@ -1228,8 +1228,11 @@ static void draw_overlay(const living_world_t *world)
                    (world->effects_level==2?"FX VIVID":"FX LIVING");
     if(raylib_lite_design_view_native(s_view))
         DrawText(fx,260,31,8,(Color){156,220,211,230});
-    DrawText(TextFormat("%03d DEG",(int)world->yaw),376+ox,28,hud_font(12),
-             (Color){131,226,221,255});
+    DrawRectangle(330+ox,12,134,48,(Color){0,35,45,220});
+    DrawRectangleLines(330+ox,12,134,48,(Color){131,226,221,255});
+    const char *tour=world->auto_pan?"AUTO":"HOLD";
+    DrawText(tour,397+ox-MeasureText(tour,hud_font(14))/2,27,hud_font(14),
+             (Color){218,250,242,255});
     draw_scene_button(25+ox,"AURORA",world->scene==LIVING_SCENE_AURORA);
     draw_scene_button(137+ox,"OCEAN",world->scene==LIVING_SCENE_OCEAN);
     draw_scene_button(249+ox,"SUNRISE",world->scene==LIVING_SCENE_SUNRISE);

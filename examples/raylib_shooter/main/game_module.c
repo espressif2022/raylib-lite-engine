@@ -22,7 +22,7 @@ typedef struct {
     shooter_game_t game;
     raylib_lite_atlas_t atlas;
     raylib_lite_atlas_t backdrop;
-    bool paused, left, right;
+    bool paused, left, right, up, down;
     float imu_x, imu_y;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
     shooter_feedback_t feedback;
@@ -85,9 +85,11 @@ static void input(void *value,const raylib_lite_game_input_v1_t *event)
     else if(event->type==RAYLIB_LITE_GAME_INPUT_ACTION){
         if(event->code==0)state->left=event->pressed;
         else if(event->code==1)state->right=event->pressed;
+        else if(event->code==2)state->up=event->pressed;
+        else if(event->code==5)state->down=event->pressed;
         else if(event->pressed&&event->code==3)shooter_game_toggle_pause(&state->game);
         else if(event->pressed&&event->code==4)
-            shooter_game_set_pointer(&state->game,state->game.width*.5f,420,true);
+            shooter_game_start(&state->game);
     }else if(event->type==RAYLIB_LITE_GAME_INPUT_IMU){
         state->imu_x=event->value_x;
         state->imu_y=event->value_y;
@@ -115,9 +117,10 @@ static void update(void *value)
     shooter_game_set_width(&state->game,raylib_lite_design_view(480.0f).width);
     if(state->game.phase==SHOOTER_PLAYING&&state->left!=state->right){
         float direction=state->right?7.0f:-7.0f;
-        shooter_game_set_pointer(&state->game,state->game.player.x+18.0f+direction,
-                                 state->game.player.y+18.0f,true);
+        shooter_game_move(&state->game,direction,0);
     }
+    if(state->up!=state->down)
+        shooter_game_move(&state->game,0,state->down?7.0f:-7.0f);
     float ix=fabsf(state->imu_x)>0.10f?state->imu_x:0.0f;
     float iy=fabsf(state->imu_y)>0.10f?state->imu_y:0.0f;
     shooter_game_move(&state->game,ix*10.0f,iy*10.0f);
@@ -140,9 +143,9 @@ static uint32_t state_hash(const void *value)
 static int state_json(const void *value,char *output,size_t capacity)
 {
     const shooter_module_state_t *state=value;
-    static const char *phases[]={"start","playing","paused","game_over"};
+    static const char *phases[]={"start","playing","paused","game_over","won"};
     const shooter_game_t *game=&state->game;
-    const char *phase=(unsigned)game->phase<4?phases[game->phase]:"unknown";
+    const char *phase=(unsigned)game->phase<5?phases[game->phase]:"unknown";
     return snprintf(output,capacity,
         "{\"score\":%lu,\"lives\":%u,\"phase\":\"%s\",\"wave\":%u,"
         "\"combo\":%u,\"kills\":%u,\"player_x\":%d,\"player_y\":%d,"

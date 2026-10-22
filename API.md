@@ -62,13 +62,26 @@ function's specific ownership and return behavior.
   queued events on its own thread. Define a policy for queue overflow.
 - Mounted/registered asset memory must remain valid while loaded resources or
   streams reference it. Close streams and unload textures before unmounting.
-  Do not mutate backing data while it is being rendered.
+  Do not mutate backing data while it is being rendered. Memory registrations
+  borrow both names and data; `raylib_lite_asset_unregister_memory` removes a
+  registration after all borrowers have exited. Unmount clears registrations.
 - Audio is optional: a NULL platform audio backend is a supported configuration.
   The application owns the output device and audio worker. Stop playback and
   workers before freeing their memory; the Board implements the game facade.
 - The IDF save backend uses NVS. The application owns NVS initialization and
   its partition choice. Handle save failures; Engine installation does not
   create or replace the application's partition table.
+
+## Bitmap text
+
+`raylib_lite_font_load` loads explicit metrics and atlas resources generated from
+an application-owned font and UTF-8 text subset. `font_from_memory` borrows its
+metrics and live atlas; `font_load` owns both resource leases. Unload fonts before
+textures or the asset store. Measure and draw share strict UTF-8 decoding,
+fallback statistics, explicit line breaks and optional character wrapping.
+The default compatibility `DrawText` remains unchanged. Runtime TTF, kerning,
+shaping and bidi are outside this bitmap API. See
+[font assets (Chinese)](docs/font-assets.CN.md) for generation and native FNT loading.
 
 ## Product integrations
 

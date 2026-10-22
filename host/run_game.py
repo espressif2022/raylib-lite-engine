@@ -133,6 +133,7 @@ def _rgb565_png_bytes(pixels: bytes, width: int, height: int) -> bytes:
 
 def prepare_project_assets(project: Path) -> None:
     """Build deterministic Host assets before compiling the game module."""
+    project = project.resolve()
     def run(command: list[str]) -> None:
         result = subprocess.run(command, cwd=project, capture_output=True,
                                 text=True)
@@ -158,6 +159,8 @@ def prepare_project_assets(project: Path) -> None:
 class GenericHostRuntime:
     """Versioned C module; Python never mirrors project-owned game structs."""
     def __init__(self, project: Path, directory: Path, generation: int = 0) -> None:
+        project = project.resolve()
+        directory = directory.resolve()
         manifest_path = project / "game.sim.json"
         suffix = ".dll" if os.name == "nt" else ".so"
         library = directory / f"host_game_{generation}{suffix}"
@@ -183,6 +186,8 @@ class GenericHostRuntime:
             ENGINE_ROOT / "host/host_clock.c",
             ENGINE_ROOT / "src/runtime/raylib_lite_raylib_port.c",
             ENGINE_ROOT / "host/host_asset_runtime.c",
+            *(ENGINE_ROOT / source for source in json.loads(
+                (ENGINE_ROOT / "src/portable_sources.json").read_text())),
             ENGINE_ROOT / "src/renderer/raylib_lite_renderer.c",
             ENGINE_ROOT / "src/renderer/raylib_lite_renderer_raylib.c",
             ENGINE_ROOT / "src/renderer/raylib_lite_rgb565.c",
@@ -191,6 +196,7 @@ class GenericHostRuntime:
             ENGINE_ROOT / "src/renderer/raylib_lite_tilemap.c",
         ]
         includes = [ENGINE_ROOT / "host/include", ENGINE_ROOT / "host",
+                    ENGINE_ROOT / "src/assets", ENGINE_ROOT / "src/audio",
                     ENGINE_ROOT / "examples/common_components/examples_common/include",
                     ENGINE_ROOT / "include/raylib_lite",
                     ENGINE_ROOT / "compat/raylib/include",

@@ -195,12 +195,13 @@ static void draw_selected_range(const tower_game_t *game)
 {
     if (game->selected_pad < 0 || game->selected_pad >= TOWER_PAD_COUNT) return;
     const tower_slot_t *tower = &game->towers[(unsigned)game->selected_pad];
-    if (!tower->occupied) return;
-    Color color = tower->type == TOWER_PULSE ? C_CYAN
-        : tower->type == TOWER_RAPID ? C_GOLD : C_BLUE;
-    float range = TOWER_RANGE[tower->type] + (tower->level - 1U) * 12.0f;
+    unsigned type = tower->occupied ? tower->type : game->selected_type;
+    unsigned level = tower->occupied ? tower->level : 1;
+    Color color = type == TOWER_PULSE ? C_CYAN
+        : type == TOWER_RAPID ? C_GOLD : C_BLUE;
+    float range = TOWER_RANGE[type] + (level - 1U) * 12.0f;
     DrawCircleLines(tower->x, tower->y, range, (Color){color.r, color.g, color.b, 150});
-    const char *label = TextFormat("L%u  R%03u", tower->level, (unsigned)range);
+    const char *label = TextFormat("L%u  R%03u", level, (unsigned)range);
     if (!compact()) {
         DrawRectangle(tower->x - 34, tower->y - 39, 68, 16, (Color){3, 12, 18, 225});
         draw_text(label, tower->x - 29, tower->y - 36, 9, color);
@@ -371,6 +372,25 @@ static void draw_bar(const tower_game_t *game, tower_layout_t layout)
                   (Color){181, 246, 245, 255});
 }
 
+static void draw_purchase(const tower_game_t *game)
+{
+    if (game->phase != TOWER_PLAYING || game->selected_pad < 0) return;
+    const tower_purchase_t quote = tower_game_purchase(game);
+    const char *action = quote.action == TOWER_FEEDBACK_BUILT ? "BUILD"
+        : quote.action == TOWER_FEEDBACK_UPGRADED ? "UPGRADE"
+        : quote.action == TOWER_FEEDBACK_REPLACED ? "REPLACE" : "MAX LEVEL";
+    Color color = game->credits >= quote.cost ? C_CYAN : C_RED;
+    DrawRectangle(TOWER_CONFIRM_X,TOWER_CONFIRM_Y,TOWER_CONFIRM_W,TOWER_CONFIRM_H,C_BG);
+    DrawRectangleLines(TOWER_CONFIRM_X,TOWER_CONFIRM_Y,TOWER_CONFIRM_W,TOWER_CONFIRM_H,color);
+    draw_text(TextFormat("%s $%u",action,quote.cost),TOWER_CONFIRM_X+12,TOWER_CONFIRM_Y+8,16,color);
+    if (quote.action == TOWER_FEEDBACK_REPLACED)
+        draw_text(TextFormat("REFUND $%u INCLUDED",quote.refund),TOWER_CONFIRM_X+12,TOWER_CONFIRM_Y+32,10,C_GOLD);
+    else draw_text("TAP TO CONFIRM",TOWER_CONFIRM_X+12,TOWER_CONFIRM_Y+32,10,RAYWHITE);
+    DrawRectangle(TOWER_CANCEL_X,TOWER_CONFIRM_Y,TOWER_CANCEL_W,TOWER_CONFIRM_H,C_BG);
+    DrawRectangleLines(TOWER_CANCEL_X,TOWER_CONFIRM_Y,TOWER_CANCEL_W,TOWER_CONFIRM_H,C_GOLD);
+    draw_text("CANCEL",TOWER_CANCEL_X+8,TOWER_CONFIRM_Y+19,12,C_GOLD);
+}
+
 static void draw_messages(const tower_game_t *game)
 {
     if (game->phase == TOWER_START)
@@ -385,13 +405,23 @@ static void draw_messages(const tower_game_t *game)
                      TextFormat("WAVE %u // SCORE %05lu", game->wave,
                                 (unsigned long)game->score),
                      "TOUCH TO RETRY", C_RED);
-    else if (game->intermission) {
+    else if (game->phase == TOWER_WON)
+        draw_overlay("CORE SECURED", TextFormat("6 WAVES // SCORE %05lu",(unsigned long)game->score),
+                     "TOUCH TO PLAY AGAIN", C_CYAN);
+    else if (game->awaiting_wave && game->selected_pad < 0) {
+        DrawRectangle(TOWER_WAVE_X,TOWER_WAVE_Y,TOWER_WAVE_W,TOWER_WAVE_H,C_BG);
+        DrawRectangleLines(TOWER_WAVE_X,TOWER_WAVE_Y,TOWER_WAVE_W,TOWER_WAVE_H,C_GOLD);
+        draw_centered(TextFormat("START %u/6",game->wave),TOWER_WAVE_Y+10,13,C_GOLD);
+        draw_centered(TextFormat("%u ENEMIES",game->wave_total),TOWER_WAVE_Y+32,11,RAYWHITE);
+    }
+    else if (game->intermission && !game->awaiting_wave) {
         DrawRectangle(164, 374, 152, 18, (Color){4, 15, 22, 255});
         DrawRectangleLines(164, 374, 152, 18, (Color){77, 103, 100, 255});
         draw_centered(TextFormat("WAVE %u // T-%u", game->wave,
             (game->intermission + 29) / 30), 378, 11, C_GOLD);
     }
     draw_feedback(game);
+    draw_purchase(game);
 }
 
 static void render_wide(const tower_view_t *view, tower_layout_t layout)
@@ -430,7 +460,7 @@ static void render_wide(const tower_view_t *view, tower_layout_t layout)
     raylib_lite_design_field_end(s_view, FIELD, FIELD);
 }
 
-void tower_view_map_pointer(float x, float y, float *field_x, float *field_y)
+void tower_view_map_pointer(const tower_game_t *game, float x, float y, float *field_x, float *field_y)
 {
     const raylib_lite_design_view_t view = raylib_lite_design_view(FIELD);
     const tower_layout_t layout = layout_for(view);
@@ -438,6 +468,20 @@ void tower_view_map_pointer(float x, float y, float *field_x, float *field_y)
     if (!layout.wide) {
         point = raylib_lite_design_field_point(view, FIELD, FIELD, x, y);
     } else {
+        Vector2 overlay = raylib_lite_design_field_point(view, FIELD, FIELD, x, y);
+        if (game && game->phase==TOWER_PLAYING && game->awaiting_wave && game->selected_pad<0 &&
+            overlay.x>=TOWER_WAVE_X && overlay.x<TOWER_WAVE_X+TOWER_WAVE_W &&
+            overlay.y>=TOWER_WAVE_Y && overlay.y<TOWER_WAVE_Y+TOWER_WAVE_H) {
+            *field_x=overlay.x; *field_y=overlay.y; return;
+        }
+        if (game && game->phase == TOWER_PLAYING && game->selected_pad >= 0 && overlay.y >= TOWER_CONFIRM_Y &&
+            overlay.y < TOWER_CONFIRM_Y+TOWER_CONFIRM_H &&
+            ((overlay.x >= TOWER_CONFIRM_X && overlay.x < TOWER_CONFIRM_X+TOWER_CONFIRM_W) ||
+             (overlay.x >= TOWER_CANCEL_X && overlay.x < TOWER_CANCEL_X+TOWER_CANCEL_W))) {
+            *field_x = overlay.x;
+            *field_y = overlay.y;
+            return;
+        }
         point = raylib_lite_design_point(view, x, y);
         if (point.y < layout.my) {
             /* Bar taps become taps on the matching 480-layout control. */
@@ -449,6 +493,11 @@ void tower_view_map_pointer(float x, float y, float *field_x, float *field_y)
         } else {
             point = (Vector2){(point.x - layout.mx) / layout.k,
                               69.0f + (point.y - layout.my) / layout.k};
+            /* A map point must not alias the differently positioned overlay. */
+            if (game && game->phase == TOWER_PLAYING && game->selected_pad >= 0 &&
+                point.y >= TOWER_CONFIRM_Y && point.y < TOWER_CONFIRM_Y+TOWER_CONFIRM_H &&
+                point.x >= TOWER_CONFIRM_X && point.x < TOWER_CANCEL_X+TOWER_CANCEL_W)
+                point = (Vector2){-1000,-1000};
         }
     }
     *field_x = point.x;

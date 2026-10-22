@@ -37,8 +37,13 @@ typedef struct {
 const raylib_lite_asset_t *raylib_lite_asset_find(const raylib_lite_asset_t *assets,size_t count,raylib_lite_asset_id_t id);
 raylib_lite_asset_id_t raylib_lite_asset_id(const char *name);
 raylib_lite_result_t raylib_lite_assets_mount(const raylib_lite_asset_store_config_t *config);
+/* Name and data are borrowed until unregister or unmount. Release all views,
+ * streams, textures and other borrowers before unregister/unmount. Registration
+ * does not override mounted files. Duplicate IDs are rejected. */
 raylib_lite_result_t raylib_lite_asset_register_memory(const char *name,
                                               const void *data, size_t size);
+raylib_lite_result_t raylib_lite_asset_unregister_memory(const char *name);
+/* Clears both the backing store and memory registrations; never frees borrowed data. */
 void raylib_lite_assets_unmount(void);
 bool raylib_lite_assets_is_mounted(void);
 raylib_lite_result_t raylib_lite_asset_open(const char *name, raylib_lite_asset_view_t *out);

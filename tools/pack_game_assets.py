@@ -488,22 +488,77 @@ def write_terrain_atlas(destination: Path) -> dict:
             "width": 96, "height": 32, "frames": 3}
 
 
-def write_tilemap(source: Path, destination: Path) -> dict:
+def _tilemap_tileset(data: dict, source: Path) -> tuple[int, int]:
+    """Resolve one Tiled GID range to the runtime's horizontal atlas strip.
+
+    MTM1 stores one atlas ID and local, one-based uint16 tile indices. It cannot
+    represent Tiled transforms or multiple independent tileset images.
+    """
+    tilesets = data.get("tilesets", [])
+    if not tilesets:
+        if data.get("tileset", "terrain.atlas") == "terrain.atlas":
+            return 1, 3  # Backward-compatible built-in terrain generator.
+        raise ValueError("custom tilemap requires Tiled tilesets metadata")
+    if len(tilesets) != 1:
+        raise ValueError("MTM1 supports exactly one tileset / horizontal atlas strip")
+    entry = tilesets[0]
+    first_gid = entry.get("firstgid")
+    tileset = entry
+    if "source" in entry:
+        external = _source_file(source.parent, str(entry["source"]))
+        if external.suffix.lower() not in {".json", ".tsj"}:
+            raise ValueError("external tileset must be Tiled JSON (.tsj or .json)")
+        tileset = json.loads(external.read_text(encoding="utf-8"))
+    count = tileset.get("tilecount")
+    if (type(first_gid) is not int or first_gid < 1 or
+            type(count) is not int or not 1 <= count <= 65535 or
+            first_gid + count - 1 > 0x0fffffff):
+        raise ValueError("invalid tileset firstgid/tilecount")
+    if (tileset.get("tilewidth", data["tilewidth"]) != data["tilewidth"] or
+            tileset.get("tileheight", data["tileheight"]) != data["tileheight"]):
+        raise ValueError("tileset dimensions must match map tiles")
+    return first_gid, count
+
+
+def write_tilemap(source: Path, destination: Path,
+                  atlases: dict[str, dict] | None = None) -> dict:
     data = json.loads(source.read_text(encoding="utf-8"))
     if data.get("orientation") != "orthogonal" or data.get("infinite"):
         raise ValueError("only finite orthogonal Tiled maps are supported")
     width, height = int(data["width"]), int(data["height"])
     tile_w, tile_h = int(data["tilewidth"]), int(data["tileheight"])
+    if any(value < 1 or value > 65535 for value in (width, height, tile_w, tile_h)):
+        raise ValueError("map dimensions must fit positive MTM1 uint16 fields")
+    first_gid, tile_count = _tilemap_tileset(data, source)
+    atlas_name = data.get("tileset", "terrain.atlas")
+    if atlases is not None:
+        atlas = atlases.get(atlas_name)
+        if not atlas:
+            raise ValueError(f"tilemap atlas is absent from manifest: {atlas_name}")
+        if atlas["width"] < tile_count * tile_w or atlas["height"] < tile_h:
+            raise ValueError(f"tilemap atlas must contain {tile_count} tiles in one horizontal strip")
     tile_layers = [layer for layer in data["layers"] if layer["type"] == "tilelayer"]
+    if not 1 <= len(tile_layers) <= 65535:
+        raise ValueError("MTM1 requires between 1 and 65535 tile layers")
     object_layers = [layer for layer in data["layers"] if layer["type"] == "objectgroup"]
     layers = bytearray()
     for layer in tile_layers:
         values = layer["data"]
         if len(values) != width * height:
             raise ValueError(f"invalid layer length: {layer.get('name')}")
-        if any(not isinstance(value, int) or value < 0 or value > 3 for value in values):
-            raise ValueError(f"invalid tile reference: {layer.get('name')}")
-        layers.extend(struct.pack(f"<{len(values)}H", *values))
+        local_ids = []
+        for value in values:
+            if type(value) is not int or value < 0 or value > 0xffffffff:
+                raise ValueError(f"invalid tile reference: {layer.get('name')}")
+            if value & 0xf0000000:
+                raise ValueError(f"Tiled flip/rotation bits are unsupported: {layer.get('name')}")
+            if value == 0:
+                local_ids.append(0)
+            elif first_gid <= value < first_gid + tile_count:
+                local_ids.append(value - first_gid + 1)
+            else:
+                raise ValueError(f"unknown tile GID {value}: {layer.get('name')}")
+        layers.extend(struct.pack(f"<{len(local_ids)}H", *local_ids))
     objects = bytearray()
     paths = bytearray()
     object_count = point_count = 0
@@ -520,6 +575,8 @@ def write_tilemap(source: Path, destination: Path) -> dict:
                 paths.extend(struct.pack("<hh", round(item.get("x", 0) + point["x"]),
                                          round(item.get("y", 0) + point["y"])))
                 point_count += 1
+    if point_count > 32:
+        raise ValueError("MTM1 runtime supports at most 32 path points")
     collision = bytearray((width * height + 7) // 8)
     for layer in tile_layers:
         if layer.get("name", "").lower() != "collision":
@@ -529,7 +586,7 @@ def write_tilemap(source: Path, destination: Path) -> dict:
                 collision[index // 8] |= 1 << (index & 7)
     header = MAP_HEADER.pack(b"MTM1", width, height, tile_w, tile_h,
         len(tile_layers), object_count, point_count, len(layers), len(collision),
-        asset_id(data.get("tileset", "terrain.atlas")))
+        asset_id(atlas_name))
     destination.write_bytes(header + layers + collision + objects + paths)
     return {"file": destination.name, "type": "tilemap", "bytes": destination.stat().st_size,
             "width": width, "height": height, "layers": len(tile_layers),
@@ -634,7 +691,8 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
         raise ValueError("asset payload limit must be positive")
     output.mkdir(parents=True, exist_ok=True)
     for stale in output.iterdir():
-        if stale.is_file() and stale.suffix in {".atlas", ".wall", ".map", ".sound", ".jpg"}:
+        if stale.is_file() and (stale.suffix in {".atlas", ".wall", ".map", ".sound", ".jpg", ".font", ".fnt", ".qoi", ".png"}
+                                or stale.name.endswith(".font.json")):
             stale.unlink()
     report: list[dict] = []
     identifiers: set[str] = set()
@@ -662,20 +720,50 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
         report.append(write_wall_atlas(image, config, destination))
         identifiers.update(str(frame["name"]) for frame in config["frames"])
 
+    for item in manifest.get("fonts", []):
+        try:
+            from .pack_font import pack, scalar
+        except ImportError:
+            from pack_font import pack, scalar
+        destination = _output_file(output, str(item["output"]), ".font")
+        prefix = destination.with_suffix("")
+        if Path(str(prefix) + ".atlas").exists():
+            raise ValueError(f"font atlas output already exists: {prefix.name}.atlas")
+        args = argparse.Namespace(
+            font=_source_file(source, str(item["source"])),
+            font_index=int(item.get("font_index", 0)), size=int(item.get("size", 20)),
+            atlas_width=int(item.get("atlas_width", 256)),
+            license=str(item.get("license", "")), output=prefix,
+            text_file=[_source_file(source, str(name)) for name in item.get("text_files", [])],
+            codepoint=[scalar(str(cp)) for cp in item.get("codepoints", [])],
+            fallback=scalar(str(item.get("fallback", "U+003F"))),
+        )
+        font_report = pack(args)
+        for suffix, kind in ((".font", "font"), (".atlas", "atlas")):
+            asset = Path(str(prefix) + suffix)
+            report.append({"file": asset.name, "type": kind,
+                           "bytes": asset.stat().st_size,
+                           "width": font_report["atlas_width"],
+                           "height": font_report["atlas_height"],
+                           "font_report": prefix.name + ".font.json"})
+
     for item in manifest.get("maps", []):
         source_map = _source_file(source, str(item["source"]))
         destination = _output_file(output, str(item["output"]), ".map")
-        report.append(write_tilemap(source_map, destination))
+        report.append(write_tilemap(source_map, destination,
+            {entry["file"]: entry for entry in report if entry["type"] == "atlas"}))
 
     for item in manifest.get("files", []):
         source_name = str(item["source"])
         output_name = str(item.get("output", Path(source_name).name))
-        if Path(output_name).name != output_name or Path(output_name).suffix.lower() != ".jpg":
-            raise ValueError(f"raw file output must be a .jpg filename: {output_name}")
+        if Path(output_name).name != output_name or Path(output_name).suffix.lower() not in {".jpg", ".png", ".qoi", ".fnt"}:
+            raise ValueError(f"raw file output must be a .jpg/.png/.qoi/.fnt filename: {output_name}")
         payload = _source_file(source, source_name).read_bytes()
         destination = output / output_name
+        if destination.exists():
+            raise ValueError(f"duplicate asset output: {output_name}")
         destination.write_bytes(payload)
-        report.append({"file": output_name, "type": "jpeg", "bytes": len(payload)})
+        report.append({"file": output_name, "type": "jpeg" if destination.suffix.lower() == ".jpg" else "raw", "bytes": len(payload)})
 
     for item in manifest.get("sounds", []):
         pattern = str(item["source"])
@@ -690,8 +778,10 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
             report.append(write_sound(wav, _output_file(output, output_name, ".sound"),
                                       str(item.get("encoding", "auto"))))
 
-    identifiers.update(path.name for path in output.iterdir()
-                       if path.suffix in {".atlas", ".wall", ".map", ".sound"})
+    names = [item["file"] for item in report]
+    if len(names) != len(set(names)):
+        raise ValueError("duplicate asset output names")
+    identifiers.update(names)
     write_asset_ids(output / "assets_ids.h", identifiers, animations)
     total = sum(item["bytes"] for item in report)
     if total > limit:

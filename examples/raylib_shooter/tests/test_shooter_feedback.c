@@ -53,7 +53,7 @@ static unsigned played(unsigned sound) { return s_played[sound + 1U]; }
 int main(void)
 {
     const shooter_haptics_t haptics = {.pulse = pulse, .pattern = pattern, .stop = stop};
-    shooter_game_t game;
+    shooter_game_t game = {0};
     shooter_game_reset(&game, 0x4d4f5341U);
     shooter_feedback_t feedback;
     shooter_feedback_init(&feedback, &game, &haptics);
@@ -106,6 +106,22 @@ int main(void)
     shooter_feedback_update(&feedback, &game, false);
     assert(played(SHOOTER_SOUND_HURT) == 1 && played(SHOOTER_SOUND_START) == 1);
 
+    shooter_game_start(&game);
+    shooter_feedback_update(&feedback, &game, false);
+    assert(s_music_plays == 2);
+    ++game.kills;
+    game.phase = SHOOTER_WON;
+    shooter_feedback_update(&feedback, &game, false);
+    unsigned explosions = played(SHOOTER_SOUND_EXPLODE);
+    assert(explosions == 2 && s_music_stops == 2);
+    shooter_feedback_update(&feedback, &game, false);
+    assert(played(SHOOTER_SOUND_EXPLODE) == explosions && s_music_stops == 2);
+    shooter_game_start(&game);
+    shooter_feedback_update(&feedback, &game, false);
+    assert(s_music_plays == 3); /* Winning and restarting resumes the music once. */
+
+    shooter_feedback_close(&feedback);
+    assert(s_unloaded == SHOOTER_SOUND_COUNT + 1 && s_closed == 1);
     shooter_feedback_close(&feedback);
     assert(s_unloaded == SHOOTER_SOUND_COUNT + 1 && s_closed == 1);
     assert(s_haptics > 0);

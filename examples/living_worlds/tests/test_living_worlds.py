@@ -46,6 +46,36 @@ int main(void){living_world_t w;living_world_reset(&w);
             executable = compile_model(compiler, source, Path(directory))
             subprocess.run([str(executable)], check=True)
 
+    def test_hold_view_and_ui_gesture_ownership(self) -> None:
+        compiler = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
+        source = r'''#include <assert.h>
+#include "living_worlds_world.h"
+int main(void){living_world_t w;living_world_reset(&w);
+ assert(w.auto_pan);
+ living_world_pointer(&w,397,32,1);assert(!w.auto_pan);
+ living_world_pointer(&w,400,35,1);assert(!w.auto_pan);
+ living_world_pointer(&w,120,32,1);assert(w.effects_level==1);
+ living_world_pointer(&w,0,0,0);
+ const int tabs[4]={80,180,300,410};
+ for(int scene=0;scene<4;++scene){
+   living_world_pointer(&w,tabs[scene],440,1);
+   living_world_pointer(&w,0,0,0);assert(w.scene==scene&&!w.auto_pan);
+   living_world_pointer(&w,180,180,1);living_world_pointer(&w,220,200,1);
+   living_world_pointer(&w,0,0,0);
+   float yaw=w.yaw,pitch=w.pitch;unsigned tick=w.tick;
+   for(int i=0;i<240;++i)living_world_update(&w);
+   assert(w.yaw==yaw&&w.pitch==pitch&&w.tick==tick+240);
+ }
+ living_world_pointer(&w,397,32,1);living_world_pointer(&w,0,0,0);assert(w.auto_pan);
+ float yaw=w.yaw;for(int i=0;i<120;++i)living_world_update(&w);assert(w.yaw!=yaw);
+ living_world_pointer(&w,120,32,1);assert(w.effects_level==2);
+ living_world_pointer(&w,125,33,1);assert(w.effects_level==2);
+ living_world_pointer(&w,0,0,0);living_world_reset(&w);assert(w.auto_pan);
+ return 0;}'''
+        with tempfile.TemporaryDirectory() as directory:
+            executable = compile_model(compiler, source, Path(directory))
+            subprocess.run([str(executable)], check=True)
+
     def test_host_drag_changes_yaw_and_pitch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             replay = Path(directory) / "drag.json"

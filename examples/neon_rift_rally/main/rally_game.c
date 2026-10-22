@@ -1026,6 +1026,7 @@ uint32_t rally_state_hash(const rally_game_t *game)
     hash = hash_float(hash, game->draft_meter);
     hash = hash_float(hash, game->gap_ahead);
     hash = hash_mix(hash, game->course_id);
+    hash = hash_mix(hash, (uint32_t)game->control_mode);
     hash = hash_mix(hash, game->tick);
     hash = hash_mix(hash, game->laps_completed);
     hash = hash_mix(hash, game->next_checkpoint);
