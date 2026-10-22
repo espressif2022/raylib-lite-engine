@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "raylib_lite_game_module_contract.h"
-/* One module entry for Host, direct native, and lobby ELF builds. */
+/* One module entry for Host and native builds. */
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>
@@ -13,6 +13,7 @@
 #if !defined(RAYLIB_LITE_GAME_NATIVE) && 1
 #include "host_asset_runtime.h"
 #endif
+#include "raylib_lite_design_view.h"
 #include "raylib_lite_raylib.h"
 #include "last_zone_game.h"
 #include "last_zone_view.h"
@@ -78,7 +79,7 @@ static void clear_tracks(last_zone_module_t *state)
 #if defined(RAYLIB_LITE_GAME_NATIVE)
 static void report_missing_asset(const char *path)
 {
-    fprintf(stderr, "last_zone_audio: failed to load %s\n", path);
+    printf("last_zone_audio: failed to load %s\n", path);
 }
 static const last_zone_feedback_backend_t s_feedback_backend = {
     .init = raylib_lite_native_feedback_init,
@@ -234,6 +235,15 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         else if (event->code == 9) state->strafe_right = event->pressed;
     } else if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER) {
         int track = event->track_id;
+        /* Screen pixels to the 480x480 HUD field; the stick and fire controls
+         * are pinned to the panel edges, so they test with the margin removed. */
+        const raylib_lite_design_view_t view = raylib_lite_design_view(480.0f);
+        const Vector2 field = raylib_lite_design_field_point(view, 480.0f, 480.0f,
+                                                             (float)event->x, (float)event->y);
+        const int margin =
+            (int)fmaxf(0.0f, raylib_lite_design_field_origin(view, 480.0f, 480.0f).x);
+        const int fx = (int)floorf(field.x), fy = (int)floorf(field.y);
+        const int lx = fx + margin, rx = fx - margin;
         if (!event->pressed) {
             /* A release can arrive on a different track id than the press.
              * Once nothing is touching, drop every capture so a mismatched
@@ -251,29 +261,29 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
             if (track == state->fire_track || none) state->fire_track = -1;
             if (track == state->radar_track || none) state->radar_track = -1;
         } else if (track == state->joystick_track)
-            update_joystick(state, event->x, event->y);
+            update_joystick(state, lx, fy);
         else if (track == state->radar_track)
-            last_zone_move_radar(&state->game, event->x - state->radar_dx,
-                                 event->y - state->radar_dy);
+            last_zone_move_radar(&state->game, fx - state->radar_dx,
+                                 fy - state->radar_dy);
         else if (track == state->look_track) {
-            last_zone_turn(&state->game, (float)(event->x - state->look_x) * .008f);
-            last_zone_look(&state->game, (float)(event->y - state->look_y) * -.09f);
-            state->look_x = event->x;
-            state->look_y = event->y;
+            last_zone_turn(&state->game, (float)(fx - state->look_x) * .008f);
+            last_zone_look(&state->game, (float)(fy - state->look_y) * -.09f);
+            state->look_x = fx;
+            state->look_y = fy;
         } else if (track == state->fire_track) {
-        } else if (last_zone_in_radar(&state->game, event->x, event->y) &&
+        } else if (last_zone_in_radar(&state->game, fx, fy) &&
                    state->radar_track < 0) {
             state->radar_track = track;
-            state->radar_dx = event->x - state->game.radar_x;
-            state->radar_dy = event->y - state->game.radar_y;
-        } else if (last_zone_in_fire_zone(event->x, event->y) && state->fire_track < 0)
+            state->radar_dx = fx - state->game.radar_x;
+            state->radar_dy = fy - state->game.radar_y;
+        } else if (last_zone_in_fire_zone(rx, fy) && state->fire_track < 0)
             state->fire_track = track;
-        else if (last_zone_in_move_capture(event->x, event->y) && state->joystick_track < 0)
-            begin_joystick(state, track, event->x, event->y);
-        else if (event->x >= LAST_ZONE_LOOK_MIN_X && state->look_track < 0) {
+        else if (last_zone_in_move_capture(lx, fy) && state->joystick_track < 0)
+            begin_joystick(state, track, lx, fy);
+        else if (lx >= LAST_ZONE_LOOK_MIN_X && state->look_track < 0) {
             state->look_track = track;
-            state->look_x = event->x;
-            state->look_y = event->y;
+            state->look_x = fx;
+            state->look_y = fy;
         }
     }
 }
@@ -281,12 +291,15 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
 static void update(void *value)
 {
     last_zone_module_t *state = value;
-    if (!state || state->paused) return;
+    if (!state) return;
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    last_zone_feedback_music(&state->feedback, &state->game, state->paused);
+#endif
+    if (state->paused) return;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
     if (state->warmup_frames) state->warmup_frames--;
     if (!state->deploy_ready && state->warmup_frames == 0 && state->contact_mask == 0)
         state->deploy_ready = true;
-    last_zone_feedback_music(&state->feedback, state->game.phase);
     if (state->game.phase != LAST_ZONE_PHASE_PLAYING || state->block_until_up) {
         clear_tracks(state);
         return;
@@ -418,6 +431,8 @@ static const raylib_lite_game_module_v1_t s_module = {
     .update = update, .render = render, .state_hash = state_hash,
     .state_json = state_json,
 };
+
+bool raylib_lite_game_adaptive_surface(void) { return true; }
 
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {

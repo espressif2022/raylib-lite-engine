@@ -14,6 +14,21 @@ typedef struct Color { uint8_t r, g, b, a; } Color;
 typedef struct Texture { unsigned int id; int width, height, mipmaps, format; } Texture;
 typedef Texture Texture2D;
 typedef struct Camera2D { Vector2 offset, target; float rotation, zoom; } Camera2D;
+typedef struct rAudioBuffer rAudioBuffer;
+typedef struct rAudioProcessor rAudioProcessor;
+typedef struct AudioStream {
+    rAudioBuffer *buffer;
+    rAudioProcessor *processor;
+    unsigned int sampleRate, sampleSize, channels;
+} AudioStream;
+typedef struct Sound { AudioStream stream; unsigned int frameCount; } Sound;
+typedef struct Music {
+    AudioStream stream;
+    unsigned int frameCount;
+    bool looping;
+    int ctxType;
+    void *ctxData;
+} Music;
 
 #define KEY_SPACE 32
 #define KEY_A 65

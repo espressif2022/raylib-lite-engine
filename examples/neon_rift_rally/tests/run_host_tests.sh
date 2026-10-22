@@ -6,7 +6,9 @@ cc -std=c11 -Wall -Wextra -Werror -I"$project_dir/main" \
   "$project_dir/tests/test_rally_game.c" "$project_dir/main/rally_game.c" \
   -lm -o "$out"
 "$out"
-python3 "$project_dir/tests/check_feedback.py"
+python3 "$project_dir/tests/check_motorcycle_poses.py"
+python3 "$project_dir/tests/check_scenery_assets.py"
+python3 "$project_dir/tests/check_view_motion.py"
 python3 "$project_dir/tests/check_steering_response.py"
 
 state="${TMPDIR:-/tmp}/neon_rift_rally_two_finger.json"
@@ -16,3 +18,5 @@ control_state="${TMPDIR:-/tmp}/neon_rift_rally_control.json"
 python3 "$project_dir/tests/check_control_flow.py" "$control_state"
 content_state="${TMPDIR:-/tmp}/neon_rift_rally_content.json"
 python3 "$project_dir/tests/check_content_flow.py" "$content_state"
+
+python3 "$project_dir/tests/check_world_projection.py"

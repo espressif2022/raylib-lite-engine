@@ -20,6 +20,11 @@ typedef struct {
     uint16_t height;
     size_t stride_pixels;
     raylib_lite_pixel_format_t format;
+    /* Optional. A backend that only ever displays rows y where
+     * y % sample_row_step == 0 (for example a 2:1 vertical downscale) sets a
+     * power of two here; 0 and 1 mean every row is displayed. Renderers may
+     * then leave the other rows unwritten, so their pixels are unspecified. */
+    uint16_t sample_row_step;
 } raylib_lite_video_info_t;
 
 typedef struct {

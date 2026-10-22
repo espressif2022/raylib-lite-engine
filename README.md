@@ -19,7 +19,7 @@ Once the component is published, add it to your application's `main/idf_componen
 
 ```yaml
 dependencies:
-  idf: ">=6.2"
+  idf: ">=6.1"
   espressif2022/raylib-lite-engine: "^0.1.0"
 ```
 
@@ -36,7 +36,7 @@ python3 tools/game_cli.py sim examples/sky_hop
 
 Open `http://127.0.0.1:8460/` in a browser. See the [quickstart](docs/quickstart.EN.md) and [game development guide](docs/game-development.EN.md) for creating games and replay tests.
 
-The repository includes seven reference games and a render benchmark; see the [example list](examples/README.md). Native ESP-Mosaico games use a shared Board adapter that automatically resolves board dependencies. Build and installation steps are in the [build guide](docs/build-matrix.EN.md).
+The repository includes six released reference games, an internal preview (Tomb Raycast) and a render benchmark; see the [example list](examples/README.md). Native ESP-Mosaico games use a shared Board adapter that automatically resolves board dependencies. Build and installation steps are in the [build guide](docs/build-matrix.EN.md).
 
 Host currently covers game modules, rendering, input replay and effects. Scene, UI, save and audio modules are not linked by the current Host runner.
 
@@ -50,3 +50,5 @@ Host currently covers game modules, rendering, input replay and effects. Scene, 
 ## License
 
 Source code is licensed under [Apache-2.0](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for external dependencies and the [asset record](release/asset_provenance.json) for example media origins.
+
+Raylib Lite Engine is an independent project. It is not an official raylib project and is not affiliated with or endorsed by raylib or its author, Ramon Santamaria (@raysan5); the vendored raylib sources keep their zlib/libpng license.

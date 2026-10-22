@@ -1,63 +1,69 @@
 # Last Zone: Extraction
 
-A compact battle-royale-inspired training-ground game for the Host simulator and ESP-Mosaico native
-firmware. Fight through five tactical drills, scavenge supplies, clear the last
-hostile, and reach the extraction pad. The native C Host preview and the
-device share the same fixed-step model and RGB565 view.
+[简体中文](README.CN.md) · [Examples](../README.md)
 
-轻量训练场射击 Demo。五关战术关卡、搜刮补给、清掉最后一名敌人后走到撤离点。Host RGB565 预览与真机共用同一套固定步长模型和画面。
+Last Zone is a lightweight tactical shooter. Complete five training missions in order: search for supplies, clear enemies and reach the extraction point. Later missions give less ammunition and armor and more elite enemies.
 
 ![Last Zone: Extraction](docs/screenshot.png)
 
-The screenshot is a Host RGB565 frame of the Dock mission.
+The image is the Host RGB565 frame of the Dock mission.
 
-截图为 Dock 关卡的 Host RGB565 画面。
+## Play and controls
 
-墙体、纹理布局与性能验收见
-[可复用设计方法](../../docs/reference-designs.CN.md)，其中也定义原生声音与震动事件的职责。
+### Device
 
-## Play / 玩法
+- Tap the briefing to deploy or redeploy.
+- The left stick moves; push to the outer ring ahead to sprint.
+- Drag on the right side to turn and pitch.
+- Tap the fire button to shoot or open the door you face; hold fire to steady the weapon.
+- The radar panel can be dragged out of the way.
 
-- Tap the briefing to deploy or redeploy. / 点击简报部署或重新部署。
-- Left stick moves. Push the outer ring forward to sprint. / 左摇杆移动，外环前推冲刺。
-- Right drag looks and pitches. / 右侧拖动转向和俯仰。
-- Tap fire (Host `F` / Ctrl) to shoot or open a facing gate. Hold fire to
-  steady the bolt. / 点射击开火或打开面前的门；按住射击稳住枪机。
-- Drag the radar to park it. / 拖动雷达面板挪开视线。
-- Host keys: `A/D` turn, `W`/`S` walk, `Shift` sprint, `Q`/`E` strafe.
+### Host
 
-Dock teaches windows, cover, the gold gate, and extract. Later missions cut
-spare ammo and add elites. Clear every hostile, then follow the extract arrow
-onto the pad.
+- `W`/`S`: forward and back; `Q`/`E`: strafe.
+- `A`/`D`: turn; `Shift`: sprint.
+- `F` or `Ctrl`: fire or interact.
+- Drag on the right side with the mouse: adjust the view.
 
-Dock 是教学关；之后弹药更紧、会出精英。清完敌人后沿箭头走上撤离点。
+## Campaign
 
-## Campaign / 战役
+| Mission | Focus | Enemies |
+| --- | --- | ---: |
+| Dock | Observation tutorial | 5 |
+| Depot | Area control | 7 |
+| Command | Flank breakthrough | 8, including 2 elites |
+| Ghost | Ambush | 8 |
+| Run | Assault | 9, including 3 elites |
 
-| Mission | Role | Hostiles |
-| --- | --- | --- |
-| Dock | observe / 观察 | 5 standard |
-| Depot | control / 控制 | 7 standard |
-| Command | flank / 侧翼 | 8 including 2 elites |
-| Ghost | ambush / 伏击 | 8 standard |
-| Run | assault / 突击 | 9 including 3 elites |
+Device NVS stores campaign progress and each mission's best result.
 
-Starting ammo is 20 / 18 / 17 / 17 / 16; starting armor is 2 / 2 / 1 / 1 / 0.
-Each mission has its own 360-degree horizon. Device NVS keeps campaign
-progress and per-mission bests.
+## Hostiles
 
-每关有独立的 360° 天际线。设备 NVS 保存战役进度和每关最好成绩。
+- Three roles, told apart by the shoulder flash: riflemen (blue) hold mid range behind cover, flankers (amber) move faster and pick spots outside your view, and heavies (red, the elites) take three hits, press in and barely flinch.
+- Patrols walk their own routes around their post, pause and look around. They see in a 120 degree cone, so you can slip past behind them. A glimpse builds suspicion (an amber bar and "?" over the head) rather than an instant alert; standing still far away is hard to spot, sprinting in the open is not. A patrol that loses a half-seen shape walks over to check. Sprinting and gunfire are still heard all around.
+- An alerted hostile radios patrols within about seven cells after a short delay (an antenna icon over its head, then an "ENEMY RADIO" banner). Kill the caller first to cut the call for a +50 bonus.
+- Enemy fire is a roll: moving makes you harder to hit, sprinting much harder, and close range easier. Misses show a tracer and a yellow arrow toward the shooter, with a whizz cue.
+- A hit staggers the target and interrupts its aim. A wounded rifleman or flanker falls back to cover; heavies keep coming. Searchers sweep nearby cells around the last sighting instead of standing still.
+- Radar blips show which way each hostile faces; calm patrols are dim, suspicious ones amber.
 
-## Run / 运行
+## Host preview
 
-```bash
-# Host 仿真：本仓库根目录，主机 C 编译器 + Pillow
+From the repository root:
+
+```sh
 python3 tools/game_cli.py sim examples/last_zone_extraction
-python3 tools/game_cli.py sim examples/last_zone_extraction --headless --frames 90
 ```
 
-本目录可作为 ESP-IDF native 工程构建；直接烧录会替换当前启动器固件。
+## Implementation
+
+Host and device share the fixed-step model, perspective scene and RGB565 view. Gameplay includes cover, window openings, doors, ammunition, armor, elite enemies and extraction checks; sound and haptics are driven by semantic events.
+
+- The crosshair opens with movement, sprint and recoil, and tightens while you hold fire to steady. It turns red when the magazine is empty.
+- The radar is translucent, with a sweep arm and pulsing hostile blips; its frame flashes when an enemy is alerted.
+- Kills show a `TARGET DOWN` banner with the kill count. Pickups, gates, empty magazines and gate hints use backed labels that stay readable over bright sky.
+- A tense stealth loop plays while you scout. When any enemy is alerted or engaging, a driving combat loop takes over and holds for about five seconds after contact ends. Gates, deploying and death each have their own cue, and music ducks while paused.
+- `assets_src/generate_audio.py` synthesizes every clip; the generated WAVs are not tracked in git. The debug FPS label is compiled only with `LAST_ZONE_SHOW_FPS`.
 
 ## Native build
 
-See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.
+See [build paths](../../docs/build-matrix.EN.md) for targets and Board selection. Flashing a standalone project replaces the device's current firmware; see the [game development guide](../../docs/game-development.EN.md) for tests and device acceptance.

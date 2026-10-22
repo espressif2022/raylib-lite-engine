@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.16)
+# Offscreen 480x480 frame comparison on ESP32-S31. compat and upstream are
+# separate builds because the two Raylib implementations cannot share a process.
+set(FRAME_COMPARE_IMPL "compat" CACHE STRING "compat or upstream")
+if(NOT FRAME_COMPARE_IMPL MATCHES "^(compat|upstream)$")
+    message(FATAL_ERROR "FRAME_COMPARE_IMPL must be compat or upstream")
+endif()
+if(IDF_TARGET STREQUAL "esp32s3")
+    set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults.esp32s3")
+else()
+    set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
+endif()
+if(NOT SDKCONFIG)
+    set(SDKCONFIG "${CMAKE_BINARY_DIR}/sdkconfig" CACHE FILEPATH "Per-build config")
+endif()
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+project(frame_compare)

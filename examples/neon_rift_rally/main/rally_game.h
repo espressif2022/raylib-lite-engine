@@ -53,7 +53,29 @@ typedef enum {
     RALLY_EVENT_START      = 1u << 11,
     RALLY_EVENT_FAIL       = 1u << 12,
     RALLY_EVENT_DRIFT_BOOST = 1u << 13,
+    RALLY_EVENT_OVERTAKE    = 1u << 14,
+    RALLY_EVENT_OVERTAKEN   = 1u << 15,
+    RALLY_EVENT_DRAFT_READY = 1u << 16,
+    /* A nearby rider (see event_rider) fires nitro, or slips and opens a gap. */
+    RALLY_EVENT_RIVAL_BOOST = 1u << 17,
+    RALLY_EVENT_RIVAL_SLIP  = 1u << 18,
 } rally_event_flags_t;
+
+typedef enum {
+    RALLY_OPPONENT_SPRINTER = 0,
+    RALLY_OPPONENT_DEFENDER,
+    RALLY_OPPONENT_CHASER,
+} rally_opponent_style_t;
+
+/* What a rider is doing right now; views use it to show intent. */
+typedef enum {
+    RALLY_INTENT_CRUISE = 0,
+    RALLY_INTENT_ATTACK,
+    RALLY_INTENT_DEFEND,
+    RALLY_INTENT_DRAFT,
+    RALLY_INTENT_NITRO,
+    RALLY_INTENT_SLIP,
+} rally_opponent_intent_t;
 
 typedef struct {
     float throttle; /* 0..1 */
@@ -112,13 +134,27 @@ typedef struct {
     float lateral;
     float speed;
     float lane;
+    float target_lane;
     float phase;
+    float lateral_velocity; /* m/s; a damped spring steers toward lane */
     uint16_t laps_completed;
     uint8_t position;
     uint8_t collision_cooldown;
     uint8_t near_miss_cooldown;
+    uint8_t decision_cooldown;
+    uint8_t style;
     bool active;
     bool finished;
+    /* Per-race personality rolled from the race seed. */
+    float skill;      /* pace offset, about -1..+1 */
+    float cornering;  /* 0.7 brakes early .. 1.4 carries speed through bends */
+    float aggression; /* 0..1: blocking, retaliation and risky dives */
+    float nitro;      /* 0..RALLY_NITRO_MAX */
+    uint32_t rng;
+    uint8_t nitro_ticks;
+    uint8_t slip_ticks;
+    int8_t slip_side;
+    uint8_t intent;   /* rally_opponent_intent_t */
 } rally_opponent_t;
 
 typedef struct {
@@ -169,6 +205,10 @@ typedef struct {
     uint16_t combo;
     uint16_t combo_timer;
     float risk_meter;
+    float draft_meter;
+    float gap_ahead;
+    uint8_t draft_boost_ticks;
+    uint8_t previous_position;
 
     rally_input_t input;
     bool previous_jump;
@@ -180,9 +220,24 @@ typedef struct {
     uint32_t last_event;
 
     rally_opponent_t opponents[RALLY_OPPONENT_COUNT];
+    uint32_t seed;
+    uint8_t rival;       /* opponent index that races the player hardest */
+    uint8_t event_rider; /* opponent behind the latest RIVAL_* event */
 } rally_game_t;
 
+/* Native one-finger/tilt drift: hold a strong turn, release toward center.
+ * Kept outside race state so keyboard/replay inputs retain explicit drift. */
+typedef struct {
+    uint8_t hold_ticks;
+    bool active;
+} rally_drift_assist_t;
+void rally_drift_assist_reset(rally_drift_assist_t *assist);
+bool rally_drift_assist_update(rally_drift_assist_t *assist,
+                              const rally_game_t *game, float steer);
+
 void rally_reset(rally_game_t *game);
+/* Rerolls rider personalities and the rival; call after rally_reset(). */
+void rally_set_seed(rally_game_t *game, uint32_t seed);
 void rally_start(rally_game_t *game);
 void rally_set_input(rally_game_t *game, rally_input_t input);
 void rally_set_controls(rally_game_t *game, float throttle, float brake,
@@ -210,3 +265,6 @@ bool rally_track_scenery_course(unsigned course_id, unsigned segment, unsigned s
                                 rally_track_scenery_t *out);
 
 uint32_t rally_state_hash(const rally_game_t *game);
+/* Display name of an opponent; also used by Host state output. */
+const char *rally_rider_name(unsigned index);
+const char *rally_intent_name(unsigned intent);

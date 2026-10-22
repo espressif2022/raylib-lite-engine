@@ -35,6 +35,9 @@ Keep callbacks bounded.
 
 `get_info` describes a fixed native-endian RGB565 surface. Stride is in pixels
 and must be at least width. The backend performs any transfer byte swapping.
+A backend that only ever displays rows `y % sample_row_step == 0` (power of
+two) may report that step; the Raylib-compatible facade and renderer then leave
+the other rows unwritten, and the backend must not show or snapshot them as-is.
 A successful `acquire` lends one exclusively writable frame; its opaque token
 belongs to the backend. The Engine holds at most one acquired frame.
 
@@ -83,3 +86,19 @@ Boot runs before Board creation, attach borrows the Board video/input interfaces
 and first-present runs after frame submission/flush and input startup. Detach must
 finish before the Board is destroyed; failure retains resources. A selected provider
 is a required link dependency. Ordinary native examples select no provider.
+
+## API audiences
+
+Public visibility does not make every entrypoint a default game API. The reviewed
+[catalog](compat/api/catalog.json) separates game capabilities, application integration
+hooks, low-level tools, compatibility facades and retained modules under review.
+Some legacy `raylib_lite_2d_*` names use neutral types in the renderer header;
+classify them by header/type contract rather than name alone. See the
+[custom API boundaries (Chinese)](docs/custom-api.CN.md) and
+[Scene/UI usage contract (Chinese)](docs/scene-ui.CN.md).
+
+Renderer callers may include the narrow [drawing](include/raylib_lite/raylib_lite_renderer_draw.h),
+[statistics](include/raylib_lite/raylib_lite_renderer_stats.h), or
+[benchmark](include/raylib_lite/raylib_lite_renderer_benchmark.h) contracts. The old renderer
+header re-exports all three. Statistics keep their existing layout and five legacy phase
+slots; benchmark entrypoint availability does not prove it was enabled or run.

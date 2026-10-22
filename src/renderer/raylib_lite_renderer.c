@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "raylib_lite_renderer.h"
+#include "raylib_lite_renderer_draw.h"
+#include "raylib_lite_renderer_stats.h"
+#include "raylib_lite_primitives_internal.h"
 #include "raylib_lite_rgb565.h"
 #include "raylib_lite_wall_config.h"
 #include <math.h>
@@ -39,11 +41,15 @@ static void texture_slot_release(texture_slot_t *slot)
 }
 static uint16_t *s_target;static size_t s_stride;static int s_target_width,s_target_height;
 static int s_clip_x0,s_clip_y0,s_clip_x1,s_clip_y1;
+/* Rows with (y & s_row_mask) set are never displayed and are left unwritten. */
+static int s_row_mask;
+#define ROW_HIDDEN(y) (((y)&s_row_mask)!=0)
 static raylib_lite_renderer_sprite_frame_t s_frame_result;
 static raylib_lite_renderer_raster_stats_t s_raster_stats;
 static uint32_t s_rejected_draw_calls;
 static texture_slot_t *texture_slot(raylib_lite_renderer_texture_t texture){if(!texture.id||texture.id>M2D_MAX_TEXTURES)return NULL;texture_slot_t *slot=&s_textures[texture.id-1];return slot->used?slot:NULL;}
 void raylib_lite_renderer_set_target(uint16_t *pixels,size_t stride,int width,int height){s_target=pixels;s_stride=stride;s_target_width=width;s_target_height=height;s_clip_x0=0;s_clip_y0=0;s_clip_x1=width;s_clip_y1=height;}
+void raylib_lite_renderer_set_row_step(unsigned step){s_row_mask=step>1&&!(step&(step-1))?(int)step-1:0;}
 void raylib_lite_renderer_set_clip(int x,int y,int width,int height){
  s_clip_x0=x<0?0:x;s_clip_y0=y<0?0:y;
  s_clip_x1=x+width>s_target_width?s_target_width:x+width;
@@ -65,6 +71,154 @@ void raylib_lite_renderer_set_phase_us(uint32_t sky_us,uint32_t floor_us,uint32_
  s_raster_stats.sky_us=sky_us;s_raster_stats.floor_us=floor_us;s_raster_stats.wall_us=wall_us;
  s_raster_stats.enemy_us=enemy_us;s_raster_stats.hud_us=hud_us;
 }
+/* Validate packaged metadata once at load time, outside draw hot paths. */
+static bool atlas_frames_valid(const uint8_t *data, unsigned count,
+                               unsigned width, unsigned height)
+{
+    for (unsigned i = 0; i < count; ++i) {
+        atlas_frame_t frame;
+        memcpy(&frame, data + (size_t)i * sizeof(frame), sizeof(frame));
+        if (!frame.width || !frame.height ||
+                (uint32_t)frame.x + frame.width > width ||
+                (uint32_t)frame.y + frame.height > height) return false;
+    }
+    return true;
+}
+
+/* Blending never mixes channels, so a constant paint is three per-channel
+ * tables of the old pixel. Rebuilt only when the paint changes. */
+static struct { uint16_t pixel; unsigned alpha; uint16_t r[32], g[64], b[32]; } s_blend_lut;
+
+M2D_HOT void raylib_lite_primitive_blend_run(uint16_t *dst, int count,
+    const raylib_lite_primitive_paint_t *paint)
+{
+    if (s_blend_lut.alpha != paint->alpha || s_blend_lut.pixel != paint->pixel) {
+        for (unsigned i = 0; i < 32; ++i) {
+            s_blend_lut.r[i] = raylib_lite_primitive_blend(i << 11, paint) & 0xf800U;
+            s_blend_lut.b[i] = raylib_lite_primitive_blend(i, paint) & 0x001fU;
+        }
+        for (unsigned i = 0; i < 64; ++i)
+            s_blend_lut.g[i] = raylib_lite_primitive_blend(i << 5, paint) & 0x07e0U;
+        s_blend_lut.pixel = paint->pixel;
+        s_blend_lut.alpha = paint->alpha;
+    }
+    const uint16_t *r = s_blend_lut.r, *g = s_blend_lut.g, *b = s_blend_lut.b;
+    for (int i = 0; i < count; ++i) {
+        unsigned old = dst[i];
+        dst[i] = (uint16_t)(r[old >> 11] | g[(old >> 5) & 63U] | b[old & 31U]);
+    }
+}
+
+void raylib_lite_primitive_draw_span(raylib_lite_primitive_surface_t *surface,
+    int y, int x0, int x1, const raylib_lite_primitive_paint_t *paint)
+{
+    raylib_lite_primitive_fill_span(surface,y,x0,x1,paint);
+}
+
+void raylib_lite_primitive_draw_rectangle(raylib_lite_primitive_surface_t *surface,
+    int x, int y, int width, int height, raylib_lite_renderer_color_t color)
+{
+    if (!surface->pixels || width <= 0 || height <= 0) return;
+    int x0 = x < 0 ? 0 : x;
+    int y0 = y < 0 ? 0 : y;
+    int x1 = x + width > surface->width ? surface->width : x + width;
+    int y1 = y + height > surface->height ? surface->height : y + height;
+    if (surface->clip_active) {
+        if (x0 < surface->clip_x0) x0 = surface->clip_x0;
+        if (y0 < surface->clip_y0) y0 = surface->clip_y0;
+        if (x1 > surface->clip_x1) x1 = surface->clip_x1;
+        if (y1 > surface->clip_y1) y1 = surface->clip_y1;
+    }
+    if (x0 >= x1 || y0 >= y1) return;
+    if (!color.a) return;
+    raylib_lite_primitive_paint_t paint = raylib_lite_primitive_paint(color);
+    if (x1-x0 == 1) {
+        /* Jelly caps and vertical gradients use one-pixel columns. Bounds
+         * are already clipped above; avoid redoing span setup for every row. */
+        uint16_t *dst = surface->pixels + (size_t)y0*surface->stride + x0;
+        surface->pixel_count += (uint32_t)(y1-y0);
+        surface->run_count += (uint32_t)(y1-y0);
+        if (color.a == 255) {
+            for (int yy=y0; yy<y1; ++yy, dst+=surface->stride)
+                if (!(yy & surface->row_mask)) *dst=paint.pixel;
+        } else {
+            for (int yy=y0; yy<y1; ++yy, dst+=surface->stride)
+                if (!(yy & surface->row_mask)) *dst=raylib_lite_primitive_blend(*dst,&paint);
+        }
+        return;
+    }
+    for (int yy=y0; yy<y1; ++yy) raylib_lite_primitive_write_span(surface, yy, x0, x1, &paint);
+}
+
+static inline int64_t edge(int ax, int ay, int bx, int by, int px, int py)
+{
+    return ((int64_t)px-ax)*((int64_t)by-ay) -
+           ((int64_t)py-ay)*((int64_t)bx-ax);
+}
+
+/* Positive denominator; C division truncates toward zero rather than floor. */
+static inline int64_t triangle_floor_div(int64_t n, int64_t d)
+{
+    return n/d - (n%d < 0);
+}
+
+static inline int64_t triangle_ceil_div(int64_t n, int64_t d)
+{
+    return n/d + (n%d > 0);
+}
+
+void raylib_lite_primitive_draw_triangle(raylib_lite_primitive_surface_t *surface,
+    int ax, int ay, int bx, int by, int cx, int cy, raylib_lite_renderer_color_t color)
+{
+    if (!surface->pixels) return;
+    int minx=ax<bx?(ax<cx?ax:cx):(bx<cx?bx:cx);
+    int maxx=ax>bx?(ax>cx?ax:cx):(bx>cx?bx:cx);
+    int miny=ay<by?(ay<cy?ay:cy):(by<cy?by:cy);
+    int maxy=ay>by?(ay>cy?ay:cy):(by>cy?by:cy);
+    if(minx<0) minx=0;
+    if(miny<0) miny=0;
+    if(maxx>=surface->width) maxx=surface->width-1;
+    if(maxy>=surface->height) maxy=surface->height-1;
+    if (surface->clip_active) {
+        if(minx<surface->clip_x0)minx=surface->clip_x0;
+        if(miny<surface->clip_y0)miny=surface->clip_y0;
+        if(maxx>=surface->clip_x1)maxx=surface->clip_x1-1;
+        if(maxy>=surface->clip_y1)maxy=surface->clip_y1-1;
+    }
+    int64_t area=edge(ax,ay,bx,by,cx,cy);
+    if(!area||!color.a||minx>maxx||miny>maxy)return;
+    raylib_lite_primitive_paint_t paint=raylib_lite_primitive_paint(color);
+    /* Intersect the three integer half-planes directly, either winding.
+     * Top-left rule: pixels on a left or top edge are inside, pixels on a
+     * right or bottom edge are not, so triangles sharing an edge (fans,
+     * strips, polygons, rotated rectangles) cover each pixel exactly once. */
+    int winding=area>0?1:-1;
+    int vx[3]={ax,bx,cx},vy[3]={ay,by,cy};
+    int64_t slope[3],value[3],step[3];
+    for(int i=0;i<3;++i){
+        int j=(i+1)%3;
+        slope[i]=((int64_t)vy[j]-vy[i])*winding;
+        step[i]=-((int64_t)vx[j]-vx[i])*winding;
+        value[i]=edge(vx[i],vy[i],vx[j],vy[j],0,miny)*winding;
+        if(!(slope[i]>0||(slope[i]==0&&step[i]>0)))value[i]-=1;
+    }
+    for(int y=miny;y<=maxy;++y){
+        int64_t first=minx,last=maxx;
+        bool inside=true;
+        for(int i=0;i<3;++i){
+            if(slope[i]>0){
+                int64_t lo=triangle_ceil_div(-value[i],slope[i]);
+                if(lo>first)first=lo;
+            }else if(slope[i]<0){
+                int64_t hi=triangle_floor_div(value[i],-slope[i]);
+                if(hi<last)last=hi;
+            }else if(value[i]<0)inside=false;
+            value[i]+=step[i];
+        }
+        if(inside&&first<=last)raylib_lite_primitive_write_span(surface,y,(int)first,(int)last+1,&paint);
+    }
+}
+
 raylib_lite_renderer_texture_t raylib_lite_renderer_load_texture(const char *path)
 {
     raylib_lite_asset_view_t asset = {0};
@@ -78,9 +232,13 @@ raylib_lite_renderer_texture_t raylib_lite_renderer_load_texture(const char *pat
     size_t frame_bytes = (size_t)header->frame_count * sizeof(atlas_frame_t);
     uint64_t expected = (uint64_t)sizeof(*header) + frame_bytes +
                         header->rgb_bytes + header->alpha_bytes;
+    uint64_t pixels = (uint64_t)header->width * header->height;
     if (header->magic != M2D_MAGIC || !header->width || !header->height ||
             expected > asset.size ||
-            header->rgb_bytes != (uint32_t)header->width * header->height * 2U) {
+            header->rgb_bytes != pixels * 2U ||
+            (header->alpha_bytes && header->alpha_bytes != pixels) ||
+            !atlas_frames_valid(asset.data + sizeof(*header), header->frame_count,
+                                header->width, header->height)) {
         raylib_lite_asset_release(&asset);
         return (raylib_lite_renderer_texture_t){0};
     }
@@ -148,7 +306,9 @@ raylib_lite_wall_atlas_t raylib_lite_wall_atlas_load(const char *path)
             !header->width || !header->height || header->light_levels != 16 ||
             header->palette_entries != 256 ||
             header->index_bytes != (uint32_t)header->width * header->height ||
-            expected > asset.size) {
+            expected > asset.size ||
+            !atlas_frames_valid(asset.data + sizeof(*header), header->frame_count,
+                                header->width, header->height)) {
         raylib_lite_asset_release(&asset);
         return (raylib_lite_wall_atlas_t){0};
     }
@@ -251,11 +411,59 @@ static inline int sample_next(sample_step_t*step){
  if(step->error>=step->denominator){++step->value;step->error-=step->denominator;}
  return value;
 }
+/* Texture compositing retains 8-bit tint precision until the final RGB565
+ * write. Do not quantize the tinted source or effective alpha first. Other
+ * raster kernels retain their existing blend565 pixel contract. */
+static inline uint16_t texture_blend_white8(uint16_t dst,uint16_t src,unsigned a)
+{
+ unsigned inverse=255U-a;
+ unsigned sr=src>>11,sg=(src>>5)&63U,sb=src&31U;
+ unsigned dr=dst>>11,dg=(dst>>5)&63U,db=dst&31U;
+ sr=(sr<<3)|(sr>>2);sg=(sg<<2)|(sg>>4);sb=(sb<<3)|(sb>>2);
+ dr=(dr<<3)|(dr>>2);dg=(dg<<2)|(dg>>4);db=(db<<3)|(db>>2);
+ /* For raw alpha 255 and white tint, cancel two factors of 255 from
+  * the full-precision formula. Preserve floor before RGB565 packing. */
+ unsigned r=(sr*a+dr*inverse)/255U;
+ unsigned g=(sg*a+dg*inverse)/255U;
+ unsigned b=(sb*a+db*inverse)/255U;
+ return (uint16_t)((r>>3)<<11|(g>>2)<<5|(b>>3));
+}
+static uint16_t texture_blend(uint16_t dst,uint16_t src,unsigned raw_alpha,
+                             raylib_lite_renderer_color_t tint)
+{
+ unsigned a=raw_alpha*tint.a, inverse=65025U-a;
+ unsigned sr=src>>11,sg=(src>>5)&63U,sb=src&31U;
+ unsigned dr=dst>>11,dg=(dst>>5)&63U,db=dst&31U;
+ sr=(sr<<3)|(sr>>2);sg=(sg<<2)|(sg>>4);sb=(sb<<3)|(sb>>2);
+ dr=(dr<<3)|(dr>>2);dg=(dg<<2)|(dg>>4);db=(db<<3)|(db>>2);
+ /* Products fit uint32_t; divide only once per channel. */
+ unsigned r=(sr*tint.r*a+dr*255U*inverse)/16581375U;
+ unsigned g=(sg*tint.g*a+dg*255U*inverse)/16581375U;
+ unsigned b=(sb*tint.b*a+db*255U*inverse)/16581375U;
+ return (uint16_t)((r>>3)<<11|(g>>2)<<5|(b>>3));
+}
+
 void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t texture,raylib_lite_renderer_rect_t source,raylib_lite_renderer_rect_t dest,raylib_lite_renderer_vec2_t origin,float rotation,raylib_lite_renderer_color_t tint){
  texture_slot_t*s=texture_slot(texture);if(!s||!s_target||source.width==0||source.height==0||dest.width==0||dest.height==0){++s_rejected_draw_calls;return;}
  if(!tint.a)return;
- bool fx=source.width<0,fy=source.height<0;float sw=fabsf(source.width),sh=fabsf(source.height),rad=rotation*0.01745329252f,cs=cosf(rad),sn=sinf(rad);int dw=(int)fabsf(dest.width),dh=(int)fabsf(dest.height),extent=dw>dh?dw:dh;bool identity=fabsf(rotation)<.001f;
- int x0=identity?(int)(dest.x-origin.x):(int)(dest.x-origin.x-extent),y0=identity?(int)(dest.y-origin.y):(int)(dest.y-origin.y-extent),x1=identity?x0+dw:(int)(dest.x+extent),y1=identity?y0+dh:(int)(dest.y+extent);
+ bool fx=source.width<0,fy=source.height<0;float sw=fabsf(source.width),sh=fabsf(source.height),rad=(fabsf(rotation)>=360.0f?fmodf(rotation,360.0f):rotation)*0.01745329252f,cs=cosf(rad),sn=sinf(rad);int dw=(int)fabsf(dest.width),dh=(int)fabsf(dest.height);bool identity=fabsf(rotation)<.001f;
+ int x0=(int)(dest.x-origin.x),y0=(int)(dest.y-origin.y),x1=x0+dw,y1=y0+dh;
+ if(!identity){
+  /* Bound the actual transformed corners, including origins outside the
+   * rectangle. A max(width,height) radius clips diagonal rotations. */
+  float minx=INFINITY,miny=INFINITY,maxx=-INFINITY,maxy=-INFINITY;
+  for(int i=0;i<4;++i){
+   float lx=((i&1)?fabsf(dest.width):0)-origin.x;
+   float ly=((i&2)?fabsf(dest.height):0)-origin.y;
+   float x=dest.x+lx*cs-ly*sn,y=dest.y+lx*sn+ly*cs;
+   if(x<minx)minx=x;
+   if(x>maxx)maxx=x;
+   if(y<miny)miny=y;
+   if(y>maxy)maxy=y;
+  }
+  x0=(int)ceilf(minx-.5f);y0=(int)ceilf(miny-.5f);
+  x1=(int)ceilf(maxx-.5f);y1=(int)ceilf(maxy-.5f);
+ }
  if(x0<0)x0=0;
  if(y0<0)y0=0;
  if(x1>s_target_width)x1=s_target_width;
@@ -271,11 +479,29 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
   int sx=(int)source.x+(x0-left),sy=(int)source.y+(y0-top),copy=x1-x0;
   if(copy>0&&sx>=0&&sy>=0&&sx+copy<=s->header->width&&
      sy+(y1-y0)<=s->header->height){
-   for(int y=y0;y<y1;++y,++sy)raylib_lite_rgb565_copy(&s_target[(size_t)y*s_stride+x0],
+   for(int y=y0;y<y1;++y,++sy)if(!ROW_HIDDEN(y))raylib_lite_rgb565_copy(&s_target[(size_t)y*s_stride+x0],
       &s->rgb[(size_t)sy*s->header->width+sx],(size_t)copy);
    ++s_raster_stats.opaque_copy_calls;
    s_raster_stats.opaque_copy_pixels+=(uint32_t)copy*(uint32_t)(y1-y0);
    m2d_note_store_rows(copy,y1-y0);
+   return;
+  }
+ }
+ if(identity&&!fx&&!fy&&!s->alpha&&tint.r==255&&tint.g==255&&tint.b==255&&
+    tint.a<255&&dw==(int)sw&&dh==(int)sh){
+  int left=(int)(dest.x-origin.x),top=(int)(dest.y-origin.y);
+  int sx=(int)source.x+(x0-left),sy=(int)source.y+(y0-top),count=x1-x0;
+  if(sx>=0&&sy>=0&&sx+count<=s->header->width&&
+     sy+(y1-y0)<=s->header->height){
+   for(int y=y0;y<y1;++y,++sy){
+    if(ROW_HIDDEN(y))continue;
+    const uint16_t *src=&s->rgb[(size_t)sy*s->header->width+sx];
+    uint16_t *dst=&s_target[(size_t)y*s_stride+x0];
+    for(int x=0;x<count;++x)dst[x]=texture_blend_white8(dst[x],src[x],tint.a);
+   }
+   ++s_raster_stats.alpha_calls;
+   s_raster_stats.alpha_pixels+=(uint32_t)count*(uint32_t)(y1-y0);
+   m2d_note_store_rows(count,y1-y0);
    return;
   }
  }
@@ -306,7 +532,7 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
    sample_step_t ystep=sample_step(first_ly,ish,dh);
    for(int y=y0;y<y1;++y){
     int sy=sample_next(&ystep);if(fy)sy=ish-1-sy;sy+=source_y;
-    if((unsigned)sy>=s->header->height)continue;
+    if((unsigned)sy>=s->header->height||ROW_HIDDEN(y))continue;
     const uint16_t *src=s->rgb+(size_t)sy*s->header->width;
     uint16_t *dst=s_target+(size_t)y*s_stride+left_x;
     if(white){
@@ -332,6 +558,7 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
      sy+(y1-y0)<=s->header->height){
    uint32_t drawn=0;
    for(int y=y0;y<y1;++y,++sy){
+    if(ROW_HIDDEN(y))continue;
     const uint8_t*mask=&s->alpha[(size_t)sy*s->header->width+sx];
     const uint16_t*src=&s->rgb[(size_t)sy*s->header->width+sx];
     uint16_t*dst=&s_target[(size_t)y*s_stride+x0];
@@ -358,7 +585,7 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
   uint32_t drawn=0,runs=0;
   for(int y=y0;y<y1;++y){
    int sy=sample_next(&ystep);if(fy)sy=ish-1-sy;sy+=source_y;
-   if((unsigned)sy>=s->header->height)continue;
+   if((unsigned)sy>=s->header->height||ROW_HIDDEN(y))continue;
    sample_step_t xstep=sample_step(first_lx,isw,dw);
    uint16_t*dst=&s_target[(size_t)y*s_stride+x0];
    for(int x=x0;x<x1;++x){
@@ -386,7 +613,7 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
   sample_step_t ystep=sample_step(first_ly,ish,dh);
   for(int y=y0;y<y1;++y){
    int sy=sample_next(&ystep);if(fy)sy=ish-1-sy;sy+=source_y;
-   if((unsigned)sy>=s->header->height)continue;
+   if((unsigned)sy>=s->header->height||ROW_HIDDEN(y))continue;
    sample_step_t xstep=sample_step(first_lx,isw,dw);
    uint16_t*dst=&s_target[(size_t)y*s_stride+x0];
    for(int x=x0;x<x1;++x){
@@ -394,9 +621,10 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
     if((unsigned)sx<s->header->width){
      size_t i=(size_t)sy*s->header->width+sx;
      unsigned raw_a=s->alpha?s->alpha[i]:255U;
-     if(raw_a){uint16_t src=tint565(s->rgb[i],tint);
-      if((s->header->flags&M2D_ATLAS_BINARY_ALPHA)&&tint.a==255)*dst=src;
-      else{unsigned a=raw_a*tint.a/255U;*dst=blend565(*dst,src,a);}}
+     if(raw_a){
+      if(raw_a==255&&tint.a==255)*dst=tint565(s->rgb[i],tint);
+      else *dst=texture_blend(*dst,s->rgb[i],raw_a,tint);
+     }
     }
     ++dst;
    }
@@ -406,7 +634,23 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
  ++s_raster_stats.rotated_calls;
  s_raster_stats.rotated_pixels+=(uint32_t)(x1-x0)*(uint32_t)(y1-y0);
  m2d_note_store_rows(x1-x0,y1-y0);
- for(int y=y0;y<y1;++y)for(int x=x0;x<x1;++x){float dx=x-dest.x,dy=y-dest.y;float lx=dx*cs+dy*sn+origin.x,ly=-dx*sn+dy*cs+origin.y;if(lx<0||ly<0||lx>=dw||ly>=dh)continue;int sx=(int)(lx*sw/dw),sy=(int)(ly*sh/dh);if(fx)sx=(int)sw-1-sx;if(fy)sy=(int)sh-1-sy;sx+=(int)source.x;sy+=(int)source.y;if((unsigned)sx>=s->header->width||(unsigned)sy>=s->header->height)continue;size_t i=(size_t)sy*s->header->width+sx;unsigned a=(s->alpha?s->alpha[i]:255U)*tint.a/255U;if(!a)continue;uint16_t*dst=&s_target[(size_t)y*s_stride+x];*dst=blend565(*dst,tint565(s->rgb[i],tint),a);}}
+ for(int y=y0;y<y1;++y)if(!ROW_HIDDEN(y))for(int x=x0;x<x1;++x){
+  float dx=x+.5f-dest.x,dy=y+.5f-dest.y;
+  float lx=dx*cs+dy*sn+origin.x,ly=-dx*sn+dy*cs+origin.y;
+  if(lx<0||ly<0||lx>=fabsf(dest.width)||ly>=fabsf(dest.height))continue;
+  int sx=(int)(lx*sw/fabsf(dest.width)),sy=(int)(ly*sh/fabsf(dest.height));
+  if(fx)sx=(int)sw-1-sx;
+  if(fy)sy=(int)sh-1-sy;
+  sx+=(int)source.x;sy+=(int)source.y;
+  if((unsigned)sx>=s->header->width||(unsigned)sy>=s->header->height)continue;
+  size_t i=(size_t)sy*s->header->width+sx;
+  unsigned raw_a=s->alpha?s->alpha[i]:255U;
+  if(!raw_a)continue;
+  uint16_t *dst=&s_target[(size_t)y*s_stride+x];
+  *dst=raw_a==255&&tint.a==255?tint565(s->rgb[i],tint):
+       texture_blend(*dst,s->rgb[i],raw_a,tint);
+ }
+}
 
 typedef struct {
  int32_t phase,step,period;
@@ -633,7 +877,7 @@ static M2D_HOT void draw_textured_triangle_section(texture_slot_t*s,
  for(int y=y0;y<y1;++y){
   triangle_scan_edge_t*left=&long_edge,*right=&short_edge;
   if(left->x>right->x){left=&short_edge;right=&long_edge;}
-  if(right->x-left->x>64){
+  if(right->x-left->x>64&&!ROW_HIDDEN(y)){
    int x0=raster_ceil_fixed(left->x),x1=raster_ceil_fixed(right->x);
    if(x0<s_clip_x0)x0=s_clip_x0;
    if(x1>s_clip_x1)x1=s_clip_x1;
@@ -1051,7 +1295,7 @@ static M2D_HOT void draw_indexed_triangle_section(const raylib_lite_wall_atlas_t
  for(int y=y0;y<y1;++y){
   triangle_scan_edge_t*left=&long_edge,*right=&short_edge;
   if(left->x>right->x){left=&short_edge;right=&long_edge;}
-  if(right->x-left->x>64){
+  if(right->x-left->x>64&&!ROW_HIDDEN(y)){
    int x0=raster_ceil_fixed(left->x),x1=raster_ceil_fixed(right->x);
    if(x0<s_clip_x0)x0=s_clip_x0;
    if(x1>s_clip_x1)x1=s_clip_x1;
@@ -1105,7 +1349,7 @@ static void draw_indexed_triangle_section_persp(const raylib_lite_wall_atlas_t *
  for(int y=y0;y<y1;++y){
   persp_edge_t *left=&long_edge,*right=&short_edge;
   if(left->x>right->x){left=&short_edge;right=&long_edge;}
-  if(right->x-left->x>64){
+  if(right->x-left->x>64&&!ROW_HIDDEN(y)){
    int x0=raster_ceil_fixed(left->x),x1=raster_ceil_fixed(right->x);
    if(x0<s_clip_x0)x0=s_clip_x0;
    if(x1>s_clip_x1)x1=s_clip_x1;
@@ -1246,7 +1490,7 @@ static void draw_indexed_quad_persp(const raylib_lite_wall_atlas_t *atlas,
  for(;;){
   persp_edge_t *left=&first.edge,*right=&second.edge;
   if(left->x>right->x){left=&second.edge;right=&first.edge;}
-  if(right->x-left->x>64){
+  if(right->x-left->x>64&&!ROW_HIDDEN(row)){
    int x0=raster_ceil_fixed(left->x),x1=raster_ceil_fixed(right->x);
    if(x0<s_clip_x0)x0=s_clip_x0;
    if(x1>s_clip_x1)x1=s_clip_x1;
@@ -1302,7 +1546,7 @@ static M2D_HOT void draw_indexed_quad_direct(const raylib_lite_wall_atlas_t *atl
   triangle_scan_edge_t *left=&first.edge,*right=&second.edge;
   if(left->x>right->x){left=&second.edge;right=&first.edge;}
   int32_t width=right->x-left->x;
-  if(width>64){
+  if(width>64&&!ROW_HIDDEN(row)){
    int x0=raster_ceil_fixed(left->x),x1=raster_ceil_fixed(right->x);
    if(x0<s_clip_x0)x0=s_clip_x0;
    if(x1>s_clip_x1)x1=s_clip_x1;
@@ -1371,7 +1615,7 @@ static void draw_rgb_quad_direct(texture_slot_t *s,
   triangle_scan_edge_t *left=&first.edge,*right=&second.edge;
   if(left->x>right->x){left=&second.edge;right=&first.edge;}
   int32_t width=right->x-left->x;
-  if(width>64){
+  if(width>64&&!ROW_HIDDEN(row)){
    int x0=raster_ceil_fixed(left->x),x1=raster_ceil_fixed(right->x);
    if(x0<s_clip_x0)x0=s_clip_x0;
    if(x1>s_clip_x1)x1=s_clip_x1;
@@ -1450,7 +1694,7 @@ void raylib_lite_renderer_draw_tile_row(raylib_lite_renderer_texture_t texture,c
   int x1=left+tw<s_clip_x1?left+tw:s_clip_x1;
   if(x0>=x1||sx<0||sx+tw>s->header->width||th>s->header->height)continue;
   int source_x=sx+(x0-left),copy=x1-x0;
-  for(int y=y0;y<y1;++y)raylib_lite_rgb565_copy(&s_target[(size_t)y*s_stride+x0],
+  for(int y=y0;y<y1;++y)if(!ROW_HIDDEN(y))raylib_lite_rgb565_copy(&s_target[(size_t)y*s_stride+x0],
     &s->rgb[(size_t)(y-dy)*s->header->width+source_x],(size_t)copy);
   pixels+=(uint32_t)copy*(uint32_t)(y1-y0);
   m2d_note_store_rows(copy,y1-y0);
@@ -1484,7 +1728,7 @@ void raylib_lite_renderer_draw_column(raylib_lite_renderer_texture_t texture,ray
  sample_step_t step=sample_step(y0-dest_y,ish,dest_height);
  for(int y=y0;y<y1;++y){
   int sy=source_y+sample_next(&step);
-  if((unsigned)sy>=s->header->height)continue;
+  if((unsigned)sy>=s->header->height||ROW_HIDDEN(y))continue;
   uint16_t px=shade565(s->rgb[(size_t)sy*s->header->width+(unsigned)sx],light);
   fill_shaded(&s_target[(size_t)y*s_stride+x0],x1-x0,px);
   drawn+=(uint32_t)(x1-x0);
@@ -1497,7 +1741,7 @@ void raylib_lite_renderer_draw_span(raylib_lite_renderer_texture_t texture,rayli
  texture_slot_t *s=texture_slot(texture);
  if(dest_x1<=dest_x0)return;
  if(!s||!s_target||s->alpha||source.width==0||source.height==0){++s_rejected_draw_calls;return;}
- if(dest_y<s_clip_y0||dest_y>=s_clip_y1)return;
+ if(dest_y<s_clip_y0||dest_y>=s_clip_y1||ROW_HIDDEN(dest_y))return;
  int x0=dest_x0>s_clip_x0?dest_x0:s_clip_x0;
  int x1=dest_x1<s_clip_x1?dest_x1:s_clip_x1;
  if(x0>=x1)return;
@@ -1549,8 +1793,8 @@ void raylib_lite_renderer_draw_floor_rows(raylib_lite_renderer_texture_t texture
  uint32_t drawn=0;
  int64_t u=u_16,v=v_16;
  int y1=dest_y+1;
- bool write0=dest_y>=s_clip_y0&&dest_y<s_clip_y1;
- bool write1=row_repeat>1&&y1>=s_clip_y0&&y1<s_clip_y1;
+ bool write0=dest_y>=s_clip_y0&&dest_y<s_clip_y1&&!ROW_HIDDEN(dest_y);
+ bool write1=row_repeat>1&&y1>=s_clip_y0&&y1<s_clip_y1&&!ROW_HIDDEN(y1);
  /* Row base calculation is shared by all samples; never form an out-of-range pointer. */
  uint16_t *row0_base=write0?s_target+(size_t)dest_y*s_stride:NULL;
  uint16_t *row1_base=write1?s_target+(size_t)y1*s_stride:NULL;
@@ -1585,7 +1829,7 @@ void raylib_lite_2d_copy_scanline(int src_y,int dst_y)
 {
  if(src_y==dst_y)return;
  if(!s_target){++s_rejected_draw_calls;return;}
- if(src_y<s_clip_y0||src_y>=s_clip_y1||dst_y<s_clip_y0||dst_y>=s_clip_y1)return;
+ if(src_y<s_clip_y0||src_y>=s_clip_y1||dst_y<s_clip_y0||dst_y>=s_clip_y1||ROW_HIDDEN(dst_y))return;
  int x0=s_clip_x0,x1=s_clip_x1;
  if(x0>=x1)return;
  m2d_note_store(x1-x0);
@@ -1647,7 +1891,7 @@ void raylib_lite_renderer_draw_raycast_walls(raylib_lite_renderer_texture_t text
     int sy;
     if(p->step){sy=p->source_y+(p->phase>>16);p->phase+=p->step;}
     else sy=p->source_y+sample_next(&p->sample);
-    if((unsigned)sy>=(unsigned)atlas_h)continue;
+    if((unsigned)sy>=(unsigned)atlas_h||ROW_HIDDEN(y))continue;
     uint16_t px=shade565(s->rgb[(size_t)sy*atlas_w+(unsigned)p->sx],p->light);
     fill_shaded(row+p->x0,p->width,px);
     drawn+=(uint32_t)p->width;
@@ -1694,7 +1938,7 @@ void raylib_lite_2d_draw_indexed_raycast_walls(raylib_lite_wall_atlas_t atlas,
     uint16_t pixel=0;
     for(int y=y0;y<y1;++y,dst+=s_stride){
      int sy=c->src_y+sample_next(&sample);
-     if((unsigned)sy>=atlas.height)continue;
+     if((unsigned)sy>=atlas.height||ROW_HIDDEN(y))continue;
      /* Magnified near walls repeat one 128px source texel for several screen
       * rows. Keep the lit texel hot instead of repeating INDEX8 + LUT reads. */
      if(sy!=previous_sy){pixel=light[source[sy]];previous_sy=sy;}
@@ -1705,7 +1949,7 @@ void raylib_lite_2d_draw_indexed_raycast_walls(raylib_lite_wall_atlas_t atlas,
    }
    for(int y=y0;y<y1;++y,dst+=s_stride){
     int sy=c->src_y+sample_next(&sample);
-    if((unsigned)sy>=atlas.height)continue;
+    if((unsigned)sy>=atlas.height||ROW_HIDDEN(y))continue;
     fill_shaded(dst,width,light[source[sy]]);
     drawn+=(uint32_t)width;
    }
@@ -1743,7 +1987,7 @@ void raylib_lite_2d_draw_indexed_raycast_walls(raylib_lite_wall_atlas_t atlas,
     prepared_wall_t *p=&prepared[i];
     if(y<p->y0||y>=p->y1)continue;
     int sy=p->source_y+sample_next(&p->sample);
-    if((unsigned)sy>=atlas.height)continue;
+    if((unsigned)sy>=atlas.height||ROW_HIDDEN(y))continue;
     size_t source=(size_t)(unsigned)sy*atlas.width+(unsigned)p->sx;
     uint8_t index=atlas.indices[source];
     uint16_t pixel=atlas.light_lut[(size_t)p->light*256U+index];
@@ -1775,6 +2019,7 @@ void raylib_lite_2d_draw_solid_raycast_walls(const raylib_lite_solid_wall_t *col
   int width=x1-x0;
   any=true;
   for(int y=y0;y<y1;++y,dst+=s_stride){
+   if(ROW_HIDDEN(y))continue;
    fill_shaded(dst,width,c->color565);
    drawn+=(uint32_t)width;
   }

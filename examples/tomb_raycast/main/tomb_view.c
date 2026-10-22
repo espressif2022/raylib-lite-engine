@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "tomb_view.h"
 #include "assets_ids.h"
+#include "raylib_lite_design_view.h"
 #include "raylib_lite_raylib.h"
 #include "raylib_lite_clock.h"
 #include <math.h>
@@ -45,6 +46,10 @@ static float s_fwd_x, s_fwd_y, s_fwd_z;
 static float s_right_x, s_right_z;
 static float s_up_x, s_up_y, s_up_z;
 static float s_focal;
+/* The 3D pass draws at native resolution: projection centre and culling
+ * follow the panel, and the focal length keeps the short-side field of view. */
+static float s_center_x=240.0f, s_center_y=240.0f;
+static int s_screen_w=480, s_screen_h=480;
 
 typedef struct {
     float vx, vy, vz, u, v, light;
@@ -103,7 +108,11 @@ static void set_camera(const tomb_game_t *game)
     s_fwd_x=sy*cp;s_fwd_y=sp;s_fwd_z=cy*cp;
     s_right_x=cy;s_right_z=-sy;
     s_up_x=-sy*sp;s_up_y=cp;s_up_z=-cy*sp;
-    s_focal=240.0f/tanf(FOV*0.5f);
+    s_screen_w=GetScreenWidth()>0?GetScreenWidth():480;
+    s_screen_h=GetScreenHeight()>0?GetScreenHeight():480;
+    s_center_x=(float)s_screen_w*0.5f;
+    s_center_y=(float)s_screen_h*0.5f;
+    s_focal=(s_center_x<s_center_y?s_center_x:s_center_y)/tanf(FOV*0.5f);
 }
 
 static void to_view(float wx, float wy, float wz, float *vx, float *vy, float *vz)
@@ -117,8 +126,8 @@ static void to_view(float wx, float wy, float wz, float *vx, float *vy, float *v
 static bool project_view(float vx, float vy, float vz, float *sx, float *sy)
 {
     if(vz<NEAR_Z)return false;
-    *sx=240.0f+s_focal*vx/vz;
-    *sy=240.0f-s_focal*vy/vz;
+    *sx=s_center_x+s_focal*vx/vz;
+    *sy=s_center_y-s_focal*vy/vz;
     return true;
 }
 
@@ -163,7 +172,7 @@ static bool push_surface(const raylib_lite_textured_vertex_t *v, int n,
         if(v[i].y<min_y)min_y=v[i].y;
         if(v[i].y>max_y)max_y=v[i].y;
     }
-    if(max_x<0.0f||min_x>=480.0f||max_y<0.0f||min_y>=480.0f)return true;
+    if(max_x<0.0f||min_x>=(float)s_screen_w||max_y<0.0f||min_y>=(float)s_screen_h)return true;
     /* Screen Y is down, so world-front CCW becomes clockwise here. */
     float area=(v[1].x-v[0].x)*(v[2].y-v[0].y)-(v[1].y-v[0].y)*(v[2].x-v[0].x);
     if(area>=0.0f)return true;
@@ -236,8 +245,8 @@ static bool should_subdivide(const tomb_clip_t *poly, int level, int allowed_lev
         float z=poly[i].vz<NEAR_Z?NEAR_Z:poly[i].vz;
         if(z<min_z)min_z=z;
         if(z>max_z)max_z=z;
-        float sx=240.0f+s_focal*poly[i].vx/z;
-        float sy=240.0f-s_focal*poly[i].vy/z;
+        float sx=s_center_x+s_focal*poly[i].vx/z;
+        float sy=s_center_y-s_focal*poly[i].vy/z;
         if(sx<min_x)min_x=sx;
         if(sx>max_x)max_x=sx;
         if(sy<min_y)min_y=sy;
@@ -432,7 +441,7 @@ static int collect_visible(const tomb_game_t *game, tomb_vis_t *out)
     int count=0;
     uint8_t start=game->camera_room<level->room_count?game->camera_room:game->room;
     if(start>=level->room_count)return 0;
-    queue[count++] = (tomb_vis_t){start,0,0,0,480,480};
+    queue[count++] = (tomb_vis_t){start,0,0,0,s_screen_w,s_screen_h};
     for(int head=0;head<count && count<MAX_VIS;++head){
         tomb_vis_t cur=queue[head];
         if(cur.depth>=4)continue;
@@ -562,24 +571,33 @@ static void draw_hud(const tomb_game_t *game, raylib_lite_atlas_t controls,
     if(stick){stick_src=stick->source;has_stick=true;}
     const raylib_lite_sprite_frame_t *jump=raylib_lite_atlas_get_frame(controls,RAYLIB_LITE_ASSET_ID_JUMP_BUTTON);
     if(jump){jump_src=jump->source;has_jump=true;}
+    const raylib_lite_design_view_t view=raylib_lite_design_view((float)TOMB_VIEW_WIDTH);
+    const int font=raylib_lite_design_font(view,10),width=(int)view.width;
+    const int jump_x=width-(TOMB_VIEW_WIDTH-TOMB_JUMP_X);
+    raylib_lite_design_begin(view);
     int stick_x=input&&input->stick_active?input->stick_x:TOMB_MOVE_X;
     int stick_y=input&&input->stick_active?input->stick_y:TOMB_MOVE_Y;
     if(has_stick)DrawTexturePro(controls.texture,stick_src,
         (Rectangle){stick_x-53,stick_y-53,106,106},(Vector2){0,0},0,WHITE);
     if(has_jump)DrawTexturePro(controls.texture,jump_src,
-        (Rectangle){358,352,jump_src.width,jump_src.height},(Vector2){0,0},0,
+        (Rectangle){jump_x-40,352,jump_src.width,jump_src.height},(Vector2){0,0},0,
         input&&input->jump_active?(Color){255,225,120,255}:WHITE);
     DrawCircle(stick_x+(int)(game->strafe*28.0f),
                stick_y-(int)(game->forward*28.0f),9,(Color){255,232,160,255});
-    DrawText("MOVE",stick_x-28,stick_y-54,10,(Color){230,210,160,255});
-    DrawText("JUMP",376,338,10,(Color){240,200,70,255});
+    DrawText("MOVE",stick_x-28,stick_y-54,font,(Color){230,210,160,255});
+    DrawText("JUMP",jump_x-22,338,font,(Color){240,200,70,255});
     char fps_text[16];
     if(input && input->display_fps>0.5f)
         snprintf(fps_text,sizeof(fps_text),"FPS: %d",(int)(input->display_fps+0.5f));
     else
         snprintf(fps_text,sizeof(fps_text),"FPS: --");
-    DrawText(fps_text,198,14,16,(Color){240,210,120,255});
-    DrawText("W walk  F jump  left stick / right look",86,458,10,(Color){160,140,100,255});
+    const int fps_font=raylib_lite_design_font(view,16);
+    const char *help="W walk  F jump  left stick / right look";
+    DrawText(fps_text,raylib_lite_design_view_native(view)?198:(width-MeasureText(fps_text,fps_font))/2,
+             14,fps_font,(Color){240,210,120,255});
+    DrawText(help,raylib_lite_design_view_native(view)?86:(width-MeasureText(help,font))/2,
+             (int)view.height-22,font,(Color){160,140,100,255});
+    raylib_lite_design_end(view);
 }
 
 void tomb_view_render(const tomb_game_t *game, raylib_lite_wall_atlas_t textures, raylib_lite_atlas_t controls,

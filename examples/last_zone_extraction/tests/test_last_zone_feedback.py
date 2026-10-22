@@ -1,4 +1,6 @@
 from pathlib import Path
+import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -43,6 +45,15 @@ void raylib_lite_game_audio_set_music_volume(Music music, float volume);
                 str(GAME / "last_zone_feedback.c"), "-lm", "-o", str(executable),
             ], check=True)
             subprocess.run([str(executable)], check=True)
+
+    def test_manifest_packs_exactly_the_clips_feedback_loads(self) -> None:
+        source = (GAME / "last_zone_feedback.c").read_text(encoding="utf-8")
+        manifest = json.loads((GAME.parent / "assets_src/game_assets.json").read_text(
+            encoding="utf-8"))
+        packed = {entry["source"] for entry in manifest["sounds"]}
+        loaded = {f"{stem}.wav" for stem in re.findall(r'"(\w+)\.sound"', source)}
+        self.assertEqual(packed, loaded)
+        self.assertLessEqual(len(loaded), 20, "CONFIG_ESP_MOSAICO_AUDIO_CLIPS default")
 
 
 if __name__ == "__main__":

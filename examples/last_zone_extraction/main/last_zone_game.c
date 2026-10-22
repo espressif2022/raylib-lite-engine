@@ -199,20 +199,40 @@ static bool ally_at(const last_zone_game_t *game,int ignore,float x,float y)
     return false;
 }
 
+static uint32_t mix_hash(uint32_t a,uint32_t b,uint32_t c)
+{
+    uint32_t h=a*0x9e3779b1U^b*0x85ebca77U^c*0xc2b2ae3dU;
+    h^=h>>15;h*=0x2c1b3c6dU;h^=h>>12;h*=0x297a2d39U;h^=h>>15;
+    return h;
+}
+
+static float hash_unit(uint32_t h){return (float)(h&0xffffU)/65535.0f;}
+
+/* Riflemen keep mid range behind cover, flankers prefer cells outside the
+ * player's view, heavies close in, and wounded riflemen fall back. */
 static void pick_hold_cell(last_zone_game_t *game,int index,last_zone_enemy_t *enemy)
 {
+    float near=2.2f,far=5.4f,ideal=3.4f,cover=1.5f;
+    int reach=2;
+    if(enemy->retreat_timer){near=4.0f;far=6.4f;ideal=5.4f;cover=2.5f;}
+    else if(enemy->role==LAST_ZONE_ROLE_HEAVY){near=1.4f;far=4.0f;ideal=2.4f;cover=.5f;}
+    else if(enemy->role==LAST_ZONE_ROLE_FLANK){near=2.0f;far=5.0f;ideal=3.0f;reach=3;}
     int ex=(int)enemy->x,ey=(int)enemy->y,best_x=ex,best_y=ey;
     float best=1e9f;
-    for(int dy=-2;dy<=2;++dy)for(int dx=-2;dx<=2;++dx){
+    for(int dy=-reach;dy<=reach;++dy)for(int dx=-reach;dx<=reach;++dx){
         int nx=ex+dx,ny=ey+dy;
         if(!layout_open(game,nx,ny)||last_zone_blocks(game,nx,ny))continue;
         float cx=(float)nx+0.5f,cy=(float)ny+0.5f;
         if(ally_at(game,index,cx,cy))continue;
         if(!line_clear(game,cx,cy,game->x,game->y))continue;
         float px=cx-game->x,py=cy-game->y,dist=sqrtf(px*px+py*py);
-        if(dist<2.2f||dist>5.4f)continue;
-        float score=fabsf(dist-3.4f);
-        if(adjacent_cover(game,nx,ny))score-=1.5f;
+        if(dist<near||dist>far)continue;
+        float score=fabsf(dist-ideal);
+        if(adjacent_cover(game,nx,ny))score-=cover;
+        if(enemy->role==LAST_ZONE_ROLE_FLANK&&!enemy->retreat_timer){
+            float view=fabsf(angle_delta(atan2f(py,px)-game->angle));
+            score+=view<.9f?2.0f:-view*.4f;
+        }
         if(score<best){best=score;best_x=nx;best_y=ny;}
     }
     enemy->hold_x=(int8_t)best_x;
@@ -256,6 +276,34 @@ static void route_next(const last_zone_game_t *game,int sx,int sy,int gx,int gy,
             best=distance[ny][nx];*out_dx=dirs[i][0];*out_dy=dirs[i][1];
         }
     }
+}
+
+/* A reachable open cell within radius of (cx,cy); used for patrol routes
+ * and for sweeping around the last known position. */
+static bool pick_open_near(const last_zone_game_t *game,uint32_t seed,const last_zone_enemy_t *enemy,
+                           int cx,int cy,int radius,int8_t *out_x,int8_t *out_y)
+{
+    const unsigned span=(unsigned)(radius*2+1);
+    for(unsigned attempt=0;attempt<8U;++attempt){
+        uint32_t h=mix_hash(seed,attempt,game->layout);
+        int px=cx+(int)(h%span)-radius,py=cy+(int)((h>>8)%span)-radius;
+        if(!layout_open(game,px,py)||last_zone_blocks(game,px,py))continue;
+        if(px==(int)enemy->x&&py==(int)enemy->y)continue;
+        int8_t dx=0,dy=0;
+        route_next(game,(int)enemy->x,(int)enemy->y,px,py,&dx,&dy);
+        if(!dx&&!dy)continue;
+        *out_x=(int8_t)px;*out_y=(int8_t)py;
+        return true;
+    }
+    return false;
+}
+
+static void turn_toward(float *facing,float target,float rate)
+{
+    float delta=angle_delta(target-*facing);
+    *facing+=delta>rate?rate:delta<-rate?-rate:delta;
+    if(*facing<0)*facing+=6.2831853f;
+    if(*facing>=6.2831853f)*facing-=6.2831853f;
 }
 
 static void hurt_player(last_zone_game_t *game,const last_zone_enemy_t *enemy)
@@ -567,6 +615,12 @@ static void place_layout(last_zone_game_t *game,uint8_t layout)
         game->enemies[i].hold_y=(int8_t)game->enemies[i].y;
         game->enemies[i].active=i<last_zone_enemy_total(game);
         game->enemies[i].ai_state=LAST_ZONE_ENEMY_PATROL;
+        game->enemies[i].role=(uint8_t)(game->enemies[i].elite?LAST_ZONE_ROLE_HEAVY:
+                                        (i%3==1)?LAST_ZONE_ROLE_FLANK:LAST_ZONE_ROLE_RIFLE);
+        game->enemies[i].home_x=game->enemies[i].patrol_x=(int8_t)game->enemies[i].x;
+        game->enemies[i].home_y=game->enemies[i].patrol_y=(int8_t)game->enemies[i].y;
+        game->enemies[i].patrol_wait=(uint8_t)(20U+((unsigned)i*23U)%60U);
+        game->enemies[i].facing=(float)(mix_hash((uint32_t)i,layout,7U)%628U)*.01f;
     }
     for(int i=0;i<LAST_ZONE_PICKUPS;++i){
         game->pickups[i].x=pickup_xy[layout][i][0];
@@ -664,7 +718,8 @@ static void emit_sfx(last_zone_game_t *game,uint8_t id)
 const char *last_zone_sfx_name(const last_zone_game_t *game)
 {
     static const char *names[]={"","rifle","impact","empty","confirm","alert",
-                                "pickup","step_l","step_r","hurt","explode","extract"};
+                                "pickup","step_l","step_r","hurt","explode","extract",
+                                "whizz","radio"};
     uint8_t id=game?game->sfx:0;
     if(id>=sizeof(names)/sizeof(names[0]))id=0;
     return names[id];
@@ -737,11 +792,16 @@ void last_zone_update(last_zone_game_t *game)
     game->last_pickup=false;
     game->last_alert=false;
     game->last_blast=false;
+    game->last_radio=false;
+    game->last_miss=false;
     game->sprinting=false;
     if(game->sfx_hold){if(!--game->sfx_hold)game->sfx=0;}
     if(game->fire_cooldown)--game->fire_cooldown;
     if(game->enemy_shot_lock)--game->enemy_shot_lock;
     if(game->alert_flash)game->alert_flash--;
+    if(game->radio_flash)game->radio_flash--;
+    if(game->miss_flash)game->miss_flash--;
+    if(game->call_cut_flash)game->call_cut_flash--;
     if(game->fire_held){
         if(game->breath_hold<255)game->breath_hold++;
         game->holding_breath=game->breath_hold>=LAST_ZONE_BREATH_TICKS;
@@ -845,6 +905,7 @@ void last_zone_update(last_zone_game_t *game)
         if(enemy->hit_flash)--enemy->hit_flash;
         if(enemy->attack_flash)--enemy->attack_flash;
         if(enemy->attack_cooldown)--enemy->attack_cooldown;
+        if(enemy->retreat_timer)--enemy->retreat_timer;
         /* Bring the final hostile to the player instead of requiring a sweep
          * through every previously explored dead end. */
         if(i==last_enemy&&enemy->ai_state!=LAST_ZONE_ENEMY_ENGAGE&&
@@ -856,7 +917,14 @@ void last_zone_update(last_zone_game_t *game)
         }
         float to_x=game->x-enemy->x,to_y=game->y-enemy->y;
         float distance=sqrtf(to_x*to_x+to_y*to_y),heading=0;
-        bool sees_player=distance<6.8f&&line_clear(game,enemy->x,enemy->y,game->x,game->y);
+        float bearing=atan2f(to_y,to_x);
+        float view=fabsf(angle_delta(bearing-enemy->facing));
+        /* Patrols watch a 120 degree cone, searchers a wider one; anyone
+         * already in a fight tracks the player all around. */
+        bool in_cone=enemy->ai_state==LAST_ZONE_ENEMY_PATROL?(view<1.05f||distance<1.6f):
+                     enemy->ai_state==LAST_ZONE_ENEMY_SEARCH?(view<1.45f||distance<2.4f):true;
+        bool sees_player=in_cone&&distance<6.8f&&
+                         line_clear(game,enemy->x,enemy->y,game->x,game->y);
         bool hears_player=false;
         if(!sees_player){
             if(game->sprinting&&distance<LAST_ZONE_HEAR_SPRINT)hears_player=true;
@@ -864,37 +932,101 @@ void last_zone_update(last_zone_game_t *game)
                     line_clear(game,enemy->x,enemy->y,game->x,game->y))
                 hears_player=true;
         }
+        const bool calm=enemy->ai_state==LAST_ZONE_ENEMY_PATROL||
+                        enemy->ai_state==LAST_ZONE_ENEMY_SEARCH;
         if(sees_player||hears_player){
-            enemy->last_seen_x=game->x;enemy->last_seen_y=game->y;enemy->search_timer=150;
-            if(enemy->ai_state==LAST_ZONE_ENEMY_PATROL||
-               (enemy->ai_state==LAST_ZONE_ENEMY_SEARCH&&(sees_player?distance<3.8f:true))){
+            enemy->last_seen_x=game->x;enemy->last_seen_y=game->y;
+            bool alarm=hears_player||!calm;
+            if(calm&&sees_player){
+                /* A glimpse builds suspicion; standing still far away is
+                 * hard to pick out, sprinting in the open is not. */
+                unsigned gain=distance<2.6f?10U:distance<4.2f?5U:3U;
+                if(game->sprinting)gain+=4U;
+                else if(length<.05f)gain=(gain+1U)/2U;
+                if(enemy->ai_state==LAST_ZONE_ENEMY_SEARCH)gain*=2U;
+                unsigned next=enemy->suspicion+gain;
+                enemy->suspicion=(uint8_t)(next>255U?255U:next);
+                if(enemy->suspicion>=LAST_ZONE_SUSPICION_ALERT)alarm=true;
+                turn_toward(&enemy->facing,bearing,.20f);
+            }
+            if(alarm)enemy->search_timer=150;
+            if(alarm&&calm){
                 enemy->ai_state=LAST_ZONE_ENEMY_ALERT;enemy->alert_timer=LAST_ZONE_ALERT_TICKS;
+                enemy->suspicion=LAST_ZONE_SUSPICION_ALERT;
+                if(!enemy->radioed){enemy->radioed=true;enemy->radio_timer=LAST_ZONE_RADIO_TICKS;}
                 game->last_alert=true;
                 game->alert_flash=18;
-                if(sees_player||hears_player)game->spotted=true;
+                game->spotted=true;
             }
+        }else if(enemy->ai_state==LAST_ZONE_ENEMY_PATROL&&enemy->suspicion){
+            if(enemy->suspicion>=12U){
+                /* Lost a half-seen shape: walk over and look. */
+                enemy->ai_state=LAST_ZONE_ENEMY_SEARCH;enemy->search_timer=120;
+            }
+            --enemy->suspicion;
         }else if((enemy->ai_state==LAST_ZONE_ENEMY_ENGAGE||enemy->ai_state==LAST_ZONE_ENEMY_ALERT)
                  &&enemy->search_timer){
             enemy->ai_state=LAST_ZONE_ENEMY_SEARCH;enemy->aim_timer=0;
+        }else if(enemy->suspicion&&enemy->ai_state==LAST_ZONE_ENEMY_SEARCH&&enemy->suspicion<
+                 LAST_ZONE_SUSPICION_ALERT)--enemy->suspicion;
+        if(enemy->radio_timer&&!--enemy->radio_timer){
+            bool reached=false;
+            for(int j=0;j<LAST_ZONE_ENEMIES;++j){
+                last_zone_enemy_t *ally=&game->enemies[j];
+                if(j==i||!ally->active||ally->ai_state!=LAST_ZONE_ENEMY_PATROL)continue;
+                float ax=ally->x-enemy->x,ay=ally->y-enemy->y;
+                if(ax*ax+ay*ay>LAST_ZONE_RADIO_RANGE*LAST_ZONE_RADIO_RANGE)continue;
+                ally->ai_state=LAST_ZONE_ENEMY_SEARCH;ally->search_timer=180;
+                ally->last_seen_x=enemy->last_seen_x;ally->last_seen_y=enemy->last_seen_y;
+                ally->suspicion=12;ally->radioed=true;
+                reached=true;
+            }
+            if(reached){game->last_radio=true;game->radio_flash=45;emit_sfx(game,13);}
         }
         if(enemy->ai_state==LAST_ZONE_ENEMY_ALERT){
             if(enemy->alert_timer)--enemy->alert_timer;
             else enemy->ai_state=LAST_ZONE_ENEMY_ENGAGE;
         }else if(enemy->ai_state==LAST_ZONE_ENEMY_SEARCH){
-            if(enemy->search_timer)--enemy->search_timer;else enemy->ai_state=LAST_ZONE_ENEMY_PATROL;
+            if(enemy->search_timer)--enemy->search_timer;
+            else{enemy->ai_state=LAST_ZONE_ENEMY_PATROL;enemy->suspicion=0;enemy->patrol_wait=30;}
         }
-        if(enemy->ai_state==LAST_ZONE_ENEMY_ENGAGE&&sees_player&&distance>.9f&&distance<6.2f){
+        if(enemy->ai_state==LAST_ZONE_ENEMY_ENGAGE||enemy->ai_state==LAST_ZONE_ENEMY_ALERT)
+            turn_toward(&enemy->facing,bearing,.18f);
+        const bool fleeing=enemy->retreat_timer&&distance<4.4f;
+        if(enemy->ai_state==LAST_ZONE_ENEMY_ENGAGE&&sees_player&&distance>.9f&&distance<6.2f&&
+           !enemy->stagger&&!fleeing){
             if(!enemy->attack_cooldown&&!game->enemy_shot_lock){
                 if(!enemy->aim_timer){
                     static const uint8_t aim_ticks[LAST_ZONE_LAYOUTS]={30,27,24,22,20};
-                    enemy->aim_timer=game->layout<LAST_ZONE_LAYOUTS?aim_ticks[game->layout]:20;
+                    int aim=game->layout<LAST_ZONE_LAYOUTS?aim_ticks[game->layout]:20;
+                    if(enemy->role==LAST_ZONE_ROLE_FLANK)aim-=4;
+                    else if(enemy->role==LAST_ZONE_ROLE_HEAVY)aim+=6;
+                    enemy->aim_timer=(uint8_t)aim;
                 }else if(!--enemy->aim_timer){
-                    static const uint8_t cool_ticks[LAST_ZONE_LAYOUTS]={96,86,76,70,64};
+                    static const uint8_t cool_ticks[LAST_ZONE_LAYOUTS]={82,74,66,60,54};
+                    unsigned cool=game->layout<LAST_ZONE_LAYOUTS?cool_ticks[game->layout]:54U;
+                    if(enemy->role==LAST_ZONE_ROLE_HEAVY)cool=cool*7U/8U;
                     enemy->attack_flash=4;
-                    enemy->attack_cooldown=game->layout<LAST_ZONE_LAYOUTS?cool_ticks[game->layout]:64;
+                    enemy->attack_cooldown=(uint8_t)cool;
                     game->enemy_shot_lock=12;
-                    hurt_player(game,enemy);
-                    if(game->phase==LAST_ZONE_PHASE_DEAD)return;
+                    /* Moving targets are harder to hit; close range is not. */
+                    float chance=enemy->role==LAST_ZONE_ROLE_HEAVY?.80f:
+                                 enemy->role==LAST_ZONE_ROLE_FLANK?.62f:.72f;
+                    chance+=.03f*(float)game->layout;
+                    if(game->sprinting)chance-=.28f;
+                    else if(length>.2f)chance-=.12f;
+                    if(distance<2.6f)chance+=.18f;
+                    else if(distance>4.2f)chance-=.10f*(distance-4.2f);
+                    if(chance<.2f)chance=.2f;
+                    if(chance>.95f)chance=.95f;
+                    if(hash_unit(mix_hash(game->tick,(uint32_t)i,game->shots_fired+game->damage_taken))<chance){
+                        hurt_player(game,enemy);
+                        if(game->phase==LAST_ZONE_PHASE_DEAD)return;
+                    }else{
+                        game->last_miss=true;game->miss_flash=12;
+                        game->miss_angle=angle_delta(atan2f(enemy->y-game->y,enemy->x-game->x)-game->angle);
+                        emit_sfx(game,12);
+                    }
                 }
             }
         }else enemy->aim_timer=0;
@@ -903,14 +1035,20 @@ void last_zone_update(last_zone_game_t *game)
             game->enemy_shot_lock=12;
             if(game->phase==LAST_ZONE_PHASE_DEAD)return;
         }
+        if(enemy->stagger){--enemy->stagger;continue;}
+        float step=.022f;
         if(enemy->ai_state==LAST_ZONE_ENEMY_ENGAGE&&sees_player){
             if(((game->tick+(uint32_t)i)%12U)==0U)
                 pick_hold_cell(game,i,enemy);
             bool at_hold=fabsf(enemy->x-((float)enemy->hold_x+0.5f))<.35f&&
                          fabsf(enemy->y-((float)enemy->hold_y+0.5f))<.35f;
-            if(distance<2.0f){
+            const bool heavy=enemy->role==LAST_ZONE_ROLE_HEAVY&&!enemy->retreat_timer;
+            const bool flank=enemy->role==LAST_ZONE_ROLE_FLANK||enemy->retreat_timer;
+            step=enemy->retreat_timer?.034f:enemy->role==LAST_ZONE_ROLE_FLANK?.034f:
+                 heavy?.022f:.028f;
+            if(distance<(heavy?1.2f:2.0f)){
                 heading=atan2f(-to_y,-to_x);
-            }else if(distance>4.6f){
+            }else if(distance>(heavy?3.6f:flank?5.2f:4.6f)){
                 heading=atan2f(to_y,to_x);
             }else if(!at_hold){
                 if(((game->tick+(uint32_t)i)%8U)==0U||(!enemy->nav_dx&&!enemy->nav_dy))
@@ -919,26 +1057,53 @@ void last_zone_update(last_zone_game_t *game)
                 if(!enemy->nav_dx&&!enemy->nav_dy)continue;
                 heading=atan2f((float)enemy->nav_dy,(float)enemy->nav_dx);
             }else continue;
-        }else{
-            bool should_move=enemy->ai_state==LAST_ZONE_ENEMY_PATROL||
-                             enemy->ai_state==LAST_ZONE_ENEMY_SEARCH;
-            if(!should_move)continue;
-            if(enemy->ai_state==LAST_ZONE_ENEMY_PATROL)
-                heading=((float)((game->tick/75U+enemy->move_phase)%16U))*0.3926991f;
-            else{
-                if(((game->tick+(uint32_t)i)%8U)==0U||(!enemy->nav_dx&&!enemy->nav_dy))
-                    route_next(game,(int)enemy->x,(int)enemy->y,(int)enemy->last_seen_x,
-                               (int)enemy->last_seen_y,&enemy->nav_dx,&enemy->nav_dy);
-                if(!enemy->nav_dx&&!enemy->nav_dy)continue;
-                heading=atan2f((float)enemy->nav_dy,(float)enemy->nav_dx);
+        }else if(enemy->ai_state==LAST_ZONE_ENEMY_PATROL){
+            if(enemy->suspicion>8U)continue;
+            if(enemy->patrol_wait){
+                --enemy->patrol_wait;
+                enemy->facing+=sinf((float)(game->tick+(uint32_t)i*17U)*.05f)*.03f;
+                continue;
             }
-        }
+            float px=(float)enemy->patrol_x+.5f,py=(float)enemy->patrol_y+.5f;
+            if(fabsf(enemy->x-px)<.3f&&fabsf(enemy->y-py)<.3f){
+                uint32_t h=mix_hash(game->tick,(uint32_t)i,enemy->home_x);
+                enemy->patrol_wait=(uint8_t)(40U+h%50U);
+                if(!pick_open_near(game,h,enemy,enemy->home_x,enemy->home_y,4,
+                                   &enemy->patrol_x,&enemy->patrol_y)){
+                    enemy->patrol_x=enemy->home_x;enemy->patrol_y=enemy->home_y;
+                }
+                continue;
+            }
+            if(((game->tick+(uint32_t)i)%8U)==0U||(!enemy->nav_dx&&!enemy->nav_dy))
+                route_next(game,(int)enemy->x,(int)enemy->y,enemy->patrol_x,
+                           enemy->patrol_y,&enemy->nav_dx,&enemy->nav_dy);
+            if(!enemy->nav_dx&&!enemy->nav_dy){enemy->patrol_x=enemy->home_x;
+                enemy->patrol_y=enemy->home_y;enemy->patrol_wait=20;continue;}
+            heading=atan2f((float)enemy->nav_dy,(float)enemy->nav_dx);
+            step=.018f;
+        }else if(enemy->ai_state==LAST_ZONE_ENEMY_SEARCH){
+            float sx=enemy->last_seen_x-enemy->x,sy=enemy->last_seen_y-enemy->y;
+            if(sx*sx+sy*sy<.36f&&i!=last_enemy){
+                /* Reached the last sighting: sweep a nearby cell next. */
+                int8_t nx=0,ny=0;
+                if(pick_open_near(game,mix_hash(game->tick,(uint32_t)i,31U),enemy,
+                                  (int)enemy->x,(int)enemy->y,3,&nx,&ny)){
+                    enemy->last_seen_x=(float)nx+.5f;enemy->last_seen_y=(float)ny+.5f;
+                }
+            }
+            if(((game->tick+(uint32_t)i)%8U)==0U||(!enemy->nav_dx&&!enemy->nav_dy))
+                route_next(game,(int)enemy->x,(int)enemy->y,(int)enemy->last_seen_x,
+                           (int)enemy->last_seen_y,&enemy->nav_dx,&enemy->nav_dy);
+            if(!enemy->nav_dx&&!enemy->nav_dy)continue;
+            heading=atan2f((float)enemy->nav_dy,(float)enemy->nav_dx);
+            step=.024f;
+        }else continue;
+        if(enemy->ai_state!=LAST_ZONE_ENEMY_ENGAGE)turn_toward(&enemy->facing,heading,.12f);
         for(int j=0;j<LAST_ZONE_ENEMIES;++j){
             if(j==i||!game->enemies[j].active)continue;
             float ox=enemy->x-game->enemies[j].x,oy=enemy->y-game->enemies[j].y;
             if(ox*ox+oy*oy<1.6f)heading+=1.2f;
         }
-        float step=enemy->ai_state==LAST_ZONE_ENEMY_ENGAGE?.028f:.022f;
         float dx=cosf(heading)*step,dy=sinf(heading)*step;
         float nx=enemy->x+dx,ny=enemy->y+dy;
         if(!blocked_at(game,nx,enemy->y))enemy->x=nx;
@@ -1041,6 +1206,9 @@ last_zone_fire_result_t last_zone_fire(last_zone_game_t *game)
     last_zone_enemy_t *enemy=&game->enemies[target];
     if(enemy->hp)--enemy->hp;
     enemy->hit_flash=12;
+    enemy->aim_timer=0;
+    enemy->stagger=(uint8_t)(enemy->role==LAST_ZONE_ROLE_HEAVY?4:12);
+    if(enemy->role!=LAST_ZONE_ROLE_HEAVY&&enemy->hp==1)enemy->retreat_timer=100;
     float knock_x=enemy->x-game->x,knock_y=enemy->y-game->y;
     float knock_length=sqrtf(knock_x*knock_x+knock_y*knock_y);
     if(knock_length>.01f){
@@ -1053,7 +1221,9 @@ last_zone_fire_result_t last_zone_fire(last_zone_game_t *game)
     ++game->shots_hit;
     game->score+=25;
     if(!enemy->hp){enemy->active=false;enemy->death_timer=20;game->kill_flash=18;
-        ++game->kills;game->score+=100;return NEON_FIRE_KILL;}
+        ++game->kills;game->score+=100;
+        if(enemy->radio_timer){enemy->radio_timer=0;game->score+=50;game->call_cut_flash=40;}
+        return NEON_FIRE_KILL;}
     return NEON_FIRE_HIT;
 }
 
@@ -1068,8 +1238,13 @@ uint32_t last_zone_state_hash(const last_zone_game_t *game)
         (uint32_t)game->layout,(uint32_t)game->spotted,(uint32_t)game->holding_breath,
         (uint32_t)game->unlocked};
     for(unsigned i=0;i<sizeof(values)/sizeof(values[0]);++i){hash^=values[i];hash*=16777619U;}
-    for(int i=0;i<LAST_ZONE_ENEMIES;++i){hash^=(uint32_t)game->enemies[i].hp;
-        hash*=16777619U;}
+    for(int i=0;i<LAST_ZONE_ENEMIES;++i){
+        const last_zone_enemy_t *enemy=&game->enemies[i];
+        const uint32_t enemy_values[]={enemy->hp,(uint32_t)(enemy->x*256),(uint32_t)(enemy->y*256),
+            enemy->ai_state,enemy->suspicion,enemy->radio_timer,enemy->stagger,enemy->retreat_timer};
+        for(unsigned j=0;j<sizeof(enemy_values)/sizeof(enemy_values[0]);++j){
+            hash^=enemy_values[j];hash*=16777619U;}
+    }
     for(int i=0;i<LAST_ZONE_PICKUPS;++i){hash^=game->pickups[i].taken;hash*=16777619U;}
     for(int i=0;i<LAST_ZONE_PROPS;++i){hash^=game->props[i].active;hash*=16777619U;
         hash^=game->props[i].blast_timer;hash*=16777619U;}

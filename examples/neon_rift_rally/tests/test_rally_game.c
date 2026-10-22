@@ -63,9 +63,160 @@ static void steering_recovery(void)
     puts("high-speed pulses recover; all courses require steering and remain controllable");
 }
 
+static void drift_assist_and_clean_release(void)
+{
+    rally_game_t game;
+    driving_state(&game, 0);
+    rally_drift_assist_t assist = {0};
+    for (unsigned i = 0; i < 7; ++i)
+        assert(!rally_drift_assist_update(&assist, &game, .75f));
+    assert(rally_drift_assist_update(&assist, &game, .75f));
+    assert(rally_drift_assist_update(&assist, &game, .35f));
+    assert(!rally_drift_assist_update(&assist, &game, .2f));
+    assert(assist.hold_ticks == 0 && !assist.active);
+    for (unsigned i = 0; i < 20; ++i) {
+        assert(!rally_drift_assist_update(&assist, &game, i % 2 ? .4f : .75f));
+    }
+    for (unsigned condition = 0; condition < 4; ++condition) {
+        driving_state(&game, 0);
+        assist = (rally_drift_assist_t){8, true};
+        if (condition == 0) game.grounded = false;
+        if (condition == 1) game.offtrack = true;
+        if (condition == 2) game.collision_ticks = 8;
+        if (condition == 3) game.phase = RALLY_PHASE_COUNTDOWN;
+        assert(!rally_drift_assist_update(&assist, &game, -.75f));
+        assert(!assist.active && !assist.hold_ticks);
+    }
+    for (unsigned condition = 0; condition < 4; ++condition) {
+        driving_state(&game, 0);
+        game.risk_meter = 60;
+        game.previous_drifting = true;
+        if (condition == 1) game.lateral = RALLY_MAX_LATERAL;
+        if (condition == 2) { game.grounded = false; game.height = 2; }
+        if (condition == 3) game.collision_ticks = 8;
+        rally_set_controls(&game, 1, 0, 0, false, false);
+        rally_update(&game);
+        assert(!!(rally_events(&game) & RALLY_EVENT_DRIFT_BOOST) == (condition == 0));
+        assert(game.risk_meter == 0);
+    }
+    puts("drift assist hysteresis and clean release reward passed");
+}
+
+static void fair_launch(void)
+{
+    rally_game_t game;
+    rally_reset(&game);
+    game.phase = RALLY_PHASE_PLAYING;
+    game.countdown_ticks = 0;
+    rally_set_controls(&game, 1, 0, 0, false, false);
+    for (unsigned tick = 0; tick < 30; ++tick) {
+        rally_update(&game);
+        for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i)
+            assert(game.opponents[i].speed <= game.speed + .01f);
+    }
+    for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
+        float gap = game.opponents[i].progress - game.progress;
+        assert(gap > 0 && gap < 45);
+    }
+    puts("opponents launch fairly and remain in sight");
+}
+
+static void harbor_geometry(void)
+{
+    rally_track_pose_t before, after, pose;
+    for (unsigned joint=0;joint<16;++joint) {
+        float at=RALLY_TRACK_LENGTH*(float)joint/16.0f;
+        assert(rally_track_sample_course(0,at-.01f,0,&before));
+        assert(rally_track_sample_course(0,at+.01f,0,&after));
+        assert(hypotf(after.x-before.x,after.z-before.z)<.02f);
+        assert(hypotf(after.tangent_x-before.tangent_x,
+                      after.tangent_z-before.tangent_z)<.005f);
+    }
+    for(unsigned i=0;i<90;++i) {
+        float at=(float)i*20;
+        rally_track_sample_course(0,at,0,&pose);
+        rally_track_sample_course(0,at-.1f,0,&before);
+        rally_track_sample_course(0,at+.1f,0,&after);
+        float dx=after.x-before.x,dz=after.z-before.z;
+        float length=hypotf(dx,dz);
+        float tangent_length=hypotf(pose.tangent_x,pose.tangent_z);
+        assert(length>.001f);
+        assert(fabsf(dx/length-pose.tangent_x/tangent_length)<.002f);
+        assert(fabsf(dz/length-pose.tangent_z/tangent_length)<.002f);
+    }
+    rally_track_sample_course(0,100,0,&pose);
+    assert(fabsf(pose.x)<.01f && pose.tangent_z>.95f);
+    rally_track_sample_course(0,620,0,&pose);
+    assert(fabsf(pose.z-82)<2.0f && pose.tangent_x<-.95f);
+    puts("authored harbor has continuous seams, correct tangents and port/bridge alignment");
+}
+
+static void opponent_traffic(void)
+{
+    for(unsigned course=0;course<3;++course) {
+        rally_game_t game;
+        driving_state(&game,course);
+        game.progress=300;game.lateral=-4;
+        for(unsigned i=0;i<2;++i) {
+            game.opponents[i].active=true;
+            game.opponents[i].laps_completed=0;
+            game.opponents[i].lateral=0;game.opponents[i].lane=0;
+            game.opponents[i].decision_cooldown=0;
+        }
+        game.opponents[0].progress=330;game.opponents[0].speed=32;
+        game.opponents[1].progress=335;game.opponents[1].speed=20;
+        float initial_speed=game.opponents[0].speed;
+        rally_update(&game);
+        assert(game.opponents[0].speed<initial_speed);
+        assert(fabsf(game.opponents[0].target_lane)>1.4f);
+        assert(fabsf(game.opponents[0].lateral)<.3f); /* Smooth lane change. */
+        assert(game.opponents[0].progress>330 && game.opponents[0].progress<332);
+        /* The move eases in: sideways speed builds over several ticks and
+         * never jumps, so the bike steers instead of sliding. */
+        const float side=game.opponents[0].target_lane>0?1.0f:-1.0f;
+        float previous=0.0f;
+        for(unsigned tick=0;tick<8;++tick) {
+            float before=game.opponents[0].lateral;
+            rally_update(&game);
+            float velocity=game.opponents[0].lateral_velocity*side;
+            assert(velocity>=previous-.01f);
+            assert(fabsf(game.opponents[0].lateral-before)<.12f);
+            previous=velocity;
+        }
+        assert(previous>1.0f);
+    }
+    puts("rivals slow for occupied lanes and choose a smooth passing lane on every course");
+}
+
+static void polar_road_width(void)
+{
+    float minimum=1000000;
+    for(unsigned at=0;at<1800;at+=5) {
+        rally_track_pose_t a,b,c;
+        rally_track_sample_course(2,(float)at-1,0,&a);
+        rally_track_sample_course(2,(float)at,0,&b);
+        rally_track_sample_course(2,(float)at+1,0,&c);
+        float ab=hypotf(b.x-a.x,b.z-a.z),bc=hypotf(c.x-b.x,c.z-b.z);
+        float ac=hypotf(c.x-a.x,c.z-a.z);
+        float cross=fabsf((b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x));
+        assert(ab>.01f && bc>.01f);
+        if(cross>.000001f) {
+            float radius=ab*bc*ac/(2*cross);
+            assert(radius>RALLY_TRACK_WIDTH*.55f);
+            if(radius<minimum)minimum=radius;
+        }
+    }
+    printf("polar minimum sampled radius %.2f keeps the inside road edge unfolded\n",minimum);
+}
+
 int main(void)
 {
     steering_recovery();
+    drift_assist_and_clean_release();
+    fair_launch();
+    harbor_geometry();
+    opponent_traffic();
+    polar_road_width();
     rally_game_t a, b;
     rally_reset(&a); rally_reset(&b);
     deterministic_drive(&a, 900U);

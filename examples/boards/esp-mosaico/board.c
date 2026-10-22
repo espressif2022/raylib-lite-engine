@@ -7,7 +7,9 @@
 #include "esp_board_manager_includes.h"
 #include "mosaico_hardware.h"
 #include "esp_display_present_config.h"
+#include "raylib_lite_example_async_video.h"
 #include "esp_lcd_touch.h"
+#include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -257,6 +259,9 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
         return ESP_ERR_INVALID_ARG;
     }
     *out = NULL;
+    if ((c->drawbuf_lines && c->drawbuf_lines != RAYLIB_LITE_EXAMPLE_STRIP_LINES) ||
+            (c->drawbuf_count && c->drawbuf_count != RAYLIB_LITE_EXAMPLE_TRANSFER_DEPTH))
+        return ESP_ERR_INVALID_ARG;
     if (c->logical_width != ESP_MOSAICO_GAME_WIDTH ||
             c->logical_height != ESP_MOSAICO_GAME_HEIGHT) {
         return ESP_ERR_NOT_SUPPORTED;
@@ -285,21 +290,33 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
         goto failed;
     }
     dev_display_lcd_handles_t *lcd = NULL;
-    dev_lcd_touch_handles_t *touch = NULL;
-    if ((err = esp_board_manager_get_device_handle("display_lcd", (void **)&lcd)) != ESP_OK ||
-            (err = esp_board_manager_get_device_handle("lcd_touch", (void **)&touch)) != ESP_OK) {
+    if ((err = esp_board_manager_get_device_handle("display_lcd", (void **)&lcd)) != ESP_OK) {
         goto failed;
     }
-    if (!lcd || !lcd->panel_handle || !lcd->io_handle || !touch || !touch->touch_handle) {
+    if (!lcd || !lcd->panel_handle || !lcd->io_handle) {
         err = ESP_ERR_INVALID_STATE;
         goto failed;
     }
-    p->touch = touch->touch_handle;
+    /* The CST9220 probe occasionally times out at power-on; a game stays usable
+     * with buttons/IMU, so touch is retried once and otherwise left disabled. */
+    dev_lcd_touch_handles_t *touch = NULL;
+    if (esp_board_manager_get_device_handle("lcd_touch", (void **)&touch) != ESP_OK ||
+            !touch || !touch->touch_handle) {
+        vTaskDelay(pdMS_TO_TICKS(50));
+        touch = NULL;
+        if (esp_board_manager_init_device_by_name("lcd_touch") != ESP_OK ||
+                esp_board_manager_get_device_handle("lcd_touch", (void **)&touch) != ESP_OK) {
+            touch = NULL;
+        }
+    }
+    p->touch = touch ? touch->touch_handle : NULL;
+    if (!p->touch) ESP_LOGW("game_board", "touch unavailable; continuing without touch input");
     esp_display_presenter_config_t present_config = {
         .width = ESP_MOSAICO_GAME_WIDTH,
         .height = ESP_MOSAICO_GAME_HEIGHT,
         .pixel_format = ESP_DISPLAY_PRESENT_PIXEL_FORMAT_RGB565,
         .max_damage_areas = 1,
+        .transfer_timeout_ms = RAYLIB_LITE_EXAMPLE_TRANSFER_TIMEOUT_MS,
         .target = {
             .hw = {
                 .panel = lcd->panel_handle,
@@ -313,8 +330,8 @@ esp_err_t raylib_lite_example_board_create(const raylib_lite_example_board_confi
             },
             .fb = {.mode = ESP_DISPLAY_PRESENT_MODE_NONE},
             .drawbuf = {
-                .lines = c->drawbuf_lines ? c->drawbuf_lines : 34,
-                .buffers = c->drawbuf_count ? c->drawbuf_count : 2,
+                .lines = RAYLIB_LITE_EXAMPLE_STRIP_LINES,
+                .buffers = RAYLIB_LITE_EXAMPLE_TRANSFER_DEPTH,
                 .in_psram = false,
             },
         },
@@ -375,6 +392,12 @@ failed:
     }
 }
 
+void raylib_lite_example_board_panel_size(uint16_t *width, uint16_t *height)
+{
+    if (width) *width = ESP_MOSAICO_GAME_WIDTH;
+    if (height) *height = ESP_MOSAICO_GAME_HEIGHT;
+}
+
 const raylib_lite_platform_t *raylib_lite_example_board_services(
     raylib_lite_example_board_t *p)
 {
@@ -393,7 +416,7 @@ esp_err_t raylib_lite_example_board_start_input(raylib_lite_example_board_t *p)
         return ESP_ERR_INVALID_STATE;
     }
     atomic_store(&p->sampling, true);
-    if (xTaskCreate(touch_worker, "game_touch", 4096, p, 5,
+    if (p->touch && xTaskCreate(touch_worker, "game_touch", 4096, p, 5,
                     &p->touch_task) != pdPASS) {
         goto fail;
     }

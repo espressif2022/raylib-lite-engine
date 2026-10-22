@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "raylib_lite_design_view.h"
 #include "raylib_lite_raylib.h"
 #if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
@@ -19,14 +20,13 @@
 #include "rally_game.h"
 #include "rally_view.h"
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-#include "raylib_lite_raylib_audio.h"
 #include "raylib_lite_save.h"
 #include "native_feedback.h"
+#include "rally_feedback.h"
 #include "raylib_lite_clock.h"
 #endif
 
 #define NEON_RIFT_COURSE_COUNT 3U
-#define NEON_RIFT_HAPTICS_ENABLED 1
 
 typedef struct {
     const char *id;
@@ -53,6 +53,7 @@ typedef struct {
     bool brake;
     bool nitro;
     bool drift;
+    rally_drift_assist_t drift_assist;
     int32_t steer_track;
     int32_t nitro_track;
     int32_t course_select_track;
@@ -70,10 +71,10 @@ typedef struct {
     uint32_t best_lap_ticks;
     uint32_t best_race_ticks;
     uint8_t course_id;
-    uint32_t last_feedback_serial;
+    uint32_t race_serial;
+    rally_view_motion_t view_motion;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-    Sound sounds[9];
-    Music engine;
+    rally_feedback_t feedback;
     raylib_lite_save_t save;
     bool save_ready;
 #endif
@@ -92,107 +93,12 @@ typedef struct {
 #endif
 
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-static const char *const SFX_PATHS[9] = {
-    "boost.sound", "drift.sound", "jump.sound", "land.sound",
-    "checkpoint.sound", "lap.sound", "finish.sound", "offtrack.sound",
-    "collision.sound"
+static const rally_haptics_t s_haptics = {
+    .init = raylib_lite_native_feedback_init,
+    .pulse = raylib_lite_native_feedback_pulse,
+    .pattern = raylib_lite_native_feedback_pattern,
+    .stop = raylib_lite_native_feedback_stop,
 };
-
-static void feedback_pulse(int strength, int duration_ms)
-{
-#if NEON_RIFT_HAPTICS_ENABLED
-    raylib_lite_native_feedback_pulse(strength, duration_ms);
-#else
-    (void)strength;
-    (void)duration_ms;
-#endif
-}
-
-static void feedback_pattern(int first_strength, int first_duration_ms,
-                             int second_strength, int second_duration_ms,
-                             int gap_ms)
-{
-#if NEON_RIFT_HAPTICS_ENABLED
-    raylib_lite_native_feedback_pattern(first_strength, first_duration_ms,
-                                    second_strength, gap_ms,
-                                    second_duration_ms);
-#else
-    (void)first_strength;
-    (void)first_duration_ms;
-    (void)second_strength;
-    (void)second_duration_ms;
-    (void)gap_ms;
-#endif
-}
-
-static void feedback_stop(void)
-{
-#if NEON_RIFT_HAPTICS_ENABLED
-    raylib_lite_native_feedback_stop();
-#endif
-}
-
-static void feedback_init(neon_rift_rally_module_t *state)
-{
-    InitAudioDevice();
-    if (IsAudioDeviceReady()) {
-        for (unsigned i = 0; i < 9; ++i) state->sounds[i] = LoadSound(SFX_PATHS[i]);
-        state->engine = LoadMusicStream("engine.sound");
-        SetMusicVolume(state->engine, .26f);
-        PlayMusicStream(state->engine);
-    }
-#if NEON_RIFT_HAPTICS_ENABLED
-    raylib_lite_native_feedback_init();
-#endif
-}
-
-static void play_cue(neon_rift_rally_module_t *state, unsigned cue)
-{
-    if (cue < 9 && state->sounds[cue].frameCount) PlaySound(state->sounds[cue]);
-}
-
-static void feedback_events(neon_rift_rally_module_t *state)
-{
-    if (state->game.event_serial == state->last_feedback_serial) return;
-    state->last_feedback_serial = state->game.event_serial;
-    uint32_t events = rally_events(&state->game);
-    if (events & RALLY_EVENT_NITRO) {
-        play_cue(state, 0); feedback_pattern(42, 24, 26, 16, 18);
-    }
-    if (events & RALLY_EVENT_DRIFT) {
-        play_cue(state, 1); feedback_pulse(24, 22);
-    }
-    if (events & RALLY_EVENT_JUMP) {
-        play_cue(state, 2); feedback_pulse(36, 28);
-    }
-    if (events & RALLY_EVENT_LANDING) {
-        play_cue(state, 3); feedback_pattern(76, 38, 34, 18, 20);
-    }
-    if (events & RALLY_EVENT_CHECKPOINT) {
-        play_cue(state, 4); feedback_pulse(28, 25);
-    }
-    if (events & RALLY_EVENT_LAP) {
-        play_cue(state, 5); feedback_pattern(48, 35, 58, 35, 40);
-    }
-    if (events & RALLY_EVENT_FINISH) {
-        play_cue(state, 6); feedback_pattern(74, 65, 100, 100, 90);
-    }
-    if (events & RALLY_EVENT_OFFTRACK) {
-        play_cue(state, 7); feedback_pattern(58, 45, 30, 24, 34);
-    }
-    if (events & RALLY_EVENT_NEAR_MISS) {
-        play_cue(state, 4); feedback_pulse(34, 18);
-    }
-    if (events & RALLY_EVENT_START) {
-        play_cue(state, 0); feedback_pattern(28, 25, 44, 20, 24);
-    }
-    if (events & RALLY_EVENT_COLLISION) {
-        play_cue(state, 8); feedback_pattern(100, 55, 82, 28, 46);
-    }
-    if (events & RALLY_EVENT_FAIL) {
-        play_cue(state, 7); feedback_pattern(100, 90, 76, 70, 90);
-    }
-}
 #endif
 
 static float clamp_unit(float value)
@@ -215,11 +121,12 @@ static void clear_touch(neon_rift_rally_module_t *state)
 static void reset_run(neon_rift_rally_module_t *state)
 {
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-    feedback_stop();
+    rally_feedback_reset(&state->feedback);
 #endif
     rally_reset(&state->game);
     state->game.course_id = state->course_id;
     state->game.progress = COURSES[state->course_id].start_progress;
+    rally_set_seed(&state->game, 0x9e3779b9u * ++state->race_serial + state->course_id);
     state->paused = false;
     state->steer_left = state->steer_right = false;
     state->throttle = state->brake = state->nitro = state->drift = false;
@@ -232,7 +139,8 @@ static void reset_run(neon_rift_rally_module_t *state)
     state->imu_steer = 0.0f;
     state->imu_age_ticks = UINT8_MAX;
     state->imu_calibrated = false;
-    state->last_feedback_serial = 0;
+    rally_drift_assist_reset(&state->drift_assist);
+    rally_view_motion_reset(&state->view_motion);
 }
 
 static void select_course(neon_rift_rally_module_t *state, int direction)
@@ -358,7 +266,7 @@ static int initialize(void *value, const char *asset_root)
     reset_run(state);
 #if defined(RAYLIB_LITE_GAME_NATIVE)
     load_record(state);
-    feedback_init(state);
+    rally_feedback_init(&state->feedback, &s_haptics);
 #endif
 #if !defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_host_assets_set_root(asset_root);
@@ -381,15 +289,10 @@ static void shutdown(void *value)
         raylib_lite_atlas_unload(state->motorcycle_art);
     }
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-    feedback_stop();
-    if (state && IsAudioDeviceReady()) {
-        StopMusicStream(state->engine);
-        UnloadMusicStream(state->engine);
-        for (unsigned i = 0; i < 9; ++i)
-            if (state->sounds[i].frameCount) UnloadSound(state->sounds[i]);
-        CloseAudioDevice();
+    if (state) {
+        rally_feedback_close(&state->feedback);
+        save_record(state, true);
     }
-    if (state) save_record(state, true);
 #else
     (void)state;
 #endif
@@ -403,8 +306,9 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
     if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
         if (event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE) {
             state->paused = true;
+            rally_drift_assist_reset(&state->drift_assist);
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-            feedback_stop();
+            rally_feedback_pause(&state->feedback);
 #endif
         }
         else if (event->code == RAYLIB_LITE_GAME_CONTROL_RESUME) state->paused = false;
@@ -426,8 +330,9 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         else if (event->code == 7) state->drift = event->pressed;
         else if (event->code == 3 && event->pressed) {
             state->paused = !state->paused;
+            if (state->paused) rally_drift_assist_reset(&state->drift_assist);
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-            if (state->paused) feedback_stop();
+            if (state->paused) rally_feedback_pause(&state->feedback);
 #endif
         }
         else if (event->code == 4 && event->pressed) reset_run(state);
@@ -464,13 +369,16 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
     }
 
     if (event->type != RAYLIB_LITE_GAME_INPUT_POINTER) return;
+    const Vector2 point = raylib_lite_design_field_point(raylib_lite_design_view(480.0f), 480.0f,
+                                                         480.0f, (float)event->x, (float)event->y);
+    const int x = (int)floorf(point.x), y = (int)floorf(point.y);
     if (!event->pressed && event->track_id == state->course_select_track)
         state->course_select_track = -1;
     if (event->pressed && state->game.phase == RALLY_PHASE_COUNTDOWN &&
-        event->y >= 70 && event->y <= 230 &&
-        (event->x < 160 || event->x >= 320)) {
+        y >= 70 && y <= 230 &&
+        (x < 160 || x >= 320)) {
         if (state->course_select_track != event->track_id) {
-            int direction = event->x < 160 ? -1 : 1;
+            int direction = x < 160 ? -1 : 1;
             select_course(state, direction);
             state->course_select_track = event->track_id;
         }
@@ -494,14 +402,14 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         return;
     }
     if (event->track_id == state->steer_track)
-        update_touch_steer(state, event->x, event->y);
+        update_touch_steer(state, x, y);
     else if (event->track_id == state->nitro_track)
-        state->touch_nitro = event->x >= 300 && event->y >= 310;
-    else if (event->x < 260 && state->steer_track < 0) {
+        state->touch_nitro = x >= 300 && y >= 310;
+    else if (x < 260 && state->steer_track < 0) {
         state->steer_track = event->track_id;
-        state->touch_origin_x = (float)event->x;
-        update_touch_steer(state, event->x, event->y);
-    } else if (state->nitro_track < 0 && event->x >= 300 && event->y >= 310) {
+        state->touch_origin_x = (float)x;
+        update_touch_steer(state, x, y);
+    } else if (state->nitro_track < 0 && x >= 300 && y >= 310) {
         state->nitro_track = event->track_id;
         state->touch_nitro = true;
     }
@@ -510,13 +418,24 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
 static void update(void *value)
 {
     neon_rift_rally_module_t *state = value;
-    if (!state || state->paused) return;
+    if (!state) return;
+    if (state->paused) {
+        rally_drift_assist_reset(&state->drift_assist);
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+        rally_feedback_update(&state->feedback, &state->game, state->course_id, true);
+#endif
+        return;
+    }
     if (state->imu_age_ticks < UINT8_MAX) ++state->imu_age_ticks;
     float tilt = 0.0f;
     if (state->imu_calibrated && state->imu_age_ticks <= 12U) {
         float delta = state->imu_roll - state->imu_center_roll;
         if (fabsf(delta) > .10f)
-            tilt = clamp_unit((delta - copysignf(.10f, delta)) / .50f);
+            /* On the mounted S31 board, positive sensor-X roll is a physical
+             * tilt to the player's left. Gameplay steering uses negative for
+             * left, so the IMU axis must be inverted here. Touch and keyboard
+             * inputs already use screen-space signs and remain unchanged. */
+            tilt = -clamp_unit((delta - copysignf(.10f, delta)) / .50f);
     }
     float imu_response = fabsf(tilt) < fabsf(state->imu_steer) ? .65f : .30f;
     state->imu_steer += (tilt - state->imu_steer) * imu_response;
@@ -525,16 +444,19 @@ static void update(void *value)
         steer = (state->steer_right ? 1.0f : 0.0f) -
                 (state->steer_left ? 1.0f : 0.0f);
     bool drive_throttle = state->throttle || state->touch_throttle;
+    bool drive_drift = state->drift;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
     /* Touch-first kart controls: native play auto-accelerates so one finger
        steers and the second can boost. Host/replay controls remain explicit. */
     drive_throttle = true;
+    drive_drift |= rally_drift_assist_update(&state->drift_assist, &state->game, steer);
 #endif
     rally_set_controls(&state->game,
         drive_throttle,
-        state->brake, steer, state->drift,
+        state->brake, steer, drive_drift,
         state->nitro || state->touch_nitro);
     rally_update(&state->game);
+    rally_view_motion_update(&state->view_motion, &state->game);
     if (state->game.event_flags & RALLY_EVENT_LAP) {
         const uint32_t lap_ticks = state->game.tick - state->lap_start_tick;
         state->last_lap_ticks = lap_ticks;
@@ -549,8 +471,8 @@ static void update(void *value)
 #endif
     }
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-    feedback_events(state);
-    UpdateMusicStream(state->engine);
+    rally_feedback_events(&state->feedback, &state->game);
+    rally_feedback_update(&state->feedback, &state->game, state->course_id, false);
 #endif
 }
 
@@ -561,7 +483,7 @@ static int render(void *value)
        scene source; the scenic atlas is no longer a game asset. */
     return rally_view_render(&state->game, state->rally_art,
                              state->track_background, state->motorcycle_art,
-                             state->course_id);
+                             state->course_id, &state->view_motion);
 }
 
 static uint32_t state_hash(const void *value)
@@ -585,7 +507,10 @@ static int state_json(const void *value, char *output, size_t capacity)
         "\"lateral_velocity\":%.3f,\"steering\":%.3f,\"heading_error\":%.4f,"
         "\"speed\":%.2f,\"lap\":%u,\"checkpoint\":%u,\"nitro\":%.2f,"
         "\"position\":%u,\"integrity\":%u,\"score\":%lu,\"combo\":%u,"
-        "\"rating\":\"%s\",\"trophy\":\"%s\","
+        "\"draft\":%.1f,\"draft_ready\":%s,\"gap_ahead\":%.2f,"
+        "\"view_steering\":%.2f,\"view_pose\":%d,\"competition_event\":\"%s\","
+        "\"rating\":\"%s\",\"trophy\":\"%s\",\"rival\":\"%s\",\"rival_position\":%u,"
+        "\"rival_intent\":\"%s\","
         "\"offtrack\":%s,\"last_lap_ticks\":%lu,\"best_lap_ticks\":%lu,"
         "\"best_race_ticks\":%lu,\"tick\":%lu,\"event_flags\":%lu,"
         "\"state_hash\":\"%08lx\"}",
@@ -597,7 +522,14 @@ static int state_json(const void *value, char *output, size_t capacity)
         (unsigned)(game->laps_completed + 1U), (unsigned)game->next_checkpoint,
         game->nitro, (unsigned)game->position, (unsigned)game->integrity,
         (unsigned long)game->score, (unsigned)game->combo,
-        race_rating(game), race_trophy(game),
+        game->draft_meter, game->draft_boost_ticks ? "true" : "false",
+        game->gap_ahead, state->view_motion.steering, (int)state->view_motion.pose,
+        state->view_motion.alert_ticks && state->view_motion.alert == 1U ? "overtake" :
+        state->view_motion.alert_ticks && state->view_motion.alert == 2U ? "overtaken" :
+        state->view_motion.alert_ticks && state->view_motion.alert == 3U ? "draft_ready" : "none",
+        race_rating(game), race_trophy(game), rally_rider_name(game->rival),
+        (unsigned)game->opponents[game->rival].position,
+        rally_intent_name(game->opponents[game->rival].intent),
         game->offtrack ? "true" : "false",
         (unsigned long)state->last_lap_ticks, (unsigned long)state->best_lap_ticks,
         (unsigned long)state->best_race_ticks,
@@ -619,6 +551,8 @@ static const raylib_lite_game_module_v1_t s_module = {
     .state_hash = state_hash,
     .state_json = state_json,
 };
+
+bool raylib_lite_game_adaptive_surface(void) { return true; }
 
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {

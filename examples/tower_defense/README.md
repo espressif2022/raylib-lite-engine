@@ -1,35 +1,37 @@
-# Circuit Keep 塔防游戏
+# Circuit Keep
 
-塔防参考游戏，使用 480×480 RGB565 画面。
-地图来自 Tiled `.tmj`，角色和塔来自统一 RGB565+A8 Atlas，短音效采用 PCM16，循环
-背景音乐采用 IMA-ADPCM。设备和 Host 使用相同的资源文件、游戏模型和 C 像素渲染核心。
+[简体中文](README.CN.md) · [Examples](../README.md)
 
-## 玩法
+Circuit Keep is a 480×480 RGB565 tower defense game. Build and convert three tower types on fixed pads to stop enemies walking the road into the core on the right.
 
-1. 点击开始。
-2. 在底部选择 `PULSE`、`RAPID` 或 `FROST`。
-3. 点击地图上的 `+` 基座建塔；选中同类塔再点已有塔可升级，最高三级。
-   选中不同类型再点已有塔可将其改造为新塔，旧塔累计投入按 50% 折抵。
-4. 阻止三类敌人沿道路进入右侧核心。击杀获得金币，波次结束有奖励。
-5. 右上角按钮暂停或继续，核心生命归零后点击面板重新开始。
+## Play and controls
 
-三类塔分别侧重均衡伤害、高射速和减速控制；游戏模型使用固定对象池，运行中不分配对象。
+### Device
 
-## 运行
+1. Tap to start.
+2. Pick `PULSE`, `RAPID` or `FROST` at the bottom.
+3. Tap a `+` pad on the map to build.
+4. With the same type selected, tap an existing tower to upgrade it; a different type converts it and refunds 50% of the previous investment.
+5. The top-right button pauses or resumes; after a defeat, tap the result panel to restart.
 
-```bash
-# Host 仿真：本仓库根目录，主机 C 编译器 + Pillow
+The three towers focus on balanced damage, fire rate and slowing. Adjacent towers of different types grant combo bonuses. Start, build, shot, kill, new wave, leak and defeat have sound effects, and background music plays (quieter while paused).
+
+### Host
+
+Mouse clicks follow the same interface and placement rules as device touch. The browser toolbar can pause, single-step and restart.
+
+## Host preview
+
+From the repository root:
+
+```sh
 python3 tools/game_cli.py sim examples/tower_defense
-python3 tools/game_cli.py sim examples/tower_defense --headless --frames 300
-python3 tools/game_cli.py sim examples/tower_defense --headless \
-  --scenario replay.json --state-output artifacts/tower-state.json
 ```
 
-本目录提供独立 ESP-IDF 原生固件工程；生产固件的板级策略由外部产品仓库决定。
+## Implementation
 
-非 headless 预览地址为 `http://127.0.0.1:8460/`；局域网预览可加
-`--listen 0.0.0.0`。
+The map comes from Tiled; units and towers use RGB565+A8 atlases. The game model uses fixed pools and allocates no enemy, projectile or effect objects at runtime. Device and Host share assets, model and C drawing code.
 
 ## Native build
 
-See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.
+See [build paths](../../docs/build-matrix.EN.md) for targets and Board selection, and the [game development guide](../../docs/game-development.EN.md) for Host tests, replay and device acceptance.

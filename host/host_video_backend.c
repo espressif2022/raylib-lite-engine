@@ -2,6 +2,7 @@
 #include "raylib_lite_host_video.h"
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include "raylib_lite_raylib_port.h"
 #include "raylib_lite_video.h"
@@ -32,6 +33,9 @@ static raylib_lite_result_t host_get_info(
         .stride_pixels = host->stride_pixels,
         .format = RAYLIB_LITE_PIXEL_RGB565_NATIVE,
     };
+    /* Test hook: emulate a backend that displays only every Nth row. */
+    const char *row_step = getenv("RAYLIB_LITE_HOST_SAMPLE_ROW_STEP");
+    if (row_step) out_info->sample_row_step = (uint16_t)atoi(row_step);
     return RAYLIB_LITE_OK;
 }
 

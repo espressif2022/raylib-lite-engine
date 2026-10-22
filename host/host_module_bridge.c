@@ -26,6 +26,20 @@ typedef struct {
 
 static raylib_lite_host_game_descriptor_v1_t s_host_descriptor;
 
+/* RAYLIB_LITE_HOST_SIZE=WxH renders on another panel size, e.g. 320x240. */
+static void host_surface_size(uint16_t *width, uint16_t *height)
+{
+    const char *size = getenv("RAYLIB_LITE_HOST_SIZE");
+    char *end = NULL;
+    if (!size || !*size) return;
+    long w = strtol(size, &end, 10);
+    if (!end || (*end != 'x' && *end != 'X')) return;
+    long h = strtol(end + 1, &end, 10);
+    if (*end || w < 64 || h < 64 || w > 2048 || h > 2048) return;
+    *width = (uint16_t)w;
+    *height = (uint16_t)h;
+}
+
 const raylib_lite_host_game_descriptor_v1_t *raylib_lite_host_game_v1(void)
 {
     const raylib_lite_game_module_v1_t *module = raylib_lite_game_module_v1();
@@ -40,6 +54,7 @@ const raylib_lite_host_game_descriptor_v1_t *raylib_lite_host_game_v1(void)
         .tick_hz = module->descriptor.tick_hz,
         .max_pointers = module->descriptor.max_pointers,
     };
+    host_surface_size(&s_host_descriptor.width, &s_host_descriptor.height);
     return &s_host_descriptor;
 }
 
@@ -57,6 +72,10 @@ void *raylib_lite_host_game_create_v1(const char *asset_root)
     if (module->initialize && module->initialize(instance->state, asset_root)) {
         free(instance->state); free(instance); return NULL;
     }
+    uint16_t width = module->descriptor.width, height = module->descriptor.height;
+    host_surface_size(&width, &height);
+    if (width != module->descriptor.width || height != module->descriptor.height)
+        raylib_lite_raylib_init_window(width, height, module->descriptor.title);
     return instance;
 }
 
@@ -115,11 +134,12 @@ int raylib_lite_host_game_render_rgb565_v1(void *value, uint16_t *pixels,
                                            size_t stride_pixels)
 {
     module_instance_t *instance = value;
-    if (!instance || !pixels || stride_pixels < instance->module->descriptor.width)
+    if (!instance || !pixels || !raylib_lite_host_game_v1() ||
+            stride_pixels < s_host_descriptor.width)
         return -1;
     if (raylib_lite_host_video_set_target(
-            pixels, stride_pixels, instance->module->descriptor.width,
-            instance->module->descriptor.height) != RAYLIB_LITE_OK) {
+            pixels, stride_pixels, s_host_descriptor.width,
+            s_host_descriptor.height) != RAYLIB_LITE_OK) {
         return -1;
     }
     int result = instance->module->render(instance->state);

@@ -1,0 +1,41 @@
+# Mosaico Raylib Shooter
+
+[English](README.md) · [示例索引（English）](../README.md)
+
+Raylib Shooter 是纵向街机射击参考游戏。玩家拖动飞船躲避弹幕，武器自动开火；连续击破
+编队和精英敌人可获得额外奖励。
+
+## 玩法与操作
+
+### 真机
+
+- 点击标题画面开始。
+- 在屏幕上拖动飞船；射击自动进行。
+- 触摸和暂停状态由共享游戏模块处理。
+- 射击、击毁、机体受击、进入新区域、连击强化（x4 双管、x8 速射）、开局和失败都有独立音效和触觉脉冲。对局中播放太空合成器音乐，暂停时压低。
+
+### Host
+
+- 鼠标按下并拖动飞船。
+- 方向键或 `A`/`D`/`W`/`S` 可移动。
+- `Enter` 开始或重新开始，`P` 暂停或继续。
+
+## Host 预览
+
+在仓库根目录运行：
+
+```sh
+python3 tools/game_cli.py sim examples/raylib_shooter
+```
+
+## 实现特点
+
+游戏以 30 Hz 固定步长运行，敌人、弹丸和特效均使用固定容量池。绘制代码使用 Raylib
+兼容入口，但直接写入 480×480 RGB565 帧缓冲；Host 与真机编译同一套模型和视图源码。
+
+模型没有事件位，因此 `shooter_feedback.[ch]` 逐 tick 比较一组计数快照（射击、击毁、生命、区域、连击、阶段），每 tick 按重要性只播放一个音效，并用桩音频后端测试。`assets_src/generate_audio.py` 用 numpy 合成音频片段，生成的 WAV 不纳入 git。
+
+## Native 构建
+
+构建目标和 Board 选择见[构建路径](../../docs/build-matrix.CN.md)。兼容层边界与游戏验证
+流程见[游戏开发指南](../../docs/game-development.CN.md)。

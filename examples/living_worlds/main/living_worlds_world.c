@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "living_worlds_world.h"
+#include "living_screen.h"
 #include <math.h>
 #include <stddef.h>
 #include <string.h>
+
+float living_view_width=480.0f;
+float living_view_scale=1.0f;
 
 #define SUNRISE_YAW_LIMIT 14.3239f
 #define SUNRISE_PITCH_LIMIT 7.735f
@@ -46,8 +50,8 @@ static void sunrise_spawn_seed(living_world_t *world,
                                living_sunrise_seed_t *seed,bool gust)
 {
     const float focal=480.0f*1.055f;
-    float screen_x=gust?sunrise_random_range(world,-26.0f,145.0f):
-                        sunrise_random_range(world,8.0f,472.0f);
+    float screen_x=gust?sunrise_random_range(world,-26.0f-LIVING_VIEW_OX,145.0f-LIVING_VIEW_OX):
+                        sunrise_random_range(world,8.0f-LIVING_VIEW_OX,472.0f+LIVING_VIEW_OX);
     float screen_y=gust?sunrise_random_range(world,205.0f,445.0f):
                         sunrise_random_range(world,105.0f,450.0f);
     float z=gust?sunrise_random_range(world,3.7f,15.0f):
