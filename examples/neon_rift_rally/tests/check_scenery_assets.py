@@ -41,7 +41,11 @@ from pack_game_assets import compile_assets
 with tempfile.TemporaryDirectory(prefix='rally_art_') as directory:
     output = Path(directory)
     report = compile_assets(source, output, source / 'game_assets.json')
-    assert report['total_bytes'] <= 700000, report['total_bytes']
+    # Atlases are sampled every frame; audio streams from mapped flash.
+    art = sum(f['bytes'] for f in report['files'] if f['type'] == 'atlas')
+    audio = sum(f['bytes'] for f in report['files'] if f['type'].startswith('audio'))
+    assert art <= 700000, art
+    assert audio <= 960000, audio
     ids = (output / 'assets_ids.h').read_text()
 for frame in props['frames'] + sky['frames']:
     assert 'RAYLIB_LITE_ASSET_ID_' + frame['name'].upper() in ids

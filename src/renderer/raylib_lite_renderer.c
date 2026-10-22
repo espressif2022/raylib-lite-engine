@@ -85,6 +85,30 @@ static bool atlas_frames_valid(const uint8_t *data, unsigned count,
     return true;
 }
 
+/* Blending never mixes channels, so a constant paint is three per-channel
+ * tables of the old pixel. Rebuilt only when the paint changes. */
+static struct { uint16_t pixel; unsigned alpha; uint16_t r[32], g[64], b[32]; } s_blend_lut;
+
+M2D_HOT void raylib_lite_primitive_blend_run(uint16_t *dst, int count,
+    const raylib_lite_primitive_paint_t *paint)
+{
+    if (s_blend_lut.alpha != paint->alpha || s_blend_lut.pixel != paint->pixel) {
+        for (unsigned i = 0; i < 32; ++i) {
+            s_blend_lut.r[i] = raylib_lite_primitive_blend(i << 11, paint) & 0xf800U;
+            s_blend_lut.b[i] = raylib_lite_primitive_blend(i, paint) & 0x001fU;
+        }
+        for (unsigned i = 0; i < 64; ++i)
+            s_blend_lut.g[i] = raylib_lite_primitive_blend(i << 5, paint) & 0x07e0U;
+        s_blend_lut.pixel = paint->pixel;
+        s_blend_lut.alpha = paint->alpha;
+    }
+    const uint16_t *r = s_blend_lut.r, *g = s_blend_lut.g, *b = s_blend_lut.b;
+    for (int i = 0; i < count; ++i) {
+        unsigned old = dst[i];
+        dst[i] = (uint16_t)(r[old >> 11] | g[(old >> 5) & 63U] | b[old & 31U]);
+    }
+}
+
 void raylib_lite_primitive_draw_span(raylib_lite_primitive_surface_t *surface,
     int y, int x0, int x1, const raylib_lite_primitive_paint_t *paint)
 {

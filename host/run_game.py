@@ -639,7 +639,10 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8460)
     parser.add_argument("--replay", type=Path)
     parser.add_argument("--state-output", type=Path)
+    parser.add_argument("--size", help="render surface WxH, e.g. 320x240")
     args = parser.parse_args()
+    if args.size:
+        os.environ["RAYLIB_LITE_HOST_SIZE"] = args.size
     manifest = args.project / "game.sim.json"
     if not manifest.is_file():
         parser.error(f"game simulator manifest not found: {manifest}")

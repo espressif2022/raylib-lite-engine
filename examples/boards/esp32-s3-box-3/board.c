@@ -309,6 +309,12 @@ failed:
     }
 }
 
+void raylib_lite_example_board_panel_size(uint16_t *width, uint16_t *height)
+{
+    if (width) *width = 320;
+    if (height) *height = 240;
+}
+
 const raylib_lite_platform_t *raylib_lite_example_board_services(
     raylib_lite_example_board_t *board)
 {

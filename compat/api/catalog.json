@@ -952,6 +952,7 @@
       "header": "include/raylib_lite/raylib_lite_tilemap.h",
       "entries": [
         "raylib_lite_tilemap_draw_layer",
+        "raylib_lite_tilemap_draw_layer_scaled",
         "raylib_lite_tilemap_find_object",
         "raylib_lite_tilemap_is_blocked",
         "raylib_lite_tilemap_load",

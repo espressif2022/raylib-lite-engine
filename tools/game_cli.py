@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -106,6 +107,7 @@ def _parser() -> argparse.ArgumentParser:
         sim.add_argument("--port", type=int, default=8460)
         sim.add_argument("--scenario", "--replay", dest="replay")
         sim.add_argument("--state-output")
+        sim.add_argument("--size", help="render surface WxH, e.g. 320x240")
 
     test = commands.add_parser("test", help="Run a finite deterministic Host test/replay")
     _add_finite_host_arguments(test)
@@ -303,6 +305,8 @@ def _host_command(project: Path, *, frames: int, replay: Optional[str],
 def _simulate(arguments: argparse.Namespace, project: Path) -> int:
     if arguments.json and not arguments.headless:
         raise ValueError("sim --json requires --headless")
+    if arguments.size:
+        os.environ["RAYLIB_LITE_HOST_SIZE"] = arguments.size
     code, payload = _host_command(
         project, frames=arguments.frames, replay=arguments.replay,
         state_output=arguments.state_output, json_mode=arguments.json,

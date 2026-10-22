@@ -29,6 +29,45 @@ void rally_view_motion_update(rally_view_motion_t *motion, const rally_game_t *g
         motion->alert = 3U;
         motion->alert_ticks = 30U;
     }
+    const uint32_t gain = game->score > motion->last_score ? game->score - motion->last_score : 0U;
+    if (game->score < motion->last_score) motion->shown_score = game->score;
+    motion->last_score = game->score;
+    if (motion->shown_score < game->score)
+        motion->shown_score += (game->score - motion->shown_score + 3U) / 4U;
+    if (motion->callout_ticks) --motion->callout_ticks;
+    if (motion->boost_cooldown) --motion->boost_cooldown;
+    const uint32_t events = game->event_flags;
+    if ((events & RALLY_EVENT_LAP) && !(events & RALLY_EVENT_FINISH)) {
+        motion->callout = game->laps_completed + 1U >= RALLY_TARGET_LAPS ?
+                          RALLY_CALLOUT_FINAL_LAP : RALLY_CALLOUT_LAP;
+        motion->callout_ticks = 54U;
+        motion->callout_value = game->laps_completed + 1U;
+    } else if (motion->callout_ticks > 30U &&
+               motion->callout >= RALLY_CALLOUT_LAP) {
+        /* Lap banners hold the slot until they start to fade. */
+    } else if (events & RALLY_EVENT_NEAR_MISS) {
+        motion->callout = RALLY_CALLOUT_NEAR_MISS;
+        motion->callout_ticks = 30U;
+        motion->callout_value = gain;
+    } else if (events & RALLY_EVENT_DRIFT_BOOST) {
+        motion->callout = RALLY_CALLOUT_DRIFT_BOOST;
+        motion->callout_ticks = 30U;
+        motion->callout_value = gain;
+    } else if (events & RALLY_EVENT_RIVAL_SLIP) {
+        motion->callout = RALLY_CALLOUT_RIVAL_SLIP;
+        motion->callout_ticks = 36U;
+        motion->callout_value = game->event_rider;
+    } else if (events & RALLY_EVENT_CHECKPOINT) {
+        motion->callout = RALLY_CALLOUT_CHECKPOINT;
+        motion->callout_ticks = 24U;
+        motion->callout_value = game->next_checkpoint;
+    } else if ((events & RALLY_EVENT_RIVAL_BOOST) && !motion->callout_ticks &&
+               (!motion->boost_cooldown || game->event_rider == game->rival)) {
+        motion->callout = RALLY_CALLOUT_RIVAL_BOOST;
+        motion->callout_ticks = 30U;
+        motion->callout_value = game->event_rider;
+        motion->boost_cooldown = 150U;
+    }
     float target = game->steering * 9.0f + game->heading_error * 14.0f +
                    game->lateral_velocity * (game->drifting ? .55f : .28f);
     float rate = fabsf(target) < fabsf(motion->steering) ? 3.2f : 2.2f;

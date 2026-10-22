@@ -28,6 +28,8 @@ typedef struct {
 esp_err_t raylib_lite_example_board_create(
     const raylib_lite_example_board_config_t *config,
     raylib_lite_example_board_t **out_board);
+/* Native panel size. Adaptive games use it as their logical surface. */
+void raylib_lite_example_board_panel_size(uint16_t *width, uint16_t *height);
 const raylib_lite_platform_t *raylib_lite_example_board_services(
     raylib_lite_example_board_t *board);
 raylib_lite_input_queue_t *raylib_lite_example_board_input(

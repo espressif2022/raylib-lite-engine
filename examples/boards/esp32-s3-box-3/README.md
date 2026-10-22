@@ -8,9 +8,10 @@ The package keeps its amend and defaults at this directory's root and its
 Raylib Lite IDF adapter directly in this Board directory, matching the
 `esp-mosaico` package layout.
 
-The Game's logical RGB565 surface is scaled proportionally with black bars to the
-physical 320x240 SPI LCD. Touch coordinates are mapped back to the Game's logical
-surface. The adapter uses `esp_display_present` 1.0.2 for DMA buffers, LCD transfer
+`raylib_lite_example_board_panel_size()` reports 320x240. Adaptive Games (those
+defining `raylib_lite_game_adaptive_surface()`) render at that size one-to-one.
+Any other Game's logical RGB565 surface is scaled proportionally with black bars
+to the physical 320x240 SPI LCD, and touch coordinates are mapped back to it. The adapter uses `esp_display_present` 1.0.2 for DMA buffers, LCD transfer
 completion and retryable teardown. It implements input events, monotonic
 clock, and cleanup. BOX-3 also provides ES8311 speaker playback through the
 Board Manager `audio_dac` device using the shared native Game Audio Mixer

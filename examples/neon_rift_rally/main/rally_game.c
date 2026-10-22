@@ -379,70 +379,160 @@ static bool opponent_lane_clear(const rally_game_t *game, unsigned self, float l
     return true;
 }
 
+static uint32_t rider_random(rally_opponent_t *rider)
+{
+    uint32_t x = rider->rng ? rider->rng : 0x9e3779b9u;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    rider->rng = x;
+    return x;
+}
+
+static float rider_unit(rally_opponent_t *rider)
+{
+    return (float)(rider_random(rider) >> 8) * (1.0f / 16777216.0f);
+}
+
+static void roll_riders(rally_game_t *game)
+{
+    static const float base_aggression[3] = {.30f, .70f, .55f};
+    game->rival = (uint8_t)(((game->seed * 2654435761u) >> 16) % RALLY_OPPONENT_COUNT);
+    for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
+        rally_opponent_t *rider = &game->opponents[i];
+        rider->rng = (game->seed + 1u) * 0x9e3779b9u ^ (i + 1u) * 0x85ebca6bu;
+        (void)rider_random(rider);
+        rider->skill = (rider_unit(rider) - .5f) * 2.0f;
+        rider->cornering = .7f + .7f * rider_unit(rider);
+        rider->aggression = clampf(base_aggression[rider->style % 3U] +
+                                   (rider_unit(rider) - .5f) * .4f, 0.0f, 1.0f);
+        rider->nitro = 55.0f + 45.0f * rider_unit(rider);
+        if (i == game->rival) {
+            rider->skill = fmaxf(rider->skill, .5f);
+            rider->aggression = fmaxf(rider->aggression, .8f);
+            rider->nitro = RALLY_NITRO_MAX;
+        }
+    }
+}
+
 static void update_opponents(rally_game_t *game)
 {
+    const float player_distance = race_distance(game->progress, game->laps_completed);
     for (unsigned i = 0; i < RALLY_OPPONENT_COUNT; ++i) {
         rally_opponent_t *opponent = &game->opponents[i];
         if (!opponent->active || opponent->finished) continue;
         if (opponent->collision_cooldown) --opponent->collision_cooldown;
         if (opponent->near_miss_cooldown) --opponent->near_miss_cooldown;
+        if (opponent->nitro_ticks) --opponent->nitro_ticks;
+        if (opponent->slip_ticks) --opponent->slip_ticks;
+        opponent->nitro = clampf(opponent->nitro + 2.0f * RALLY_DT, 0.0f, RALLY_NITRO_MAX);
+        const bool rival = i == game->rival;
 
         /* A deterministic pace wave makes the cars look less like three
          * copies, while keeping their input entirely replayable. */
         const float wave = 1.35f * sinf(opponent->phase +
                                         (float)game->tick * (0.017f + i * 0.003f));
-        const float player_distance = race_distance(game->progress,
-                                                    game->laps_completed);
         const float opponent_distance = race_distance(opponent->progress,
                                                        opponent->laps_completed);
         const float gap = player_distance - opponent_distance;
-        /* Gentle catch-up gives a trailing AI a reason to stay in the race,
-         * but caps the rubber band below the player's boosted top speed. */
-        const float catch_up = opponent->style == RALLY_OPPONENT_CHASER ?
-                               clampf(gap * 0.008f, 0.0f, 3.0f) : 0.0f;
+        /* Gentle catch-up keeps the pack in the race, but stays below the
+         * player's boosted top speed. The rival also hunts a leading player. */
+        float catch_up = clampf((gap - 40.0f) * 0.01f, 0.0f, 1.2f);
+        if (opponent->style == RALLY_OPPONENT_CHASER) catch_up += clampf(gap * 0.008f, 0.0f, 3.0f);
+        if (rival) catch_up += gap > 25.0f ? clampf((gap - 25.0f) * .03f, 0.0f, 2.5f)
+                                           : (gap > 0.0f ? .8f : 0.0f);
         const float leader_brake = clampf(-gap * 0.006f, 0.0f, 1.5f);
         rally_track_pose_t here, ahead;
         rally_track_sample_course(game->course_id, opponent->progress, 0, &here);
         rally_track_sample_course(game->course_id, opponent->progress + 12, 0, &ahead);
         float bend = clampf(
             fabsf(here.tangent_x * ahead.tangent_z - here.tangent_z * ahead.tangent_x) * 3, 0, 1);
+        float turn_right = here.right_x * ahead.tangent_x + here.right_z * ahead.tangent_z;
         float style_speed = opponent->style == RALLY_OPPONENT_SPRINTER ?
                             1.4f - bend * 2.1f :
                             opponent->style == RALLY_OPPONENT_DEFENDER ? -.25f : .35f;
+        float corner_loss = bend * (1.4f - opponent->cornering) * 2.0f;
         float final_lap = opponent->laps_completed + 1U >= RALLY_TARGET_LAPS ? .6f : 0.0f;
-        float target_speed =
-            s_opponent_speeds[i] + wave + catch_up - leader_brake + style_speed + final_lap;
-        bool blocked = false;
+        float target_speed = s_opponent_speeds[i] + opponent->skill + wave + catch_up -
+                             leader_brake + style_speed - corner_loss + final_lap;
+        bool blocked = false, drafting = false;
+        float cap = 1e9f;
         for (unsigned j = 0; j < RALLY_OPPONENT_COUNT; ++j) {
             const rally_opponent_t *front = &game->opponents[j];
             if (j == i || !front->active || front->finished)
                 continue;
             float ahead_gap =
                 race_distance(front->progress, front->laps_completed) - opponent_distance;
-            if (ahead_gap > 0 && ahead_gap < 12 &&
+            if (ahead_gap > 0 && ahead_gap < 14 &&
                 fabsf(front->lateral - opponent->lateral) < 1.4f) {
-                blocked = true;
-                if (ahead_gap < 6)
-                    target_speed = fminf(target_speed, fmaxf(0, front->speed - 1));
+                if (ahead_gap > 3) drafting = true;
+                if (ahead_gap < 12) blocked = true;
+                if (ahead_gap < 6) cap = fminf(cap, fmaxf(0, front->speed - 1));
             }
         }
-        if (gap > 0 && gap < 12 && fabsf(game->lateral - opponent->lateral) < 1.4f) {
-            blocked = true;
-            if (gap < 6)
-                target_speed = fminf(target_speed, fmaxf(0, game->speed - 1));
+        if (gap > 0 && gap < 14 && fabsf(game->lateral - opponent->lateral) < 1.4f) {
+            if (gap > 3) drafting = true;
+            if (gap < 12) blocked = true;
+            if (gap < 6) cap = fminf(cap, fmaxf(0, game->speed - 1));
         }
-        /* Launch with comparable acceleration instead of jumping to race pace.
-         * Existing bounded catch-up and driving styles still set the target. */
+        if (drafting) target_speed += 1.4f;
+        target_speed = fminf(target_speed, 39.5f);
+        if (opponent->nitro_ticks) target_speed = fminf(target_speed + 5.5f, 45.0f);
+        if (opponent->slip_ticks) target_speed -= 6.0f * (float)opponent->slip_ticks / 36.0f;
+        target_speed = fminf(target_speed, cap);
+        /* Launch with comparable acceleration instead of jumping to race pace. */
         opponent->speed += clampf((target_speed - opponent->speed) * 2.7f,
                                    -20.0f, 18.0f) * RALLY_DT;
         if (opponent->decision_cooldown) --opponent->decision_cooldown;
         else {
             float target = s_opponent_lanes[i] +
                 .55f * sinf(opponent->phase + (float)game->tick * .013f);
-            if (opponent->style == RALLY_OPPONENT_DEFENDER && gap < -5.0f && gap > -20.0f)
-                target += clampf(game->lateral - target, -1.2f, 1.2f);
-            if (opponent->style == RALLY_OPPONENT_CHASER && gap > 12 && gap < 30)
+            /* Racing line: lean toward the inside of the coming bend. */
+            target += (turn_right > 0.0f ? 1.0f : -1.0f) * bend * 2.2f * opponent->cornering;
+            uint8_t intent = drafting ? RALLY_INTENT_DRAFT : RALLY_INTENT_CRUISE;
+            /* Block only with reaction room: never cut across a player who is
+             * already closing fast, so defending reads as a line, not a wall. */
+            if (gap < -6.0f && gap > -18.0f && opponent->aggression > .45f &&
+                game->speed - opponent->speed < 5.0f) {
+                target += clampf(game->lateral - target, -1.0f, 1.0f) * opponent->aggression * .8f;
+                intent = RALLY_INTENT_DEFEND;
+            }
+            if ((opponent->style == RALLY_OPPONENT_CHASER || rival) && gap > 10 && gap < 32) {
                 target = game->lateral;
+                intent = RALLY_INTENT_ATTACK;
+            }
+            /* Mirror check: do not merge onto a player closing right behind. */
+            if (gap > -8.0f && gap < 0.0f && intent != RALLY_INTENT_DEFEND &&
+                fabsf(target - game->lateral) < 1.6f &&
+                fabsf(target - game->lateral) < fabsf(opponent->lateral - game->lateral))
+                target = opponent->lateral;
+            if (!opponent->nitro_ticks && !blocked && opponent->speed > 26.0f &&
+                opponent->nitro >= 30.0f && bend < .45f) {
+                float chance = bend < .12f ? .22f : 0.0f;
+                if (gap > 0.0f && gap < 10.0f) chance += opponent->aggression * .8f;
+                if (final_lap > 0.0f) chance += .25f;
+                if (rival && fabsf(gap) < 30.0f) chance += .25f;
+                if (rider_unit(opponent) < chance) {
+                    opponent->nitro -= 30.0f;
+                    opponent->nitro_ticks = (uint8_t)(36U + rider_random(opponent) % 24U);
+                    if (gap > -25.0f && gap < 15.0f) {
+                        game->event_rider = (uint8_t)i;
+                        emit(game, RALLY_EVENT_RIVAL_BOOST);
+                    }
+                }
+            }
+            if (!blocked && !opponent->slip_ticks && bend > .25f) {
+                float chance = .06f + (1.4f - opponent->cornering) * .14f;
+                if (gap < 0.0f && gap > -12.0f) chance += .10f;
+                if (rider_unit(opponent) < chance) {
+                    opponent->slip_ticks = 36U;
+                    opponent->slip_side = (int8_t)(turn_right > 0.0f ? -1 : 1);
+                    if (gap < 0.0f && gap > -40.0f) {
+                        game->event_rider = (uint8_t)i;
+                        emit(game, RALLY_EVENT_RIVAL_SLIP);
+                    }
+                }
+            }
             if (blocked) {
                 float first = clampf(opponent->lateral + 2.2f, -4.2f, 4.2f);
                 float second = clampf(opponent->lateral - 2.2f, -4.2f, 4.2f);
@@ -457,13 +547,32 @@ static void update_opponents(rally_game_t *game)
                     target = second;
                 else
                     target = opponent->lateral;
+                intent = RALLY_INTENT_ATTACK;
             }
             opponent->target_lane = clampf(target, -4.2f, 4.2f);
-            opponent->decision_cooldown = 30U;
+            opponent->decision_cooldown = (uint8_t)(18U + rider_random(opponent) % 25U);
+            opponent->intent = intent;
         }
+        if (opponent->nitro_ticks) opponent->intent = RALLY_INTENT_NITRO;
+        else if (opponent->slip_ticks) opponent->intent = RALLY_INTENT_SLIP;
+        else if (opponent->intent == RALLY_INTENT_NITRO || opponent->intent == RALLY_INTENT_SLIP)
+            opponent->intent = RALLY_INTENT_CRUISE;
         opponent->lane = opponent->target_lane;
-        opponent->lateral += (opponent->lane - opponent->lateral) *
-                             fminf(1.0f, 2.0f * RALLY_DT);
+        float lane = opponent->lane;
+        if (opponent->slip_ticks) lane += (float)opponent->slip_side * 1.3f;
+        /* Steer like a rider: ease into the move, peak mid-change and
+         * settle without overshoot. A slide is underdamped and fishtails. */
+        const float stiffness = opponent->slip_ticks ? 10.0f : 8.0f;
+        const float damping = opponent->slip_ticks ? 3.5f : 5.6f;
+        const float accel = clampf((lane - opponent->lateral) * stiffness -
+                                   opponent->lateral_velocity * damping, -9.0f, 9.0f);
+        opponent->lateral_velocity =
+            clampf(opponent->lateral_velocity + accel * RALLY_DT, -3.4f, 3.4f);
+        opponent->lateral += opponent->lateral_velocity * RALLY_DT;
+        if (fabsf(opponent->lateral) > 5.4f) {
+            opponent->lateral = clampf(opponent->lateral, -5.4f, 5.4f);
+            opponent->lateral_velocity = 0.0f;
+        }
         opponent->progress += opponent->speed * RALLY_DT;
         if (opponent->progress >= RALLY_TRACK_LENGTH) {
             opponent->progress -= RALLY_TRACK_LENGTH;
@@ -596,6 +705,11 @@ static void update_interactions(rally_game_t *game)
             game->collision_ticks = 14U;
             game->speed *= 0.62f;
             game->lateral_velocity -= (game->lateral >= opponent->lateral ? 1.0f : -1.0f) * 2.2f;
+            /* Contact costs the rider too, so trading paint can be a pass. */
+            opponent->speed *= 0.78f;
+            opponent->slip_ticks = 24U;
+            opponent->slip_side = (int8_t)(opponent->lateral >= game->lateral ? 1 : -1);
+            opponent->lateral_velocity += (float)opponent->slip_side * 2.0f;
             game->integrity = game->integrity > RALLY_COLLISION_DAMAGE
                                   ? (uint8_t)(game->integrity - RALLY_COLLISION_DAMAGE)
                                   : 0U;
@@ -641,6 +755,15 @@ void rally_reset(rally_game_t *game)
         game->opponents[i].decision_cooldown = (uint8_t)(1U + i * 5U);
         game->opponents[i].style = (uint8_t)(i % 3U);
     }
+    game->seed = 0x5eedu;
+    roll_riders(game);
+}
+
+void rally_set_seed(rally_game_t *game, uint32_t seed)
+{
+    if (!game) return;
+    game->seed = seed;
+    roll_riders(game);
 }
 
 void rally_start(rally_game_t *game)
@@ -941,6 +1064,7 @@ uint32_t rally_state_hash(const rally_game_t *game)
         const rally_opponent_t *opponent = &game->opponents[i];
         hash = hash_float(hash, opponent->progress);
         hash = hash_float(hash, opponent->lateral);
+        hash = hash_float(hash, opponent->lateral_velocity);
         hash = hash_float(hash, opponent->speed);
         hash = hash_float(hash, opponent->lane);
         hash = hash_float(hash, opponent->target_lane);
@@ -952,7 +1076,18 @@ uint32_t rally_state_hash(const rally_game_t *game)
         hash = hash_mix(hash, opponent->style);
         hash = hash_mix(hash, opponent->active ? 1u : 0u);
         hash = hash_mix(hash, opponent->finished ? 1u : 0u);
+        hash = hash_float(hash, opponent->skill);
+        hash = hash_float(hash, opponent->cornering);
+        hash = hash_float(hash, opponent->aggression);
+        hash = hash_float(hash, opponent->nitro);
+        hash = hash_mix(hash, opponent->rng);
+        hash = hash_mix(hash, opponent->nitro_ticks);
+        hash = hash_mix(hash, opponent->slip_ticks);
+        hash = hash_mix(hash, (uint32_t)(int32_t)opponent->slip_side);
+        hash = hash_mix(hash, opponent->intent);
     }
+    hash = hash_mix(hash, game->seed);
+    hash = hash_mix(hash, game->rival);
     return hash;
 }
 
@@ -976,4 +1111,18 @@ bool rally_drift_assist_update(rally_drift_assist_t *assist,
         if (++assist->hold_ticks >= 8U) assist->active = true;
     } else assist->hold_ticks = 0U;
     return assist->active;
+}
+
+const char *rally_rider_name(unsigned index)
+{
+    static const char *names[RALLY_OPPONENT_COUNT] = {
+        "VOLT", "NOVA", "JADE", "BLAZE", "ORCHID", "FROST",
+    };
+    return index < RALLY_OPPONENT_COUNT ? names[index] : "";
+}
+
+const char *rally_intent_name(unsigned intent)
+{
+    static const char *names[] = {"cruise", "attack", "defend", "draft", "nitro", "slip"};
+    return intent < sizeof(names) / sizeof(names[0]) ? names[intent] : "cruise";
 }

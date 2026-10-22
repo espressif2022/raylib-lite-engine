@@ -7,9 +7,14 @@
 #include "host_asset_runtime.h"
 #endif
 #include "raylib_lite_2d.h"
+#include "raylib_lite_design_view.h"
 #include "raylib_lite_raylib.h"
 #include "shooter_game.h"
 #include "shooter_view.h"
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+#include "native_feedback.h"
+#include "shooter_feedback.h"
+#endif
 
 #define RAYLIB_SHOOTER_ABI RAYLIB_LITE_GAME_MODULE_ABI
 
@@ -19,7 +24,19 @@ typedef struct {
     raylib_lite_atlas_t backdrop;
     bool paused, left, right;
     float imu_x, imu_y;
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    shooter_feedback_t feedback;
+#endif
 } shooter_module_state_t;
+
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+static const shooter_haptics_t s_haptics = {
+    .init = raylib_lite_native_feedback_init,
+    .pulse = raylib_lite_native_feedback_pulse,
+    .pattern = raylib_lite_native_feedback_pattern,
+    .stop = raylib_lite_native_feedback_stop,
+};
+#endif
 
 static int initialize(void *value
                       , const char *asset_root
@@ -32,8 +49,11 @@ static int initialize(void *value
     state->atlas=raylib_lite_atlas_load("shooter.atlas");
     if(!state->atlas.texture.id)return -1;
     state->backdrop=raylib_lite_atlas_load("nebula.atlas");
+    state->game.width=480.0f;
     shooter_game_reset(&state->game,0x4d4f5341U);
-#if !defined(RAYLIB_LITE_GAME_NATIVE)
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    shooter_feedback_init(&state->feedback,&state->game,&s_haptics);
+#else
     InitWindow(480,480,"Mosaico Strike");
     SetTargetFPS(30);
 #endif
@@ -44,6 +64,9 @@ static void shutdown(void *value)
 {
     shooter_module_state_t *state=value;
     if(!state)return;
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    shooter_feedback_close(&state->feedback);
+#endif
     raylib_lite_atlas_unload(state->atlas);
     raylib_lite_atlas_unload(state->backdrop);
 }
@@ -52,29 +75,44 @@ static void input(void *value,const raylib_lite_game_input_v1_t *event)
 {
     shooter_module_state_t *state=value;
     if(!state||!event)return;
-    if(event->type==RAYLIB_LITE_GAME_INPUT_POINTER)
-        shooter_game_set_pointer(&state->game,(float)event->x,(float)event->y,event->pressed);
+    const raylib_lite_design_view_t view=raylib_lite_design_view(480.0f);
+    shooter_game_set_width(&state->game,view.width);
+    if(event->type==RAYLIB_LITE_GAME_INPUT_POINTER){
+        Vector2 point=raylib_lite_design_field_point(view,view.width,480.0f,
+                                                     (float)event->x,(float)event->y);
+        shooter_game_set_pointer(&state->game,point.x,point.y,event->pressed);
+    }
     else if(event->type==RAYLIB_LITE_GAME_INPUT_ACTION){
         if(event->code==0)state->left=event->pressed;
         else if(event->code==1)state->right=event->pressed;
         else if(event->pressed&&event->code==3)shooter_game_toggle_pause(&state->game);
         else if(event->pressed&&event->code==4)
-            shooter_game_set_pointer(&state->game,240,420,true);
+            shooter_game_set_pointer(&state->game,state->game.width*.5f,420,true);
     }else if(event->type==RAYLIB_LITE_GAME_INPUT_IMU){
         state->imu_x=event->value_x;
         state->imu_y=event->value_y;
     }else if(event->type==RAYLIB_LITE_GAME_INPUT_CONTROL){
         if(event->code==RAYLIB_LITE_GAME_CONTROL_PAUSE)state->paused=true;
         else if(event->code==RAYLIB_LITE_GAME_CONTROL_RESUME)state->paused=false;
-        else if(event->code==RAYLIB_LITE_GAME_CONTROL_RESET)
+        else if(event->code==RAYLIB_LITE_GAME_CONTROL_RESET){
             shooter_game_reset(&state->game,0x4d4f5341U);
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+            shooter_feedback_sync(&state->feedback,&state->game);
+#endif
+        }
     }
 }
 
 static void update(void *value)
 {
     shooter_module_state_t *state=value;
-    if(!state||state->paused)return;
+    if(!state)return;
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    if(state->paused){shooter_feedback_update(&state->feedback,&state->game,true);return;}
+#else
+    if(state->paused)return;
+#endif
+    shooter_game_set_width(&state->game,raylib_lite_design_view(480.0f).width);
     if(state->game.phase==SHOOTER_PLAYING&&state->left!=state->right){
         float direction=state->right?7.0f:-7.0f;
         shooter_game_set_pointer(&state->game,state->game.player.x+18.0f+direction,
@@ -84,6 +122,9 @@ static void update(void *value)
     float iy=fabsf(state->imu_y)>0.10f?state->imu_y:0.0f;
     shooter_game_move(&state->game,ix*10.0f,iy*10.0f);
     shooter_game_update(&state->game);
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    shooter_feedback_update(&state->feedback,&state->game,false);
+#endif
 }
 
 static int render(void *value)
@@ -117,6 +158,8 @@ static const raylib_lite_game_module_v1_t s_module={
     .initialize=initialize,.shutdown=shutdown,.input=input,.update=update,.render=render,
     .state_hash=state_hash,.state_json=state_json,
 };
+
+bool raylib_lite_game_adaptive_surface(void) { return true; }
 
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 { return &s_module; }

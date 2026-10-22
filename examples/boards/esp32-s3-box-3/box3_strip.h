@@ -15,6 +15,11 @@ static inline void box3_sample_view_row(
     uint32_t view_row, bool swap_bytes)
 {
     const uint32_t logical_w = view->logical_width;
+    if (!swap_bytes && logical_w == view->view_width &&
+            view->logical_height == view->view_height) {
+        memcpy(out, frame + view_row * logical_w, logical_w * sizeof(uint16_t));
+        return;
+    }
     const uint32_t base = logical_w / view->view_width;
     const uint32_t remainder = logical_w % view->view_width;
     uint32_t src_y = (view_row * view->logical_height) / view->view_height;

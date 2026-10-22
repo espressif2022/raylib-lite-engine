@@ -35,7 +35,7 @@ python3 tools/game_cli.py list --json --target esp-mosaico
 
 `tomb_raycast` 为内测版本：可在仓库中为两块 Board 构建，但不属于发布集合。
 
-可选择的第二块 Board：[`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md) 使用 `espressif/esp_board_manager`，物理 LCD 为 320×240。Game 保留自己的逻辑分辨率，由 Board adapter 等比缩放并反向映射触摸。此 Board 必须使用包含 GPIO47 与设备初始化修订的 `bmgr_amend` 配置，为每个 Game 独立生成 Board Manager 代码。从仓库根目录进入 Game 目录后执行（下方以 `raylib_shooter` 为例）：
+可选择的第二块 Board：[`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md) 使用 `espressif/esp_board_manager`，物理 LCD 为 320×240。已发布的 Game 按面板尺寸布局，以 320×240 一比一运行；未通过 `raylib_lite_game_adaptive_surface()` 声明自适应的 Game 保留自己的逻辑分辨率，由 Board adapter 等比缩放加黑边并反向映射触摸。此 Board 必须使用包含 GPIO47 与设备初始化修订的 `bmgr_amend` 配置，为每个 Game 独立生成 Board Manager 代码。从仓库根目录进入 Game 目录后执行（下方以 `raylib_shooter` 为例）：
 
 ```sh
 cd examples/raylib_shooter

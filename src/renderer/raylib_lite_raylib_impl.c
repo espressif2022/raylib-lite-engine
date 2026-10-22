@@ -444,9 +444,14 @@ void raylib_lite_raylib_draw_pixel_v(Vector2 position, Color color)
 void raylib_lite_raylib_draw_rectangle(int x, int y, int width, int height, Color color)
 {
     if (s_camera_active) {
-        Vector2 p = active_to_screen((Vector2){(float)x, (float)y});
-        x = (int)p.x; y = (int)p.y;
-        width = (int)(width*s_camera.zoom); height = (int)(height*s_camera.zoom);
+        /* Snap both edges so zoomed tiles stay seamless and hairlines survive. */
+        if (width <= 0 || height <= 0) return;
+        Vector2 a = active_to_screen((Vector2){(float)x, (float)y});
+        Vector2 b = active_to_screen((Vector2){(float)(x + width), (float)(y + height)});
+        int x0 = (int)floorf(fminf(a.x, b.x)), x1 = (int)floorf(fmaxf(a.x, b.x));
+        int y0 = (int)floorf(fminf(a.y, b.y)), y1 = (int)floorf(fmaxf(a.y, b.y));
+        x = x0; y = y0;
+        width = x1 > x0 ? x1 - x0 : 1; height = y1 > y0 ? y1 - y0 : 1;
     }
     raylib_lite_primitive_draw_rectangle(&s_primitive_surface,x,y,width,height,
         (raylib_lite_renderer_color_t){color.r,color.g,color.b,color.a});

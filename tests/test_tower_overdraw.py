@@ -24,7 +24,7 @@ class TowerOverdrawTests(unittest.TestCase):
     def test_view_layers_match_the_covered_rows(self):
         view = (GAME / "main/tower_view.c").read_text()
         self.assertIn("DrawRectangle(0, 0, 480, 69, C_BG)", view)
-        self.assertIn("(raylib_lite_renderer_vec2_t){0, 69}", view)
+        self.assertIn("(field.y + 69) * s_view.scale", view)
         self.assertIn("DrawRectangle(0, 392, 480, 88,", view)
         self.assertIn("DrawRectangle(0, 389, 480, 3, C_GRASS)", view)
         self.assertIsNone(re.search(r"ClearBackground\(", view))

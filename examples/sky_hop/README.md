@@ -2,17 +2,25 @@
 
 [简体中文](README.CN.md) · [Examples](../README.md)
 
-Sky Hop is a four-level side-scrolling platformer. Collect coins, stomp patrolling enemies and reach the end of each level; lives, score and coin-chain bonuses carry across levels, and clearing the fourth level finishes the run.
+Sky Hop is a four-level side-scrolling platformer. Collect coins, stomp patrolling enemies, bounce on springs and reach the flag at the end of each level; lives, score and coin-chain bonuses carry across levels, and clearing the fourth level finishes the run.
+
+The four levels each have their own weather and palette: Sunny Meadow (birds), Storm Ridge (rain and lightning), Frost Peaks (snow) and Ember Crag (drifting embers).
+
+![Sky Hop](docs/screenshot.png)
+
+The image is a Host RGB565 frame of the first level with its level banner.
 
 ## Play and controls
 
 ### Device
 
 - Tap the title card to start.
-- The bottom `<` and `>` buttons move left and right, `JUMP` jumps; short and long presses give different jump heights.
+- The two arrow buttons at the bottom move left and right, and the `JUMP` button jumps; a short press gives a hop, a long press a full jump.
 - Movement and jump can be held together. The top-right button pauses and resumes.
 - Button, joystick and IMU input map to the same game actions.
-- Jump, coin, stomp, hurt and level clear have sound effects, and music plays during a level.
+- Stomping enemies without touching the ground chains the reward: 250, 500, 1000, then 2000 points. After a hit the hero blinks and is briefly invulnerable.
+- The HUD shows hearts, collected coins, score, best score, the level name and a progress bar. Short tips appear at the start of the first level.
+- Every event has its own chiptune cue and haptic pattern: jump, landing, coin, stomp, spring, checkpoint, hurt, level clear, game over and start. Levels 1 and 3 play the day theme, levels 2 and 4 the night theme, and music ducks while paused.
 
 ### Host
 
@@ -31,9 +39,13 @@ python3 tools/game_cli.py sim examples/sky_hop
 
 Host and device share the gameplay model, Camera2D world view and RGB565 drawing code; audio, physical input and LCD output still need device verification.
 
+To preview a later level on Host, set `SKY_HOP_SIM_LEVEL` to 1–4, for example `SKY_HOP_SIM_LEVEL=3 python3 tools/game_cli.py sim examples/sky_hop`. Native builds ignore it.
+
 ## Implementation
 
-The game uses fixed-capacity objects, four continuous levels, variable jump height, coin-chain bonuses, scene slide-ins and particles. The best score is kept only for the current session and is not saved. Native firmware embeds the assets in the application image.
+The gameplay model (`platform_game.[ch]`) reports what happened each tick as an event bitmask. The view (`sky_hop_view.[ch]`) turns those events into particles, score popups, squash and stretch and screen shake; the feedback module (`sky_hop_feedback.[ch]`) turns them into sound and haptics. `game_module.c` only wires input and lifecycle. All objects have fixed capacity. The best score is kept only for the current session and is not saved.
+
+`assets_src/generate_audio.py` synthesizes every effect and both music loops with numpy; the generated WAVs are not tracked in git. Native firmware embeds the packed assets in the application image.
 
 ## Native build
 

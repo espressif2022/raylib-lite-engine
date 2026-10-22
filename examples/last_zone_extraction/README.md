@@ -37,6 +37,15 @@ The image is the Host RGB565 frame of the Dock mission.
 
 Device NVS stores campaign progress and each mission's best result.
 
+## Hostiles
+
+- Three roles, told apart by the shoulder flash: riflemen (blue) hold mid range behind cover, flankers (amber) move faster and pick spots outside your view, and heavies (red, the elites) take three hits, press in and barely flinch.
+- Patrols walk their own routes around their post, pause and look around. They see in a 120 degree cone, so you can slip past behind them. A glimpse builds suspicion (an amber bar and "?" over the head) rather than an instant alert; standing still far away is hard to spot, sprinting in the open is not. A patrol that loses a half-seen shape walks over to check. Sprinting and gunfire are still heard all around.
+- An alerted hostile radios patrols within about seven cells after a short delay (an antenna icon over its head, then an "ENEMY RADIO" banner). Kill the caller first to cut the call for a +50 bonus.
+- Enemy fire is a roll: moving makes you harder to hit, sprinting much harder, and close range easier. Misses show a tracer and a yellow arrow toward the shooter, with a whizz cue.
+- A hit staggers the target and interrupts its aim. A wounded rifleman or flanker falls back to cover; heavies keep coming. Searchers sweep nearby cells around the last sighting instead of standing still.
+- Radar blips show which way each hostile faces; calm patrols are dim, suspicious ones amber.
+
 ## Host preview
 
 From the repository root:
@@ -48,6 +57,12 @@ python3 tools/game_cli.py sim examples/last_zone_extraction
 ## Implementation
 
 Host and device share the fixed-step model, perspective scene and RGB565 view. Gameplay includes cover, window openings, doors, ammunition, armor, elite enemies and extraction checks; sound and haptics are driven by semantic events.
+
+- The crosshair opens with movement, sprint and recoil, and tightens while you hold fire to steady. It turns red when the magazine is empty.
+- The radar is translucent, with a sweep arm and pulsing hostile blips; its frame flashes when an enemy is alerted.
+- Kills show a `TARGET DOWN` banner with the kill count. Pickups, gates, empty magazines and gate hints use backed labels that stay readable over bright sky.
+- A tense stealth loop plays while you scout. When any enemy is alerted or engaging, a driving combat loop takes over and holds for about five seconds after contact ends. Gates, deploying and death each have their own cue, and music ducks while paused.
+- `assets_src/generate_audio.py` synthesizes every clip; the generated WAVs are not tracked in git. The debug FPS label is compiled only with `LAST_ZONE_SHOW_FPS`.
 
 ## Native build
 

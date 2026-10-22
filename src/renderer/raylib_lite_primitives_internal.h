@@ -45,6 +45,10 @@ static inline uint16_t raylib_lite_primitive_blend(unsigned old, const raylib_li
     return (uint16_t)(((rb&0x00f80000U)>>8)|((g&0xfcU)<<3)|((rb&0xf8U)>>3));
 }
 
+/* Translucent run of one paint; same result as per-pixel primitive_blend. */
+void raylib_lite_primitive_blend_run(uint16_t *dst, int count,
+    const raylib_lite_primitive_paint_t *paint);
+
 /* Coordinates must already lie inside the target and clip; alpha is nonzero. */
 static inline void raylib_lite_primitive_write_span(
     raylib_lite_primitive_surface_t *surface, int y, int x0, int x1,
@@ -63,6 +67,8 @@ static inline void raylib_lite_primitive_write_span(
         if ((uintptr_t)dst & 3U) { *dst++ = pixel; --count; }
         while (count >= 2) { memcpy(dst, &pair, sizeof(pair)); dst += 2; count -= 2; }
         if (count) *dst = pixel;
+    } else if (count >= 64) {
+        raylib_lite_primitive_blend_run(dst, count, paint);
     } else {
         for (int i = 0; i < count; ++i) {
             dst[i] = raylib_lite_primitive_blend(dst[i], paint);

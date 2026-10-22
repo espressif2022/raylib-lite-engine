@@ -27,6 +27,7 @@ MAP_OBJECT = struct.Struct("<IhhhhI")
 SOUND_HEADER = struct.Struct("<4sIHHII")
 ATLAS_FLAG_BINARY_ALPHA = 1 << 0
 ATLAS_FLAG_OPAQUE = 1 << 1
+SOUND_ADPCM_MIN_SNR_DB = 20.0
 IMA_INDEX = (-1, -1, -1, -1, 2, 4, 6, 8,
              -1, -1, -1, -1, 2, 4, 6, 8)
 IMA_STEP = (7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31,
@@ -535,7 +536,42 @@ def write_tilemap(source: Path, destination: Path) -> dict:
             "objects": object_count, "path_points": point_count}
 
 
-def write_sound(source: Path, destination: Path) -> dict:
+def _ima_adpcm(mono: list[int]) -> tuple[bytes, float]:
+    """Encode IMA-ADPCM and return the payload with its reconstruction SNR in dB."""
+    head = [abs(b - a) for a, b in zip(mono[:32], mono[1:33])]
+    start = next((i for i, step in enumerate(IMA_STEP) if step >= max(head, default=0)), 88)
+    predictor = mono[0] if mono else 0
+    index = start
+    codes = []
+    signal = noise = 0
+    for sample in mono[1:]:
+        step = IMA_STEP[index]
+        delta = sample - predictor
+        code = 8 if delta < 0 else 0
+        delta = abs(delta)
+        diff = step >> 3
+        if delta >= step: code |= 4; delta -= step; diff += step
+        if delta >= step >> 1: code |= 2; delta -= step >> 1; diff += step >> 1
+        if delta >= step >> 2: code |= 1; diff += step >> 2
+        predictor += -diff if code & 8 else diff
+        predictor = max(-32768, min(32767, predictor))
+        index = max(0, min(88, index + IMA_INDEX[code]))
+        codes.append(code)
+        signal += sample * sample
+        noise += (sample - predictor) ** 2
+    packed = bytearray(struct.pack("<hBB", mono[0] if mono else 0, start, 0))
+    for i in range(0, len(codes), 2):
+        packed.append(codes[i] | ((codes[i + 1] if i + 1 < len(codes) else 0) << 4))
+    snr = 10 * math.log10(signal / noise) if noise and signal else 99.0
+    return bytes(packed), round(min(snr, 99.0), 1)
+
+
+def write_sound(source: Path, destination: Path, encoding: str = "auto") -> dict:
+    """Clips of a second or more always use ADPCM to bound flash size; shorter
+    clips use it only when the reconstruction stays at or above
+    SOUND_ADPCM_MIN_SNR_DB, because IMA lags full-scale pulse edges."""
+    if encoding not in {"auto", "adpcm", "pcm16"}:
+        raise ValueError(f"{source}: unsupported sound encoding: {encoding}")
     with wave.open(str(source), "rb") as wav:
         channels, width, rate, frames = (wav.getnchannels(), wav.getsampwidth(),
                                          wav.getframerate(), wav.getnframes())
@@ -550,36 +586,23 @@ def write_sound(source: Path, destination: Path) -> dict:
     if rate != target_rate:
         count = max(1, round(len(mono) * target_rate / rate))
         mono = [mono[min(len(mono) - 1, i * rate // target_rate)] for i in range(count)]
-    bits = 4 if len(mono) >= target_rate else 16
-    if bits == 4:
-        predictor = mono[0] if mono else 0
-        index = 0
-        codes = []
-        for sample in mono[1:]:
-            step = IMA_STEP[index]
-            delta = sample - predictor
-            code = 8 if delta < 0 else 0
-            delta = abs(delta)
-            diff = step >> 3
-            if delta >= step: code |= 4; delta -= step; diff += step
-            if delta >= step >> 1: code |= 2; delta -= step >> 1; diff += step >> 1
-            if delta >= step >> 2: code |= 1; diff += step >> 2
-            predictor += -diff if code & 8 else diff
-            predictor = max(-32768, min(32767, predictor))
-            index = max(0, min(88, index + IMA_INDEX[code]))
-            codes.append(code)
-        packed = bytearray(struct.pack("<hBB", mono[0] if mono else 0, 0, 0))
-        for i in range(0, len(codes), 2):
-            packed.append(codes[i] | ((codes[i + 1] if i + 1 < len(codes) else 0) << 4))
-        payload = bytes(packed)
+    snr = None
+    if encoding == "pcm16":
+        bits = 16
     else:
-        payload = struct.pack(f"<{len(mono)}h", *mono)
+        adpcm, snr = _ima_adpcm(mono)
+        bits = 4 if (encoding == "adpcm" or len(mono) >= target_rate
+                     or snr >= SOUND_ADPCM_MIN_SNR_DB) else 16
+    payload = adpcm if bits == 4 else struct.pack(f"<{len(mono)}h", *mono)
     destination.write_bytes(SOUND_HEADER.pack(b"MSN1", target_rate, 1, bits,
                                                len(mono), zlib.crc32(payload)) + payload)
-    return {"file": destination.name,
-            "type": "audio_ima_adpcm" if bits == 4 else "audio_pcm16",
-            "bits": bits, "bytes": destination.stat().st_size,
-            "samples": len(mono), "rate": target_rate}
+    report = {"file": destination.name,
+              "type": "audio_ima_adpcm" if bits == 4 else "audio_pcm16",
+              "bits": bits, "bytes": destination.stat().st_size,
+              "samples": len(mono), "rate": target_rate}
+    if snr is not None:
+        report["adpcm_snr_db"] = snr
+    return report
 
 
 def _source_file(root: Path, value: str) -> Path:
@@ -664,7 +687,8 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
             output_name = str(item.get("output", f"{wav.stem}.sound"))
             if len(matches) > 1 and "output" in item:
                 raise ValueError("sound output cannot be fixed for a multi-file pattern")
-            report.append(write_sound(wav, _output_file(output, output_name, ".sound")))
+            report.append(write_sound(wav, _output_file(output, output_name, ".sound"),
+                                      str(item.get("encoding", "auto"))))
 
     identifiers.update(path.name for path in output.iterdir()
                        if path.suffix in {".atlas", ".wall", ".map", ".sound"})

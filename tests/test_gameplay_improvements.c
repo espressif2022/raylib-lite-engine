@@ -26,7 +26,7 @@ static void test_tower_synergy(void)
 
 static void test_shooter_elite_cycle(void)
 {
-    shooter_game_t game;
+    shooter_game_t game = {0};
     shooter_game_reset(&game, 11);
     game.phase = SHOOTER_PLAYING;
     bool saw_elite = false;

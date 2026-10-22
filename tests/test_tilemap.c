@@ -107,6 +107,24 @@ void raylib_lite_renderer_draw_tile_row(
     ++s_rows;
 }
 
+static unsigned s_quads;
+static raylib_lite_renderer_rect_t s_quad_src[4], s_quad_dst[4];
+
+void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t texture,
+    raylib_lite_renderer_rect_t source, raylib_lite_renderer_rect_t dest,
+    raylib_lite_renderer_vec2_t origin, float rotation,
+    raylib_lite_renderer_color_t tint)
+{
+    (void)origin;
+    (void)rotation;
+    (void)tint;
+    assert(texture.id == 1);
+    assert(s_quads < 4);
+    s_quad_src[s_quads] = source;
+    s_quad_dst[s_quads] = dest;
+    ++s_quads;
+}
+
 static void assert_rejected(void)
 {
     unsigned before = s_release_count;
@@ -141,6 +159,21 @@ int main(void)
     assert(s_rows == 2);
     assert(s_row_x[0] == 3 && s_row_x[1] == 3);
     assert(s_row_y[0] == 7 && s_row_y[1] == 23);
+
+    s_rows = 0;
+    raylib_lite_tilemap_draw_layer_scaled(
+        map, 0, (raylib_lite_renderer_rect_t){0, 0, 32, 32},
+        (raylib_lite_renderer_vec2_t){3, 7}, 1.0f);
+    assert(s_rows == 2 && s_quads == 0);
+
+    raylib_lite_tilemap_draw_layer_scaled(
+        map, 0, (raylib_lite_renderer_rect_t){0, 0, 32, 32},
+        (raylib_lite_renderer_vec2_t){3, 7}, 0.5f);
+    assert(s_quads == 4);
+    assert(s_quad_dst[0].x == 3 && s_quad_dst[0].y == 7);
+    assert(s_quad_dst[0].width == 8 && s_quad_dst[0].height == 8);
+    assert(s_quad_dst[3].x == 11 && s_quad_dst[3].y == 15);
+    assert(s_quad_src[3].x == 48 && s_quad_src[3].width == 16);
 
     raylib_lite_tilemap_unload(map);
     puts("tilemap: ok");

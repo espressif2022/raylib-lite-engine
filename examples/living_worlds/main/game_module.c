@@ -10,8 +10,11 @@
 #if defined(RAYLIB_LITE_GAME_NATIVE)
 #include "living_worlds_native_assets.h"
 #endif
+#include "raylib_lite_design_view.h"
 #include "raylib_lite_raylib.h"
+#include "living_screen.h"
 #include "living_worlds_session.h"
+#include "living_worlds_view.h"
 
 typedef struct {
     living_worlds_session_t session;
@@ -119,9 +122,14 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
     module_state_t *module = value;
     living_worlds_session_t *session = &module->session;
     if (!event) return;
-    if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER)
-        living_worlds_session_pointer(session, (float)event->x, (float)event->y,
+    if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER) {
+        /* Screen pixels to the authored 480 span (the HUD stays centred). */
+        living_worlds_view_sync_screen();
+        Vector2 point = raylib_lite_design_point(raylib_lite_design_view(480.0f),
+                                                 (float)event->x, (float)event->y);
+        living_worlds_session_pointer(session, point.x - LIVING_VIEW_OX, point.y,
                                       event->pressed);
+    }
     else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION)
         living_worlds_session_action(session, event->code, event->pressed);
     else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL) {
@@ -135,6 +143,7 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
 static void update(void *value)
 {
     module_state_t *module = value;
+    living_worlds_view_sync_screen();
     (void)living_worlds_session_update(&module->session);
 }
 
@@ -175,6 +184,8 @@ static const raylib_lite_game_module_v1_t s_module = {
     .state_hash = state_hash,
     .state_json = state_json,
 };
+
+bool raylib_lite_game_adaptive_surface(void) { return true; }
 
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {

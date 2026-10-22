@@ -4,6 +4,7 @@
 #if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif
+#include "raylib_lite_design_view.h"
 #include "raylib_lite_raylib.h"
 #include "tower_game.h"
 #include "tower_view.h"
@@ -73,9 +74,11 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
 {
     tower_module_state_t *state = value;
     if (!state || !event) return;
-    if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER)
-        tower_game_set_pointer(&state->game, (float)event->x, (float)event->y, event->pressed);
-    else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION)
+    if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER) {
+        float x, y;
+        tower_view_map_pointer((float)event->x, (float)event->y, &x, &y);
+        tower_game_set_pointer(&state->game, x, y, event->pressed);
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION)
         tower_game_set_pointer(&state->game, 240, 220, event->pressed);
     else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
              event->code == RAYLIB_LITE_GAME_CONTROL_RESET)
@@ -178,6 +181,8 @@ static const raylib_lite_game_module_v1_t s_module = {
     .update = update, .render = render, .state_hash = state_hash,
     .state_json = state_json,
 };
+
+bool raylib_lite_game_adaptive_surface(void) { return true; }
 
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {

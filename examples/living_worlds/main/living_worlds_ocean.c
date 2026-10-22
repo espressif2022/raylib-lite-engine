@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "living_worlds_ocean.h"
+#include "living_screen.h"
 #include <math.h>
 #include <stdbool.h>
 #include <string.h>
@@ -147,7 +148,7 @@ void living_ocean_reset(living_ocean_t *ocean)
     ocean_spawn_wanderer(ocean,&ocean->wanderers[4],OCEAN_WANDER_TURTLE,432,340,29,.34f,-1);
     ocean_spawn_wanderer(ocean,&ocean->wanderers[5],OCEAN_WANDER_WHALE,460,208,36,.68f,-1);
     for(unsigned i=0;i<ocean->mote_count;++i)
-        ocean_spawn_mote(ocean,&ocean->motes[i],ocean_range(ocean,0,480),
+        ocean_spawn_mote(ocean,&ocean->motes[i],ocean_range(ocean,-LIVING_VIEW_OX,480+LIVING_VIEW_OX),
                          ocean_range(ocean,0,480),ocean_range(ocean,3,38));
 }
 
@@ -209,8 +210,9 @@ void living_ocean_update(living_ocean_t *ocean)
         shoal->x+=shoal->speed*shoal->dir*OCEAN_DT;
         shoal->y+=sinf(t*.55f+shoal->phase)*.018f*OCEAN_DT;
         float screen_x=240.0f+shoal->x*OCEAN_FOCAL/shoal->z;
-        if((shoal->dir<0&&screen_x<-110.0f)||(shoal->dir>0&&screen_x>590.0f)){
-            ocean_unproject(shoal->dir<0?520.0f:-36.0f,ocean_range(ocean,125,345),
+        if((shoal->dir<0&&screen_x<-110.0f-LIVING_VIEW_OX)||
+           (shoal->dir>0&&screen_x>590.0f+LIVING_VIEW_OX)){
+            ocean_unproject(shoal->dir<0?520.0f+LIVING_VIEW_OX:-36.0f-LIVING_VIEW_OX,ocean_range(ocean,125,345),
                             shoal->z,&shoal->x,&shoal->y);
             shoal->phase=ocean_range(ocean,0,6.2831853f);
         }
@@ -222,7 +224,8 @@ void living_ocean_update(living_ocean_t *ocean)
         item->x+=item->speed*item->dir*OCEAN_DT;
         item->y+=sinf(t*.55f+item->phase)*item->drift*OCEAN_DT*factor;
         float screen_x=240.0f+item->x*OCEAN_FOCAL/item->z;
-        if((item->dir<0&&screen_x<-120.0f)||(item->dir>0&&screen_x>600.0f))
+        if((item->dir<0&&screen_x<-120.0f-LIVING_VIEW_OX)||
+           (item->dir>0&&screen_x>600.0f+LIVING_VIEW_OX))
             ocean_recycle_wanderer(ocean,item);
     }
     for(unsigned i=0;i<ocean->mote_count;++i){
@@ -231,8 +234,8 @@ void living_ocean_update(living_ocean_t *ocean)
         mote->y+=(mote->vy+ocean->flow_y*.03f)*OCEAN_DT;
         float sx=240.0f+mote->x*OCEAN_FOCAL/mote->z;
         float sy=240.0f-mote->y*OCEAN_FOCAL/mote->z;
-        if(sy<-12.0f||sy>492.0f||sx<-15.0f||sx>495.0f)
-            ocean_spawn_mote(ocean,mote,ocean_range(ocean,3,477),
+        if(sy<-12.0f||sy>492.0f||sx<-15.0f-LIVING_VIEW_OX||sx>495.0f+LIVING_VIEW_OX)
+            ocean_spawn_mote(ocean,mote,ocean_range(ocean,3-LIVING_VIEW_OX,477+LIVING_VIEW_OX),
                              mote->vy>0?490.0f:-8.0f,mote->z);
     }
 }
@@ -359,7 +362,7 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
         float right=fmaxf(fmaxf(mesh[a].x,mesh[b].x),fmaxf(mesh[c].x,mesh[d].x));
         float top=fminf(fminf(mesh[a].y,mesh[b].y),fminf(mesh[c].y,mesh[d].y));
         float bottom=fmaxf(fmaxf(mesh[a].y,mesh[b].y),fmaxf(mesh[c].y,mesh[d].y));
-        if(right<0||left>=480||bottom<0||top>=480)continue;
+        if(right<0||left>=LIVING_VIEW_W||bottom<0||top>=480)continue;
         if((right-left)*(bottom-top)<1.5f)continue;
         if(living_cover_quad(mesh[a],mesh[b],mesh[c],mesh[d]))continue;
         unsigned reef=(unsigned)((mask[a]+mask[b]+mask[c]+mask[d])*.25f);
@@ -389,7 +392,7 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
                 float sr=fmaxf(fmaxf(mesh[sa].x,mesh[sb].x),fmaxf(mesh[sc].x,mesh[sd].x));
                 float st=fminf(fminf(mesh[sa].y,mesh[sb].y),fminf(mesh[sc].y,mesh[sd].y));
                 float sbm=fmaxf(fmaxf(mesh[sa].y,mesh[sb].y),fmaxf(mesh[sc].y,mesh[sd].y));
-                if(sr<0||sl>=480||sbm<0||st>=480||(sr-sl)*(sbm-st)<1.5f){merge=0;break;}
+                if(sr<0||sl>=LIVING_VIEW_W||sbm<0||st>=480||(sr-sl)*(sbm-st)<1.5f){merge=0;break;}
                 if(living_cover_quad(mesh[sa],mesh[sb],mesh[sc],mesh[sd])){merge=0;break;}
                 unsigned sreef=(unsigned)((mask[sa]+mask[sb]+mask[sc]+mask[sd])*.25f);
                 if(sreef<128U){merge=0;break;}
@@ -418,7 +421,7 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
             raylib_lite_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+span],tv[iy],0.f};
             raylib_lite_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+span],0.f};
             raylib_lite_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+span],tv[iy+span],0.f};
-            raylib_lite_2d_draw_textured_quad(water.texture,va,vb,vc,vd,background_light);
+            living_draw_quad(water.texture,va,vb,vc,vd,background_light);
         }
         /* Depth values map to z as 1 / (raw * .3 / 65535).  Insert each
            jelly after the farther water bands; subsequent, nearer terrain
@@ -454,7 +457,7 @@ static void draw_ocean_water(const living_ocean_t *ocean,const living_camera_t *
         raylib_lite_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+span],tv[iy],0.f};
         raylib_lite_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+span],0.f};
         raylib_lite_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+span],tv[iy+span],0.f};
-        raylib_lite_2d_draw_textured_quad(water.texture,va,vb,vc,vd,band_light[band][i]);
+        living_draw_quad(water.texture,va,vb,vc,vd,band_light[band][i]);
     }
 }
 

@@ -41,10 +41,10 @@ Run one module with `python3 -m unittest tests.<module> -v`.
 | Benchmarks and measurement tools | `test_render_benchmark`, `test_wall_benchmark`, `test_render_perf_tools`, `test_frame_compare` (compat layer vs upstream raylib + rlsw full frames) |
 | Raylib compatibility | `test_raylib_compat_policy` (every mapping registered), `test_raylib_compat_semantics` (time, input edges, helpers), `test_raylib_audit` (vendored sources and frozen names), `test_rcore_platform` (upstream raylib on the Raylib Lite platform), `test_audio_facade` |
 | Runtime and lifecycle | `test_runner`, `test_runtime_stats`, `test_game_action`, `test_game_app_first_frame`, `test_raylib_lite_video_port`, `test_game_save`, `test_game_assets`, `test_scene_ui_behavior` |
-| Audio service | `test_audio_mixer`, `test_audio_worker`, `test_audio_service_lifecycle` |
+| Audio service | `test_audio_mixer`, `test_audio_worker`, `test_audio_service_lifecycle`, `test_sound_packing` (packer format choice, decoded by the engine decoder) |
 | Host simulator and CLI | `test_host_runner`, `test_host_video_backend`, `test_game_cli`, `test_svg2vg` |
 | Boards | `test_board_display_contract`, `test_board_overrides`, `test_board_audio_codec`; BOX-3: `test_box3_strip`, `test_box3_transfer_cleanup`, `test_box3_viewport`; ESP-Mosaico: `test_mosaico_board_lifecycle`, `test_mosaico_panel_handoff`, `test_mosaico_video` |
-| Games | `test_examples` (loads each game's `examples/<game>/tests/`), `test_platform_game`, `test_gameplay_improvements`, `test_tower_overdraw` |
+| Games | `test_examples` (loads each game's `examples/<game>/tests/`, including the Sky Hop platform model and the feedback modules of Sky Hop, Neon Rift Rally, Last Zone and the shooter), `test_gameplay_improvements`, `test_tower_overdraw` |
 | API, documentation and release | `test_api_catalog`, `test_renderer_headers`, `test_platform_dependency_boundaries`, `test_documentation_boundaries`, `test_release_packaging` |
 
 # RGB565 raster regression

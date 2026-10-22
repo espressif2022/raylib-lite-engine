@@ -223,7 +223,7 @@ int main(void) {
     assert(tactics.opponents[0].target_lane == old_target);
     rally_update(&tactics);
     rally_update(&tactics);
-    assert(tactics.opponents[0].decision_cooldown == 30U);
+    assert(tactics.opponents[0].decision_cooldown >= 18U && tactics.opponents[0].decision_cooldown <= 42U);
     assert(fabsf(tactics.opponents[0].lateral - old_target) < 1.0f);
 
     rally_fail(&near);

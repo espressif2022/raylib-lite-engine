@@ -32,9 +32,12 @@ typedef struct {
     uint8_t lives, combo, max_combo, wave;
     uint8_t invulnerable, hit_flash, wave_banner;
     uint8_t formation_step;
+    float width; /* arena width; the height is always 480 */
 } shooter_game_t;
 
+/* Keeps the current arena width (480 when unset). */
 void shooter_game_reset(shooter_game_t *game, uint32_t seed);
+void shooter_game_set_width(shooter_game_t *game, float width);
 void shooter_game_set_pointer(shooter_game_t *game, float x, float y, bool pressed);
 void shooter_game_move(shooter_game_t *game, float dx, float dy);
 void shooter_game_toggle_pause(shooter_game_t *game);

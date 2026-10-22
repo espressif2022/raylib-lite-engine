@@ -392,6 +392,12 @@ failed:
     }
 }
 
+void raylib_lite_example_board_panel_size(uint16_t *width, uint16_t *height)
+{
+    if (width) *width = ESP_MOSAICO_GAME_WIDTH;
+    if (height) *height = ESP_MOSAICO_GAME_HEIGHT;
+}
+
 const raylib_lite_platform_t *raylib_lite_example_board_services(
     raylib_lite_example_board_t *p)
 {

@@ -171,6 +171,19 @@ static void opponent_traffic(void)
         assert(fabsf(game.opponents[0].target_lane)>1.4f);
         assert(fabsf(game.opponents[0].lateral)<.3f); /* Smooth lane change. */
         assert(game.opponents[0].progress>330 && game.opponents[0].progress<332);
+        /* The move eases in: sideways speed builds over several ticks and
+         * never jumps, so the bike steers instead of sliding. */
+        const float side=game.opponents[0].target_lane>0?1.0f:-1.0f;
+        float previous=0.0f;
+        for(unsigned tick=0;tick<8;++tick) {
+            float before=game.opponents[0].lateral;
+            rally_update(&game);
+            float velocity=game.opponents[0].lateral_velocity*side;
+            assert(velocity>=previous-.01f);
+            assert(fabsf(game.opponents[0].lateral-before)<.12f);
+            previous=velocity;
+        }
+        assert(previous>1.0f);
     }
     puts("rivals slow for occupied lanes and choose a smooth passing lane on every course");
 }

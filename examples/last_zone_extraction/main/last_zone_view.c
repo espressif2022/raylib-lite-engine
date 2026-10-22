@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "assets_ids.h"
 #include "raylib_lite_clock.h"
+#include "raylib_lite_design_view.h"
 #include "raylib_lite_raylib.h"
 #include "raylib_lite_rgb565.h"
 
@@ -65,6 +66,14 @@ static last_zone_wall_sample_t s_anchors[LAST_ZONE_COLUMNS];
 static last_zone_wall_sample_t s_pixels[LAST_ZONE_SCREEN];
 static float s_col_depth[LAST_ZONE_SCREEN];
 static raylib_lite_raycast_wall_t s_wall_batch[LAST_ZONE_MAX_WALL_SAMPLES];
+/* The 3D pass draws at native resolution, at most LAST_ZONE_SCREEN wide. Pixel
+ * constants are authored for 480x480 and scale by s_k (short side / 480); the
+ * camera plane widens on longer panels so the vertical field of view holds.
+ * The HUD uses a 480x480 design field with the controls pinned to the edges. */
+static int s_w = LAST_ZONE_SCREEN, s_h = LAST_ZONE_SCREEN, s_columns = LAST_ZONE_COLUMNS;
+static float s_k = 1.0f, s_plane = LAST_ZONE_CAMERA_PLANE, s_fov_ratio = 1.0f;
+static raylib_lite_design_view_t s_view = {1.0f, 480.0f, 480.0f};
+static float s_margin;
 static float s_camera_dir_x;
 static float s_camera_dir_y;
 static float s_camera_plane_x;
@@ -83,12 +92,34 @@ void last_zone_view_get_stats(last_zone_view_stats_t *stats)
     if (stats) *stats = s_view_stats;
 }
 
+static void set_screen(void)
+{
+    int w = GetScreenWidth(), h = GetScreenHeight();
+    if (w <= 0 || h <= 0) w = h = LAST_ZONE_SCREEN;
+    s_h = h;
+    s_w = w > LAST_ZONE_SCREEN ? LAST_ZONE_SCREEN : w;
+    s_columns = s_w / LAST_ZONE_COLUMN_WIDTH;
+    s_k = (float)(s_w < s_h ? s_w : s_h) / 480.0f;
+    s_plane = s_w > s_h ? LAST_ZONE_CAMERA_PLANE * (float)s_w / (float)s_h
+                        : LAST_ZONE_CAMERA_PLANE;
+    s_fov_ratio = atanf(s_plane) / atanf(LAST_ZONE_CAMERA_PLANE);
+    s_view = raylib_lite_design_view(480.0f);
+    s_margin = fmaxf(0.0f, raylib_lite_design_field_origin(s_view, 480.0f, 480.0f).x);
+}
+
+static int base_horizon(void)
+{
+    return (int)((float)s_h * .5f - (float)(240 - LAST_ZONE_HORIZON) * s_k);
+}
+
 static int view_horizon(const last_zone_game_t *game)
 {
     float kick = game->hit_flash ? sinf((float)game->hit_flash * 2.15f) * 6.0f : 0.0f;
-    int horizon = LAST_ZONE_HORIZON + (int)(game->look_pitch + game->look_kick + kick);
-    if (horizon < 150) horizon = 150;
-    if (horizon > 260) horizon = 260;
+    int horizon = base_horizon() + (int)((game->look_pitch + game->look_kick + kick) * s_k);
+    const int low = (int)((float)s_h * .5f - 90.0f * s_k);
+    const int high = (int)((float)s_h * .5f + 20.0f * s_k);
+    if (horizon < low) horizon = low;
+    if (horizon > high) horizon = high;
     return horizon;
 }
 
@@ -113,7 +144,7 @@ static int panorama_height(const last_zone_game_t *game)
     int horizon = view_horizon(game);
     bool any_window = false;
     int sky = 0;
-    for (int column = 0; column < LAST_ZONE_COLUMNS; ++column) {
+    for (int column = 0; column < s_columns; ++column) {
         if (s_wall_type[column] == 2) any_window = true;
         if (s_wall_top[column] > sky) sky = s_wall_top[column];
     }
@@ -139,11 +170,12 @@ static void draw_panorama(const last_zone_game_t *game, raylib_lite_atlas_t envi
     if (!first_frame) return;
     const float half_width = first_frame->source.width - 4.0f;
     const float available = half_width * 2.0f;
-    const float window = available * (300.0f / 504.0f);
+    const float window = available * (300.0f / 504.0f) * s_fov_ratio;
     float offset = fmodf(game->angle / 6.2831853f * available, available);
     float consumed = 0.0f;
     float max_height = first_frame->source.height - 4.0f;
-    float src_h = dest_height > max_height ? max_height : (float)dest_height;
+    float src_h = (float)dest_height / s_k;
+    if (src_h > max_height) src_h = max_height;
     while (consumed < window) {
         float position = fmodf(offset + consumed, available);
         int half = position >= half_width ? 1 : 0;
@@ -152,9 +184,9 @@ static void draw_panorama(const last_zone_game_t *game, raylib_lite_atlas_t envi
         if (chunk > window - consumed) chunk = window - consumed;
         const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(environment, ids[layout][half]);
         if (!frame) return;
-        float x = 480.0f * consumed / window, width = 480.0f * chunk / window;
+        float x = (float)s_w * consumed / window, width = (float)s_w * chunk / window;
         if (consumed + chunk >= window)
-            width = 480.0f - x;
+            width = (float)s_w - x;
         if (width < 1.0f) break;
         DrawTexturePro(environment.texture,
             (Rectangle){frame->source.x + 2 + local, frame->source.y + 2, chunk, src_h},
@@ -179,22 +211,22 @@ static void project_sprite(const last_zone_game_t *game, float world_x, float wo
     float camera_x = inverse * (s_camera_dir_y * dx - s_camera_dir_x * dy);
     float distance = inverse * (-s_camera_plane_y * dx + s_camera_plane_x * dy);
     if (distance <= .1f) return;
-    *center = (int)(240.0f * (1.0f + camera_x / distance));
-    if (*center < -260 || *center > 740) return;
-    *size = (int)(280.0f / distance);
+    *center = (int)((float)s_w * .5f * (1.0f + camera_x / distance));
+    if (*center < -260 * s_w / 480 || *center > s_w + 260 * s_w / 480) return;
+    *size = (int)(280.0f * s_k / distance);
     if (*size < 10) *size = 10;
-    if (*size > 260) *size = 260;
-    *ground = (int)((float)view_horizon(game) + 165.0f / distance);
-    if (*ground > 480) *ground = 480;
+    if (*size > (int)(260.0f * s_k)) *size = (int)(260.0f * s_k);
+    *ground = (int)((float)view_horizon(game) + 165.0f * s_k / distance);
+    if (*ground > s_h) *ground = s_h;
     *distance_out = distance;
 }
 
 static bool column_visible(int screen, float distance)
 {
-    if (screen < 0 || screen >= LAST_ZONE_SCREEN) return false;
+    if (screen < 0 || screen >= s_w) return false;
     float depth = s_col_depth[screen];
     if (screen > 0 && s_col_depth[screen - 1] > depth) depth = s_col_depth[screen - 1];
-    if (screen + 1 < LAST_ZONE_SCREEN && s_col_depth[screen + 1] > depth)
+    if (screen + 1 < s_w && s_col_depth[screen + 1] > depth)
         depth = s_col_depth[screen + 1];
     return distance < depth + .10f;
 }
@@ -275,6 +307,10 @@ static void draw_enemies(const last_zone_game_t *game, raylib_lite_atlas_t atlas
         int dest_w = corpse ? size + size / 6 : size;
         if (dest_h < 12) dest_h = 12;
         if (!corpse && enemy->hp < 2) center += 3;
+        if (!corpse && enemy->stagger) center += (game->tick & 2U) ? 3 : -3;
+        if (!corpse && column_visible(center, distance))
+            DrawEllipse(center, ground - 1, (float)dest_w * .30f, (float)(size / 18 + 2),
+                        (Color){0, 0, 0, 76});
         Color tint = corpse ? (Color){210, 186, 168, 255}
                     : (enemy->hit_flash ? (Color){255, 92, 64, 255}
                     : (enemy->elite ? (Color){186, 164, 228, 255} : WHITE));
@@ -306,19 +342,37 @@ static void draw_enemies(const last_zone_game_t *game, raylib_lite_atlas_t atlas
         if (visible_any && enemy->hp < 2)
             DrawRectangle(center - 6, top - 4, 12, 3, (Color){255, 72, 48, 255});
         if (visible_any) {
-            Color ident = enemy->move_phase % 3U == 0 ? (Color){72, 168, 214, 255}
-                        : enemy->move_phase % 3U == 1 ? (Color){214, 168, 72, 255}
-                        : (Color){168, 92, 72, 255};
-            DrawRectangle(center - 3, top + size / 8, 6, 4, ident);
+            /* Shoulder flash by role: rifle blue, flanker amber, heavy red. */
+            Color ident = enemy->role == LAST_ZONE_ROLE_FLANK ? (Color){240, 176, 60, 255}
+                        : enemy->role == LAST_ZONE_ROLE_HEAVY ? (Color){226, 70, 62, 255}
+                        : (Color){72, 168, 214, 255};
+            const int ident_w = enemy->role == LAST_ZONE_ROLE_HEAVY ? 10 : 6;
+            DrawRectangle(center - ident_w / 2, top + size / 8, ident_w, 4, ident);
         }
         if (visible_any && enemy->ai_state == LAST_ZONE_ENEMY_ALERT) {
             DrawCircle(center, top - 12, 9, (Color){255, 210, 55, 255});
             DrawText("!", center - 3, top - 19, 14, (Color){45, 28, 12, 255});
         } else if (visible_any && enemy->ai_state == LAST_ZONE_ENEMY_SEARCH) {
             DrawText("?", center - 4, top - 18, 15, (Color){116, 210, 255, 255});
+        } else if (visible_any && enemy->suspicion) {
+            /* Suspicion fills toward the alert threshold. */
+            int fill = (int)enemy->suspicion * 20 / LAST_ZONE_SUSPICION_ALERT;
+            if (fill > 20) fill = 20;
+            DrawRectangle(center - 10, top - 10, 20, 3, (Color){40, 34, 18, 255});
+            DrawRectangle(center - 10, top - 10, fill, 3, (Color){255, 196, 64, 255});
+            DrawText("?", center - 3, top - 24, 12, (Color){255, 196, 64, 255});
+        }
+        if (visible_any && enemy->radio_timer) {
+            const int rx = center + 12, ry = top - 14;
+            DrawRectangle(rx - 1, ry - 2, 2, 9, (Color){222, 230, 210, 255});
+            if ((game->tick >> 2) & 1U) {
+                DrawCircleLines(rx, ry - 2, 4, (Color){255, 92, 140, 255});
+                DrawCircleLines(rx, ry - 2, 7, (Color){255, 92, 140, 160});
+            }
         }
         if (visible_any && enemy->aim_timer) {
             int width = 30 - (int)enemy->aim_timer;
+            if (width < 0) width = 0;
             DrawRectangle(center - 15, top - 5, 30, 3, (Color){58, 25, 22, 255});
             DrawRectangle(center - 15, top - 5, width, 3, (Color){255, 66, 48, 255});
         }
@@ -326,7 +380,7 @@ static void draw_enemies(const last_zone_game_t *game, raylib_lite_atlas_t atlas
             int muzzle_y = top + size * 43 / 100;
             DrawCircle(center + size / 5, muzzle_y, size / 18 + 2,
                        (Color){255, 226, 85, 255});
-            DrawLine(center + size / 5, muzzle_y, 240, 205,
+            DrawLine(center + size / 5, muzzle_y, s_w / 2, base_horizon(),
                      (Color){255, 118, 52, 255});
         }
         if (visible_any) draw_enemy_effect(game, enemy);
@@ -475,11 +529,11 @@ static void project_wall(last_zone_wall_sample_t *sample, int horizon)
     sample->depth = distance;
     sample->q = 1.0f / distance;
     sample->uq = sample->u * sample->q;
-    int height = (int)(330.0f / distance);
+    int height = (int)(330.0f * s_k / distance);
     if (height < 1) height = 1;
     int top = horizon - height / 2;
     int bottom = top + height;
-    if (bottom > LAST_ZONE_SCREEN) bottom = LAST_ZONE_SCREEN;
+    if (bottom > s_h) bottom = s_h;
     if (bottom < horizon) bottom = horizon;
     if (bottom < 0) bottom = 0;
     sample->top = (int16_t)top;
@@ -491,7 +545,7 @@ static void cast_wall_sample(const last_zone_game_t *game, int screen_x, int hor
                              last_zone_wall_sample_t *sample)
 {
     float sample_x = (float)screen_x + 0.5f;
-    float camera_x = sample_x / 240.0f - 1.0f;
+    float camera_x = sample_x / ((float)s_w * .5f) - 1.0f;
     float rx = s_camera_dir_x + s_camera_plane_x * camera_x;
     float ry = s_camera_dir_y + s_camera_plane_y * camera_x;
     int map_x = (int)game->x, map_y = (int)game->y;
@@ -564,7 +618,7 @@ static void fill_interp_span(const last_zone_wall_sample_t *a,
 {
     if (x1 < x0) return;
     if (x0 < 0) x0 = 0;
-    if (x1 >= LAST_ZONE_SCREEN) x1 = LAST_ZONE_SCREEN - 1;
+    if (x1 >= s_w) x1 = s_w - 1;
     int span = x1 - x0;
     for (int x = x0; x <= x1; ++x) {
         float t = span > 0 ? (float)(x - x0) / (float)span : 0.0f;
@@ -631,21 +685,20 @@ static void raycast_world(const last_zone_game_t *game)
     int extra = 0;
     s_camera_dir_x = cosf(game->angle);
     s_camera_dir_y = sinf(game->angle);
-    s_camera_plane_x = -s_camera_dir_y * LAST_ZONE_CAMERA_PLANE;
-    s_camera_plane_y = s_camera_dir_x * LAST_ZONE_CAMERA_PLANE;
-    for (int column = 0; column < LAST_ZONE_COLUMNS; ++column) {
+    s_camera_plane_x = -s_camera_dir_y * s_plane;
+    s_camera_plane_y = s_camera_dir_x * s_plane;
+    for (int column = 0; column < s_columns; ++column) {
         int screen_x = column * LAST_ZONE_COLUMN_WIDTH;
         cast_wall_sample(game, screen_x, horizon, &s_anchors[column]);
     }
     last_zone_wall_sample_t tail;
-    cast_wall_sample(game, LAST_ZONE_SCREEN - 1, horizon, &tail);
+    cast_wall_sample(game, s_w - 1, horizon, &tail);
     ++extra;
-    for (int column = 0; column < LAST_ZONE_COLUMNS; ++column) {
+    for (int column = 0; column < s_columns; ++column) {
         int x0 = column * LAST_ZONE_COLUMN_WIDTH;
-        int x1 = column + 1 < LAST_ZONE_COLUMNS ? x0 + LAST_ZONE_COLUMN_WIDTH
-                                                : LAST_ZONE_SCREEN - 1;
+        int x1 = column + 1 < s_columns ? x0 + LAST_ZONE_COLUMN_WIDTH : s_w - 1;
         last_zone_wall_sample_t left = s_anchors[column];
-        last_zone_wall_sample_t right = column + 1 < LAST_ZONE_COLUMNS
+        last_zone_wall_sample_t right = column + 1 < s_columns
             ? s_anchors[column + 1] : tail;
         if (!wall_boundary(&left, &right)) {
             fill_interp_span(&left, &right, x0, x1, horizon);
@@ -658,13 +711,13 @@ static void raycast_world(const last_zone_game_t *game)
     qsort(gaps, (size_t)gap_count, sizeof(gaps[0]), wall_gap_cmp);
     for (int i = 0; i < gap_count; ++i)
         fill_gap(game, &gaps[i], horizon, &extra);
-    for (int x = 0; x < LAST_ZONE_SCREEN; ++x) s_col_depth[x] = s_pixels[x].depth;
-    for (int column = 0; column < LAST_ZONE_COLUMNS; ++column) {
+    for (int x = 0; x < s_w; ++x) s_col_depth[x] = s_pixels[x].depth;
+    for (int column = 0; column < s_columns; ++column) {
         int x0 = column * LAST_ZONE_COLUMN_WIDTH;
         uint16_t bottom = s_pixels[x0].bottom;
         int16_t top = s_pixels[x0].top;
         uint8_t wall = s_pixels[x0].wall;
-        for (int x = x0; x < x0 + LAST_ZONE_COLUMN_WIDTH && x < LAST_ZONE_SCREEN; ++x) {
+        for (int x = x0; x < x0 + LAST_ZONE_COLUMN_WIDTH && x < s_w; ++x) {
             if (s_pixels[x].bottom < bottom) bottom = s_pixels[x].bottom;
             if (s_pixels[x].top > top) top = s_pixels[x].top;
             if (s_pixels[x].wall == 2) wall = 2;
@@ -674,7 +727,7 @@ static void raycast_world(const last_zone_game_t *game)
         s_wall_type[column] = wall;
     }
     s_view_stats.refined_columns = (uint16_t)extra;
-    s_view_stats.rays_cast = (uint16_t)(LAST_ZONE_COLUMNS + extra);
+    s_view_stats.rays_cast = (uint16_t)(s_columns + extra);
 }
 
 static int floor_kind_at(const last_zone_game_t *game, float wx, float wy, int ex, int ey)
@@ -698,16 +751,16 @@ static void draw_floor(const last_zone_game_t *game, raylib_lite_atlas_t materia
 {
     if (!tile) return;
     int horizon = view_horizon(game);
-    float cam0 = (0.5f / (float)LAST_ZONE_COLUMNS) * 2.0f - 1.0f;
-    float cam_step = 2.0f / (float)LAST_ZONE_COLUMNS;
+    float cam0 = (0.5f / (float)s_columns) * 2.0f - 1.0f;
+    float cam_step = 2.0f / (float)s_columns;
     const int ex=(int)last_zone_extract_x(game),ey=(int)last_zone_extract_y(game);
-    unsigned first_visible=LAST_ZONE_SCREEN;
-    for(int column=0;column<LAST_ZONE_COLUMNS;++column)
+    unsigned first_visible=(unsigned)s_h;
+    for(int column=0;column<s_columns;++column)
         if(s_wall_bottom[column]<first_visible)first_visible=s_wall_bottom[column];
-    for (int y = horizon + 1; y < 480; y += 2) {
+    for (int y = horizon + 1; y < s_h; y += 2) {
         /* Both repeated rows are hidden: avoid projection and map queries. */
         if((unsigned)(y+1)<first_visible)continue;
-        float dist = LAST_ZONE_FLOOR_SCALE / (float)(y - horizon);
+        float dist = LAST_ZONE_FLOOR_SCALE * s_k / (float)(y - horizon);
         float ray_x = s_camera_dir_x + s_camera_plane_x * cam0;
         float ray_y = s_camera_dir_y + s_camera_plane_y * cam0;
         float wx = game->x + ray_x * dist, wy = game->y + ray_y * dist;
@@ -722,9 +775,9 @@ static void draw_floor(const last_zone_game_t *game, raylib_lite_atlas_t materia
         if (light > 210U) light = 210U;
         light += (unsigned)(game->weapon_recoil * 36.0f);
         int run_kind = -1, run_start = 0;
-        for (int column = 0; column <= LAST_ZONE_COLUMNS; ++column) {
+        for (int column = 0; column <= s_columns; ++column) {
             int kind = 0;
-            if (column < LAST_ZONE_COLUMNS) {
+            if (column < s_columns) {
                 /* Carry a run through hidden columns. Their material cannot
                  * affect either row, and visible columns still split runs. */
                 if(y+1<s_wall_bottom[column])kind=run_kind<0?0:run_kind;
@@ -736,7 +789,7 @@ static void draw_floor(const last_zone_game_t *game, raylib_lite_atlas_t materia
                 run_start = 0;
                 continue;
             }
-            if (column < LAST_ZONE_COLUMNS && kind == run_kind) continue;
+            if (column < s_columns && kind == run_kind) continue;
             Rectangle floor_src = tile->source;
             if (run_kind == 1) floor_src.y += 64.0f;
             floor_src.width = 64.0f;
@@ -760,7 +813,7 @@ static void draw_wall_footing(int screen_x, int width, int top, int bottom)
 {
     int height = bottom - top;
     if (height <= 0) return;
-    if (bottom > 480) bottom = 480;
+    if (bottom > s_h) bottom = s_h;
     if (bottom <= 0) return;
     int foot = height / 14;
     if (foot < 5) foot = 5;
@@ -801,10 +854,10 @@ static int wall_dest_width(int x, int tex_span)
 {
     const last_zone_wall_sample_t *sample = &s_pixels[x];
     if (sample->wall == 2 || sample->wall == 4) return 1;
-    if (x + 1 >= LAST_ZONE_SCREEN || !wall_run_match(sample, &s_pixels[x + 1]))
+    if (x + 1 >= s_w || !wall_run_match(sample, &s_pixels[x + 1]))
         return 1;
     if (sample->depth >= LAST_ZONE_NEAR_WALL &&
-        x + 3 < LAST_ZONE_SCREEN &&
+        x + 3 < s_w &&
         wall_run_match(sample, &s_pixels[x + 2]) &&
         wall_run_match(sample, &s_pixels[x + 3]))
         return 4;
@@ -851,7 +904,7 @@ static void draw_walls(const last_zone_game_t *game, raylib_lite_wall_atlas_t wa
     float flash = game->weapon_recoil;
     int batch = 0;
     int horizon = view_horizon(game);
-    for (int x = 0; x < LAST_ZONE_SCREEN; ) {
+    for (int x = 0; x < s_w; ) {
         const last_zone_wall_sample_t *sample = &s_pixels[x];
         uint8_t wall = sample->wall;
         if (!wall) {
@@ -884,7 +937,7 @@ static void draw_walls(const last_zone_game_t *game, raylib_lite_wall_atlas_t wa
         int height = sample->height;
         if (height < 1) height = 1;
         int bottom = top + height;
-        float true_h = 330.0f / sample->depth;
+        float true_h = 330.0f * s_k / sample->depth;
         if (true_h < 1.0f) true_h = 1.0f;
         float true_top = (float)horizon - true_h * 0.5f;
         float src_w = (float)width;
@@ -945,7 +998,7 @@ static void draw_walls(const last_zone_game_t *game, raylib_lite_wall_atlas_t wa
         x += width;
     }
     if (batch) raylib_lite_2d_draw_indexed_raycast_walls(walls, s_wall_batch, batch);
-    for (int x = 0; x < LAST_ZONE_SCREEN; ) {
+    for (int x = 0; x < s_w; ) {
         const last_zone_wall_sample_t *sample = &s_pixels[x];
         int mat = 0;
         if (sample->wall == 2 || sample->wall == 4) mat = 1;
@@ -971,6 +1024,29 @@ static void load_material_frames(raylib_lite_atlas_t floor,raylib_lite_wall_atla
         else
             s_material_frames[i] = NULL;
     }
+}
+
+static int font(int size) { return raylib_lite_design_font(s_view, size); }
+static void draw_text(const char *text, int x, int y, int size, Color color)
+{
+    DrawText(text, x, y, font(size), color);
+}
+static int measure_text(const char *text, int size) { return MeasureText(text, font(size)); }
+static bool compact(void) { return !raylib_lite_design_view_native(s_view); }
+/* Authored x at 1:1; on scaled panels the snapped font changes the width, so centre. */
+static int hud_x(const char *text, int size, int x)
+{
+    return compact() ? 240 - measure_text(text, size) / 2 : x;
+}
+
+/* Shifts the HUD field camera by `dx` design units; 0 restores it. */
+static void pin_hud(float dx)
+{
+    if (raylib_lite_design_field_identity(s_view, 480.0f, 480.0f)) return;
+    Vector2 origin = raylib_lite_design_field_origin(s_view, 480.0f, 480.0f);
+    EndMode2D();
+    BeginMode2D((Camera2D){.offset = {(origin.x + dx) * s_view.scale, origin.y * s_view.scale},
+                           .zoom = s_view.scale});
 }
 
 static void draw_weapon(const last_zone_game_t *game, raylib_lite_atlas_t atlas)
@@ -1020,10 +1096,13 @@ static void draw_radar(const last_zone_game_t *game)
     const int left = game->radar_x, top = game->radar_y;
     const int span = radius * 2 + 1;
     int origin_x = (int)game->x - radius, origin_y = (int)game->y - radius;
-    DrawRectangle(left - 4, top - 4, span * scale + 8, span * scale + 8, (Color){3, 9, 20, 255});
-    if (game->alert_flash)
-        DrawRectangleLines(left - 4, top - 4, span * scale + 8, span * scale + 8,
-                           (Color){255, 210, 55, 255});
+    const last_zone_look_t *look = layout_look(game);
+    const Rectangle frame = {(float)(left - 4), (float)(top - 4),
+                             (float)(span * scale + 8), (float)(span * scale + 8)};
+    DrawRectangleRounded(frame, .14f, 4, (Color){3, 9, 20, 178});
+    DrawRectangleRoundedLines(frame, .14f, 4,
+                              game->alert_flash && (game->alert_flash & 2U)
+                                  ? (Color){255, 210, 55, 255} : look->accent_dim);
     for (int y = 0; y < span; ++y)
         for (int x = 0; x < span; ++x) {
             int mx = origin_x + x, my = origin_y + y;
@@ -1058,7 +1137,19 @@ static void draw_radar(const last_zone_game_t *game)
             (alive == 1 && game->enemies[i].active)) {
             int ex = (int)game->enemies[i].x - origin_x, ey = (int)game->enemies[i].y - origin_y;
             if (ex >= 0 && ey >= 0 && ex < span && ey < span)
-                DrawRectangle(left + ex * scale, top + ey * scale, 4, 4, (Color){255, 52, 147, 255});
+            {
+                const int pulse = (game->tick >> 3) & 1U;
+                const last_zone_enemy_t *enemy = &game->enemies[i];
+                const int bx = left + ex * scale + 2, by = top + ey * scale + 2;
+                DrawLine(bx, by, bx + (int)(cosf(enemy->facing) * 6.0f),
+                         by + (int)(sinf(enemy->facing) * 6.0f), (Color){255, 150, 190, 200});
+                DrawRectangle(left + ex * scale - pulse, top + ey * scale - pulse,
+                              4 + pulse * 2, 4 + pulse * 2,
+                              enemy->ai_state == LAST_ZONE_ENEMY_PATROL
+                                  ? (enemy->suspicion ? (Color){255, 196, 64, 255}
+                                                      : (Color){200, 70, 140, 255})
+                                  : (Color){255, 52, 147, 255});
+            }
         }
     if (extract_open) {
         int ex = (int)last_zone_extract_x(game) - origin_x;
@@ -1067,6 +1158,15 @@ static void draw_radar(const last_zone_game_t *game)
             DrawRectangle(left + ex * scale, top + ey * scale, 4, 4, (Color){72, 255, 214, 255});
     }
     int px = left + radius * scale, py = top + radius * scale;
+    /* A sweep arm with a short fading trail gives the scope some life. */
+    const float reach = (float)(radius * scale + 1);
+    for (int trail = 0; trail < 4; ++trail) {
+        float sweep = (float)game->tick * .09f - (float)trail * .11f;
+        Color arm = look->accent;
+        arm.a = (unsigned char)(120 - trail * 28);
+        DrawLine(px + 2, py + 2, px + 2 + (int)(cosf(sweep) * reach),
+                 py + 2 + (int)(sinf(sweep) * reach), arm);
+    }
     DrawRectangle(px - 1, py - 1, 3, 3, (Color){255, 235, 91, 255});
     DrawLine(px, py, px + (int)(cosf(game->angle) * 7), py + (int)(sinf(game->angle) * 7),
              (Color){255, 235, 91, 255});
@@ -1082,7 +1182,7 @@ static void draw_compass(const last_zone_game_t *game)
     DrawRectangleRoundedLines(panel, 0.18f, 4, look->accent_dim);
     DrawRectangle(148, 22, 184, 1, (Color){82, 112, 108, 135});
     DrawRectangle(140, 8, 4, 42, look->accent);
-    DrawText(look->name, 208, 40, 10, look->accent);
+    if (!compact()) draw_text(look->name, 208, 40, 10, look->accent);
     DrawRectangle(cx - 1, top, 2, 16, (Color){255, 220, 72, 255});
     for (int i = 0; i < 8; ++i) {
         float relative = (float)i * 0.7853982f - game->angle;
@@ -1091,7 +1191,7 @@ static void draw_compass(const last_zone_game_t *game)
         int x = cx + (int)(relative * 58.0f);
         if (x < cx - half + 8 || x > cx + half - 10) continue;
         bool cardinal = (i % 2) == 0;
-        DrawText(marks[i], x - (cardinal ? 4 : 6), top + 1, cardinal ? 12 : 10,
+        draw_text(marks[i], x - (cardinal ? 4 : 6), top + 1, cardinal ? 12 : 10,
                  cardinal ? (Color){239, 242, 224, 255} : (Color){140, 160, 150, 255});
     }
 }
@@ -1128,23 +1228,25 @@ static void draw_bearing_marker(float bearing, Color color, const char *label)
     int x = 240 + (int)(clamped * 118.0f);
     DrawTriangle((Vector2){(float)x, 70}, (Vector2){(float)(x - 8), 86},
                  (Vector2){(float)(x + 8), 86}, color);
-    DrawText(label, x - 18, 88, 12, color);
+    draw_text(label, x - 18, 88, 12, color);
 }
 
+#if defined(LAST_ZONE_SHOW_FPS)
 static void draw_fps(const last_zone_game_t *game)
 {
     if(game->perf_display_fps<=0.0f)
-        DrawText("FPS --",8,6,16,(Color){255,220,72,255});
+        draw_text("FPS --",8,6,16,(Color){255,220,72,255});
     else{
         int fps=(int)(game->perf_display_fps+0.5f);
-        DrawText(TextFormat("FPS %d",fps),8,6,16,(Color){255,220,72,255});
+        draw_text(TextFormat("FPS %d",fps),8,6,16,(Color){255,220,72,255});
     }
 }
+#endif
 
 static void draw_status_hud(const last_zone_game_t *game)
 {
     int alive = last_zone_enemies_alive(game);
-    DrawText(format_clock(game->tick), 222, 26, 12, (Color){239, 242, 224, 255});
+    if (!compact()) draw_text(format_clock(game->tick), 222, 26, 12, (Color){239, 242, 224, 255});
     for (int i = 0; i < LAST_ZONE_MAX_HP; ++i) {
         Color pip = i < game->hp ? (game->hp > 2 ? (Color){65, 220, 116, 255}
                                                  : (Color){255, 72, 72, 255})
@@ -1155,14 +1257,20 @@ static void draw_status_hud(const last_zone_game_t *game)
         DrawRectangle(148 + i * 9, 41, 7, 5,
                       i < game->armor ? (Color){64, 170, 255, 255}
                                       : (Color){28, 44, 58, 255});
+    if (compact()) {
+        draw_text(TextFormat("EN %d", alive), 226, 26, 9, (Color){255, 92, 140, 255});
+        const char *ammo = TextFormat("%u", (unsigned)game->ammo);
+        draw_text(ammo, 334 - measure_text(ammo, 11), 26, 11, (Color){255, 214, 75, 255});
+        return;
+    }
     int ammo_shown = game->ammo > 10 ? 10 : (int)game->ammo;
     for (int i = 0; i < 10; ++i) {
         Color tick = i < ammo_shown ? (Color){255, 214, 75, 255} : (Color){36, 40, 44, 255};
         DrawRectangle(285 + i * 3, 29, 2, 7, tick);
     }
-    DrawText(TextFormat("%u", (unsigned)game->ammo), 319, 27, 11,
+    draw_text(TextFormat("%u", (unsigned)game->ammo), 319, 27, 11,
              (Color){255, 214, 75, 255});
-    DrawText(TextFormat("EN %d", alive), 285, 40, 9, (Color){255, 92, 140, 255});
+    draw_text(TextFormat("EN %d", alive), 285, 40, 9, (Color){255, 92, 140, 255});
 }
 
 static void draw_guidance(const last_zone_game_t *game)
@@ -1175,7 +1283,8 @@ static void draw_guidance(const last_zone_game_t *game)
         unsigned meters = (unsigned)sqrtf(dx * dx + dy * dy);
         draw_bearing_marker(last_zone_extract_bearing(game), (Color){72, 255, 214, 255},
                             TextFormat("EX %um", meters));
-        DrawText("EXTRACT OPEN", 176, 104, 14, (Color){72, 255, 214, 255});
+        draw_text("EXTRACT OPEN", hud_x("EXTRACT OPEN", 14, 176), 104, 14,
+                  (Color){72, 255, 214, 255});
     } else if (last >= 0) {
         float dx = game->enemies[last].x - game->x, dy = game->enemies[last].y - game->y;
         unsigned meters = (unsigned)sqrtf(dx * dx + dy * dy);
@@ -1183,7 +1292,8 @@ static void draw_guidance(const last_zone_game_t *game)
         while (bearing > 3.1415927f) bearing -= 6.2831853f;
         while (bearing < -3.1415927f) bearing += 6.2831853f;
         draw_bearing_marker(bearing, (Color){255, 92, 140, 255}, TextFormat("EN %um", meters));
-        DrawText("LAST HOSTILE INBOUND", 132, 104, 14, (Color){255, 92, 140, 255});
+        draw_text("LAST HOSTILE INBOUND", hud_x("LAST HOSTILE INBOUND", 14, 132), 104, 14,
+                  (Color){255, 92, 140, 255});
     }
     if (!game->ammo && alive > 1) {
         int nearest = -1;
@@ -1205,6 +1315,36 @@ static void draw_guidance(const last_zone_game_t *game)
     }
 }
 
+static void callout(const char *text, int y, int size, Color color)
+{
+    const int width = measure_text(text, size) + 20;
+    DrawRectangleRounded((Rectangle){240.0f - width / 2.0f, (float)(y - 5), (float)width,
+                                     (float)(size + 10)}, .45f, 4, (Color){6, 10, 16, 190});
+    draw_text(text, 240 - (width - 20) / 2, y, size, color);
+}
+
+/* Four ticks that open with movement, sprint and recoil, and close while the
+ * player holds breath. */
+static void draw_crosshair(const last_zone_game_t *game)
+{
+    float motion = sqrtf(game->move_forward * game->move_forward +
+                         game->move_strafe * game->move_strafe);
+    if (motion > 1.0f) motion = 1.0f;
+    float spread = 5.0f + motion * 7.0f + game->weapon_recoil * 9.0f +
+                   (game->sprinting ? 6.0f : 0.0f);
+    if (game->holding_breath) spread = 3.0f;
+    const Color cross = game->holding_breath ? (Color){72, 255, 214, 255}
+                      : !game->ammo ? (Color){255, 92, 70, 255}
+                                    : (Color){255, 220, 72, 255};
+    const int gap = (int)spread, len = game->holding_breath ? 6 : 8;
+    const int cx = 240, cy = 204;
+    DrawRectangle(cx - gap - len, cy - 1, len, 2, cross);
+    DrawRectangle(cx + gap, cy - 1, len, 2, cross);
+    DrawRectangle(cx - 1, cy - gap - len, 2, len, cross);
+    DrawRectangle(cx - 1, cy + gap, 2, len, cross);
+    DrawRectangle(cx - 1, cy - 1, 2, 2, cross);
+}
+
 static void draw_damage_frame(int thickness, Color color)
 {
     enum { SIZE = 480, SEGMENTS = 8 };
@@ -1213,7 +1353,7 @@ static void draw_damage_frame(int thickness, Color color)
     for (int layer = 0; layer < thickness; ++layer) {
         float inset = (float)layer;
         DrawRectangleRoundedLines(
-            (Rectangle){inset, inset, (float)SIZE - inset * 2.0f,
+            (Rectangle){inset - s_margin, inset, (float)SIZE + s_margin * 2.0f - inset * 2.0f,
                         (float)SIZE - inset * 2.0f},
             0.26f, SEGMENTS, color);
     }
@@ -1227,29 +1367,27 @@ static void draw_controls(const last_zone_game_t *game, raylib_lite_atlas_t cont
         controls, RAYLIB_LITE_ASSET_ID_JOYSTICK_BASE);
     const raylib_lite_sprite_frame_t *fire = raylib_lite_atlas_get_frame(
         controls, RAYLIB_LITE_ASSET_ID_FIRE_BUTTON);
+    pin_hud(-s_margin);
     if (joystick) DrawTexturePro(controls.texture, joystick->source,
         (Rectangle){42, 352, joystick->source.width, joystick->source.height},
         (Vector2){0, 0}, 0, WHITE);
     DrawCircle(thumb_x, thumb_y, 9, game->sprinting ? (Color){255, 220, 72, 255}
                                                     : (Color){186, 224, 217, 255});
+    draw_text(game->sprinting ? "SPRINT" : "MOVE", 54, 338, 10,
+             game->sprinting ? (Color){255, 220, 72, 255} : (Color){192, 235, 214, 255});
+    pin_hud(s_margin);
     if (fire) DrawTexturePro(controls.texture, fire->source,
         (Rectangle){358, 352, fire->source.width, fire->source.height},
         (Vector2){0, 0}, 0, WHITE);
     if (game->fire_held)
         DrawCircle(LAST_ZONE_FIRE_X, LAST_ZONE_FIRE_Y, 16, (Color){255, 220, 72, 255});
-    DrawText(game->sprinting ? "SPRINT" : "MOVE", 54, 338, 10,
-             game->sprinting ? (Color){255, 220, 72, 255} : (Color){192, 235, 214, 255});
     const char *fire_label = !game->ammo ? "DRY" : (game->fire_cooldown ? "BOLT" : "FIRE");
     Color fire_color = !game->ammo ? (Color){255, 92, 70, 255} : (Color){255, 220, 72, 255};
-    DrawText(fire_label, 376, 338, 10, fire_color);
-    Color cross = game->holding_breath ? (Color){72, 255, 214, 255}
-                                      : (Color){255, 220, 72, 255};
-    int cross_w = game->holding_breath ? 16 : 22;
-    int cross_h = game->holding_breath ? 16 : 22;
-    DrawRectangle(240 - cross_w / 2, 203, cross_w, 2, cross);
-    DrawRectangle(239, 204 - cross_h / 2, 2, cross_h, cross);
+    draw_text(fire_label, 376, 338, 10, fire_color);
+    pin_hud(0);
+    draw_crosshair(game);
     if (game->holding_breath)
-        DrawText("HOLD", 226, 176, 12, (Color){72, 255, 214, 255});
+        draw_text("STEADY", 222, 176, 10, (Color){72, 255, 214, 255});
     draw_status_hud(game);
     draw_guidance(game);
     if (game->hit_marker) {
@@ -1257,22 +1395,43 @@ static void draw_controls(const last_zone_game_t *game, raylib_lite_atlas_t cont
         DrawLine(226, 191, 234, 199, marker); DrawLine(254, 191, 246, 199, marker);
         DrawLine(226, 219, 234, 211, marker); DrawLine(254, 219, 246, 211, marker);
     }
-    if (game->kill_flash)
-        DrawRectangle(236, 148, 8, 8, (Color){255, 214, 75, 255});
+    if (game->kill_flash) {
+        const int rise = 18 - (int)game->kill_flash;
+        callout(TextFormat("TARGET DOWN  %u/%d", (unsigned)game->kills,
+                           last_zone_enemy_total(game)), 140 - rise, 14,
+                (Color){255, 96, 80, 255});
+    }
+    if (game->call_cut_flash)
+        callout("CALL CUT  +50", 122, 14, (Color){72, 255, 214, 255});
+    else if (game->radio_flash > 30 || (game->radio_flash & 4U))
+        callout("ENEMY RADIO", 122, 14, (Color){255, 92, 140, 255});
+    if (game->miss_flash) {
+        /* A near miss: a tracer from the shooter's side past the sight. */
+        const float side = game->miss_angle >= 0 ? 1.0f : -1.0f;
+        const float bearing = fabsf(game->miss_angle) < 1.0f ? game->miss_angle : side;
+        const int from_x = 240 + (int)(bearing * 230.0f);
+        const int to_x = 240 - (int)(side * 70.0f);
+        const unsigned char alpha = (unsigned char)(game->miss_flash * 18);
+        DrawLine(from_x, 214, to_x, 190 - game->miss_flash, (Color){255, 226, 140, alpha});
+        DrawLine(from_x, 215, to_x, 191 - game->miss_flash, (Color){255, 160, 72, alpha});
+        int arrow_x = 240 + (int)(sinf(game->miss_angle) * 105.0f);
+        DrawTriangle((Vector2){(float)arrow_x, 62}, (Vector2){(float)arrow_x - 7, 73},
+                     (Vector2){(float)arrow_x + 7, 73}, (Color){255, 214, 75, 255});
+    }
     if (game->last_fire == NEON_FIRE_SHOT) {
         DrawCircle(248, 198, 3, (Color){255, 214, 96, 255});
         DrawCircle(232, 212, 2, (Color){255, 168, 72, 255});
     }
     if (game->pickup_flash)
-        DrawText("SECURED", 204, 248, 16, (Color){72, 255, 214, 255});
-    if (game->door_flash)
-        DrawText("GATE OPEN", 196, 248, 16, (Color){255, 220, 72, 255});
+        callout("SECURED", 246, 16, (Color){72, 255, 214, 255});
+    else if (game->door_flash)
+        callout("GATE OPEN", 246, 16, (Color){255, 220, 72, 255});
     if (game->dry_flash)
-        DrawText("NO AMMO", 198, 264, 16, (Color){255, 92, 70, 255});
+        callout("NO AMMO", 266, 16, (Color){255, 92, 70, 255});
     if (last_zone_door_ahead(game))
-        DrawText("FIRE TO OPEN GATE", 148, 278, 14, (Color){255, 220, 72, 255});
+        callout("FIRE TO OPEN GATE", 290, 14, (Color){255, 220, 72, 255});
     else if (last_zone_near_closed_door(game))
-        DrawText("FACE GATE, THEN FIRE", 136, 278, 14, (Color){255, 220, 72, 255});
+        callout("FACE GATE, THEN FIRE", 290, 14, (Color){255, 220, 72, 255});
     if (game->hp == 1 && game->phase == LAST_ZONE_PHASE_PLAYING) {
         int pulse = 5 + (int)(sinf((float)game->tick * 0.28f) * 3.0f);
         draw_damage_frame(pulse, (Color){120, 18, 28, 255});
@@ -1287,23 +1446,29 @@ static void draw_controls(const last_zone_game_t *game, raylib_lite_atlas_t cont
     }
 }
 
+/* Panel copy keeps its authored x at 1:1; scaled text is centred instead. */
+static void overlay_text(const char *text, int x, int y, int size, Color color)
+{
+    draw_text(text, hud_x(text, size, x), y, size, color);
+}
+
 static void draw_round_stats(const last_zone_game_t *game, int y)
 {
     char time_buf[8], best_buf[8];
     format_clock_buf(game->tick, time_buf);
     format_clock_buf(game->best_ticks, best_buf);
-    DrawText(TextFormat("TIME %s   KILLS %u/%d", time_buf,
+    overlay_text(TextFormat("TIME %s   KILLS %u/%d", time_buf,
                         (unsigned)game->kills, last_zone_enemy_total(game)), 118, y, 14,
              (Color){239, 242, 224, 255});
-    DrawText(TextFormat("HIT %u%%   DMG %u   HP %u  AMMO %u", accuracy_pct(game),
+    overlay_text(TextFormat("HIT %u%%   DMG %u   HP %u  AMMO %u", accuracy_pct(game),
                         (unsigned)game->damage_taken, (unsigned)game->hp,
                         (unsigned)game->ammo), 110, y + 20, 14,
              (Color){192, 235, 214, 255});
-    DrawText(TextFormat("GRADE %c   %s %s", last_zone_grade(game),
+    overlay_text(TextFormat("GRADE %c   %s %s", last_zone_grade(game),
                         game->best_updated ? "NEW BEST" : "BEST",
                         game->best_ticks ? best_buf : "--:--"),
              118, y + 40, 14, (Color){72, 255, 214, 255});
-    DrawText(TextFormat("%s  %s  %s", game->spotted ? "SPOTTED" : "CLEAN",
+    overlay_text(TextFormat("%s  %s  %s", game->spotted ? "SPOTTED" : "CLEAN",
                         game->barrel_used ? "BLAST" : "RIFLE",
                         game->armor_hit ? "ARMOR" : "FLESH"),
              126, y + 60, 12, (Color){192, 235, 214, 255});
@@ -1314,32 +1479,42 @@ static void draw_phase_overlay(const last_zone_game_t *game)
     if (game->phase == LAST_ZONE_PHASE_PLAYING) return;
     const last_zone_look_t *look = layout_look(game);
     const Rectangle panel = {58, 96, 364, 248};
-    DrawRectangleRounded(panel, 0.16f, 6, (Color){8, 12, 18, 255});
+    DrawRectangle(-(int)s_margin, 0, 480 + 2 * (int)s_margin, 480, (Color){2, 4, 8, 120});
+    DrawRectangleRounded(panel, 0.16f, 6, (Color){8, 12, 18, 236});
     DrawRectangleRoundedLines(panel, 0.16f, 6, look->accent);
+    DrawRectangle(78, 100, 324, 3, look->accent);
+    const Color prompt = (game->tick >> 4) & 1U ? (Color){255, 220, 72, 255}
+                                               : (Color){255, 220, 72, 150};
     if (game->phase == LAST_ZONE_PHASE_START) {
-        DrawText("LAST ZONE", 166, 112, 28, (Color){239, 242, 224, 255});
+        overlay_text("LAST ZONE", 166, 112, 28, (Color){239, 242, 224, 255});
         const char *briefing=last_zone_briefing(game);
-        int briefing_x=240-MeasureText(briefing,14)/2;
-        DrawText(briefing, briefing_x, 156, 14, (Color){192, 235, 214, 255});
-        DrawText("TAP FIRE TO SHOOT / OPEN GATE", 82, 178, 16, (Color){192, 235, 214, 255});
-        DrawText("HOLD FIRE TO STEADY, STAND SILENT", 78, 200, 14, (Color){192, 235, 214, 255});
-        DrawText("CLEAR ALL, THEN THE EXTRACT PAD", 86, 222, 14, (Color){255, 220, 72, 255});
+        int briefing_x=240-measure_text(briefing,14)/2;
+        overlay_text(briefing, briefing_x, 156, 14, (Color){192, 235, 214, 255});
+        overlay_text(compact() ? "FIRE: SHOOT / OPEN GATE" : "TAP FIRE TO SHOOT / OPEN GATE",
+                     82, 178, 16, (Color){192, 235, 214, 255});
+        overlay_text(compact() ? "HOLD FIRE TO STEADY" : "HOLD FIRE TO STEADY, STAND SILENT",
+                     78, 200, 14, (Color){192, 235, 214, 255});
+        overlay_text("CLEAR ALL, THEN THE EXTRACT PAD", 86, 222, 14, (Color){255, 220, 72, 255});
         char best_buf[8];
         format_clock_buf(game->best_ticks, best_buf);
-        DrawText(TextFormat("MISSION %u/%u %s", (unsigned)game->layout + 1U,
+        overlay_text(TextFormat("MISSION %u/%u %s", (unsigned)game->layout + 1U,
                             (unsigned)LAST_ZONE_LAYOUTS, look->name),
                  118, 250, 14, look->accent);
-        DrawText(TextFormat("BEST %s", game->best_ticks ? best_buf : "--:--"),
+        overlay_text(TextFormat("BEST %s", game->best_ticks ? best_buf : "--:--"),
                  190, 270, 12, (Color){192, 235, 214, 255});
-        DrawText("TAP TO DEPLOY", 168, 300, 16, (Color){255, 220, 72, 255});
+        overlay_text("TAP TO DEPLOY", 168, 300, 16, prompt);
     } else if (game->phase == LAST_ZONE_PHASE_WON) {
-        DrawText("EXTRACT SECURE", 128, 112, 24, (Color){72, 255, 214, 255});
+        overlay_text("EXTRACT SECURE", 92, 116, 24, (Color){72, 255, 214, 255});
+        DrawCircle(372, 128, 22, (Color){72, 255, 214, 60});
+        DrawCircleLines(372, 128, 22, (Color){72, 255, 214, 255});
+        draw_text(TextFormat("%c", last_zone_grade(game)), 364, 114, 28,
+                 (Color){239, 242, 224, 255});
         draw_round_stats(game, 160);
-        DrawText("TAP TO REDEPLOY", 152, 292, 16, (Color){255, 220, 72, 255});
+        overlay_text("TAP TO REDEPLOY", 152, 292, 16, prompt);
     } else {
-        DrawText("DOWNED", 188, 112, 28, (Color){255, 92, 70, 255});
+        overlay_text("DOWNED", 188, 112, 28, (Color){255, 92, 70, 255});
         draw_round_stats(game, 160);
-        DrawText("TAP TO REDEPLOY", 152, 292, 16, (Color){255, 220, 72, 255});
+        overlay_text("TAP TO REDEPLOY", 152, 292, 16, prompt);
     }
 }
 
@@ -1354,6 +1529,7 @@ void last_zone_view_render(const last_zone_game_t *game, raylib_lite_atlas_t ene
     load_material_frames(floor,walls);
     int64_t t0 = view_now_us();
     BeginDrawing();
+    set_screen();
     int64_t t1 = view_now_us();
     raycast_world(game);
     int64_t t2 = view_now_us();
@@ -1368,12 +1544,16 @@ void last_zone_view_render(const last_zone_game_t *game, raylib_lite_atlas_t ene
     draw_pickups(game, props);
     draw_enemies(game, enemies);
     int64_t t7 = view_now_us();
+    raylib_lite_design_field_begin(s_view, 480.0f, 480.0f);
     draw_radar(game);
     draw_compass(game);
     draw_weapon(game, weapon);
     draw_controls(game, controls);
     draw_phase_overlay(game);
+#if defined(LAST_ZONE_SHOW_FPS)
     draw_fps(game);
+#endif
+    raylib_lite_design_field_end(s_view, 480.0f, 480.0f);
     int64_t t8 = view_now_us();
     EndDrawing();
     int64_t t9 = view_now_us();

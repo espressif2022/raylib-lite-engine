@@ -132,10 +132,20 @@ static const platform_level_t LEVELS[PLATFORM_LEVEL_COUNT] = {
     LEVEL(LEVEL_4_BLOCKS, LEVEL_4_COINS, LEVEL_4_ENEMIES, LEVEL_4_SPRINGS, 1500, 2680, 2760),
 };
 
+static const char *const LEVEL_NAMES[PLATFORM_LEVEL_COUNT] = {
+    "SUNNY MEADOW", "STORM RIDGE", "FROST PEAKS", "EMBER CRAG",
+};
+
 static bool overlap(float ax, float ay, float aw, float ah,
                     float bx, float by, float bw, float bh)
 {
     return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+static void emit(platform_game_t *game, uint32_t event)
+{
+    game->events |= event;
+    ++game->event_serial;
 }
 
 static const platform_level_t *current_level(const platform_game_t *game)
@@ -162,31 +172,57 @@ float platform_game_finish_x(const platform_game_t *game)
 }
 
 float platform_game_checkpoint_x(const platform_game_t *game)
-{ return current_level(game)->checkpoint_x; }
-
-const platform_spring_t *platform_game_springs(const platform_game_t *game,size_t *count)
 {
-    const platform_level_t *level=current_level(game);
-    if(count)*count=level->spring_count;
+    return current_level(game)->checkpoint_x;
+}
+
+const platform_spring_t *platform_game_springs(const platform_game_t *game,
+                                               size_t *count)
+{
+    const platform_level_t *level = current_level(game);
+    if (count) *count = level->spring_count;
     return level->springs;
+}
+
+const char *platform_game_level_name(const platform_game_t *game)
+{
+    return LEVEL_NAMES[game->level < PLATFORM_LEVEL_COUNT ? game->level : 0];
+}
+
+uint32_t platform_game_take_events(platform_game_t *game)
+{
+    uint32_t events = game->events;
+    game->events = 0;
+    return events;
+}
+
+static void place_at_respawn(platform_game_t *game)
+{
+    game->player_x = game->respawn_x;
+    game->player_y = FLOOR_Y - PLAYER_H;
+    game->velocity_x = game->velocity_y = 0;
+    game->camera_x = 0;
+    game->grounded = true;
+    game->coyote_frames = COYOTE_FRAMES;
+    game->jump_buffer = 0;
+    game->stomp_chain = 0;
+    game->air_ticks = 0;
 }
 
 static void load_level(platform_game_t *game, uint8_t level_index)
 {
     const platform_level_t *level = &LEVELS[level_index];
     game->level = level_index;
-    game->player_x = level->start_x;
-    game->player_y = FLOOR_Y - PLAYER_H;
-    game->velocity_x = game->velocity_y = 0;
-    game->camera_x = 0;
     game->respawn_x = level->start_x;
+    place_at_respawn(game);
     game->checkpoint_active = false;
     game->move_left = game->move_right = game->jump_held = game->facing_left = false;
-    game->grounded = true;
-    game->coyote_frames = COYOTE_FRAMES;
-    game->jump_buffer = 0;
     game->coin_chain = 0;
     game->coin_chain_timer = 0;
+    game->invulnerable_ticks = 0;
+    game->coins_collected = 0;
+    game->stomps = 0;
+    memset(game->spring_ticks, 0, sizeof(game->spring_ticks));
     memset(game->pointers, 0, sizeof(game->pointers));
     game->coin_count = level->coin_count;
     game->enemy_count = level->enemy_count;
@@ -199,10 +235,17 @@ static void load_level(platform_game_t *game, uint8_t level_index)
 
 void platform_game_reset(platform_game_t *game)
 {
+    const float view_width = game->view_width;
     memset(game, 0, sizeof(*game));
+    game->view_width = view_width >= 1.0f ? view_width : PLATFORM_VIEW_WIDTH;
     game->phase = PLATFORM_START;
     game->lives = 3;
     load_level(game, 0);
+}
+
+void platform_game_set_view_width(platform_game_t *game, float width)
+{
+    game->view_width = width >= 1.0f ? width : PLATFORM_VIEW_WIDTH;
 }
 
 static void set_phase(platform_game_t *game, platform_phase_t phase)
@@ -220,17 +263,23 @@ void platform_game_set_action(platform_game_t *game, platform_action_t action,
         } else if (game->phase == PLATFORM_START) {
             load_level(game, game->level);
         } else {
+            uint32_t serial = game->event_serial;
             platform_game_reset(game);
+            game->event_serial = serial;
         }
         set_phase(game, PLATFORM_PLAYING);
+        emit(game, PLATFORM_EVENT_START);
         return;
     }
     if (action == PLATFORM_ACTION_PAUSE && pressed) {
         if (game->phase == PLATFORM_PLAYING) {
             game->move_left = game->move_right = game->jump_held = false;
             set_phase(game, PLATFORM_PAUSED);
+            emit(game, PLATFORM_EVENT_PAUSE);
+        } else if (game->phase == PLATFORM_PAUSED) {
+            set_phase(game, PLATFORM_PLAYING);
+            emit(game, PLATFORM_EVENT_RESUME);
         }
-        else if (game->phase == PLATFORM_PAUSED) set_phase(game, PLATFORM_PLAYING);
         return;
     }
     if (game->phase != PLATFORM_PLAYING) return;
@@ -259,6 +308,7 @@ static void apply_jump(platform_game_t *game)
         game->grounded = false;
         game->coyote_frames = 0;
         game->jump_buffer = 0;
+        emit(game, PLATFORM_EVENT_JUMP);
         return;
     }
     --game->jump_buffer;
@@ -290,7 +340,7 @@ void platform_game_set_pointer(platform_game_t *game, float x, float y, bool pre
         platform_game_set_action(game, PLATFORM_ACTION_RESTART, true);
         if (game->phase != PLATFORM_PLAYING) return;
     }
-    if (pressed && y < 54 && x > 420) {
+    if (pressed && y < 54 && x > game->view_width - 60) {
         platform_game_set_action(game, PLATFORM_ACTION_PAUSE, true);
         return;
     }
@@ -317,37 +367,35 @@ void platform_game_set_pointer(platform_game_t *game, float x, float y, bool pre
     if (game->phase == PLATFORM_PLAYING) sync_pointer_actions(game);
 }
 
+static void award(platform_game_t *game, uint16_t points, float x, float y)
+{
+    game->score += points;
+    game->last_gain = points;
+    game->last_gain_x = x;
+    game->last_gain_y = y;
+}
+
 static void lose_life(platform_game_t *game)
 {
     if (game->lives) --game->lives;
+    game->hit_x = game->player_x + PLAYER_W / 2;
+    game->hit_y = game->player_y + PLAYER_H / 2;
+    game->coin_chain = 0;
+    game->coin_chain_timer = 0;
     if (!game->lives) {
         set_phase(game, PLATFORM_GAME_OVER);
+        emit(game, PLATFORM_EVENT_GAME_OVER);
         return;
     }
-    game->player_x = game->respawn_x;
-    game->player_y = FLOOR_Y - PLAYER_H;
-    game->velocity_x = game->velocity_y = 0;
-    game->camera_x = 0;
-    game->grounded = true;
-    game->coyote_frames = COYOTE_FRAMES;
-    game->jump_buffer = 0;
+    emit(game, PLATFORM_EVENT_HURT);
+    place_at_respawn(game);
+    game->invulnerable_ticks = PLATFORM_INVULNERABLE_TICKS;
 }
 
-void platform_game_update(platform_game_t *game)
+static void move_horizontal(platform_game_t *game, const platform_level_t *level)
 {
-    ++game->phase_tick;
-    if (game->phase != PLATFORM_PLAYING) return;
-    const platform_level_t *level = current_level(game);
-    ++game->tick;
-    if (game->coin_chain_timer) {
-        if (!--game->coin_chain_timer) game->coin_chain = 0;
-    }
-    if (game->move_left) game->facing_left = true;
-    else if (game->move_right) game->facing_left = false;
-    apply_jump(game);
     float desired = game->move_left ? -4.0f : game->move_right ? 4.0f : 0.0f;
     game->velocity_x += (desired - game->velocity_x) * (desired ? 0.35f : 0.55f);
-
     float next_x = game->player_x + game->velocity_x;
     if (next_x < 0) next_x = 0;
     if (next_x > level->world_width - PLAYER_W) next_x = level->world_width - PLAYER_W;
@@ -360,7 +408,11 @@ void platform_game_update(platform_game_t *game)
         game->velocity_x = 0;
     }
     game->player_x = next_x;
+}
 
+static void move_vertical(platform_game_t *game, const platform_level_t *level)
+{
+    bool was_grounded = game->grounded;
     float old_bottom = game->player_y + PLAYER_H;
     game->velocity_y += 0.62f;
     if (game->velocity_y > 13) game->velocity_y = 13;
@@ -381,35 +433,54 @@ void platform_game_update(platform_game_t *game)
         }
     }
     game->player_y = next_y;
-    if(game->grounded){
-        for(size_t i=0;i<level->spring_count;++i){
-            const platform_spring_t *spring=&level->springs[i];
-            if(game->player_x+PLAYER_W>spring->x&&game->player_x<spring->x+spring->width&&
-               game->player_y+PLAYER_H>=spring->y-1&&game->player_y+PLAYER_H<=spring->y+2){
-                game->velocity_y=-14.0f;game->grounded=false;game->coyote_frames=0;
-                break;
-            }
+    if (game->grounded) {
+        if (!was_grounded && game->air_ticks >= 6U) {
+            game->land_air_ticks = game->air_ticks;
+            emit(game, PLATFORM_EVENT_LAND);
+        }
+        game->air_ticks = 0;
+        game->stomp_chain = 0;
+    } else if (game->air_ticks < UINT8_MAX) {
+        ++game->air_ticks;
+    }
+}
+
+static void bounce_springs(platform_game_t *game, const platform_level_t *level)
+{
+    if (!game->grounded) return;
+    for (size_t i = 0; i < level->spring_count; ++i) {
+        const platform_spring_t *spring = &level->springs[i];
+        float feet = game->player_y + PLAYER_H;
+        if (game->player_x + PLAYER_W > spring->x &&
+            game->player_x < spring->x + spring->width &&
+            feet >= spring->y - 1 && feet <= spring->y + 2) {
+            game->velocity_y = -14.0f;
+            game->grounded = false;
+            game->coyote_frames = 0;
+            if (i < PLATFORM_SPRING_COUNT) game->spring_ticks[i] = 10;
+            emit(game, PLATFORM_EVENT_SPRING);
+            break;
         }
     }
-    if (game->grounded) game->coyote_frames = COYOTE_FRAMES;
-    else if (game->coyote_frames) --game->coyote_frames;
-    apply_jump(game);
+}
 
+static void collect_coins(platform_game_t *game)
+{
     for (size_t i = 0; i < game->coin_count; ++i) {
         platform_coin_t *coin = &game->coins[i];
-        if (!coin->collected && overlap(game->player_x, game->player_y,
-                PLAYER_W, PLAYER_H, coin->x - 8, coin->y - 8, 16, 16)) {
-            coin->collected = true;
-            if (game->coin_chain < 5U) ++game->coin_chain;
-            game->coin_chain_timer = COIN_CHAIN_FRAMES;
-            game->score += (uint16_t)(100U * game->coin_chain);
-        }
+        if (coin->collected || !overlap(game->player_x, game->player_y,
+                PLAYER_W, PLAYER_H, coin->x - 8, coin->y - 8, 16, 16)) continue;
+        coin->collected = true;
+        ++game->coins_collected;
+        if (game->coin_chain < 5U) ++game->coin_chain;
+        game->coin_chain_timer = COIN_CHAIN_FRAMES;
+        award(game, (uint16_t)(100U * game->coin_chain), coin->x, coin->y);
+        emit(game, PLATFORM_EVENT_COIN);
     }
-    if(!game->checkpoint_active&&game->player_x>=level->checkpoint_x){
-        game->checkpoint_active=true;
-        game->respawn_x=level->checkpoint_x;
-        game->score+=200;
-    }
+}
+
+static bool update_enemies(platform_game_t *game)
+{
     for (size_t i = 0; i < game->enemy_count; ++i) {
         platform_enemy_t *enemy = &game->enemies[i];
         if (!enemy->active) continue;
@@ -420,21 +491,59 @@ void platform_game_update(platform_game_t *game)
         if (game->velocity_y > 0 && game->player_y + PLAYER_H < enemy->y + 16) {
             enemy->active = false;
             game->velocity_y = -7.5f;
-            game->score += 250;
-        } else {
-            game->coin_chain = 0;
-            game->coin_chain_timer = 0;
+            if (game->stomp_chain < PLATFORM_STOMP_CHAIN_MAX) ++game->stomp_chain;
+            ++game->stomps;
+            award(game, (uint16_t)(250U << (game->stomp_chain - 1U)),
+                  enemy->x + 14, enemy->y);
+            emit(game, PLATFORM_EVENT_STOMP);
+        } else if (!game->invulnerable_ticks) {
             lose_life(game);
-            return;
+            return false;
         }
     }
+    return true;
+}
+
+void platform_game_update(platform_game_t *game)
+{
+    ++game->phase_tick;
+    if (game->phase != PLATFORM_PLAYING) return;
+    const platform_level_t *level = current_level(game);
+    ++game->tick;
+    if (game->coin_chain_timer && !--game->coin_chain_timer) game->coin_chain = 0;
+    if (game->invulnerable_ticks) --game->invulnerable_ticks;
+    for (size_t i = 0; i < PLATFORM_SPRING_COUNT; ++i)
+        if (game->spring_ticks[i]) --game->spring_ticks[i];
+    if (game->move_left) game->facing_left = true;
+    else if (game->move_right) game->facing_left = false;
+
+    apply_jump(game);
+    move_horizontal(game, level);
+    move_vertical(game, level);
+    bounce_springs(game, level);
+    if (game->grounded) game->coyote_frames = COYOTE_FRAMES;
+    else if (game->coyote_frames) --game->coyote_frames;
+    apply_jump(game);
+    collect_coins(game);
+
+    if (!game->checkpoint_active && game->player_x >= level->checkpoint_x) {
+        game->checkpoint_active = true;
+        game->respawn_x = level->checkpoint_x;
+        award(game, 200, level->checkpoint_x + 20, 300);
+        emit(game, PLATFORM_EVENT_CHECKPOINT);
+    }
+    if (!update_enemies(game)) return;
     if (game->player_y > 500) lose_life(game);
-    if (game->player_x > level->finish_x)
-        set_phase(game, game->level + 1 < PLATFORM_LEVEL_COUNT ?
-                  PLATFORM_LEVEL_CLEAR : PLATFORM_WON);
+    if (game->player_x > level->finish_x) {
+        bool last = game->level + 1 >= PLATFORM_LEVEL_COUNT;
+        set_phase(game, last ? PLATFORM_WON : PLATFORM_LEVEL_CLEAR);
+        emit(game, last ? PLATFORM_EVENT_WON : PLATFORM_EVENT_LEVEL_CLEAR);
+    }
     float target_camera = game->player_x - 190;
     if (target_camera < 0) target_camera = 0;
-    if (target_camera > level->world_width - 480) target_camera = level->world_width - 480;
+    float camera_max = level->world_width - game->view_width;
+    if (camera_max < 0) camera_max = 0;
+    if (target_camera > camera_max) target_camera = camera_max;
     game->camera_x += (target_camera - game->camera_x) * 0.15f;
 }
 

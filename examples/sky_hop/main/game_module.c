@@ -1,102 +1,56 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "raylib_lite_game_module_contract.h"
 #include <stdio.h>
+#include <stdlib.h>
 #if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif
+#include "raylib_lite_design_view.h"
 #include "raylib_lite_raylib.h"
 #include "platform_game.h"
 #include "sky_hop_view.h"
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-#include "raylib_lite_raylib_audio.h"
+#include "native_feedback.h"
+#include "sky_hop_feedback.h"
 #endif
-
-#define SKY_HOP_ABI RAYLIB_LITE_GAME_MODULE_ABI
-
-typedef enum {
-    SKY_HOP_SFX_JUMP,
-    SKY_HOP_SFX_COIN,
-    SKY_HOP_SFX_STOMP,
-    SKY_HOP_SFX_HURT,
-    SKY_HOP_SFX_WIN,
-    SKY_HOP_SFX_COUNT,
-} sky_hop_sfx_t;
 
 typedef struct {
     platform_game_t game;
     raylib_lite_atlas_t atlas;
-    raylib_lite_particle_t particles[SKY_HOP_PARTICLE_COUNT];
-    raylib_lite_particle_pool_t pool;
-    sky_hop_overlay_t overlay;
-    uint16_t best_score;
+    sky_hop_fx_t fx;
+    uint32_t best_score;
     bool paused;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-    Sound sounds[SKY_HOP_SFX_COUNT];
-    Music music;
-    bool music_playing;
+    sky_hop_feedback_t feedback;
 #endif
 } sky_hop_module_state_t;
 
-static sky_hop_view_t view_of(sky_hop_module_state_t *state)
-{
-    return (sky_hop_view_t){
-        .game = &state->game,
-        .atlas = state->atlas,
-        .best_score = state->best_score,
-        .overlay_y = state->overlay.y,
-        .particles = state->particles,
-        .particle_count = SKY_HOP_PARTICLE_COUNT,
-    };
-}
-
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-static const char *const SFX_PATHS[SKY_HOP_SFX_COUNT] = {
-    "jump.sound", "coin.sound", "stomp.sound", "hurt.sound", "win.sound"};
-
-static void audio_init(sky_hop_module_state_t *state)
-{
-    InitAudioDevice();
-    if (!IsAudioDeviceReady()) return;
-    for (unsigned i = 0; i < SKY_HOP_SFX_COUNT; ++i) state->sounds[i] = LoadSound(SFX_PATHS[i]);
-    state->music = LoadMusicStream("music.sound");
-    SetMusicVolume(state->music, .2f);
-}
-
-static void audio_shutdown(sky_hop_module_state_t *state)
-{
-    if (!IsAudioDeviceReady()) return;
-    StopMusicStream(state->music);
-    UnloadMusicStream(state->music);
-    for (unsigned i = 0; i < SKY_HOP_SFX_COUNT; ++i)
-        if (state->sounds[i].frameCount) UnloadSound(state->sounds[i]);
-    CloseAudioDevice();
-}
-
-static void play_sfx(sky_hop_module_state_t *state, sky_hop_sfx_t cue)
-{
-    if (state->sounds[cue].frameCount) PlaySound(state->sounds[cue]);
-}
-
-static void audio_sync_music(sky_hop_module_state_t *state)
-{
-    if (!IsAudioDeviceReady()) return;
-    platform_phase_t phase = state->game.phase;
-    bool want = phase == PLATFORM_PLAYING || phase == PLATFORM_PAUSED;
-    if (want && !state->music_playing) PlayMusicStream(state->music);
-    else if (!want && state->music_playing) StopMusicStream(state->music);
-    state->music_playing = want;
-    if (want) SetMusicVolume(state->music,
-                             state->paused || phase == PLATFORM_PAUSED ? .06f : .2f);
-}
+static const sky_hop_haptics_t s_haptics = {
+    .init = raylib_lite_native_feedback_init,
+    .pulse = raylib_lite_native_feedback_pulse,
+    .pattern = raylib_lite_native_feedback_pattern,
+    .stop = raylib_lite_native_feedback_stop,
+};
 #endif
 
-static int initialize(void *value
-                      , const char *asset_root
-)
+static void consume_events(sky_hop_module_state_t *state)
+{
+    uint32_t events = platform_game_take_events(&state->game);
+    if (!events) return;
+    sky_hop_fx_events(&state->fx, &state->game, events);
+#if defined(RAYLIB_LITE_GAME_NATIVE)
+    sky_hop_feedback_events(&state->feedback, &state->game, events);
+#endif
+}
+
+static int initialize(void *value, const char *asset_root)
 {
     sky_hop_module_state_t *state = value;
 #if !defined(RAYLIB_LITE_GAME_NATIVE)
     raylib_lite_host_assets_set_root(asset_root);
+#else
+    (void)asset_root;
 #endif
     state->atlas = raylib_lite_atlas_load("tower.atlas");
     if (!state->atlas.texture.id) return -1;
@@ -105,10 +59,13 @@ static int initialize(void *value
     SetTargetFPS(30);
 #endif
     platform_game_reset(&state->game);
-    raylib_lite_particle_pool_init(&state->pool, state->particles, SKY_HOP_PARTICLE_COUNT);
-    sky_hop_overlay_sync(&state->overlay, state->game.phase);
+    sky_hop_fx_reset(&state->fx);
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-    audio_init(state);
+    sky_hop_feedback_init(&state->feedback, &s_haptics);
+#else
+    const char *level = getenv("SKY_HOP_SIM_LEVEL");
+    if (level && atoi(level) >= 1 && atoi(level) <= PLATFORM_LEVEL_COUNT)
+        state->game.level = (uint8_t)(atoi(level) - 1);
 #endif
     return 0;
 }
@@ -118,7 +75,7 @@ static void shutdown(void *value)
     sky_hop_module_state_t *state = value;
     if (!state) return;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-    audio_shutdown(state);
+    sky_hop_feedback_close(&state->feedback);
 #endif
     raylib_lite_atlas_unload(state->atlas);
 }
@@ -129,14 +86,18 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
     if (!state || !event) return;
     if (event->type == RAYLIB_LITE_GAME_INPUT_ACTION && event->code >= 0 && event->code <= 4)
         platform_game_set_action(&state->game, (platform_action_t)event->code, event->pressed);
-    else if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER)
-        platform_game_set_pointer(&state->game, (float)event->x, (float)event->y,
-                                 event->pressed, event->track_id);
+    else if (event->type == RAYLIB_LITE_GAME_INPUT_POINTER) {
+        Vector2 point = raylib_lite_design_point(raylib_lite_design_view(480.0f),
+                                                 (float)event->x, (float)event->y);
+        platform_game_set_pointer(&state->game, point.x, point.y, event->pressed,
+                                 event->track_id);
+    }
     else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
-             event->code == RAYLIB_LITE_GAME_CONTROL_RESET)
+             event->code == RAYLIB_LITE_GAME_CONTROL_RESET) {
         platform_game_reset(&state->game);
-    else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
-             event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE)
+        sky_hop_fx_reset(&state->fx);
+    } else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
+               event->code == RAYLIB_LITE_GAME_CONTROL_PAUSE)
         state->paused = true;
     else if (event->type == RAYLIB_LITE_GAME_INPUT_CONTROL &&
              event->code == RAYLIB_LITE_GAME_CONTROL_RESUME)
@@ -146,53 +107,27 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
 static void update(void *value)
 {
     sky_hop_module_state_t *state = value;
+    if (!state) return;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
-    if (state) audio_sync_music(state);
+    sky_hop_feedback_music(&state->feedback, &state->game, state->paused);
 #endif
-    if (!state || state->paused) return;
-    uint16_t score_before = state->game.score;
-#if defined(RAYLIB_LITE_GAME_NATIVE)
-    platform_phase_t phase_before = state->game.phase;
-    float velocity_y_before = state->game.velocity_y;
-#endif
-    bool stomp = false;
-    uint8_t lives_before = state->game.lives;
-    bool enemy_before[PLATFORM_ENEMY_COUNT];
-    for (size_t i = 0; i < PLATFORM_ENEMY_COUNT; ++i)
-        enemy_before[i] = state->game.enemies[i].active;
+    if (state->paused) return;
+    platform_game_set_view_width(&state->game, raylib_lite_design_view(480.0f).width);
     platform_game_update(&state->game);
-    if (state->game.score > score_before) {
-        for (size_t i = 0; i < state->game.enemy_count; ++i)
-            if (enemy_before[i] && !state->game.enemies[i].active) stomp = true;
-        sky_hop_view_spawn_particles(&state->pool, state->game.player_x + 14,
-            state->game.player_y + 8,
-            stomp ? (Color){205, 125, 255, 255} : (Color){255, 220, 70, 255}, 8);
-    }
-    if (state->game.lives < lives_before)
-        sky_hop_view_spawn_particles(&state->pool, state->game.player_x + 14,
-            state->game.player_y + 12, (Color){255, 95, 80, 255}, 12);
-#if defined(RAYLIB_LITE_GAME_NATIVE)
-    platform_phase_t phase = state->game.phase;
-    if (phase != phase_before &&
-            (phase == PLATFORM_LEVEL_CLEAR || phase == PLATFORM_WON))
-        play_sfx(state, SKY_HOP_SFX_WIN);
-    else if (state->game.lives < lives_before)
-        play_sfx(state, SKY_HOP_SFX_HURT);
-    else if (state->game.score > score_before)
-        play_sfx(state, stomp ? SKY_HOP_SFX_STOMP : SKY_HOP_SFX_COIN);
-    else if (phase == PLATFORM_PLAYING && velocity_y_before > -1.0f &&
-             state->game.velocity_y < -6.0f)
-        play_sfx(state, SKY_HOP_SFX_JUMP);
-#endif
+    consume_events(state);
     if (state->game.score > state->best_score) state->best_score = state->game.score;
-    raylib_lite_particle_pool_update(&state->pool);
-    sky_hop_overlay_sync(&state->overlay, state->game.phase);
+    sky_hop_fx_update(&state->fx, &state->game);
 }
 
 static int render(void *value)
 {
     sky_hop_module_state_t *state = value;
-    sky_hop_view_t view = view_of(state);
+    sky_hop_view_t view = {
+        .game = &state->game,
+        .fx = &state->fx,
+        .atlas = state->atlas,
+        .best_score = state->best_score,
+    };
     return sky_hop_view_render(&view) ? 0 : -1;
 }
 
@@ -209,19 +144,24 @@ static int state_json(const void *value, char *output, size_t capacity)
     const platform_game_t *game = &state->game;
     const char *phase = (unsigned)game->phase < 6 ? phases[game->phase] : "unknown";
     return snprintf(output, capacity,
-        "{\"level\":%u,\"levels\":%u,\"score\":%u,\"lives\":%u,\"phase\":\"%s\","
-        "\"tick\":%lu,\"state_hash\":\"%08lx\"}",
-        game->level + 1, PLATFORM_LEVEL_COUNT, game->score, game->lives, phase,
-        (unsigned long)game->tick, (unsigned long)platform_game_state_hash(game));
+        "{\"level\":%u,\"levels\":%u,\"level_name\":\"%s\",\"score\":%lu,\"lives\":%u,"
+        "\"coins\":%u,\"coin_total\":%u,\"stomps\":%u,\"phase\":\"%s\","
+        "\"tick\":%lu,\"event_serial\":%lu,\"state_hash\":\"%08lx\"}",
+        game->level + 1, PLATFORM_LEVEL_COUNT, platform_game_level_name(game),
+        (unsigned long)game->score, game->lives, game->coins_collected, game->coin_count,
+        game->stomps, phase, (unsigned long)game->tick, (unsigned long)game->event_serial,
+        (unsigned long)platform_game_state_hash(game));
 }
 
 static const raylib_lite_game_module_v1_t s_module = {
-    .descriptor = {SKY_HOP_ABI, "sky_hop", "Sky Hop", 480, 480, 30, 2},
+    .descriptor = {RAYLIB_LITE_GAME_MODULE_ABI, "sky_hop", "Sky Hop", 480, 480, 30, 2},
     .state_size = sizeof(sky_hop_module_state_t),
     .initialize = initialize, .shutdown = shutdown, .input = input,
     .update = update, .render = render, .state_hash = state_hash,
     .state_json = state_json,
 };
+
+bool raylib_lite_game_adaptive_surface(void) { return true; }
 
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void)
 {

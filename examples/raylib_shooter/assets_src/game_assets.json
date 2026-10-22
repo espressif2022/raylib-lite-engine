@@ -11,5 +11,31 @@
       "source": "shooter_nebula.png",
       "output": "nebula.atlas"
     }
+  ],
+  "sounds": [
+    {
+      "source": "shot.wav"
+    },
+    {
+      "source": "explode.wav"
+    },
+    {
+      "source": "hurt.wav"
+    },
+    {
+      "source": "wave.wav"
+    },
+    {
+      "source": "power.wav"
+    },
+    {
+      "source": "start.wav"
+    },
+    {
+      "source": "game_over.wav"
+    },
+    {
+      "source": "music.wav"
+    }
   ]
 }

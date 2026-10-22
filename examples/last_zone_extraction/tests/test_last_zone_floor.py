@@ -24,7 +24,8 @@ class LastZoneFloorTests(unittest.TestCase):
             command += [str(Path(__file__).with_suffix('.c')),
                         str(PROJECT/'main/last_zone_game.c')]
             for include in [temp, PROJECT/'main', ROOT/'host/include', ROOT/'include/raylib_lite',
-                            ROOT/'compat/raylib/include']:
+                            ROOT/'compat/raylib/include',
+                            ROOT/'examples/common_components/examples_common/include']:
                 command += ['-I', str(include)]
             command += ['-Wl,--gc-sections', '-lm', '-o', str(temp/'floor')]
             subprocess.run(command, check=True)
