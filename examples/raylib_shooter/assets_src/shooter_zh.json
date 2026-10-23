@@ -1,0 +1,267 @@
+{
+  "image": "shooter_zh_source.png",
+  "columns": 16,
+  "rows": 4,
+  "output_cell": 16,
+  "output_columns": 16,
+  "alpha_mode": "binary",
+  "padding": 0,
+  "frames": [
+    {
+      "name": "zh_cell_0",
+      "source_index": 0
+    },
+    {
+      "name": "zh_cell_1",
+      "source_index": 1
+    },
+    {
+      "name": "zh_cell_2",
+      "source_index": 2
+    },
+    {
+      "name": "zh_cell_3",
+      "source_index": 3
+    },
+    {
+      "name": "zh_cell_4",
+      "source_index": 4
+    },
+    {
+      "name": "zh_cell_5",
+      "source_index": 5
+    },
+    {
+      "name": "zh_cell_6",
+      "source_index": 6
+    },
+    {
+      "name": "zh_cell_7",
+      "source_index": 7
+    },
+    {
+      "name": "zh_cell_8",
+      "source_index": 8
+    },
+    {
+      "name": "zh_cell_9",
+      "source_index": 9
+    },
+    {
+      "name": "zh_cell_10",
+      "source_index": 10
+    },
+    {
+      "name": "zh_cell_11",
+      "source_index": 11
+    },
+    {
+      "name": "zh_cell_12",
+      "source_index": 12
+    },
+    {
+      "name": "zh_cell_13",
+      "source_index": 13
+    },
+    {
+      "name": "zh_cell_14",
+      "source_index": 14
+    },
+    {
+      "name": "zh_cell_15",
+      "source_index": 15
+    },
+    {
+      "name": "zh_cell_16",
+      "source_index": 16
+    },
+    {
+      "name": "zh_cell_17",
+      "source_index": 17
+    },
+    {
+      "name": "zh_cell_18",
+      "source_index": 18
+    },
+    {
+      "name": "zh_cell_19",
+      "source_index": 19
+    },
+    {
+      "name": "zh_cell_20",
+      "source_index": 20
+    },
+    {
+      "name": "zh_cell_21",
+      "source_index": 21
+    },
+    {
+      "name": "zh_cell_22",
+      "source_index": 22
+    },
+    {
+      "name": "zh_cell_23",
+      "source_index": 23
+    },
+    {
+      "name": "zh_cell_24",
+      "source_index": 24
+    },
+    {
+      "name": "zh_cell_25",
+      "source_index": 25
+    },
+    {
+      "name": "zh_cell_26",
+      "source_index": 26
+    },
+    {
+      "name": "zh_cell_27",
+      "source_index": 27
+    },
+    {
+      "name": "zh_cell_28",
+      "source_index": 28
+    },
+    {
+      "name": "zh_cell_29",
+      "source_index": 29
+    },
+    {
+      "name": "zh_cell_30",
+      "source_index": 30
+    },
+    {
+      "name": "zh_cell_31",
+      "source_index": 31
+    },
+    {
+      "name": "zh_cell_32",
+      "source_index": 32
+    },
+    {
+      "name": "zh_cell_33",
+      "source_index": 33
+    },
+    {
+      "name": "zh_cell_34",
+      "source_index": 34
+    },
+    {
+      "name": "zh_cell_35",
+      "source_index": 35
+    },
+    {
+      "name": "zh_cell_36",
+      "source_index": 36
+    },
+    {
+      "name": "zh_cell_37",
+      "source_index": 37
+    },
+    {
+      "name": "zh_cell_38",
+      "source_index": 38
+    },
+    {
+      "name": "zh_cell_39",
+      "source_index": 39
+    },
+    {
+      "name": "zh_cell_40",
+      "source_index": 40
+    },
+    {
+      "name": "zh_cell_41",
+      "source_index": 41
+    },
+    {
+      "name": "zh_cell_42",
+      "source_index": 42
+    },
+    {
+      "name": "zh_cell_43",
+      "source_index": 43
+    },
+    {
+      "name": "zh_cell_44",
+      "source_index": 44
+    },
+    {
+      "name": "zh_cell_45",
+      "source_index": 45
+    },
+    {
+      "name": "zh_cell_46",
+      "source_index": 46
+    },
+    {
+      "name": "zh_cell_47",
+      "source_index": 47
+    },
+    {
+      "name": "zh_cell_48",
+      "source_index": 48
+    },
+    {
+      "name": "zh_cell_49",
+      "source_index": 49
+    },
+    {
+      "name": "zh_cell_50",
+      "source_index": 50
+    },
+    {
+      "name": "zh_cell_51",
+      "source_index": 51
+    },
+    {
+      "name": "zh_cell_52",
+      "source_index": 52
+    },
+    {
+      "name": "zh_cell_53",
+      "source_index": 53
+    },
+    {
+      "name": "zh_cell_54",
+      "source_index": 54
+    },
+    {
+      "name": "zh_cell_55",
+      "source_index": 55
+    },
+    {
+      "name": "zh_cell_56",
+      "source_index": 56
+    },
+    {
+      "name": "zh_cell_57",
+      "source_index": 57
+    },
+    {
+      "name": "zh_cell_58",
+      "source_index": 58
+    },
+    {
+      "name": "zh_cell_59",
+      "source_index": 59
+    },
+    {
+      "name": "zh_cell_60",
+      "source_index": 60
+    },
+    {
+      "name": "zh_cell_61",
+      "source_index": 61
+    },
+    {
+      "name": "zh_cell_62",
+      "source_index": 62
+    },
+    {
+      "name": "zh_cell_63",
+      "source_index": 63
+    }
+  ]
+}

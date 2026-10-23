@@ -510,10 +510,36 @@ void raylib_lite_raylib_draw_rectangle_gradient_v(int x,int y,int width,int heig
 void raylib_lite_raylib_draw_rectangle_gradient_h(int x,int y,int width,int height,
                                        Color left,Color right)
 {
-    if(width<=0)return;
+    if(width<=0||height<=0)return;
+    Vector2 start=active_to_screen((Vector2){(float)x,(float)y});
+    int sx=(int)start.x,sy=(int)start.y;
+    int sw=s_camera_active?(int)((float)width*s_camera.zoom):width;
+    int sh=s_camera_active?(int)((float)height*s_camera.zoom):height;
+    if(sw<=0||sh<=0)return;
+    int y0=sy<0?0:sy,y1=sy+sh>s_screen_height?s_screen_height:sy+sh;
+    if(s_scissor_active){
+        if(y0<s_scissor_y0)y0=s_scissor_y0;
+        if(y1>s_scissor_y1)y1=s_scissor_y1;
+    }
+    if(y0>=y1)return;
     unsigned limit=(unsigned)(width>1?width-1:1);
-    for(int column=0;column<width;++column)
-        raylib_lite_raylib_draw_rectangle(x+column,y,1,height,mix_color(left,right,(unsigned)column,limit));
+    for(int column=0;column<width;++column){
+        int cx0=sx+(s_camera_active?(int)((float)column*s_camera.zoom):column);
+        int cx1=sx+(s_camera_active?(int)((float)(column+1)*s_camera.zoom):(column+1));
+        if(cx1<=cx0)cx1=cx0+1;
+        if(cx0<0)cx0=0;
+        if(cx1>s_screen_width)cx1=s_screen_width;
+        if(s_scissor_active){
+            if(cx0<s_scissor_x0)cx0=s_scissor_x0;
+            if(cx1>s_scissor_x1)cx1=s_scissor_x1;
+        }
+        if(cx0>=cx1)continue;
+        Color c=mix_color(left,right,(unsigned)column,limit);
+        if(!c.a)continue;
+        span_paint_t paint=span_paint(c);
+        for(int row=y0;row<y1;++row)
+            fill_span(row,cx0,cx1,&paint);
+    }
 }
 
 void raylib_lite_raylib_draw_line(int x0, int y0, int x1, int y1, Color color)
@@ -942,6 +968,282 @@ int raylib_lite_raylib_measure_text(const char *text, int font_size)
     }
     if(width>max_width)max_width=width;
     return (int)(max_width*(font_size/10.0f)+(max_count-1)*(font_size/10));
+}
+
+static bool bmfont_field(const char *line, const char *key, int *out)
+{
+    const char *p = strstr(line, key);
+    if (!p) return false;
+    p += strlen(key);
+    char *end = NULL;
+    long v = strtol(p, &end, 10);
+    if (end == p || v < -65536 || v > 0x10ffff) return false;
+    *out = (int)v;
+    return true;
+}
+
+static int bmfont_find_codepoint(Font font, int cp)
+{
+    int lo = 0, hi = font.glyphCount;
+    while (lo < hi) {
+        int mid = lo + (hi - lo) / 2;
+        int val = font.glyphs[mid].value;
+        if (val == cp) return mid;
+        if (val < cp) lo = mid + 1;
+        else hi = mid;
+    }
+    for (int i = 0; i < font.glyphCount; ++i) {
+        if (font.glyphs[i].value == cp) return i;
+    }
+    return -1;
+}
+
+static int bmfont_glyph_index(Font font, int cp)
+{
+    int idx = bmfont_find_codepoint(font, cp);
+    if (idx >= 0) return idx;
+    idx = bmfont_find_codepoint(font, '?');
+    return idx >= 0 ? idx : 0;
+}
+
+Font raylib_lite_raylib_load_font(const char *asset_path)
+{
+    Font font = {0};
+    if (!asset_path || !*asset_path) return font;
+    char fnt_name[128], atlas_name[128];
+    size_t len = strlen(asset_path);
+    if (len + 7 >= sizeof(fnt_name)) return font;
+    memcpy(fnt_name, asset_path, len + 1);
+    const char *dot = strrchr(fnt_name, '.');
+    size_t stem = dot ? (size_t)(dot - fnt_name) : len;
+    if (!dot) {
+        memcpy(fnt_name + stem, ".fnt", 5);
+    }
+    memcpy(atlas_name, fnt_name, stem);
+    memcpy(atlas_name + stem, ".atlas", 7);
+
+    raylib_lite_asset_view_t view = {0};
+    if (raylib_lite_asset_open(fnt_name, &view) != RAYLIB_LITE_OK || !view.data || !view.size) {
+        raylib_lite_asset_release(&view);
+        return font;
+    }
+    char *text = malloc(view.size + 1);
+    if (!text) {
+        raylib_lite_asset_release(&view);
+        return font;
+    }
+    memcpy(text, view.data, view.size);
+    text[view.size] = '\0';
+    raylib_lite_asset_release(&view);
+
+    int line_height = 0, scale_w = 0, scale_h = 0, pages = 1, count = 0;
+    char *cursor = text;
+    while (*cursor) {
+        char *line = cursor;
+        char *nl = strchr(cursor, '\n');
+        if (nl) { *nl = '\0'; cursor = nl + 1; }
+        else cursor += strlen(cursor);
+        if (strncmp(line, "common ", 7) == 0) {
+            (void)bmfont_field(line, "lineHeight=", &line_height);
+            (void)bmfont_field(line, "scaleW=", &scale_w);
+            (void)bmfont_field(line, "scaleH=", &scale_h);
+            (void)bmfont_field(line, "pages=", &pages);
+        } else if (strncmp(line, "chars ", 6) == 0) {
+            (void)bmfont_field(line, "count=", &count);
+            break;
+        }
+    }
+    if (line_height <= 0 || line_height > 4096 || pages != 1 || count <= 0 || count > 65535) {
+        free(text);
+        return font;
+    }
+    Texture2D tex = raylib_lite_2d_load_texture(atlas_name);
+    if (!tex.id || (scale_w && tex.width != scale_w) || (scale_h && tex.height != scale_h)) {
+        if (tex.id) raylib_lite_2d_unload_texture(tex);
+        free(text);
+        return font;
+    }
+    GlyphInfo *glyphs = calloc((size_t)count, sizeof(GlyphInfo));
+    Rectangle *recs = calloc((size_t)count, sizeof(Rectangle));
+    if (!glyphs || !recs) {
+        free(glyphs);
+        free(recs);
+        raylib_lite_2d_unload_texture(tex);
+        free(text);
+        return font;
+    }
+    int parsed = 0;
+    while (*cursor && parsed < count) {
+        char *line = cursor;
+        char *nl = strchr(cursor, '\n');
+        if (nl) { *nl = '\0'; cursor = nl + 1; }
+        else cursor += strlen(cursor);
+        if (strncmp(line, "char ", 5) != 0) continue;
+        int id = 0, x = 0, y = 0, w = 0, h = 0, ox = 0, oy = 0, adv = 0, page = 0;
+        if (!bmfont_field(line, "id=", &id) || !bmfont_field(line, "x=", &x) ||
+            !bmfont_field(line, "y=", &y) || !bmfont_field(line, "width=", &w) ||
+            !bmfont_field(line, "height=", &h) || !bmfont_field(line, "xoffset=", &ox) ||
+            !bmfont_field(line, "yoffset=", &oy) || !bmfont_field(line, "xadvance=", &adv) ||
+            (bmfont_field(line, "page=", &page) && page != 0) ||
+            x < 0 || y < 0 || w < 0 || h < 0 || x + w > tex.width || y + h > tex.height) {
+            free(glyphs);
+            free(recs);
+            raylib_lite_2d_unload_texture(tex);
+            free(text);
+            return (Font){0};
+        }
+        recs[parsed] = (Rectangle){(float)x, (float)y, (float)w, (float)h};
+        glyphs[parsed] = (GlyphInfo){
+            .value = id, .offsetX = ox, .offsetY = oy, .advanceX = adv,
+        };
+        ++parsed;
+    }
+    free(text);
+    if (parsed != count) {
+        free(glyphs);
+        free(recs);
+        raylib_lite_2d_unload_texture(tex);
+        return (Font){0};
+    }
+    /* Sort by codepoint if unordered so binary search always works. */
+    for (int i = 1; i < count; ++i) {
+        GlyphInfo g = glyphs[i];
+        Rectangle r = recs[i];
+        int j = i;
+        while (j > 0 && glyphs[j - 1].value > g.value) {
+            glyphs[j] = glyphs[j - 1];
+            recs[j] = recs[j - 1];
+            --j;
+        }
+        glyphs[j] = g;
+        recs[j] = r;
+    }
+    font.baseSize = line_height;
+    font.glyphCount = count;
+    font.glyphPadding = 0;
+    font.texture = tex;
+    font.recs = recs;
+    font.glyphs = glyphs;
+    return font;
+}
+
+void raylib_lite_raylib_unload_font(Font font)
+{
+    if (font.texture.id) raylib_lite_2d_unload_texture(font.texture);
+    free(font.glyphs);
+    free(font.recs);
+}
+
+void raylib_lite_raylib_draw_text_ex(Font font, const char *text, Vector2 position,
+                                     float font_size, float spacing, Color tint)
+{
+    if (!text || !tint.a) return;
+    if (!font.texture.id || !font.glyphs || !font.recs || font.glyphCount <= 0 || font.baseSize <= 0) {
+        raylib_lite_raylib_draw_text(text, (int)position.x, (int)position.y,
+                                     (int)(font_size > 0 ? font_size : 10), tint);
+        return;
+    }
+    float effective_size = font_size > 0 ? font_size : (float)font.baseSize;
+    float scale = effective_size / (float)font.baseSize;
+    float ox = 0.0f, oy = 0.0f;
+    while (*text) {
+        if (*text == '\r') {
+            ++text;
+            if (*text == '\n') ++text;
+            ox = 0.0f;
+            oy += effective_size + 2.0f;
+            continue;
+        }
+        unsigned cp = text_codepoint(&text);
+        if (cp == '\n') {
+            ox = 0.0f;
+            oy += effective_size + 2.0f;
+            continue;
+        }
+        int idx = bmfont_glyph_index(font, (int)cp);
+        Rectangle src = font.recs[idx];
+        GlyphInfo g = font.glyphs[idx];
+        if (cp != ' ' && cp != '\t' && src.width > 0 && src.height > 0) {
+            Rectangle dst = {
+                position.x + ox + (float)g.offsetX * scale,
+                position.y + oy + (float)g.offsetY * scale,
+                src.width * scale,
+                src.height * scale,
+            };
+            /* Snap 1:1 unrotated glyphs in screen space to integer pixels so the
+             * renderer's M2D_ATLAS_BINARY_ALPHA fast path runs without scaling. */
+            float zoom = s_camera_active ? s_camera.zoom : 1.0f;
+            float rot = s_camera_active ? s_camera.rotation : 0.0f;
+            if (fabsf(scale * zoom - 1.0f) < 0.001f && fabsf(rot) < 0.001f) {
+                if (s_camera_active) {
+                    Vector2 sp = active_to_screen((Vector2){dst.x, dst.y});
+                    raylib_lite_2d_draw_texture_pro(
+                        font.texture, src,
+                        (Rectangle){floorf(sp.x + 0.5f), floorf(sp.y + 0.5f),
+                                    src.width, src.height},
+                        (Vector2){0, 0}, 0.0f, tint);
+                } else {
+                    dst.x = floorf(dst.x + 0.5f);
+                    dst.y = floorf(dst.y + 0.5f);
+                    raylib_lite_raylib_draw_texture_pro(font.texture, src, dst,
+                                                        (Vector2){0, 0}, 0.0f, tint);
+                }
+            } else {
+                raylib_lite_raylib_draw_texture_pro(font.texture, src, dst,
+                                                    (Vector2){0, 0}, 0.0f, tint);
+            }
+        }
+        float adv = g.advanceX > 0 ? (float)g.advanceX : (src.width + (float)g.offsetX);
+        ox += adv * scale + spacing;
+    }
+}
+
+Vector2 raylib_lite_raylib_measure_text_ex(Font font, const char *text,
+                                           float font_size, float spacing)
+{
+    if (!text || !*text) return (Vector2){0, 0};
+    if (!font.texture.id || !font.glyphs || !font.recs || font.glyphCount <= 0 || font.baseSize <= 0) {
+        int sz = (int)(font_size >= 10 ? font_size : 10);
+        float h = (float)sz;
+        for (const char *p = text; *p; ++p) {
+            if (*p == '\n') h += (float)sz + 2.0f;
+        }
+        return (Vector2){(float)raylib_lite_raylib_measure_text(text, sz), h};
+    }
+    float effective_size = font_size > 0 ? font_size : (float)font.baseSize;
+    float scale = effective_size / (float)font.baseSize;
+    float width = 0.0f, max_width = 0.0f, height = effective_size;
+    int chars = 0, max_chars = 0;
+    while (*text) {
+        if (*text == '\r') {
+            ++text;
+            if (*text == '\n') ++text;
+            if (width > max_width) max_width = width;
+            if (chars > max_chars) max_chars = chars;
+            width = 0.0f;
+            chars = 0;
+            height += effective_size + 2.0f;
+            continue;
+        }
+        unsigned cp = text_codepoint(&text);
+        if (cp == '\n') {
+            if (width > max_width) max_width = width;
+            if (chars > max_chars) max_chars = chars;
+            width = 0.0f;
+            chars = 0;
+            height += effective_size + 2.0f;
+            continue;
+        }
+        int idx = bmfont_glyph_index(font, (int)cp);
+        GlyphInfo g = font.glyphs[idx];
+        Rectangle src = font.recs[idx];
+        width += g.advanceX > 0 ? (float)g.advanceX : (src.width + (float)g.offsetX);
+        ++chars;
+    }
+    if (width > max_width) max_width = width;
+    if (chars > max_chars) max_chars = chars;
+    float total_w = max_width * scale + (max_chars > 0 ? (float)(max_chars - 1) * spacing : 0.0f);
+    return (Vector2){total_w, height};
 }
 
 const char *raylib_lite_raylib_text_format_v(const char *format, va_list args)

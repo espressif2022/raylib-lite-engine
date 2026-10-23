@@ -22,6 +22,7 @@ typedef struct {
     shooter_game_t game;
     raylib_lite_atlas_t atlas;
     raylib_lite_atlas_t backdrop;
+    Font zh_font;
     bool paused, left, right, up, down;
     float imu_x, imu_y;
 #if defined(RAYLIB_LITE_GAME_NATIVE)
@@ -49,6 +50,7 @@ static int initialize(void *value
     state->atlas=raylib_lite_atlas_load("shooter.atlas");
     if(!state->atlas.texture.id)return -1;
     state->backdrop=raylib_lite_atlas_load("nebula.atlas");
+    state->zh_font=LoadFont("shooter_zh.fnt");
     state->game.width=480.0f;
     shooter_game_reset(&state->game,0x4d4f5341U);
 #if defined(RAYLIB_LITE_GAME_NATIVE)
@@ -67,6 +69,7 @@ static void shutdown(void *value)
 #if defined(RAYLIB_LITE_GAME_NATIVE)
     shooter_feedback_close(&state->feedback);
 #endif
+    UnloadFont(state->zh_font);
     raylib_lite_atlas_unload(state->atlas);
     raylib_lite_atlas_unload(state->backdrop);
 }
@@ -133,7 +136,7 @@ static void update(void *value)
 static int render(void *value)
 {
     shooter_module_state_t *state=value;
-    shooter_view_render(&state->game,state->atlas,state->backdrop);
+    shooter_view_render(&state->game,state->atlas,state->backdrop,state->zh_font);
     return 0;
 }
 

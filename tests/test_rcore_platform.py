@@ -25,7 +25,8 @@ class RcorePlatformTests(unittest.TestCase):
             upstream = [RAYLIB / "src" / name for name in ("rshapes.c", "rtextures.c", "rtext.c")]
             for source in upstream + [ROOT / "src/rcore/raylib_lite_rcore.c"]:
                 obj = str(Path(directory) / (source.stem + ".o"))
-                subprocess.run([cc, "-std=gnu99", "-O1", "-w", *DEFINES, *flags, *includes,
+                subprocess.run([cc, "-std=gnu99", "-O1", "-w", *DEFINES,
+                                "-DRAYLIB_LITE_RCORE_NO_ASSET_BRIDGE=1", *flags, *includes,
                                 "-c", str(source), "-o", obj], check=True)
                 objects.append(obj)
             executable = str(Path(directory) / "rcore_platform")

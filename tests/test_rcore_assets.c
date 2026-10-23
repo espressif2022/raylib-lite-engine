@@ -121,6 +121,25 @@ int main(int argc, char **argv)
         UnloadFileData(disk);
     }
     CloseWindow();
+    /* Invalid asset_root must fail InitWindow cleanly: IsWindowReady() stays false
+     * and the platform can be reconfigured immediately. */
+    config.asset_root="../escape";
+    assert(raylib_lite_rcore_configure(&config) == RAYLIB_LITE_OK);
+    InitWindow(32,16,"native-assets-bad-root");
+    assert(!IsWindowReady() && WindowShouldClose());
+    assert(raylib_lite_rcore_last_acquire_result() == RAYLIB_LITE_NOT_READY);
+    /* Automatic platform attachment via config.asset_root: no manual attach call. */
+    assert(raylib_lite_asset_register_memory("bundle/fonts/ui.fnt",descriptor,sizeof(descriptor)-1) == RAYLIB_LITE_OK);
+    assert(raylib_lite_asset_register_memory("bundle/fonts/atlas.png",png,(size_t)length) == RAYLIB_LITE_OK);
+    config.asset_root="bundle";
+    assert(raylib_lite_rcore_configure(&config) == RAYLIB_LITE_OK);
+    InitWindow(32,16,"native-assets-auto");
+    assert(IsWindowReady());
+    check_native_font(&surface);
+    CloseWindow();
+    assert(!IsWindowReady());
+    assert(raylib_lite_rcore_assets_last_result() == RAYLIB_LITE_NOT_READY);
+    raylib_lite_assets_unmount();
     frame_surface_free(&surface);
     free(png);
     puts("native asset bridge: ok");

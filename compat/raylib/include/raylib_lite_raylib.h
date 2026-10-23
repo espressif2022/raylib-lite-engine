@@ -91,7 +91,11 @@
 #define DrawTextureEx raylib_lite_raylib_draw_texture_ex
 #define DrawTexturePro raylib_lite_raylib_draw_texture_pro
 #define DrawText raylib_lite_raylib_draw_text
+#define DrawTextEx raylib_lite_raylib_draw_text_ex
+#define LoadFont raylib_lite_raylib_load_font
+#define UnloadFont raylib_lite_raylib_unload_font
 #define MeasureText raylib_lite_raylib_measure_text
+#define MeasureTextEx raylib_lite_raylib_measure_text_ex
 #define TextFormat raylib_lite_raylib_text_format
 #define CheckCollisionRecs raylib_lite_raylib_check_collision_recs
 #define CheckCollisionCircles raylib_lite_raylib_check_collision_circles

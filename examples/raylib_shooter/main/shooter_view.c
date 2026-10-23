@@ -14,6 +14,7 @@ static const Color C_MINT={70,242,174,255};
 #define FIELD 480.0f
 static raylib_lite_design_view_t s_view={1.0f,480.0f,480.0f};
 static int s_w=480,s_cx;
+static Font s_zh={0};
 
 static int font(int size){return raylib_lite_design_font(s_view,size);}
 static void draw_text(const char *text,int x,int y,int size,Color color)
@@ -25,6 +26,30 @@ static int measure_text(const char *text,int size){return MeasureText(text,font(
 static void draw_centered(const char *text,int y,int size,Color color)
 {
     draw_text(text,(s_w-measure_text(text,size))/2,y,size,color);
+}
+
+static float zh_size(void)
+{
+    int base=s_zh.baseSize>0?s_zh.baseSize:16;
+    if(raylib_lite_design_view_native(s_view)||s_view.scale<=0.0f)return (float)base;
+    return (float)base/s_view.scale;
+}
+static float zh_spacing(void)
+{
+    if(raylib_lite_design_view_native(s_view)||s_view.scale<=0.0f)return 1.0f;
+    return 1.0f/s_view.scale;
+}
+static void draw_zh(const char *text,int x,int y,Color color)
+{
+    if(s_zh.texture.id)
+        DrawTextEx(s_zh,text,(Vector2){(float)x,(float)y},zh_size(),zh_spacing(),color);
+}
+static void draw_zh_centered(const char *text,int y,Color color)
+{
+    if(!s_zh.texture.id)return;
+    float sz_px=zh_size(),sp=zh_spacing();
+    Vector2 sz=MeasureTextEx(s_zh,text,sz_px,sp);
+    DrawTextEx(s_zh,text,(Vector2){(float)s_w*.5f-sz.x*.5f,(float)y},sz_px,sp,color);
 }
 
 static void draw_background(const shooter_game_t *game,raylib_lite_atlas_t backdrop)
@@ -148,6 +173,7 @@ static void draw_particles(const shooter_game_t *game)
 
 static void draw_hud(const shooter_game_t *game)
 {
+    const bool compact=!raylib_lite_design_view_native(s_view);
     DrawRectangle(s_w-68,72,56,56,(Color){9,15,43,255});
     DrawRectangleLines(s_w-68,72,56,56,C_CYAN);
     DrawRectangle(s_w-52,86,8,28,RAYWHITE);
@@ -156,14 +182,38 @@ static void draw_hud(const shooter_game_t *game)
     DrawRectangle(12,12,s_w-24,52,(Color){9,15,43,255});
     DrawRectangle(12,12,92,3,C_CYAN);
     DrawRectangle(376+right,61,92,3,C_PINK);
-    draw_text("SCORE",25,20,12,(Color){94,151,193,255});
+    if(compact&&s_zh.texture.id){
+        /* At 320x240 (s_w=640, zoom=0.5), 32 design units = 16px on screen.
+         * Place label and value side-by-side inside the 52-unit HUD bar. */
+        draw_zh("得分",20,24,(Color){94,151,193,255});
+        draw_text(TextFormat("%07lu",(unsigned long)game->score),84,30,19,RAYWHITE);
+        draw_zh(TextFormat("战区%02u",game->wave),224,24,(Color){105,169,206,255});
+        if(game->combo){
+            Color color=game->combo>=8?C_GOLD:C_PINK;
+            draw_text(TextFormat("x%02u",game->combo),354,30,19,color);
+        }else{
+            draw_zh("连击--",354,24,(Color){48,70,103,255});
+        }
+        draw_zh("护甲",492,24,(Color){117,150,184,255});
+        for(unsigned i=0;i<3;++i){
+            Color color=i<game->lives?C_MINT:(Color){40,35,67,255};
+            int x=558+(int)i*20;
+            DrawTriangle((Vector2){x+7,30},(Vector2){x,45},(Vector2){x+14,45},color);
+        }
+        return;
+    }
+    if(s_zh.texture.id)draw_zh("得分",25,18,(Color){94,151,193,255});
+    else draw_text("SCORE",25,20,12,(Color){94,151,193,255});
     draw_text(TextFormat("%07lu",(unsigned long)game->score),25,36,19,RAYWHITE);
-    draw_text(TextFormat("SECTOR %02u",game->wave),200+s_cx,20,13,(Color){105,169,206,255});
+    if(s_zh.texture.id)draw_zh(TextFormat("战区 %02u",game->wave),200+s_cx,18,(Color){105,169,206,255});
+    else draw_text(TextFormat("SECTOR %02u",game->wave),200+s_cx,20,13,(Color){105,169,206,255});
     if(game->combo){
         Color color=game->combo>=8?C_GOLD:C_PINK;
         draw_text(TextFormat("x%02u",game->combo),213+s_cx,39,19,color);
-    }else draw_text("LINK --",204+s_cx,40,12,(Color){48,70,103,255});
-    draw_text("HULL",390+right,20,12,(Color){117,150,184,255});
+    }else if(s_zh.texture.id)draw_zh("连击 --",200+s_cx,38,(Color){48,70,103,255});
+    else draw_text("LINK --",204+s_cx,40,12,(Color){48,70,103,255});
+    if(s_zh.texture.id)draw_zh("护甲",390+right,18,(Color){117,150,184,255});
+    else draw_text("HULL",390+right,20,12,(Color){117,150,184,255});
     for(unsigned i=0;i<3;++i){
         Color color=i<game->lives?C_MINT:(Color){40,35,67,255};
         int x=389+right+(int)i*20;
@@ -183,38 +233,48 @@ static void draw_corner_frame(Color accent)
 
 static void draw_start_card(void)
 {
+    const bool compact=!raylib_lite_design_view_native(s_view);
     draw_corner_frame(C_CYAN);
-    draw_centered("MOSAICO",164,20,(Color){97,160,202,255});
-    draw_centered("STRIKE",190,52,RAYWHITE);
-    DrawRectangle(107+s_cx,250,266,2,(Color){38,86,121,255});
-    draw_centered("DODGE SHOTS / DEFEAT THE ACE",266,15,C_CYAN);
-    DrawRectangleRounded((Rectangle){126.0f+s_cx,302,228,42},0.18f,4,C_CYAN);
-    draw_centered("TOUCH TO DEPLOY",314,17,(Color){3,22,35,255});
-    draw_centered("DRAG TO STEER  /  AUTO FIRE",379,15,(Color){91,139,180,255});
+    draw_centered("MOSAICO",compact?146:154,18,(Color){97,160,202,255});
+    draw_centered("STRIKE",compact?166:174,48,RAYWHITE);
+    if(s_zh.texture.id)draw_zh_centered("星空突击",compact?210:224,C_GOLD);
+    DrawRectangle(107+s_cx,246,266,2,(Color){38,86,121,255});
+    if(s_zh.texture.id)draw_zh_centered("闪避弹幕 / 迎战王牌",compact?254:260,C_CYAN);
+    else draw_centered("DODGE SHOTS / DEFEAT THE ACE",266,15,C_CYAN);
+    DrawRectangleRounded((Rectangle){126.0f+s_cx,298,228,42},0.18f,4,C_CYAN);
+    if(s_zh.texture.id)draw_zh_centered("点击出击",compact?303:311,(Color){3,22,35,255});
+    else draw_centered("TOUCH TO DEPLOY",314,17,(Color){3,22,35,255});
+    if(s_zh.texture.id)draw_zh_centered("拖动战机 / 自动开火",compact?364:375,(Color){91,139,180,255});
+    else draw_centered("DRAG TO STEER  /  AUTO FIRE",379,15,(Color){91,139,180,255});
 }
 
-static void draw_status_card(const shooter_game_t *game,const char *title,Color accent)
+static void draw_status_card(const shooter_game_t *game,const char *title,const char *zh_title,Color accent)
 {
+    const bool compact=!raylib_lite_design_view_native(s_view);
     DrawRectangle(0,0,s_w,480,(Color){3,6,22,255});
     draw_corner_frame(accent);
-    draw_centered(title,181,39,RAYWHITE);
+    draw_centered(title,compact?156:168,36,RAYWHITE);
+    if(s_zh.texture.id&&zh_title)draw_zh_centered(zh_title,compact?198:210,accent);
     if(game->phase==SHOOTER_GAME_OVER || game->phase==SHOOTER_WON){
         draw_centered(TextFormat("SCORE %07lu",(unsigned long)game->score),242,19,accent);
         draw_centered(TextFormat("%u KILLS  /  MAX LINK x%u",game->kills,game->max_combo),274,14,
                       (Color){126,165,197,255});
         DrawRectangleRounded((Rectangle){126.0f+s_cx,302,228,42},0.18f,4,accent);
-        draw_centered("TOUCH TO RETRY",314,17,RAYWHITE);
+        if(s_zh.texture.id)draw_zh_centered("点击重试",compact?307:315,RAYWHITE);
+        else draw_centered("TOUCH TO RETRY",314,17,RAYWHITE);
     }else{
         draw_centered("COMBAT SYSTEMS STANDBY",246,15,(Color){132,162,194,255});
         DrawRectangleRounded((Rectangle){126.0f+s_cx,302,228,42},0.18f,4,accent);
-        draw_centered("TOUCH TO RESUME",314,17,(Color){28,18,5,255});
+        if(s_zh.texture.id)draw_zh_centered("点击继续",compact?307:315,(Color){28,18,5,255});
+        else draw_centered("TOUCH TO RESUME",314,17,(Color){28,18,5,255});
     }
 }
 
 void shooter_view_render(const shooter_game_t *game,raylib_lite_atlas_t atlas,
-                         raylib_lite_atlas_t backdrop)
+                         raylib_lite_atlas_t backdrop,Font zh_font)
 {
     if(!game)return;
+    s_zh=zh_font;
     BeginDrawing();
     s_view=raylib_lite_design_view(FIELD);
     s_w=(int)(s_view.width+.5f);
@@ -238,13 +298,18 @@ void shooter_view_render(const shooter_game_t *game,raylib_lite_atlas_t atlas,
         draw_hud(game);
     }
     if(game->phase==SHOOTER_START)draw_start_card();
-    else if(game->phase==SHOOTER_PAUSED)draw_status_card(game,"PAUSED",C_GOLD);
-    else if(game->phase==SHOOTER_GAME_OVER)draw_status_card(game,"MISSION LOST",C_PINK);
-    else if(game->phase==SHOOTER_WON)draw_status_card(game,"MISSION CLEAR",C_MINT);
+    else if(game->phase==SHOOTER_PAUSED)draw_status_card(game,"PAUSED","暂停",C_GOLD);
+    else if(game->phase==SHOOTER_GAME_OVER)draw_status_card(game,"MISSION LOST","任务失败",C_PINK);
+    else if(game->phase==SHOOTER_WON)draw_status_card(game,"MISSION CLEAR","任务完成",C_MINT);
     else if(game->wave_banner){
+        const bool compact=!raylib_lite_design_view_native(s_view);
         int width=game->wave_banner>54?250:(int)game->wave_banner*4;
-        DrawRectangle((s_w-width)/2,82,width,28,(Color){8,27,52,255});
-        draw_centered((game->finale_spawned?"FINAL ACE // DODGE AND FIRE":TextFormat("SECTOR %02u // ENGAGED",game->wave)),89,14,C_CYAN);
+        int bh=compact?36:28;
+        DrawRectangle((s_w-width)/2,82,width,bh,(Color){8,27,52,255});
+        if(s_zh.texture.id)
+            draw_zh_centered((game->finale_spawned?"迎战王牌":"战区出击"),compact?84:88,C_CYAN);
+        else
+            draw_centered((game->finale_spawned?"FINAL ACE // DODGE AND FIRE":TextFormat("SECTOR %02u // ENGAGED",game->wave)),89,14,C_CYAN);
     }
     if(game->hit_flash){
         Color color=game->hit_flash&1U?C_PINK:C_GOLD;

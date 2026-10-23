@@ -7,5 +7,9 @@
   "frames": [
     {"name": "joystick_base"},
     {"name": "fire_button"}
+  ],
+  "variants": [
+    {"name": "joystick_base_40", "source": "joystick_base", "width": 40, "height": 40},
+    {"name": "fire_button_40", "source": "fire_button", "width": 40, "height": 40}
   ]
 }

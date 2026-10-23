@@ -61,7 +61,7 @@ CloseWindow();
 
 `tests/test_raylib_compat_policy.py` 检查每个映射名都出现在下表中；增加映射却不登记会导致测试失败。
 
-[冻结名单](../compat/raylib/frozen-mappings.json)另外检查现有 105 个名字：只修改映射和状态表不能绕过冻结规则。退役或其他经审阅的名单变更需要同步更新基线，并记录消费者、验证和迁移证据。
+[冻结名单](../compat/raylib/frozen-mappings.json)另外检查现有 109 个名字：只修改映射和状态表不能绕过冻结规则。退役或其他经审阅的名单变更需要同步更新基线，并记录消费者、验证和迁移证据。
 
 `python3 tools/audit_raylib.py --output /tmp/raylib-audit.json` 校验冻结名单和 vendored 源码清单，并导出发布游戏的静态引用位置。可加 `--reference-component <解包后的 georgik/raylib 组件目录>`，核对来源版本、提交、组件路径及逐字节内容。报告分别列出声明/定义与源码引用，保留条件编译分支，区分游戏、共享适配、测试和基准；并检查[接口使用边界](custom-api.CN.md)。静态引用不是运行时调用次数或帧率。
 
@@ -96,8 +96,10 @@ CloseWindow();
 | `DrawTriangle` `DrawTriangleLines` `DrawTriangleFan` `DrawTriangleStrip` | 差异 | 整数顶点上的左上填充规则（上游 rlsw 在像素中心采样）；共享边只覆盖一次，半透明扇形和条带无重叠 |
 | `DrawPoly` `DrawPolyLines` `DrawPolyLinesEx` | 差异 | 由三角形路径组成，继承上述覆盖规则 |
 | `LoadTexture` `UnloadTexture` | 契约 | 只读取引擎打包资源；纹理 ID 是本仓库槽位，不能交给上游纹理函数 |
+| `LoadFont` `UnloadFont` | 契约 | 读取离线打包的 `.fnt` 与 `.atlas` 位图字库；纹理句柄属于本仓库，不能交给上游字体函数 |
 | `DrawTexture` `DrawTextureV` `DrawTextureRec` `DrawTextureEx` `DrawTexturePro` | 差异 | 均转到自有纹理光栅；保留不透明快路径。半透明着色保留 8 位通道精度至最终 RGB565 写入，旋转按实际四角包围盒与像素中心采样；仍未全面对齐 rlsw |
 | `DrawText` `MeasureText` | 差异 | 使用上游默认字体的 224 个字形与宽度，支持小写、UTF-8 Latin-1、非整数倍字号与换行；旋转相机和边缘采样仍有差异，不支持自定义字体 |
+| `DrawTextEx` `MeasureTextEx` | 差异 | 支持 UTF-8、自定义 fallback 与离线 BMFont 中文字库；多行行距采用与上游默认 `textLineSpacing = 2` 一致的 `fontSize + 2`，暂未映射 `SetTextLineSpacing`。屏幕 1:1 字号走二值掩码快路径，无效字体回退到默认 `DrawText`；与原生 `rcore` 共享调用形式和 `.fnt` 描述，但底层仍是独立的轻量渲染实现 |
 | `TextFormat` | 等价 | 与上游 `config.h` 相同：4 个 512 字节轮换缓冲；超长输出以 `...` 结尾，空格式不推进轮换 |
 | `CheckCollisionRecs` `CheckCollisionCircles` `CheckCollisionPointRec` `CheckCollisionCircleRec` `CheckCollisionPointCircle` `CheckCollisionPointTriangle` `GetCollisionRec` | 等价 | 与 raylib 6.0 `rshapes.c` 一致，包括边界规则 |
 | `Fade` `ColorAlpha` `ColorTint` `ColorBrightness` | 等价 | 与 raylib 6.0 `rtextures.c` 一致，包括截断规则 |

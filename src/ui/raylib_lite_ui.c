@@ -2,7 +2,6 @@
 #include "raylib_lite_ui.h"
 #include "raylib_lite_raylib_impl.h"
 
-#include <math.h>
 #include <string.h>
 
 static bool hit(raylib_lite_renderer_rect_t rect, float x, float y)
@@ -171,43 +170,4 @@ void raylib_lite_ui_draw(raylib_lite_ui_t *ui, int font_size)
                 font_size, to_raylib_color(node->text_color));
         }
     }
-}
-
-raylib_lite_result_t raylib_lite_ui_draw_font(raylib_lite_ui_t *ui,
-    const raylib_lite_font_t *font, uint32_t wrap_width)
-{
-    if (!ui || !font) return RAYLIB_LITE_INVALID_ARGUMENT;
-    for (size_t i = 0; i < ui->count; ++i) {
-        const raylib_lite_ui_node_t *node = &ui->nodes[i];
-        if (!node->visible) continue;
-        /* Validate before float-to-int conversion; keep the font coordinate
-         * limit for rectangles as well, including non-finite user bounds. */
-        const float limit = 8388608.0f;
-        raylib_lite_renderer_rect_t b = node->bounds;
-        if (!isfinite(b.x) || !isfinite(b.y) || !isfinite(b.width) ||
-                !isfinite(b.height) || fabsf(b.x) > limit || fabsf(b.y) > limit ||
-                b.width < 0 || b.height < 0 || b.width > limit || b.height > limit)
-            return RAYLIB_LITE_INVALID_SIZE;
-        raylib_lite_text_metrics_t metrics = {0};
-        size_t bytes = node->text ? strlen(node->text) : 0;
-        raylib_lite_result_t result = raylib_lite_font_measure(font,
-            node->text, bytes, wrap_width, &metrics);
-        if (result != RAYLIB_LITE_OK) return result;
-        double x = (double)b.x + ((double)b.width - metrics.width) / 2;
-        double y = (double)b.y + ((double)b.height - metrics.height) / 2;
-        if (x < -limit || x > limit || y < -limit || y > limit)
-            return RAYLIB_LITE_INVALID_SIZE;
-        Color color = to_raylib_color(node->color);
-        if (node->pressed)
-            color = (Color){color.r / 2, color.g / 2, color.b / 2, color.a};
-        if (node->type != RAYLIB_LITE_UI_LABEL)
-            raylib_lite_raylib_draw_rectangle((int)b.x, (int)b.y,
-                (int)b.width, (int)b.height, color);
-        if (bytes) {
-            result = raylib_lite_font_draw(font, node->text, bytes,
-                (int)x, (int)y, wrap_width, node->text_color, NULL);
-            if (result != RAYLIB_LITE_OK) return result;
-        }
-    }
-    return RAYLIB_LITE_OK;
 }

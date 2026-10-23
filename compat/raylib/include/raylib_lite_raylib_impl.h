@@ -138,6 +138,12 @@ void raylib_lite_raylib_draw_texture_pro(Texture2D texture, Rectangle source,
 
 void raylib_lite_raylib_draw_text(const char *text, int x, int y, int font_size, Color color);
 int raylib_lite_raylib_measure_text(const char *text, int font_size);
+Font raylib_lite_raylib_load_font(const char *asset_path);
+void raylib_lite_raylib_unload_font(Font font);
+void raylib_lite_raylib_draw_text_ex(Font font, const char *text, Vector2 position,
+                                     float font_size, float spacing, Color tint);
+Vector2 raylib_lite_raylib_measure_text_ex(Font font, const char *text,
+                                           float font_size, float spacing);
 const char *raylib_lite_raylib_text_format_v(const char *format, va_list args);
 const char *raylib_lite_raylib_text_format(const char *format, ...);
 uint16_t *raylib_lite_raylib_get_framebuffer(int *width, int *height,

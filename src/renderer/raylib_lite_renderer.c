@@ -550,13 +550,13 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
   return;
  }
  if(identity&&!fx&&!fy&&(s->header->flags&M2D_ATLAS_BINARY_ALPHA)&&s->alpha&&
-    tint.r==255&&tint.g==255&&tint.b==255&&tint.a==255&&
-    dw==(int)sw&&dh==(int)sh){
+    tint.a==255&&dw==(int)sw&&dh==(int)sh){
   int left=(int)(dest.x-origin.x),top=(int)(dest.y-origin.y);
   int sx=(int)source.x+(x0-left),sy=(int)source.y+(y0-top),copy=x1-x0;
   if(copy>0&&sx>=0&&sy>=0&&sx+copy<=s->header->width&&
      sy+(y1-y0)<=s->header->height){
    uint32_t drawn=0;
+   bool white=tint.r==255&&tint.g==255&&tint.b==255;
    for(int y=y0;y<y1;++y,++sy){
     if(ROW_HIDDEN(y))continue;
     const uint8_t*mask=&s->alpha[(size_t)sy*s->header->width+sx];
@@ -567,8 +567,11 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
      while(x<copy&&!mask[x])++x;
      int start=x;
      while(x<copy&&mask[x])++x;
-     if(start<x){raylib_lite_rgb565_copy(dst+start,src+start,(size_t)(x-start));
-      drawn+=(uint32_t)(x-start);m2d_note_store(x-start);}
+     if(start<x){
+      if(white)raylib_lite_rgb565_copy(dst+start,src+start,(size_t)(x-start));
+      else for(int i=start;i<x;++i)dst[i]=tint565(src[i],tint);
+      drawn+=(uint32_t)(x-start);m2d_note_store(x-start);
+     }
     }
    }
    ++s_raster_stats.binary_alpha_calls;s_raster_stats.binary_alpha_pixels+=drawn;
@@ -577,12 +580,13 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
   }
  }
  if(identity&&(s->header->flags&M2D_ATLAS_BINARY_ALPHA)&&s->alpha&&
-    tint.r==255&&tint.g==255&&tint.b==255&&tint.a==255){
+    tint.a==255){
   int left=(int)(dest.x-origin.x),top=(int)(dest.y-origin.y),isw=(int)sw,ish=(int)sh;
   int source_x=(int)source.x,source_y=(int)source.y;
   int first_lx=x0-left,first_ly=y0-top;
   sample_step_t ystep=sample_step(first_ly,ish,dh);
   uint32_t drawn=0,runs=0;
+  bool white=tint.r==255&&tint.g==255&&tint.b==255;
   for(int y=y0;y<y1;++y){
    int sy=sample_next(&ystep);if(fy)sy=ish-1-sy;sy+=source_y;
    if((unsigned)sy>=s->header->height||ROW_HIDDEN(y))continue;
@@ -592,7 +596,7 @@ void raylib_lite_renderer_draw_texture_pro(raylib_lite_renderer_texture_t textur
     int sx=sample_next(&xstep);if(fx)sx=isw-1-sx;sx+=source_x;
     if((unsigned)sx<s->header->width){
      size_t index=(size_t)sy*s->header->width+sx;
-     if(s->alpha[index]){*dst=s->rgb[index];++drawn;}
+     if(s->alpha[index]){*dst=white?s->rgb[index]:tint565(s->rgb[index],tint);++drawn;}
     }
     ++dst;
    }

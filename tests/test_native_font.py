@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Real native BMFont page loading, UTF-8 drawing, and repeated unload regression."""
+import json
 import os
 from pathlib import Path
 import shlex
@@ -9,6 +10,7 @@ import unittest
 
 from PIL import Image
 
+from tests.test_font import fixture_font
 from tests.test_rcore_platform import ROOT, RAYLIB, DEFINES, INCLUDES
 
 
@@ -24,7 +26,8 @@ class NativeFontTests(unittest.TestCase):
             sources = [RAYLIB / "src" / name for name in ("rshapes.c", "rtextures.c", "rtext.c")]
             for source in sources + [ROOT / "src/rcore/raylib_lite_rcore.c"]:
                 obj = output / (source.stem + ".o")
-                subprocess.run([cc, "-std=gnu99", "-O1", "-w", *DEFINES, *flags, *includes,
+                subprocess.run([cc, "-std=gnu99", "-O1", "-w", *DEFINES,
+                                "-DRAYLIB_LITE_RCORE_NO_ASSET_BRIDGE=1", *flags, *includes,
                                 "-c", str(source), "-o", str(obj)], check=True)
                 objects.append(str(obj))
             executable = output / "native_font"
@@ -49,7 +52,20 @@ class NativeFontTests(unittest.TestCase):
                 path = output / f"font{pages}.fnt"
                 path.write_text("\n".join(lines) + "\n")
                 paths.append(str(path))
-            subprocess.run([str(executable), *paths], check=True)
+            ttf = output / "source.ttf"
+            fixture_font(ttf)
+            txt = output / "strings.txt"
+            txt.write_text("中文\nA", encoding="utf-8")
+            packed = output / "packed_fb"
+            subprocess.run(["python3", str(ROOT / "tools/pack_font.py"),
+                            "--font", str(ttf), "--text-file", str(txt),
+                            "--fallback", "U+4E2D", "--size", "12", "--atlas-width", "64",
+                            "--license", "Original test fixture; Apache-2.0",
+                            "--output", str(packed)], check=True)
+            report = json.loads(Path(str(packed) + ".font.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["glyph_count"], 4)
+            self.assertIn("chars count=4", packed.with_suffix(".fnt").read_text(encoding="utf-8"))
+            subprocess.run([str(executable), *paths, str(packed.with_suffix(".fnt"))], check=True)
 
 
 if __name__ == "__main__":

@@ -62,8 +62,8 @@ class RaylibAuditTests(unittest.TestCase):
             root = Path(directory)
             shutil.copytree(ROOT / "compat/raylib", root / "compat/raylib")
             facade = root / "compat/raylib/include/raylib_lite_raylib.h"
-            facade.write_text(facade.read_text() + "\n#define LoadFont raylib_lite_load_font\n")
-            with self.assertRaisesRegex(ValueError, "LoadFont"):
+            facade.write_text(facade.read_text() + "\n#define LoadFontEx raylib_lite_load_font_ex\n")
+            with self.assertRaisesRegex(ValueError, "LoadFontEx"):
                 check_frozen(root)
 
     def test_consumer_locations_ignore_comments_and_strings(self):

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 #include "raylib.h"
 #include "raylib_lite_rcore.h"
 #include "frame_host.h"
@@ -31,9 +32,37 @@ static void check_font(const char *path, frame_surface_t *surface, int pages)
     UnloadFont(font);
 }
 
+static void check_packed_fallback(const char *path, frame_surface_t *surface)
+{
+    Font font = LoadFont(path);
+    assert(font.texture.id && font.glyphCount > 0 && font.glyphPadding == 0);
+    int idx_fb = GetGlyphIndex(font, 0x4e2d);
+    int idx_unknown = GetGlyphIndex(font, '!');
+    assert(font.recs[idx_unknown].x == font.recs[idx_fb].x);
+    assert(font.recs[idx_unknown].y == font.recs[idx_fb].y);
+    assert(font.recs[idx_unknown].width == font.recs[idx_fb].width);
+    assert(font.recs[idx_unknown].height == font.recs[idx_fb].height);
+    assert(font.glyphs[idx_unknown].offsetX == font.glyphs[idx_fb].offsetX);
+    assert(font.glyphs[idx_unknown].offsetY == font.glyphs[idx_fb].offsetY);
+    assert(font.glyphs[idx_unknown].advanceX == font.glyphs[idx_fb].advanceX);
+    uint16_t expected[32 * 16] = {0}, actual[32 * 16] = {0};
+    BeginDrawing();
+    ClearBackground(BLACK);
+    DrawTextEx(font, "\xe4\xb8\xad", (Vector2){1, 1}, (float)font.baseSize, 0, WHITE);
+    EndDrawing();
+    memcpy(expected, surface->pixels, sizeof(expected));
+    BeginDrawing();
+    ClearBackground(BLACK);
+    DrawTextEx(font, "!", (Vector2){1, 1}, (float)font.baseSize, 0, WHITE);
+    EndDrawing();
+    memcpy(actual, surface->pixels, sizeof(actual));
+    assert(!memcmp(expected, actual, sizeof(expected)));
+    UnloadFont(font);
+}
+
 int main(int argc, char **argv)
 {
-    assert(argc == 4);
+    assert(argc == 5);
     frame_surface_t surface;
     assert(frame_surface_init(&surface, 32, 16) == 0);
     raylib_lite_rcore_config_t config = {
@@ -47,6 +76,7 @@ int main(int argc, char **argv)
     for (int repeat = 0; repeat < 8; ++repeat) {
         for (int pages = 1; pages <= 3; ++pages) check_font(argv[pages], &surface, pages);
     }
+    check_packed_fallback(argv[4], &surface);
     CloseWindow();
     frame_surface_free(&surface);
     puts("native font: ok");

@@ -153,7 +153,9 @@ def write_atlas(source: Path, manifest: dict, destination: Path) -> dict:
     base_frames = []
     ids: set[int] = set()
     resampling = getattr(Image, "Resampling", Image)
-    pad = 0 if alpha_mode == "opaque" else 4
+    pad = int(manifest.get("padding", 0 if alpha_mode == "opaque" else 4))
+    if pad < 0 or pad >= output_cell:
+        raise ValueError(f"invalid atlas padding: {pad}")
     for index, item in enumerate(manifest["frames"]):
         col, row = index % output_columns, index // output_columns
         crop = _grid_cell(raw, columns, rows, int(item.get("source_index", index)))
@@ -725,7 +727,10 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
             from .pack_font import pack, scalar
         except ImportError:
             from pack_font import pack, scalar
-        destination = _output_file(output, str(item["output"]), ".font")
+        out_name = str(item["output"])
+        if out_name.endswith(".font"):
+            out_name = out_name[:-5] + ".fnt"
+        destination = _output_file(output, out_name, ".fnt")
         prefix = destination.with_suffix("")
         if Path(str(prefix) + ".atlas").exists():
             raise ValueError(f"font atlas output already exists: {prefix.name}.atlas")
@@ -739,7 +744,10 @@ def compile_assets(source: Path, output: Path, manifest_file: Path,
             fallback=scalar(str(item.get("fallback", "U+003F"))),
         )
         font_report = pack(args)
-        for suffix, kind in ((".font", "font"), (".atlas", "atlas")):
+        font_outputs = [((".fnt", "font")), ((".atlas", "atlas"))]
+        if item.get("native_png"):
+            font_outputs.append((".png", "raw"))
+        for suffix, kind in font_outputs:
             asset = Path(str(prefix) + suffix)
             report.append({"file": asset.name, "type": kind,
                            "bytes": asset.stat().st_size,

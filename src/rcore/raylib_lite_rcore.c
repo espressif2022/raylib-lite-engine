@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "raylib_lite_rcore.h"
+#include "raylib_lite_rcore_assets.h"
 #include "raylib_lite_raylib_port.h"
 
 #if !defined(PLATFORM_CUSTOM) || !defined(GRAPHICS_API_OPENGL_SOFTWARE)
@@ -17,10 +18,24 @@
 #define OVERRUN_YIELD_EVERY 8U
 #define OVERRUN_YIELD_US 1000U
 
+#if defined(RAYLIB_LITE_RCORE_NO_ASSET_BRIDGE)
+static raylib_lite_result_t rcore_attach_assets(const char *logical_root)
+{
+    (void)logical_root;
+    return RAYLIB_LITE_NOT_SUPPORTED;
+}
+
+static void rcore_detach_assets(void) {}
+#else
+#define rcore_attach_assets raylib_lite_rcore_assets_attach
+#define rcore_detach_assets raylib_lite_rcore_assets_detach
+#endif
+
 typedef struct {
     raylib_lite_rcore_config_t config;
     bool configured;
     bool port_ready;
+    bool assets_attached;
     raylib_lite_result_t last_acquire;
     raylib_lite_result_t last_present;
     uint64_t base_us;
@@ -392,11 +407,27 @@ int InitPlatform(void)
     CORE.Window.render.height = height;
     CORE.Window.currentFbo.width = width;
     CORE.Window.currentFbo.height = height;
-    CORE.Window.ready = true;
 
     platform.base_us = now_us();
     InitTimer();
     CORE.Storage.basePath = GetWorkingDirectory();
+    platform.assets_attached = false;
+    if (platform.config.asset_root)
+    {
+        raylib_lite_result_t asset_result =
+            rcore_attach_assets(platform.config.asset_root);
+        if (asset_result != RAYLIB_LITE_OK)
+        {
+            raylib_lite_raylib_port_deinit();
+            raylib_lite_raylib_port_set_clock(NULL);
+            platform.port_ready = false;
+            CORE.Window.ready = false;
+            TRACELOG(LOG_WARNING, "PLATFORM: asset bridge attach failed (%d)", (int)asset_result);
+            return -1;
+        }
+        platform.assets_attached = true;
+    }
+    CORE.Window.ready = true;
 
     TRACELOG(LOG_INFO, "PLATFORM: Raylib Lite initialized (%ux%u)", width, height);
     return 0;
@@ -404,6 +435,11 @@ int InitPlatform(void)
 
 void ClosePlatform(void)
 {
+    if (platform.assets_attached)
+    {
+        rcore_detach_assets();
+        platform.assets_attached = false;
+    }
     if (platform.port_ready)
     {
         raylib_lite_raylib_port_deinit();

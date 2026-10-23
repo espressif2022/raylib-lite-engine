@@ -81,7 +81,8 @@ def build(cc, opt, build_dir):
     upstream.append(ROOT / "src/rcore/raylib_lite_rcore.c")
     for source in upstream:
         obj = build_dir / (source.stem + ".o")
-        run_cc([cc, "-std=gnu99", opt, "-w", *UPSTREAM_DEFINES, *flags, *includes,
+        run_cc([cc, "-std=gnu99", opt, "-w", *UPSTREAM_DEFINES,
+                "-DRAYLIB_LITE_RCORE_NO_ASSET_BRIDGE=1", *flags, *includes,
                 "-c", str(source), "-o", str(obj)])
         objects.append(obj)
     compat_includes = [

@@ -5,7 +5,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "raylib_lite_renderer.h"
-#include "raylib_lite_font.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,15 +59,6 @@ bool raylib_lite_ui_action(raylib_lite_ui_t *ui, int direction, bool confirm);
  * Use on scene changes, focus loss or a platform pointer-cancel event. */
 void raylib_lite_ui_cancel_input(raylib_lite_ui_t *ui);
 void raylib_lite_ui_draw(raylib_lite_ui_t *ui, int font_size);
-/* Borrow font for this call only; text is a NUL-terminated UTF-8 string.
- * Draw visible nodes with the same native-pixel metrics used for measurement;
- * center their logical text bounds horizontally and vertically. wrap_width=0
- * disables wrapping; a nonzero value is passed unchanged to the font layout.
- * Preserve the renderer clip (node bounds do not add clipping). No font is
- * retained. Returns the first layout/draw error; earlier nodes may be drawn.
- * The existing ui_draw keeps its default-font/English compatibility behavior. */
-raylib_lite_result_t raylib_lite_ui_draw_font(raylib_lite_ui_t *ui,
-    const raylib_lite_font_t *font, uint32_t wrap_width);
 
 #ifdef __cplusplus
 }

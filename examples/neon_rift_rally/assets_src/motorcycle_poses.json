@@ -10,5 +10,12 @@
     {"name": "motorcycle_straight"},
     {"name": "motorcycle_light_right"},
     {"name": "motorcycle_heavy_right"}
+  ],
+  "variants": [
+    {"name": "motorcycle_heavy_left_56", "source": "motorcycle_heavy_left", "width": 56, "height": 56},
+    {"name": "motorcycle_light_left_56", "source": "motorcycle_light_left", "width": 56, "height": 56},
+    {"name": "motorcycle_straight_56", "source": "motorcycle_straight", "width": 56, "height": 56},
+    {"name": "motorcycle_light_right_56", "source": "motorcycle_light_right", "width": 56, "height": 56},
+    {"name": "motorcycle_heavy_right_56", "source": "motorcycle_heavy_right", "width": 56, "height": 56}
   ]
 }

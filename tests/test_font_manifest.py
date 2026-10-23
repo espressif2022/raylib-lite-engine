@@ -21,7 +21,7 @@ class FontManifestTests(unittest.TestCase):
             path=source/'game_assets.json';path.write_text(json.dumps(manifest))
             report=compile_assets(source,output,path)
             self.assertEqual({entry['file'] for entry in report['files']},
-                             {'ui.20.font','ui.20.atlas','native.fnt','glyph.png'})
+                             {'ui.20.fnt','ui.20.atlas','native.fnt','glyph.png'})
             self.assertEqual(report['total_bytes'],sum((output/e['file']).stat().st_size for e in report['files']))
             self.assertEqual(json.loads((output/'ui.20.font.json').read_text())['missing'],[])
             self.assertIn('0x', (output/'assets_ids.h').read_text())
@@ -33,6 +33,10 @@ class FontManifestTests(unittest.TestCase):
             manifest['fonts'].append(manifest['fonts'][0]);path.write_text(json.dumps(manifest))
             with self.assertRaisesRegex(ValueError,'already exists'):
                 compile_assets(source,output,path)
+            manifest['fonts']=[{**manifest['fonts'][0],'native_png':True}]
+            path.write_text(json.dumps(manifest))
+            native_report=compile_assets(source,output,path)
+            self.assertIn('ui.20.png',{e['file'] for e in native_report['files']})
 
     def test_missing_glyph_is_a_build_failure(self):
         with tempfile.TemporaryDirectory() as folder:

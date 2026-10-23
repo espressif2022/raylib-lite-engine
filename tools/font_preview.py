@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Pack a supplied font, build the neutral Host consumer and render a preview.
+"""Pack a supplied font, build the Raylib-API Host consumer and render a preview.
 
 No font is bundled or downloaded. Outputs include source provenance, native
 assets, a PNG preview and measured layout; Host timing is not device FPS.
@@ -41,11 +41,17 @@ def main():
         executable = Path(temporary) / ("font_preview.exe" if os.name == "nt" else "font_preview")
         command = [os.environ.get("CC", "cc"), "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"]
         command += shlex.split(os.environ.get("CFLAGS", ""))
-        for include in ["host", "include/raylib_lite", "src/assets", "src/renderer"]:
+        for include in ["host/include", "host", "include/raylib_lite", "compat/raylib/include",
+                        "src/assets", "src/renderer"]:
             command += ["-I", str(ROOT / include)]
-        command += [str(ROOT / source) for source in ["host/font_preview.c", "host/host_asset_runtime.c",
-            "src/assets/raylib_lite_assets.c", "src/text/raylib_lite_font.c",
-            "src/renderer/raylib_lite_renderer.c", "src/renderer/raylib_lite_rgb565.c"]]
+        command += [str(ROOT / source) for source in [
+            "host/font_preview.c", "host/host_asset_runtime.c",
+            "host/host_clock.c", "src/runtime/raylib_lite_raylib_port.c",
+            "src/assets/raylib_lite_assets.c",
+            "src/renderer/raylib_lite_renderer.c",
+            "src/renderer/raylib_lite_renderer_raylib.c",
+            "src/renderer/raylib_lite_raylib_impl.c",
+            "src/renderer/raylib_lite_rgb565.c"]]
         subprocess.run(command + ["-lm", "-o", str(executable)], check=True)
         result = subprocess.run([str(executable), str(args.output), str(text),
             str(args.output / "preview.ppm"), str(args.width), str(args.height)],

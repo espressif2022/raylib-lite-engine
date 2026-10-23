@@ -167,16 +167,6 @@ static void cancellation_and_callback_mutation(void)
     assert(ui.focused == -1 && ui.nodes[0].id == 2);
 }
 
-/* Font integration has a separate real-renderer pixel oracle. This fixture
- * retains the existing facade-only checks for the default drawing contract. */
-raylib_lite_result_t raylib_lite_font_measure(const raylib_lite_font_t *font,
-    const char *text, size_t bytes, uint32_t wrap, raylib_lite_text_metrics_t *out)
-{ (void)font; (void)text; (void)bytes; (void)wrap; (void)out; return RAYLIB_LITE_NOT_READY; }
-raylib_lite_result_t raylib_lite_font_draw(const raylib_lite_font_t *font,
-    const char *text, size_t bytes, int x, int y, uint32_t wrap,
-    raylib_lite_renderer_color_t color, raylib_lite_text_metrics_t *out)
-{ (void)font; (void)text; (void)bytes; (void)x; (void)y; (void)wrap; (void)color; (void)out; return RAYLIB_LITE_NOT_READY; }
-
 // Observe facade calls, without claiming glyph pixels or device rendering.
 typedef struct {char kind;int x,y,w,h,size;Color color;const char *text;} draw_t;
 static draw_t draws[8];static size_t draw_count;

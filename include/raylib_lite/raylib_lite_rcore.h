@@ -13,6 +13,7 @@
 #endif
 #define RAYLIB_LITE_RCORE_PLATFORM 1
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include "raylib_lite_clock.h"
@@ -39,6 +40,11 @@ typedef struct {
     /* Optional. Sees every polled event, including IMU and joystick. */
     void (*on_event)(void *user, const raylib_lite_input_event_t *event);
     void *user;
+
+    /* Optional logical asset root (e.g. "" or "bundle"). When non-NULL,
+     * InitWindow() automatically attaches raylib_lite_rcore_assets(asset_root)
+     * and CloseWindow() detaches it. */
+    const char *asset_root;
 } raylib_lite_rcore_config_t;
 
 /* Must be called before InitWindow() and not again until CloseWindow(). The

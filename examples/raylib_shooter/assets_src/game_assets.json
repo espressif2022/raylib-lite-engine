@@ -10,6 +10,17 @@
       "config": "nebula.json",
       "source": "shooter_nebula.png",
       "output": "nebula.atlas"
+    },
+    {
+      "config": "shooter_zh.json",
+      "source": "shooter_zh_source.png",
+      "output": "shooter_zh.atlas"
+    }
+  ],
+  "files": [
+    {
+      "source": "shooter_zh.fnt",
+      "output": "shooter_zh.fnt"
     }
   ],
   "sounds": [

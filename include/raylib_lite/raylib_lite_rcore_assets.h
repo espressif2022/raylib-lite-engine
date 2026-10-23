@@ -28,8 +28,8 @@ extern "C" {
  * Each successful read copies bytes into MemAlloc-owned memory and releases
  * its asset view immediately. Normal UnloadFileData/UnloadFileText frees the
  * copy, even after detach/unmount. Font/texture handles remain native raylib.
- * Mount/register the original bytes before loading; packed MSA1/RLF1 resources
- * instead belong to raylib_lite_font/renderer APIs. */
+ * Mount/register the original bytes before loading; packed MSA1 resources
+ * instead belong to the compatibility facade or renderer APIs. */
 raylib_lite_result_t raylib_lite_rcore_assets_attach(const char *logical_root);
 void raylib_lite_rcore_assets_detach(void);
 /* Result of the most recent adapter read/attach; detach sets NOT_READY.

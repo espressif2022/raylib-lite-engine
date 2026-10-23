@@ -486,12 +486,48 @@ static void draw_pickups(const last_zone_game_t *game, raylib_lite_atlas_t props
 
 static void draw_extract(const last_zone_game_t *game)
 {
-    if (!game->objective_collected) {
-        draw_billboard_box(game,game->objective_x,game->objective_y,(Color){255,214,75,255},8);
-        return;
-    }
     int center, size, ground;
     float distance;
+    if (!game->objective_collected) {
+        project_sprite(game, game->objective_x, game->objective_y,
+                       &center, &size, &ground, &distance);
+        if (size <= 0) return;
+        int case_w = size / 2 + 10;
+        int case_h = size * 2 / 5 + 8;
+        if (case_w < 12) case_w = 12;
+        if (case_h < 10) case_h = 10;
+        int left = center - case_w / 2, top = ground - case_h, run_start = -1;
+        bool any_visible = false;
+        for (int x = 0; x < case_w + 4; x += 4) {
+            int screen = left + x;
+            bool visible = x < case_w && column_visible(screen, distance);
+            if (visible) {
+                any_visible = true;
+                if (run_start < 0) run_start = x;
+            }
+            if (!visible && run_start >= 0) {
+                int run_w = (x < case_w ? x : case_w) - run_start;
+                int sx = left + run_start;
+                /* Cel-shaded encrypted data terminal case: dark outline, amber
+                 * protective frame, and glowing cyan screen. */
+                DrawRectangle(sx, top, run_w, case_h, (Color){16, 20, 28, 255});
+                if (case_h > 4)
+                    DrawRectangle(sx, top + 2, run_w, case_h - 4, (Color){248, 198, 64, 255});
+                if (case_h > 8)
+                    DrawRectangle(sx, top + 4, run_w, case_h - 8, (Color){28, 196, 224, 255});
+                run_start = -1;
+            }
+        }
+        if (any_visible) {
+            int bob = (int)(game->tick / 6U) % 5;
+            int by = top - 6 - bob;
+            DrawTriangle((Vector2){(float)center, (float)by},
+                         (Vector2){(float)(center + 8), (float)(by - 8)},
+                         (Vector2){(float)(center - 8), (float)(by - 8)},
+                         (Color){255, 220, 72, 255});
+        }
+        return;
+    }
     project_sprite(game, last_zone_extract_x(game), last_zone_extract_y(game),
                    &center, &size, &ground, &distance);
     if (size <= 0) return;
@@ -1054,10 +1090,13 @@ static void pin_hud(float dx)
 static void draw_weapon(const last_zone_game_t *game, raylib_lite_atlas_t atlas)
 {
     bool bolting = game->fire_cooldown > 4;
-    raylib_lite_asset_id_t frame_id = bolting ? RAYLIB_LITE_ASSET_ID_TACTICAL_BOLT
-                                         : RAYLIB_LITE_ASSET_ID_TACTICAL_RIFLE;
+    bool native = raylib_lite_design_view_native(s_view);
+    raylib_lite_asset_id_t frame_id = bolting
+        ? (native ? RAYLIB_LITE_ASSET_ID_TACTICAL_BOLT : RAYLIB_LITE_ASSET_ID_TACTICAL_BOLT_72)
+        : (native ? RAYLIB_LITE_ASSET_ID_TACTICAL_RIFLE : RAYLIB_LITE_ASSET_ID_TACTICAL_RIFLE_72);
     const raylib_lite_sprite_frame_t *frame = raylib_lite_atlas_get_frame(atlas, frame_id);
-    if (!frame) frame = raylib_lite_atlas_get_frame(atlas, RAYLIB_LITE_ASSET_ID_TACTICAL_RIFLE);
+    if (!frame) frame = raylib_lite_atlas_get_frame(atlas,
+        bolting ? RAYLIB_LITE_ASSET_ID_TACTICAL_BOLT : RAYLIB_LITE_ASSET_ID_TACTICAL_RIFLE);
     if (!frame) return;
     float motion = sqrtf(game->move_forward * game->move_forward +
                          game->move_strafe * game->move_strafe);
@@ -1078,14 +1117,24 @@ static void draw_weapon(const last_zone_game_t *game, raylib_lite_atlas_t atlas)
         if (dist < nearest) nearest = dist;
     }
     float hip = nearest < 1.8f ? (1.8f - nearest) * 22.0f : 0.0f;
+    float wx = floorf(128.0f + bob_x + recoil_x + 0.5f);
+    float wy = floorf(348.0f + hip + bolt * 0.45f + game->look_pitch * .22f + bob_y + recoil_y + 0.5f);
+    if (!native) {
+        wx = floorf(wx * 0.5f) * 2.0f;
+        wy = floorf(wy * 0.5f) * 2.0f;
+    }
+    if (game->weapon_recoil > .35f) {
+        int my = 204 + (int)(game->look_kick * .2f);
+        int arm = 8 + (int)(game->weapon_recoil * 11.0f);
+        /* Crisp cross muzzle flash and short barrel-tip flare before the rifle overlay. */
+        DrawLine((int)wx + 76, (int)wy - 4, 240, my, (Color){255, 224, 120, 175});
+        DrawRectangle(240 - arm, my - 2, arm * 2, 4, (Color){255, 192, 64, 255});
+        DrawRectangle(240 - 2, my - arm, 4, arm * 2, (Color){255, 192, 64, 255});
+        DrawRectangle(240 - 4, my - 4, 8, 8, (Color){255, 248, 210, 255});
+    }
     DrawTexturePro(atlas.texture, frame->source,
-        (Rectangle){128.0f + bob_x + recoil_x,
-                    348.0f + hip + bolt * 0.45f + game->look_pitch * .22f + bob_y + recoil_y,
-                    frame->source.width, frame->source.height},
+        (Rectangle){wx, wy, 144.0f, 144.0f},
         (Vector2){0, 0}, 0, WHITE);
-    if (game->weapon_recoil > .35f)
-        DrawCircle(240, 204 + (int)(game->look_kick * .2f),
-                   7 + (int)(game->weapon_recoil * 9.0f), (Color){255, 226, 96, 255});
     if (game->fire_cooldown > 6) {
         int age = LAST_ZONE_FIRE_COOLDOWN - game->fire_cooldown;
         DrawRectangle(258 + age * 2, 372 - age * 2, 4, 3, (Color){255, 196, 82, 255});
@@ -1341,29 +1390,35 @@ static void draw_crosshair(const last_zone_game_t *game)
 
 static void draw_damage_frame(int thickness, Color color)
 {
-    enum { SIZE = 480, SEGMENTS = 8 };
+    enum { SIZE = 480 };
     if (thickness < 1) return;
     if (thickness > 14) thickness = 14;
-    for (int layer = 0; layer < thickness; ++layer) {
-        float inset = (float)layer;
-        DrawRectangleRoundedLines(
-            (Rectangle){inset - s_margin, inset, (float)SIZE + s_margin * 2.0f - inset * 2.0f,
-                        (float)SIZE - inset * 2.0f},
-            0.26f, SEGMENTS, color);
-    }
+    int left = -(int)s_margin;
+    int span = SIZE + 2 * (int)s_margin;
+    /* Four contiguous horizontal/vertical border rectangles hit fill_span
+     * directly instead of 14 nested rounded-line loops (280+ line calls). */
+    DrawRectangle(left, 0, span, thickness, color);
+    DrawRectangle(left, SIZE - thickness, span, thickness, color);
+    DrawRectangle(left, thickness, thickness, SIZE - thickness * 2, color);
+    DrawRectangle(left + span - thickness, thickness, thickness, SIZE - thickness * 2, color);
 }
 
 static void draw_controls(const last_zone_game_t *game, raylib_lite_atlas_t controls)
 {
     int thumb_x = LAST_ZONE_MOVE_X + (int)(game->move_strafe * 28.0f);
     int thumb_y = LAST_ZONE_MOVE_Y - (int)(game->move_forward * 28.0f);
+    bool native = raylib_lite_design_view_native(s_view);
     const raylib_lite_sprite_frame_t *joystick = raylib_lite_atlas_get_frame(
-        controls, RAYLIB_LITE_ASSET_ID_JOYSTICK_BASE);
+        controls, native ? RAYLIB_LITE_ASSET_ID_JOYSTICK_BASE
+                         : RAYLIB_LITE_ASSET_ID_JOYSTICK_BASE_40);
+    if (!joystick) joystick = raylib_lite_atlas_get_frame(controls, RAYLIB_LITE_ASSET_ID_JOYSTICK_BASE);
     const raylib_lite_sprite_frame_t *fire = raylib_lite_atlas_get_frame(
-        controls, RAYLIB_LITE_ASSET_ID_FIRE_BUTTON);
+        controls, native ? RAYLIB_LITE_ASSET_ID_FIRE_BUTTON
+                         : RAYLIB_LITE_ASSET_ID_FIRE_BUTTON_40);
+    if (!fire) fire = raylib_lite_atlas_get_frame(controls, RAYLIB_LITE_ASSET_ID_FIRE_BUTTON);
     pin_hud(-s_margin);
     if (joystick) DrawTexturePro(controls.texture, joystick->source,
-        (Rectangle){42, 352, joystick->source.width, joystick->source.height},
+        (Rectangle){42, 352, 80.0f, 80.0f},
         (Vector2){0, 0}, 0, WHITE);
     DrawCircle(thumb_x, thumb_y, 9, game->sprinting ? (Color){255, 220, 72, 255}
                                                     : (Color){186, 224, 217, 255});
@@ -1371,7 +1426,7 @@ static void draw_controls(const last_zone_game_t *game, raylib_lite_atlas_t cont
              game->sprinting ? (Color){255, 220, 72, 255} : (Color){192, 235, 214, 255});
     pin_hud(s_margin);
     if (fire) DrawTexturePro(controls.texture, fire->source,
-        (Rectangle){358, 352, fire->source.width, fire->source.height},
+        (Rectangle){358, 352, 80.0f, 80.0f},
         (Vector2){0, 0}, 0, WHITE);
     if (game->fire_held)
         DrawCircle(LAST_ZONE_FIRE_X, LAST_ZONE_FIRE_Y, 16, (Color){255, 220, 72, 255});
@@ -1380,14 +1435,22 @@ static void draw_controls(const last_zone_game_t *game, raylib_lite_atlas_t cont
     draw_text(fire_label, 376, 338, 10, fire_color);
     pin_hud(0);
     draw_crosshair(game);
+    if (game->fire_cooldown && game->ammo) {
+        int fill = (LAST_ZONE_FIRE_COOLDOWN - (int)game->fire_cooldown) * 28 / LAST_ZONE_FIRE_COOLDOWN;
+        DrawRectangle(226, 222, 28, 3, (Color){24, 32, 42, 220});
+        DrawRectangle(226, 222, fill, 3, (Color){255, 214, 75, 255});
+    }
     if (game->holding_breath)
         draw_text("STEADY", 222, 176, 10, (Color){72, 255, 214, 255});
     draw_status_hud(game);
     draw_guidance(game);
     if (game->hit_marker) {
         Color marker = game->kill_flash ? (Color){255, 76, 65, 255} : WHITE;
-        DrawLine(226, 191, 234, 199, marker); DrawLine(254, 191, 246, 199, marker);
-        DrawLine(226, 219, 234, 211, marker); DrawLine(254, 219, 246, 211, marker);
+        int pop = game->hit_marker > 5 ? 2 : 0;
+        DrawLine(226 - pop, 191 - pop, 234, 199, marker);
+        DrawLine(254 + pop, 191 - pop, 246, 199, marker);
+        DrawLine(226 - pop, 219 + pop, 234, 211, marker);
+        DrawLine(254 + pop, 219 + pop, 246, 211, marker);
     }
     if (game->kill_flash) {
         const int rise = 18 - (int)game->kill_flash;

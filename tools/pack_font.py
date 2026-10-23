@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Subset a supplied font into RLF1 metrics and a native MSA1 alpha atlas.
+"""Subset a supplied font into standard BMFont (.fnt) metrics, an MSA1 alpha
+atlas (.atlas) for the compatibility renderer, and an RGBA PNG (.png) for
+native raylib or visual inspection.
 
 Example (the caller supplies a font and verifies its redistribution license):
   python3 tools/pack_font.py --font /path/font.ttc --text-file ui.txt \
       --size 24 --output assets/ui --license 'SPDX identifier or license path'
 
-RLF1 little-endian header <4sHHHHIII>: magic, atlas width/height, line height,
-ascent, glyph count, fallback codepoint, reserved=0. Sorted glyphs <IHHHHhhHH>:
-codepoint, atlas x/y/w/h, signed x/y offsets from logical line top, advance,
-reserved=0. Integer advances are rounded once offline. No kerning or shaping.
-Text input is a UTF-8 repertoire, not a pre-shaped string; CR/LF are layout.
+Outputs <basename>.fnt (AngelCode BMFont text), <basename>.atlas (MSA1 binary
+alpha + 8-bit alpha mask), <basename>.png, and <basename>.font.json.
 """
 from __future__ import annotations
 import argparse
@@ -23,9 +22,8 @@ from PIL import Image, ImageDraw, ImageFont, __version__ as pillow_version
 import fontTools
 from fontTools.ttLib import TTFont
 
-HEADER = struct.Struct("<4sHHHHIII")
-GLYPH = struct.Struct("<IHHHHhhHH")
 ATLAS = struct.Struct("<4sHHHHII")
+ATLAS_FLAG_BINARY_ALPHA = 1 << 0
 
 
 def scalar(value: str) -> int:
@@ -33,6 +31,24 @@ def scalar(value: str) -> int:
     if cp > 0x10FFFF or 0xD800 <= cp <= 0xDFFF or cp < 0:
         raise argparse.ArgumentTypeError("expected a Unicode scalar such as U+4E2D")
     return cp
+
+
+def _format_bmfont(family: str, size: int, line_height: int, ascent: int,
+                   atlas_width: int, atlas_height: int, page_file: str,
+                   entries: list[tuple[int, int, int, int, int, int, int, int]]) -> bytes:
+    face = (family or "Font").replace('"', "").replace("\n", " ").replace("\r", " ")
+    lines = [
+        f'info face="{face}" size={size}',
+        f"common lineHeight={line_height} base={ascent} scaleW={atlas_width} scaleH={atlas_height} pages=1",
+        f'page id=0 file="{page_file}"',
+        f"chars count={len(entries)}",
+    ]
+    for cp, gx, gy, width, height, left, offset_y, advance in entries:
+        lines.append(
+            f"char id={cp} x={gx} y={gy} width={width} height={height} "
+            f"xoffset={left} yoffset={offset_y} xadvance={advance} page=0"
+        )
+    return ("\n".join(lines) + "\n").encode("utf-8")
 
 
 def pack(args: argparse.Namespace) -> dict:
@@ -57,7 +73,7 @@ def pack(args: argparse.Namespace) -> dict:
         family = source["name"].getDebugName(1)
         license_text = source["name"].getDebugName(13)
     report = {
-        "format": "RLF1", "source_name": args.font.name,
+        "format": "BMFont", "source_name": args.font.name,
         "source_sha256": hashlib.sha256(args.font.read_bytes()).hexdigest(),
         "font_index": args.font_index, "family": family,
         "license_declaration": args.license, "embedded_license": license_text,
@@ -97,32 +113,53 @@ def pack(args: argparse.Namespace) -> dict:
         if x + width + 1 > args.atlas_width:
             x, y = 1, y + row_height + 1
             row_height = 0
-        entries.append((cp, x, y, width, height, left, offset_y, advance, 0))
+        entries.append((cp, x, y, width, height, left, offset_y, advance))
         x += width + 1
         row_height = max(row_height, height)
     atlas_height = y + row_height + 1
-    if atlas_height > 4096 or len(entries) > 65535:
+    if atlas_height > 4096 or len(entries) > 65534:
         raise ValueError("subset exceeds one atlas; split it into smaller font resources")
     mask = Image.new("L", (args.atlas_width, atlas_height), 0)
     draw = ImageDraw.Draw(mask)
-    for cp, gx, gy, width, height, left, offset_y, _, _ in entries:
+    for cp, gx, gy, width, height, left, offset_y, _ in entries:
         if width and height:
             draw.text((gx - left, gy - offset_y + ascent), chr(cp),
                       font=font, fill=255, anchor="ls")
-    metrics = HEADER.pack(b"RLF1", args.atlas_width, atlas_height,
-                          line_height, ascent, len(entries), args.fallback, 0)
-    metrics += b"".join(GLYPH.pack(*entry) for entry in entries)
-    alpha = mask.tobytes()
+    # Standard BMFont / upstream raylib GetGlyphIndex() falls back to char id=63 ('?'),
+    # or index 0 when 63 is absent. When a custom --fallback is requested, alias char id=63
+    # to the fallback rectangle so native raylib and compat LoadFont render the
+    # same glyph while preserving Font.glyphPadding semantics.
+    fb_entry = next(e for e in entries if e[0] == args.fallback)
+    fnt_entries = list(entries)
+    if args.fallback != 63:
+        if any(e[0] == 63 for e in fnt_entries):
+            fnt_entries = [
+                (63, fb_entry[1], fb_entry[2], fb_entry[3], fb_entry[4],
+                 fb_entry[5], fb_entry[6], fb_entry[7]) if e[0] == 63 else e
+                for e in fnt_entries
+            ]
+        else:
+            fnt_entries.append((63, fb_entry[1], fb_entry[2], fb_entry[3], fb_entry[4],
+                                fb_entry[5], fb_entry[6], fb_entry[7]))
+            fnt_entries.sort(key=lambda e: e[0])
+    # Crisp 1-bit threshold at native pixel size enables the zero-blend
+    # M2D_ATLAS_BINARY_ALPHA fast paths with an opaque white or colored tint.
+    # The binary mask is stored in the atlas's 8-bit alpha channel.
+    binary_mask = mask.point(lambda v: 255 if v >= 128 else 0)
+    fnt_bytes = _format_bmfont(family or args.font.stem, args.size, line_height,
+                               ascent, args.atlas_width, atlas_height,
+                               f"{args.output.name}.png", fnt_entries)
+    alpha = binary_mask.tobytes()
     pixels = len(alpha)
-    atlas = ATLAS.pack(b"MSA1", args.atlas_width, atlas_height, 0, 0,
-                       pixels * 2, pixels) + b"\xff\xff" * pixels + alpha
-    outputs = {".font": metrics, ".atlas": atlas}
+    atlas = ATLAS.pack(b"MSA1", args.atlas_width, atlas_height, 0,
+                       ATLAS_FLAG_BINARY_ALPHA, pixels * 2, pixels) + b"\xff\xff" * pixels + alpha
+    outputs = {".fnt": fnt_bytes, ".atlas": atlas}
     for suffix, data in outputs.items():
         Path(str(args.output) + suffix).write_bytes(data)
-    preview = Image.new("RGBA", mask.size, "white")
-    preview.putalpha(mask)
+    preview = Image.new("RGBA", binary_mask.size, "white")
+    preview.putalpha(binary_mask)
     preview.save(str(args.output) + ".png")
-    report.update(status="ok", glyph_count=len(entries),
+    report.update(status="ok", glyph_count=len(fnt_entries),
                   atlas_width=args.atlas_width, atlas_height=atlas_height,
                   line_height=line_height, ascent=ascent,
                   outputs={suffix: {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}

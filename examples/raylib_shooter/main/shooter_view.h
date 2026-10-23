@@ -4,4 +4,4 @@
 #include "shooter_game.h"
 
 void shooter_view_render(const shooter_game_t *game, raylib_lite_atlas_t atlas,
-                         raylib_lite_atlas_t backdrop);
+                         raylib_lite_atlas_t backdrop, Font zh_font);

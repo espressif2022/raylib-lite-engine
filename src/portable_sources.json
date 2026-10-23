@@ -8,6 +8,5 @@
   "src/audio/raylib_lite_audio_mixer.c",
   "src/scene/raylib_lite_scene.c",
   "src/ui/raylib_lite_ui.c",
-  "src/save/raylib_lite_save.c",
-  "src/text/raylib_lite_font.c"
+  "src/save/raylib_lite_save.c"
 ]

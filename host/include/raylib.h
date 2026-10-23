@@ -13,6 +13,17 @@ typedef struct Rectangle { float x, y, width, height; } Rectangle;
 typedef struct Color { uint8_t r, g, b, a; } Color;
 typedef struct Texture { unsigned int id; int width, height, mipmaps, format; } Texture;
 typedef Texture Texture2D;
+typedef struct Image { void *data; int width, height, mipmaps, format; } Image;
+typedef struct GlyphInfo {
+    int value, offsetX, offsetY, advanceX;
+    Image image;
+} GlyphInfo;
+typedef struct Font {
+    int baseSize, glyphCount, glyphPadding;
+    Texture2D texture;
+    Rectangle *recs;
+    GlyphInfo *glyphs;
+} Font;
 typedef struct Camera2D { Vector2 offset, target; float rotation, zoom; } Camera2D;
 typedef struct rAudioBuffer rAudioBuffer;
 typedef struct rAudioProcessor rAudioProcessor;

@@ -7,5 +7,9 @@
   "frames": [
     {"name": "tactical_rifle"},
     {"name": "tactical_bolt"}
+  ],
+  "variants": [
+    {"name": "tactical_rifle_72", "source": "tactical_rifle", "width": 72, "height": 72},
+    {"name": "tactical_bolt_72", "source": "tactical_bolt", "width": 72, "height": 72}
   ]
 }

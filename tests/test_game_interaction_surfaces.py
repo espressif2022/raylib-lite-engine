@@ -1,7 +1,11 @@
 """Exercise player controls through the real module and adaptive view mapping."""
+import json
 from pathlib import Path
+import shutil
+import struct
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -131,6 +135,37 @@ class GameInteractionSurfaceTests(unittest.TestCase):
                         text=True, capture_output=True, timeout=120,
                     )
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_shooter_chinese_font_coverage_and_exact_pixels(self):
+        from examples.raylib_shooter.assets_src.prepare_font import (
+            ASCII_GLYPHS, CJK_GLYPHS, check_shooter_view_coverage,
+        )
+        from host.run_game import prepare_project_assets
+        project = ROOT / "examples/raylib_shooter"
+        with tempfile.TemporaryDirectory() as td:
+            isolated = Path(td) / "assets_src"
+            shutil.copytree(project / "assets_src", isolated)
+            subprocess.run([sys.executable, str(isolated / "prepare_font.py")], check=True)
+        prepare_project_assets(project)
+        all_codes = sorted(set(ASCII_GLYPHS) | set(CJK_GLYPHS))
+        required = check_shooter_view_coverage(set(all_codes))
+        self.assertIn(0x673A, required)  # '机' from "拖动战机 / 自动开火"
+        data = (project / "assets/generated/shooter_zh.atlas").read_bytes()
+        magic, w, h, frames, flags, rgb_len, alpha_len = struct.unpack("<4sHHHHII", data[:20])
+        self.assertEqual((magic, w, h, flags), (b"MSA1", 256, 64, 1))
+        offset = 20 + frames * 16
+        alpha = data[offset + rgb_len:offset + rgb_len + alpha_len]
+        for idx, cp in enumerate(all_codes):
+            col, row = idx % 16, idx // 16
+            cx, cy = col * 16 + 2, row * 16 + 2
+            is_cjk = cp in CJK_GLYPHS
+            rows = CJK_GLYPHS[cp] if is_cjk else ASCII_GLYPHS[cp]
+            bit_w = 12 if is_cjk else 8
+            for ry, row_bits in enumerate(rows):
+                for rx in range(bit_w):
+                    expected = 255 if (row_bits & (1 << (bit_w - 1 - rx))) else 0
+                    actual = alpha[(cy + ry) * w + (cx + rx)]
+                    self.assertEqual(actual, expected, f"corrupted pixel at U+{cp:04X} ({rx},{ry})")
 
 
 if __name__ == "__main__":

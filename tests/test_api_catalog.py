@@ -79,7 +79,7 @@ void raylib_lite_last(void); void raylib_lite_same_line(void);
     def test_catalog_and_repository_evidence(self):
         catalog=check_catalog()
         self.assertEqual(set(catalog['modules']),set(public_inventory()))
-        self.assertEqual(len(catalog['compatibility']),105)
+        self.assertEqual(len(catalog['compatibility']),109)
         self.assertTrue(check_private_boundaries())
         self.assertTrue(all(r['status']=='待审查' for r in catalog['retirement_review']))
 

@@ -30,8 +30,8 @@
 | 需求 | 本轮落地 | 边界 |
 | --- | --- | --- |
 | FONT-01 原生 FNT | 真实 FNT/PNG 加载、绘制、测量和释放测试；确认并修复多页 FNT use-after-free | Host 原生路径验证，不等于所有设备字体场景验收 |
-| FONT-02 离线中文子集 | `pack_font.py` 接收 TTF/OTF/TTC 与 UTF-8 字符清单，生成 metrics、atlas、覆盖/来源报告；manifest 可直接构建字体 | 必需字符缺失报错；不把回退字形视为覆盖成功；字体授权由输入方提供 |
-| FONT-03 轻量自定义文字 | 新中性 `raylib_lite_font` 模块，拥有/借用加载、卸载、测量、绘制；真实 Host preview 消费者，UI 新增借用字体绘制入口 | 原冻结 105 个 Raylib 映射不扩展；六款界面尚未全部中文化 |
+| FONT-02 离线中文子集 | `pack_font.py` 接收 TTF/OTF/TTC 与 UTF-8 字符清单，生成标准 BMFont `.fnt`（自定义 `--fallback` 通过 `char id=63` 离线字形别名在原生与兼容两端同时生效）、`MSA1` `.atlas`（带 `M2D_ATLAS_BINARY_ALPHA` 标志）、`.png` 及覆盖/来源报告；manifest 可直接构建字体（可选 `native_png` 导出原生 `.png`） | 必需字符缺失报错；不把回退字形视为覆盖成功；1-bit 阈值化以边缘抗锯齿换取二值快路径；字体授权由输入方提供 |
+| FONT-03 标准 Raylib 字体 API | 兼容层实现标准 `LoadFont` / `UnloadFont` / `DrawTextEx` / `MeasureTextEx`（冻结映射扩充至 109 项），移除私有 `RLF1` 与 `raylib_lite_font`；Mosaico Strike 接入 1:1 像素对齐的中文 HUD 与状态卡片 | 统一的是调用形式与 `.fnt` 描述，底层仍是两个运行时实现；`alpha_calls` 统计的是进入通用 alpha 分支的调用/像素而非实际混合次数，Host 快路径计数不能直接外推为板端不降帧 |
 | FONT-04 布局 | 共用 UTF-8、advance、基线、换行/折行规则；非法序列与缺字统计明确 | 当前原生字号绘制；不承诺 shaping、bidi、kerning、任意缩放或完整富文本 |
 | FONT-05 动态 TTF | 采用离线子集作为当前路线，运行时解析继续关闭 | 动态字号/未知用户文本须另有消费者、来源和 RAM 验收，不直接开启缺依赖的宏 |
 | FONT-06 文本输入 | 中文显示和文字输入保持分离；不把 key code 宣称为字符输入 | 已提交 Unicode/IME 事件尚未新增，仍是明确缺口 |
@@ -115,7 +115,7 @@ render 指标是周期采样的单次尝试耗时分布，不是逐帧完整直�
 | --- | --- | --- |
 | Scene 在自身回调中退出，可能提前释放 context；render 中切栈改变遍历对象 | push/pop/replace 在外层回调结束后按 FIFO 提交，以预计栈深校验；每轮最多 8 个请求，包含生命周期回调继续提交的请求 | 回调退出前访问 context、exit 实际释放、原栈 render、生命周期重入及无限切换防护；同栈递归 dispatch 不派发，无跨线程保证 |
 | UI 无独立取消；click 回调重建 UI 后旧事件继续传播 | 显式 cancel 清除 track/焦点/pressed，不合成 click；释放先提交状态，重建、添加节点、取消或递归输入使旧派发停止 | 双指、重叠按钮、重复释放与回调重入；旧的“上次采样与释放都命中”规则保留，没有新增模态捕获 |
-| 新中文字库尚未接 UI 消费者 | 新增 ui_draw_font，按真实字体 metrics 居中、可折行，沿用 renderer clip；字体仅借用本次调用 | 中文像素、折行、裁剪、隐藏节点及释放生命周期测试；没有将六款界面全部中文化，也没有额外文本输入/IME |
+| 新中文字库消费与 UI 收敛 | 移除无消费者的私有 `raylib_lite_font` 和 `raylib_lite_ui_draw_font`，统一到标准 `LoadFont`/`DrawTextEx`/`MeasureTextEx`；`rcore_config.asset_root` 强引用资源桥并在挂载失败时回滚 `Window.ready`；`Mosaico Strike` 接入 `padding=0` 精确点阵与双尺寸 1:1 屏幕像素中文排版 | 静态库 `.a` 链接、挂载失败回滚、`--fallback` 语义、文本文案覆盖率、精确点阵与双尺寸 Host 测试通过 |
 | 断开后引擎输入残留 | action_cancel 清除 held/边沿并保留配置；game_app 收到 DETACHED 同时清空兼容按键、触点、IMU | 不生成 released；应用自己的手势需处理 DETACHED 并取消 UI。事件无设备 ID，不能选择性取消来源 |
 | 浏览器请求并发导致边沿乱序、失焦不发送释放、坐标硬编码 480 | 输入和控制快照按 FIFO 提交，失焦主动发送空状态；画面与截图跟随实际尺寸；服务端完整校验后统一加锁应用 | 实际内嵌 JS 在 Node DOM/fetch mock 中执行，并覆盖真实 HTTP handler；自定义 preview 页面须自行遵守相同规则 |
 | 录制缺动作/帧号不从零开始；异常退出漏清理 | 全部标准动作及游戏自定义 numeric code 可回放，同 tick 边沿不折叠；录制保存初始 held、相对 tick 和诊断状态，异常总是 close | initial_state 不能恢复模型快照；应从相同初始状态录制。Host pointercancel 仍按普通释放处理，对松手开火玩法尚有语义缺口 |

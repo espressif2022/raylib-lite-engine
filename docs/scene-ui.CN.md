@@ -50,13 +50,9 @@ confirm=true 只对当前合法可见按钮调用 click；空 UI 或没有合法
 
 `raylib_lite_ui_draw()` 按节点顺序绘制可见内容：label 不绘矩形，pressed 节点 RGB 减半而 alpha 保留，文本在 bounds 内居中。调用者提供有效兼容绘制帧及 font_size；本接口不创建帧或字体。相机、默认字体和像素覆盖限制沿用[兼容 renderer 契约](raylib-compat.CN.md)。
 
-`raylib_lite_ui_draw_font(ui, font, wrap_width)` 使用[中性位图字库](font-assets.CN.md)绘制 NUL 结尾的 UTF-8 文本；测量和绘制共用字体的原生像素尺寸，按逻辑文字边界水平、垂直居中。`wrap_width=0` 关闭自动折行，非零值原样传给文字布局。节点不额外裁剪内容，调用前设置的 renderer clip 保持有效。隐藏节点跳过文本访问。字体只在调用期间借用，返回后 UI 不持有字体；第一次错误立即返回，此前节点可能已绘制。
-
 ```c
-/* 在应用已建立的绘制帧中，font 由应用加载并持有。 */
-raylib_lite_result_t result = raylib_lite_ui_draw_font(&ui, &font, 160);
 /* 离开页面或收到真正的取消事件时，不合成点击。 */
 raylib_lite_ui_cancel_input(&ui);
 ```
 
-Scene 和 UI 的公共结构均增加了内部状态字段，调用方必须重新编译；这不是旧二进制对象的布局兼容升级。新的 UI 字体行为由[像素测试](../tests/test_ui_font.c)覆盖居中、中文折行、已有裁剪、隐藏节点与字体释放后的 UI 使用；[交互测试](../tests/test_ui_behavior.c)覆盖取消和回调重入。
+Scene 和 UI 的公共结构均增加了内部状态字段，调用方必须重新编译；这不是旧二进制对象的布局兼容升级。[交互测试](../tests/test_ui_behavior.c)覆盖取消和回调重入。
