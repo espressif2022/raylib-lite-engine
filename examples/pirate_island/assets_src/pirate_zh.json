@@ -1,0 +1,1163 @@
+{
+  "image": "pirate_zh_source.png",
+  "columns": 16,
+  "rows": 18,
+  "output_cell": 20,
+  "output_columns": 16,
+  "alpha_mode": "binary",
+  "padding": 0,
+  "frames": [
+    {
+      "name": "pzh_0",
+      "source_index": 0
+    },
+    {
+      "name": "pzh_1",
+      "source_index": 1
+    },
+    {
+      "name": "pzh_2",
+      "source_index": 2
+    },
+    {
+      "name": "pzh_3",
+      "source_index": 3
+    },
+    {
+      "name": "pzh_4",
+      "source_index": 4
+    },
+    {
+      "name": "pzh_5",
+      "source_index": 5
+    },
+    {
+      "name": "pzh_6",
+      "source_index": 6
+    },
+    {
+      "name": "pzh_7",
+      "source_index": 7
+    },
+    {
+      "name": "pzh_8",
+      "source_index": 8
+    },
+    {
+      "name": "pzh_9",
+      "source_index": 9
+    },
+    {
+      "name": "pzh_10",
+      "source_index": 10
+    },
+    {
+      "name": "pzh_11",
+      "source_index": 11
+    },
+    {
+      "name": "pzh_12",
+      "source_index": 12
+    },
+    {
+      "name": "pzh_13",
+      "source_index": 13
+    },
+    {
+      "name": "pzh_14",
+      "source_index": 14
+    },
+    {
+      "name": "pzh_15",
+      "source_index": 15
+    },
+    {
+      "name": "pzh_16",
+      "source_index": 16
+    },
+    {
+      "name": "pzh_17",
+      "source_index": 17
+    },
+    {
+      "name": "pzh_18",
+      "source_index": 18
+    },
+    {
+      "name": "pzh_19",
+      "source_index": 19
+    },
+    {
+      "name": "pzh_20",
+      "source_index": 20
+    },
+    {
+      "name": "pzh_21",
+      "source_index": 21
+    },
+    {
+      "name": "pzh_22",
+      "source_index": 22
+    },
+    {
+      "name": "pzh_23",
+      "source_index": 23
+    },
+    {
+      "name": "pzh_24",
+      "source_index": 24
+    },
+    {
+      "name": "pzh_25",
+      "source_index": 25
+    },
+    {
+      "name": "pzh_26",
+      "source_index": 26
+    },
+    {
+      "name": "pzh_27",
+      "source_index": 27
+    },
+    {
+      "name": "pzh_28",
+      "source_index": 28
+    },
+    {
+      "name": "pzh_29",
+      "source_index": 29
+    },
+    {
+      "name": "pzh_30",
+      "source_index": 30
+    },
+    {
+      "name": "pzh_31",
+      "source_index": 31
+    },
+    {
+      "name": "pzh_32",
+      "source_index": 32
+    },
+    {
+      "name": "pzh_33",
+      "source_index": 33
+    },
+    {
+      "name": "pzh_34",
+      "source_index": 34
+    },
+    {
+      "name": "pzh_35",
+      "source_index": 35
+    },
+    {
+      "name": "pzh_36",
+      "source_index": 36
+    },
+    {
+      "name": "pzh_37",
+      "source_index": 37
+    },
+    {
+      "name": "pzh_38",
+      "source_index": 38
+    },
+    {
+      "name": "pzh_39",
+      "source_index": 39
+    },
+    {
+      "name": "pzh_40",
+      "source_index": 40
+    },
+    {
+      "name": "pzh_41",
+      "source_index": 41
+    },
+    {
+      "name": "pzh_42",
+      "source_index": 42
+    },
+    {
+      "name": "pzh_43",
+      "source_index": 43
+    },
+    {
+      "name": "pzh_44",
+      "source_index": 44
+    },
+    {
+      "name": "pzh_45",
+      "source_index": 45
+    },
+    {
+      "name": "pzh_46",
+      "source_index": 46
+    },
+    {
+      "name": "pzh_47",
+      "source_index": 47
+    },
+    {
+      "name": "pzh_48",
+      "source_index": 48
+    },
+    {
+      "name": "pzh_49",
+      "source_index": 49
+    },
+    {
+      "name": "pzh_50",
+      "source_index": 50
+    },
+    {
+      "name": "pzh_51",
+      "source_index": 51
+    },
+    {
+      "name": "pzh_52",
+      "source_index": 52
+    },
+    {
+      "name": "pzh_53",
+      "source_index": 53
+    },
+    {
+      "name": "pzh_54",
+      "source_index": 54
+    },
+    {
+      "name": "pzh_55",
+      "source_index": 55
+    },
+    {
+      "name": "pzh_56",
+      "source_index": 56
+    },
+    {
+      "name": "pzh_57",
+      "source_index": 57
+    },
+    {
+      "name": "pzh_58",
+      "source_index": 58
+    },
+    {
+      "name": "pzh_59",
+      "source_index": 59
+    },
+    {
+      "name": "pzh_60",
+      "source_index": 60
+    },
+    {
+      "name": "pzh_61",
+      "source_index": 61
+    },
+    {
+      "name": "pzh_62",
+      "source_index": 62
+    },
+    {
+      "name": "pzh_63",
+      "source_index": 63
+    },
+    {
+      "name": "pzh_64",
+      "source_index": 64
+    },
+    {
+      "name": "pzh_65",
+      "source_index": 65
+    },
+    {
+      "name": "pzh_66",
+      "source_index": 66
+    },
+    {
+      "name": "pzh_67",
+      "source_index": 67
+    },
+    {
+      "name": "pzh_68",
+      "source_index": 68
+    },
+    {
+      "name": "pzh_69",
+      "source_index": 69
+    },
+    {
+      "name": "pzh_70",
+      "source_index": 70
+    },
+    {
+      "name": "pzh_71",
+      "source_index": 71
+    },
+    {
+      "name": "pzh_72",
+      "source_index": 72
+    },
+    {
+      "name": "pzh_73",
+      "source_index": 73
+    },
+    {
+      "name": "pzh_74",
+      "source_index": 74
+    },
+    {
+      "name": "pzh_75",
+      "source_index": 75
+    },
+    {
+      "name": "pzh_76",
+      "source_index": 76
+    },
+    {
+      "name": "pzh_77",
+      "source_index": 77
+    },
+    {
+      "name": "pzh_78",
+      "source_index": 78
+    },
+    {
+      "name": "pzh_79",
+      "source_index": 79
+    },
+    {
+      "name": "pzh_80",
+      "source_index": 80
+    },
+    {
+      "name": "pzh_81",
+      "source_index": 81
+    },
+    {
+      "name": "pzh_82",
+      "source_index": 82
+    },
+    {
+      "name": "pzh_83",
+      "source_index": 83
+    },
+    {
+      "name": "pzh_84",
+      "source_index": 84
+    },
+    {
+      "name": "pzh_85",
+      "source_index": 85
+    },
+    {
+      "name": "pzh_86",
+      "source_index": 86
+    },
+    {
+      "name": "pzh_87",
+      "source_index": 87
+    },
+    {
+      "name": "pzh_88",
+      "source_index": 88
+    },
+    {
+      "name": "pzh_89",
+      "source_index": 89
+    },
+    {
+      "name": "pzh_90",
+      "source_index": 90
+    },
+    {
+      "name": "pzh_91",
+      "source_index": 91
+    },
+    {
+      "name": "pzh_92",
+      "source_index": 92
+    },
+    {
+      "name": "pzh_93",
+      "source_index": 93
+    },
+    {
+      "name": "pzh_94",
+      "source_index": 94
+    },
+    {
+      "name": "pzh_95",
+      "source_index": 95
+    },
+    {
+      "name": "pzh_96",
+      "source_index": 96
+    },
+    {
+      "name": "pzh_97",
+      "source_index": 97
+    },
+    {
+      "name": "pzh_98",
+      "source_index": 98
+    },
+    {
+      "name": "pzh_99",
+      "source_index": 99
+    },
+    {
+      "name": "pzh_100",
+      "source_index": 100
+    },
+    {
+      "name": "pzh_101",
+      "source_index": 101
+    },
+    {
+      "name": "pzh_102",
+      "source_index": 102
+    },
+    {
+      "name": "pzh_103",
+      "source_index": 103
+    },
+    {
+      "name": "pzh_104",
+      "source_index": 104
+    },
+    {
+      "name": "pzh_105",
+      "source_index": 105
+    },
+    {
+      "name": "pzh_106",
+      "source_index": 106
+    },
+    {
+      "name": "pzh_107",
+      "source_index": 107
+    },
+    {
+      "name": "pzh_108",
+      "source_index": 108
+    },
+    {
+      "name": "pzh_109",
+      "source_index": 109
+    },
+    {
+      "name": "pzh_110",
+      "source_index": 110
+    },
+    {
+      "name": "pzh_111",
+      "source_index": 111
+    },
+    {
+      "name": "pzh_112",
+      "source_index": 112
+    },
+    {
+      "name": "pzh_113",
+      "source_index": 113
+    },
+    {
+      "name": "pzh_114",
+      "source_index": 114
+    },
+    {
+      "name": "pzh_115",
+      "source_index": 115
+    },
+    {
+      "name": "pzh_116",
+      "source_index": 116
+    },
+    {
+      "name": "pzh_117",
+      "source_index": 117
+    },
+    {
+      "name": "pzh_118",
+      "source_index": 118
+    },
+    {
+      "name": "pzh_119",
+      "source_index": 119
+    },
+    {
+      "name": "pzh_120",
+      "source_index": 120
+    },
+    {
+      "name": "pzh_121",
+      "source_index": 121
+    },
+    {
+      "name": "pzh_122",
+      "source_index": 122
+    },
+    {
+      "name": "pzh_123",
+      "source_index": 123
+    },
+    {
+      "name": "pzh_124",
+      "source_index": 124
+    },
+    {
+      "name": "pzh_125",
+      "source_index": 125
+    },
+    {
+      "name": "pzh_126",
+      "source_index": 126
+    },
+    {
+      "name": "pzh_127",
+      "source_index": 127
+    },
+    {
+      "name": "pzh_128",
+      "source_index": 128
+    },
+    {
+      "name": "pzh_129",
+      "source_index": 129
+    },
+    {
+      "name": "pzh_130",
+      "source_index": 130
+    },
+    {
+      "name": "pzh_131",
+      "source_index": 131
+    },
+    {
+      "name": "pzh_132",
+      "source_index": 132
+    },
+    {
+      "name": "pzh_133",
+      "source_index": 133
+    },
+    {
+      "name": "pzh_134",
+      "source_index": 134
+    },
+    {
+      "name": "pzh_135",
+      "source_index": 135
+    },
+    {
+      "name": "pzh_136",
+      "source_index": 136
+    },
+    {
+      "name": "pzh_137",
+      "source_index": 137
+    },
+    {
+      "name": "pzh_138",
+      "source_index": 138
+    },
+    {
+      "name": "pzh_139",
+      "source_index": 139
+    },
+    {
+      "name": "pzh_140",
+      "source_index": 140
+    },
+    {
+      "name": "pzh_141",
+      "source_index": 141
+    },
+    {
+      "name": "pzh_142",
+      "source_index": 142
+    },
+    {
+      "name": "pzh_143",
+      "source_index": 143
+    },
+    {
+      "name": "pzh_144",
+      "source_index": 144
+    },
+    {
+      "name": "pzh_145",
+      "source_index": 145
+    },
+    {
+      "name": "pzh_146",
+      "source_index": 146
+    },
+    {
+      "name": "pzh_147",
+      "source_index": 147
+    },
+    {
+      "name": "pzh_148",
+      "source_index": 148
+    },
+    {
+      "name": "pzh_149",
+      "source_index": 149
+    },
+    {
+      "name": "pzh_150",
+      "source_index": 150
+    },
+    {
+      "name": "pzh_151",
+      "source_index": 151
+    },
+    {
+      "name": "pzh_152",
+      "source_index": 152
+    },
+    {
+      "name": "pzh_153",
+      "source_index": 153
+    },
+    {
+      "name": "pzh_154",
+      "source_index": 154
+    },
+    {
+      "name": "pzh_155",
+      "source_index": 155
+    },
+    {
+      "name": "pzh_156",
+      "source_index": 156
+    },
+    {
+      "name": "pzh_157",
+      "source_index": 157
+    },
+    {
+      "name": "pzh_158",
+      "source_index": 158
+    },
+    {
+      "name": "pzh_159",
+      "source_index": 159
+    },
+    {
+      "name": "pzh_160",
+      "source_index": 160
+    },
+    {
+      "name": "pzh_161",
+      "source_index": 161
+    },
+    {
+      "name": "pzh_162",
+      "source_index": 162
+    },
+    {
+      "name": "pzh_163",
+      "source_index": 163
+    },
+    {
+      "name": "pzh_164",
+      "source_index": 164
+    },
+    {
+      "name": "pzh_165",
+      "source_index": 165
+    },
+    {
+      "name": "pzh_166",
+      "source_index": 166
+    },
+    {
+      "name": "pzh_167",
+      "source_index": 167
+    },
+    {
+      "name": "pzh_168",
+      "source_index": 168
+    },
+    {
+      "name": "pzh_169",
+      "source_index": 169
+    },
+    {
+      "name": "pzh_170",
+      "source_index": 170
+    },
+    {
+      "name": "pzh_171",
+      "source_index": 171
+    },
+    {
+      "name": "pzh_172",
+      "source_index": 172
+    },
+    {
+      "name": "pzh_173",
+      "source_index": 173
+    },
+    {
+      "name": "pzh_174",
+      "source_index": 174
+    },
+    {
+      "name": "pzh_175",
+      "source_index": 175
+    },
+    {
+      "name": "pzh_176",
+      "source_index": 176
+    },
+    {
+      "name": "pzh_177",
+      "source_index": 177
+    },
+    {
+      "name": "pzh_178",
+      "source_index": 178
+    },
+    {
+      "name": "pzh_179",
+      "source_index": 179
+    },
+    {
+      "name": "pzh_180",
+      "source_index": 180
+    },
+    {
+      "name": "pzh_181",
+      "source_index": 181
+    },
+    {
+      "name": "pzh_182",
+      "source_index": 182
+    },
+    {
+      "name": "pzh_183",
+      "source_index": 183
+    },
+    {
+      "name": "pzh_184",
+      "source_index": 184
+    },
+    {
+      "name": "pzh_185",
+      "source_index": 185
+    },
+    {
+      "name": "pzh_186",
+      "source_index": 186
+    },
+    {
+      "name": "pzh_187",
+      "source_index": 187
+    },
+    {
+      "name": "pzh_188",
+      "source_index": 188
+    },
+    {
+      "name": "pzh_189",
+      "source_index": 189
+    },
+    {
+      "name": "pzh_190",
+      "source_index": 190
+    },
+    {
+      "name": "pzh_191",
+      "source_index": 191
+    },
+    {
+      "name": "pzh_192",
+      "source_index": 192
+    },
+    {
+      "name": "pzh_193",
+      "source_index": 193
+    },
+    {
+      "name": "pzh_194",
+      "source_index": 194
+    },
+    {
+      "name": "pzh_195",
+      "source_index": 195
+    },
+    {
+      "name": "pzh_196",
+      "source_index": 196
+    },
+    {
+      "name": "pzh_197",
+      "source_index": 197
+    },
+    {
+      "name": "pzh_198",
+      "source_index": 198
+    },
+    {
+      "name": "pzh_199",
+      "source_index": 199
+    },
+    {
+      "name": "pzh_200",
+      "source_index": 200
+    },
+    {
+      "name": "pzh_201",
+      "source_index": 201
+    },
+    {
+      "name": "pzh_202",
+      "source_index": 202
+    },
+    {
+      "name": "pzh_203",
+      "source_index": 203
+    },
+    {
+      "name": "pzh_204",
+      "source_index": 204
+    },
+    {
+      "name": "pzh_205",
+      "source_index": 205
+    },
+    {
+      "name": "pzh_206",
+      "source_index": 206
+    },
+    {
+      "name": "pzh_207",
+      "source_index": 207
+    },
+    {
+      "name": "pzh_208",
+      "source_index": 208
+    },
+    {
+      "name": "pzh_209",
+      "source_index": 209
+    },
+    {
+      "name": "pzh_210",
+      "source_index": 210
+    },
+    {
+      "name": "pzh_211",
+      "source_index": 211
+    },
+    {
+      "name": "pzh_212",
+      "source_index": 212
+    },
+    {
+      "name": "pzh_213",
+      "source_index": 213
+    },
+    {
+      "name": "pzh_214",
+      "source_index": 214
+    },
+    {
+      "name": "pzh_215",
+      "source_index": 215
+    },
+    {
+      "name": "pzh_216",
+      "source_index": 216
+    },
+    {
+      "name": "pzh_217",
+      "source_index": 217
+    },
+    {
+      "name": "pzh_218",
+      "source_index": 218
+    },
+    {
+      "name": "pzh_219",
+      "source_index": 219
+    },
+    {
+      "name": "pzh_220",
+      "source_index": 220
+    },
+    {
+      "name": "pzh_221",
+      "source_index": 221
+    },
+    {
+      "name": "pzh_222",
+      "source_index": 222
+    },
+    {
+      "name": "pzh_223",
+      "source_index": 223
+    },
+    {
+      "name": "pzh_224",
+      "source_index": 224
+    },
+    {
+      "name": "pzh_225",
+      "source_index": 225
+    },
+    {
+      "name": "pzh_226",
+      "source_index": 226
+    },
+    {
+      "name": "pzh_227",
+      "source_index": 227
+    },
+    {
+      "name": "pzh_228",
+      "source_index": 228
+    },
+    {
+      "name": "pzh_229",
+      "source_index": 229
+    },
+    {
+      "name": "pzh_230",
+      "source_index": 230
+    },
+    {
+      "name": "pzh_231",
+      "source_index": 231
+    },
+    {
+      "name": "pzh_232",
+      "source_index": 232
+    },
+    {
+      "name": "pzh_233",
+      "source_index": 233
+    },
+    {
+      "name": "pzh_234",
+      "source_index": 234
+    },
+    {
+      "name": "pzh_235",
+      "source_index": 235
+    },
+    {
+      "name": "pzh_236",
+      "source_index": 236
+    },
+    {
+      "name": "pzh_237",
+      "source_index": 237
+    },
+    {
+      "name": "pzh_238",
+      "source_index": 238
+    },
+    {
+      "name": "pzh_239",
+      "source_index": 239
+    },
+    {
+      "name": "pzh_240",
+      "source_index": 240
+    },
+    {
+      "name": "pzh_241",
+      "source_index": 241
+    },
+    {
+      "name": "pzh_242",
+      "source_index": 242
+    },
+    {
+      "name": "pzh_243",
+      "source_index": 243
+    },
+    {
+      "name": "pzh_244",
+      "source_index": 244
+    },
+    {
+      "name": "pzh_245",
+      "source_index": 245
+    },
+    {
+      "name": "pzh_246",
+      "source_index": 246
+    },
+    {
+      "name": "pzh_247",
+      "source_index": 247
+    },
+    {
+      "name": "pzh_248",
+      "source_index": 248
+    },
+    {
+      "name": "pzh_249",
+      "source_index": 249
+    },
+    {
+      "name": "pzh_250",
+      "source_index": 250
+    },
+    {
+      "name": "pzh_251",
+      "source_index": 251
+    },
+    {
+      "name": "pzh_252",
+      "source_index": 252
+    },
+    {
+      "name": "pzh_253",
+      "source_index": 253
+    },
+    {
+      "name": "pzh_254",
+      "source_index": 254
+    },
+    {
+      "name": "pzh_255",
+      "source_index": 255
+    },
+    {
+      "name": "pzh_256",
+      "source_index": 256
+    },
+    {
+      "name": "pzh_257",
+      "source_index": 257
+    },
+    {
+      "name": "pzh_258",
+      "source_index": 258
+    },
+    {
+      "name": "pzh_259",
+      "source_index": 259
+    },
+    {
+      "name": "pzh_260",
+      "source_index": 260
+    },
+    {
+      "name": "pzh_261",
+      "source_index": 261
+    },
+    {
+      "name": "pzh_262",
+      "source_index": 262
+    },
+    {
+      "name": "pzh_263",
+      "source_index": 263
+    },
+    {
+      "name": "pzh_264",
+      "source_index": 264
+    },
+    {
+      "name": "pzh_265",
+      "source_index": 265
+    },
+    {
+      "name": "pzh_266",
+      "source_index": 266
+    },
+    {
+      "name": "pzh_267",
+      "source_index": 267
+    },
+    {
+      "name": "pzh_268",
+      "source_index": 268
+    },
+    {
+      "name": "pzh_269",
+      "source_index": 269
+    },
+    {
+      "name": "pzh_270",
+      "source_index": 270
+    },
+    {
+      "name": "pzh_271",
+      "source_index": 271
+    },
+    {
+      "name": "pzh_272",
+      "source_index": 272
+    },
+    {
+      "name": "pzh_273",
+      "source_index": 273
+    },
+    {
+      "name": "pzh_274",
+      "source_index": 274
+    },
+    {
+      "name": "pzh_275",
+      "source_index": 275
+    },
+    {
+      "name": "pzh_276",
+      "source_index": 276
+    },
+    {
+      "name": "pzh_277",
+      "source_index": 277
+    },
+    {
+      "name": "pzh_278",
+      "source_index": 278
+    },
+    {
+      "name": "pzh_279",
+      "source_index": 279
+    },
+    {
+      "name": "pzh_280",
+      "source_index": 280
+    },
+    {
+      "name": "pzh_281",
+      "source_index": 281
+    },
+    {
+      "name": "pzh_282",
+      "source_index": 282
+    },
+    {
+      "name": "pzh_283",
+      "source_index": 283
+    },
+    {
+      "name": "pzh_284",
+      "source_index": 284
+    },
+    {
+      "name": "pzh_285",
+      "source_index": 285
+    },
+    {
+      "name": "pzh_286",
+      "source_index": 286
+    },
+    {
+      "name": "pzh_287",
+      "source_index": 287
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "image": "story_bg_source.png",
+  "columns": 1,
+  "rows": 1,
+  "output_cell": 240,
+  "output_columns": 1,
+  "alpha_mode": "opaque",
+  "frames": [
+    {
+      "name": "story_paper_bg",
+      "source_index": 0
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema": "mosaico-game-assets/v1",
+  "atlases": [
+    {
+      "config": "story_bg.json",
+      "source": "story_bg_source.png",
+      "output": "story_bg.atlas"
+    },
+    {
+      "config": "story_sprites.json",
+      "source": "story_sprites_source.png",
+      "output": "story_sprites.atlas"
+    },
+    {
+      "config": "pirate_zh.json",
+      "source": "pirate_zh_source.png",
+      "output": "pirate_zh.atlas"
+    }
+  ],
+  "files": [
+    {
+      "source": "pirate_zh.fnt",
+      "output": "pirate_zh.fnt"
+    }
+  ]
+}
