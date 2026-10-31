@@ -4,7 +4,12 @@
 
 #include <stdlib.h>
 #include <string.h>
-#define EMBEDDED_ASSET_CAPACITY 32
+/* Registrations past the capacity fail, so games with many sounds raise it
+ * through CONFIG_RAYLIB_LITE_MAX_ASSETS (passed in by the component). */
+#ifndef RAYLIB_LITE_MAX_ASSETS
+#define RAYLIB_LITE_MAX_ASSETS 32
+#endif
+#define EMBEDDED_ASSET_CAPACITY RAYLIB_LITE_MAX_ASSETS
 static raylib_lite_asset_view_t s_embedded[EMBEDDED_ASSET_CAPACITY];
 static size_t s_embedded_count;
 

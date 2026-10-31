@@ -73,6 +73,10 @@ idf_component_register(
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC
     RAYLIB_LITE_DEFAULT_FPS=${CONFIG_RAYLIB_LITE_DEFAULT_FPS})
+if(CONFIG_RAYLIB_LITE_MAX_ASSETS)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE
+        RAYLIB_LITE_MAX_ASSETS=${CONFIG_RAYLIB_LITE_MAX_ASSETS})
+endif()
 
 set(_renderer_c_sources
     "${RAYLIB_LITE_ENGINE_ROOT}/src/renderer/raylib_lite_renderer_esp.c"
