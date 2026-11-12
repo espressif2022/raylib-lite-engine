@@ -2,5 +2,10 @@
 # peripheral on GPIO47. The PWM peripheral is the sole backlight owner.
 # Suppress the unused GPIO initialization to avoid the LEDC pin conflict.
 peripherals:
+  - name: spi_display
+    config:
+      spi_bus_config:
+        # RGB565: 320 pixels * 34 lines * 2 bytes, matching drawbuf capacity.
+        max_transfer_sz: 21760
   - name: gpio_backlight_control
     gen_skip: true

@@ -15,8 +15,8 @@ jobs:
       - name: Assemble and pack an isolated component
         uses: espressif/esp-idf-ci-action@v1
         with:
-          # ESP-IDF 6.2 has no release image tag yet. Device evidence is recorded
-          # separately in docs/releasing.md; this job uses the current latest image.
+          # Packaging uses the latest image; consumer builds also cover v6.1.
+          # Device evidence is recorded separately in docs/releasing.md.
           esp_idf_version: latest
           target: esp32s3
           path: '.'
@@ -63,13 +63,25 @@ jobs:
           - example: last_zone_extraction
             chip: esp32s31
             board: esp-mosaico
-          - example: tomb_raycast
-            chip: esp32s31
-            board: esp-mosaico
           - example: neon_rift_rally
             chip: esp32s31
             board: esp-mosaico
+          - example: sky_hop
+            chip: esp32s3
+            board: esp32-s3-box-3
+          - example: tower_defense
+            chip: esp32s3
+            board: esp32-s3-box-3
           - example: raylib_shooter
+            chip: esp32s3
+            board: esp32-s3-box-3
+          - example: living_worlds
+            chip: esp32s3
+            board: esp32-s3-box-3
+          - example: last_zone_extraction
+            chip: esp32s3
+            board: esp32-s3-box-3
+          - example: neon_rift_rally
             chip: esp32s3
             board: esp32-s3-box-3
     steps:

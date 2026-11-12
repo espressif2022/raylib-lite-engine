@@ -40,8 +40,15 @@ typedef struct {
 
 void raylib_lite_ui_init(raylib_lite_ui_t *ui);
 bool raylib_lite_ui_add(raylib_lite_ui_t *ui, raylib_lite_ui_node_t node);
+/* pressed=true is a down/move sample; pressed=false releases the track.
+ * Hit bounds are half-open. A release clicks each visible button containing
+ * both the release and previous sample (not necessarily the original down).
+ * Two tracks are supported; releasing one preserves the other track. */
 bool raylib_lite_ui_pointer(raylib_lite_ui_t *ui, int32_t track_id,
                             float x, float y, bool pressed);
+/* Direction sign moves one visible button forward/backward with wrapping.
+ * Zero leaves focus unchanged; confirming requires a currently visible button.
+ * Invalid/hidden focus is cleared. No callback runs on failed selection. */
 bool raylib_lite_ui_action(raylib_lite_ui_t *ui, int direction, bool confirm);
 void raylib_lite_ui_draw(raylib_lite_ui_t *ui, int font_size);
 

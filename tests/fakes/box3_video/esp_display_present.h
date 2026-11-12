@@ -16,8 +16,13 @@ typedef struct {
     void *resolve_rows_ctx;
 } esp_display_presenter_buffer_t;
 typedef struct { int32_t x1, y1, x2, y2; } esp_display_present_area_t;
-typedef struct { unsigned coverage; } esp_display_presenter_submit_t;
+typedef struct {
+    unsigned coverage;
+    const esp_display_present_area_t *areas;
+    size_t area_count;
+} esp_display_presenter_submit_t;
 #define ESP_DISPLAY_PRESENT_COVERAGE_FULL 1U
+#define ESP_DISPLAY_PRESENT_COVERAGE_AREAS 2U
 esp_err_t esp_display_presenter_begin_next_frame(esp_display_presenter_t *, const void *, void *, size_t, size_t *, bool *);
 esp_err_t esp_display_presenter_acquire_buffer(esp_display_presenter_t *, esp_display_presenter_buffer_t *);
 esp_err_t esp_display_presenter_submit_buffer(esp_display_presenter_t *, const esp_display_presenter_buffer_t *, const esp_display_present_area_t *, size_t);

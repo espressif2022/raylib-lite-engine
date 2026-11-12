@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h>
 #include "raylib_lite_raylib.h"
+#include "living_screen.h"
 
 #define LIVING_FOCAL (480.0f*1.055f)
 #define LIVING_VERTEX_CAP 400
@@ -33,7 +34,7 @@ bool living_project_xyz(const living_camera_t *camera,float x,float y,float z,Ve
     if(view_z<.2f)return false;
     float inv=LIVING_FOCAL/view_z;
     /* Orbit cameras keep m[1]=0. */
-    out->x=240.0f+inv*(dx*camera->m[0]+dz*camera->m[2]);
+    out->x=LIVING_VIEW_CX+inv*(dx*camera->m[0]+dz*camera->m[2]);
     out->y=240.0f-inv*(dx*camera->m[3]+dy*camera->m[4]+dz*camera->m[5]);
     return true;
 }
@@ -73,11 +74,11 @@ void living_draw_volume_uv(const living_camera_t *camera,
         float max_x=fmaxf(pa.x,fmaxf(pb.x,pc.x));
         float min_y=fminf(pa.y,fminf(pb.y,pc.y));
         float max_y=fmaxf(pa.y,fmaxf(pb.y,pc.y));
-        if(max_x<0||min_x>=480||max_y<0||min_y>=480)continue;
+        if(max_x<0||min_x>=LIVING_VIEW_W||max_y<0||min_y>=480)continue;
         raylib_lite_textured_vertex_t va={pa.x,pa.y,dst_u0+a->u*su,dst_v0+a->v*sv,0.f};
         raylib_lite_textured_vertex_t vb={pb.x,pb.y,dst_u0+b->u*su,dst_v0+b->v*sv,0.f};
         raylib_lite_textured_vertex_t vc={pc.x,pc.y,dst_u0+c->u*su,dst_v0+c->v*sv,0.f};
-        raylib_lite_2d_draw_textured_triangle(atlas.texture,va,vb,vc,faces[i].light);
+        living_draw_triangle(atlas.texture,va,vb,vc,faces[i].light);
     }
 }
 
@@ -104,9 +105,10 @@ void living_cover_add_triangle(Vector2 a,Vector2 b,Vector2 c)
 {
     float min_x=fminf(a.x,fminf(b.x,c.x)),max_x=fmaxf(a.x,fmaxf(b.x,c.x));
     float min_y=fminf(a.y,fminf(b.y,c.y)),max_y=fmaxf(a.y,fmaxf(b.y,c.y));
-    if(max_x<0||min_x>=480||max_y<0||min_y>=480)return;
+    if(max_x<0||min_x>=LIVING_VIEW_W||max_y<0||min_y>=480)return;
     const float to_cell=LIVING_COVER_N/480.0f,to_px=480.0f/LIVING_COVER_N;
-    int x0=(int)(min_x*to_cell),x1=(int)(max_x*to_cell);
+    const float to_cell_x=LIVING_COVER_N/LIVING_VIEW_W,to_px_x=LIVING_VIEW_W/LIVING_COVER_N;
+    int x0=(int)(min_x*to_cell_x),x1=(int)(max_x*to_cell_x);
     int y0=(int)(min_y*to_cell),y1=(int)(max_y*to_cell);
     if(x0<0)x0=0;
     if(y0<0)y0=0;
@@ -114,7 +116,7 @@ void living_cover_add_triangle(Vector2 a,Vector2 b,Vector2 c)
     if(y1>=LIVING_COVER_N)y1=LIVING_COVER_N-1;
     for(int cy=y0;cy<=y1;++cy)
     for(int cx=x0;cx<=x1;++cx){
-        if(living_point_in_tri((cx+.5f)*to_px,(cy+.5f)*to_px,a,b,c))
+        if(living_point_in_tri((cx+.5f)*to_px_x,(cy+.5f)*to_px,a,b,c))
             living_cover[cy*LIVING_COVER_N+cx]=1;
     }
 }
@@ -175,11 +177,12 @@ int living_cover_quad(Vector2 a,Vector2 b,Vector2 c,Vector2 d)
      * triangle the rasterizer would draw. Off-screen corners are ignored, so a
      * quad clipped by the screen can still be skipped. */
     const float to_cell=LIVING_COVER_N/480.0f,to_px=480.0f/LIVING_COVER_N;
+    const float to_cell_x=LIVING_COVER_N/LIVING_VIEW_W,to_px_x=LIVING_VIEW_W/LIVING_COVER_N;
     float min_x=fminf(fminf(a.x,b.x),fminf(c.x,d.x));
     float max_x=fmaxf(fmaxf(a.x,b.x),fmaxf(c.x,d.x));
     float min_y=fminf(fminf(a.y,b.y),fminf(c.y,d.y));
     float max_y=fmaxf(fmaxf(a.y,b.y),fmaxf(c.y,d.y));
-    int x0=(int)(min_x*to_cell),x1=(int)(max_x*to_cell);
+    int x0=(int)(min_x*to_cell_x),x1=(int)(max_x*to_cell_x);
     int y0=(int)(min_y*to_cell),y1=(int)(max_y*to_cell);
     if(x0<0)x0=0;
     if(y0<0)y0=0;
@@ -189,7 +192,7 @@ int living_cover_quad(Vector2 a,Vector2 b,Vector2 c,Vector2 d)
     int hits=0;
     for(int cy=y0;cy<=y1;++cy)
     for(int cx=x0;cx<=x1;++cx){
-        float px=(cx+.5f)*to_px,py=(cy+.5f)*to_px;
+        float px=(cx+.5f)*to_px_x,py=(cy+.5f)*to_px;
         if(!living_point_in_tri(px,py,a,c,b)&&!living_point_in_tri(px,py,b,c,d))
             continue;
         ++hits;

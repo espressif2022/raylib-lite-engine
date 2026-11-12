@@ -21,9 +21,11 @@ class MosaicoVideoTests(unittest.TestCase):
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pthread",
                 f"-I{fake}",
                 f"-I{PORT}",
+                f"-I{ENGINE / 'examples/common_components/examples_common/include'}",
                 f"-I{ENGINE / 'include/raylib_lite'}",
                 f"-I{ENGINE / 'include/raylib_lite'}",
                 str(ENGINE / "tests/test_mosaico_video.c"), str(source),
+                str(ENGINE / "examples/common_components/examples_common/example_async_video.c"),
                 str(ENGINE / "src/runner/raylib_lite_runtime_stats.c"),
                 "-o", str(exe),
             ], check=True)

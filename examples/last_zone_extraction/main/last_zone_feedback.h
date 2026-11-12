@@ -28,13 +28,26 @@ enum {
     LAST_ZONE_SOUND_STEP_R,
     LAST_ZONE_SOUND_EXPLODE,
     LAST_ZONE_SOUND_EXTRACT,
+    LAST_ZONE_SOUND_DOOR,
+    LAST_ZONE_SOUND_DEATH,
+    LAST_ZONE_SOUND_DEPLOY,
+    LAST_ZONE_SOUND_WHIZZ,
+    LAST_ZONE_SOUND_RADIO,
     LAST_ZONE_SOUND_COUNT,
+};
+
+enum {
+    LAST_ZONE_MUSIC_STEALTH,
+    LAST_ZONE_MUSIC_COMBAT,
+    LAST_ZONE_MUSIC_COUNT,
 };
 
 typedef struct {
     const last_zone_feedback_backend_t *backend;
     Sound sounds[LAST_ZONE_SOUND_COUNT];
-    Music music;
+    Music music[LAST_ZONE_MUSIC_COUNT];
+    int8_t playing_track;
+    uint8_t combat_hold;
     uint32_t processed_tick;
     uint8_t previous_hp, previous_armor;
     uint8_t step_wait, enemy_step_wait;
@@ -47,8 +60,10 @@ void last_zone_feedback_init(last_zone_feedback_t *feedback,
                              const last_zone_feedback_backend_t *backend);
 void last_zone_feedback_reset(last_zone_feedback_t *feedback,
                               const last_zone_game_t *game);
+/* Stealth loop by default; switches to the combat loop while any hostile is
+ * alerted or engaging and holds it for a few seconds after contact ends. */
 void last_zone_feedback_music(last_zone_feedback_t *feedback,
-                              last_zone_phase_t phase);
+                              const last_zone_game_t *game, bool paused);
 void last_zone_feedback_events(last_zone_feedback_t *feedback,
                                const last_zone_game_t *game);
 void last_zone_feedback_close(last_zone_feedback_t *feedback);

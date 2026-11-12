@@ -18,11 +18,25 @@ static bool overlaps(const shooter_actor_t *a, float aw, float ah,
            a->y < b->y + bh && a->y + ah > b->y;
 }
 
+static float arena_width(float width)
+{
+    return width >= 480.0f && width <= 2048.0f ? width : 480.0f;
+}
+
+/* Spawn columns are authored for the 480-wide arena and spread to the
+ * current width; 480 maps 1:1. */
+static float spread(const shooter_game_t *game, float x)
+{
+    return x * (game->width - 28.0f) / 452.0f;
+}
+
 void shooter_game_reset(shooter_game_t *game, uint32_t seed)
 {
+    const float width = arena_width(game->width);
     memset(game, 0, sizeof(*game));
+    game->width = width;
     game->phase = SHOOTER_START;
-    game->player = (shooter_actor_t){.x=222, .y=420, .active=true};
+    game->player = (shooter_actor_t){.x=width*.5f-18.0f, .y=420, .active=true};
     game->lives = 3;
     game->wave = 1;
     game->wave_banner = 60;
@@ -38,7 +52,7 @@ void shooter_game_set_pointer(shooter_game_t *game, float x, float y, bool press
         game->phase = SHOOTER_PLAYING;
     }
     if (game->phase == SHOOTER_PLAYING) {
-        game->player.x = fmaxf(0, fminf(444, x - 18));
+        game->player.x = fmaxf(0, fminf(game->width - 36, x - 18));
         game->player.y = fmaxf(280, fminf(438, y - 18));
     }
 }
@@ -46,8 +60,18 @@ void shooter_game_set_pointer(shooter_game_t *game, float x, float y, bool press
 void shooter_game_move(shooter_game_t *game, float dx, float dy)
 {
     if (!game || game->phase != SHOOTER_PLAYING) return;
-    game->player.x = fmaxf(0, fminf(444, game->player.x + dx));
+    game->player.x = fmaxf(0, fminf(game->width - 36, game->player.x + dx));
     game->player.y = fmaxf(280, fminf(438, game->player.y + dy));
+}
+
+void shooter_game_set_width(shooter_game_t *game, float width)
+{
+    if (!game) return;
+    width = arena_width(width);
+    if (width == game->width) return;
+    game->width = width;
+    if (game->phase == SHOOTER_START) game->player.x = width * .5f - 18.0f;
+    else game->player.x = fmaxf(0, fminf(width - 36, game->player.x));
 }
 
 void shooter_game_toggle_pause(shooter_game_t *game)
@@ -73,15 +97,16 @@ static void spawn_bullet(shooter_game_t *game)
     }
 }
 
-static bool spawn_enemy_at(shooter_game_t *game,float x,uint8_t kind)
+static bool spawn_enemy_at(shooter_game_t *game,float x,uint8_t kind,bool elite)
 {
     for (size_t i=0; i<SHOOTER_MAX_ENEMIES; ++i) if (!game->enemies[i].active) {
         uint32_t value=next_random(game);
         const float speed=1.05f+(float)game->wave*0.075f;
+        uint8_t hp=(uint8_t)(elite?8U:kind+1U);
         game->enemies[i]=(shooter_actor_t){.x=x, .y=-36,
             .vx=kind==1?((value>>9)&1?1.15f:-1.15f):0,
-            .vy=speed+(kind==0?0.45f:(kind==2?-0.18f:0.12f)),
-            .kind=kind, .hp=(uint8_t)(kind+1U), .active=true};
+            .vy=(speed+(kind==0?0.45f:(kind==2?-0.18f:0.12f)))*(elite?.72f:1.0f),
+            .kind=kind, .hp=hp, .max_hp=hp, .elite=elite, .active=true};
         return true;
     }
     return false;
@@ -91,10 +116,15 @@ static void spawn_wave_enemy(shooter_game_t *game)
 {
     uint32_t value=next_random(game);
     uint8_t kind=(uint8_t)((value>>5)%3U);
-    float x=14.0f+(float)(value%418U);
-    (void)spawn_enemy_at(game,x,kind);
-    if(game->wave>=3 && (value&7U)==0U)
-        (void)spawn_enemy_at(game,454.0f-x,0);
+    static const float lanes[5]={42.0f,132.0f,222.0f,312.0f,402.0f};
+    uint8_t step=game->formation_step++;
+    float x=game->wave < 2 ? 14.0f+(float)(value%418U)
+                           : lanes[(step+(game->wave&1U))%5U];
+    bool elite=game->wave>=2 && step%10U==9U;
+    if(elite){kind=2;x=222.0f;}
+    (void)spawn_enemy_at(game,spread(game,x),kind,elite);
+    if(game->wave>=3 && step%5U==4U)
+        (void)spawn_enemy_at(game,spread(game,454.0f-x),0,false);
 }
 
 static void emit_particles(shooter_game_t *game,float x,float y,uint8_t color,unsigned count)
@@ -148,7 +178,7 @@ void shooter_game_update(shooter_game_t *game)
     for (size_t i=0; i<SHOOTER_MAX_ENEMIES; ++i) {
         shooter_actor_t *e=&game->enemies[i]; if (!e->active) continue;
         e->x+=e->vx; e->y+=e->vy;
-        if (e->x<0 || e->x>450) e->vx=-e->vx;
+        if (e->x<0 || e->x>game->width-30) e->vx=-e->vx;
         if (e->y>490 || (!game->invulnerable&&overlaps(e,28,28,&game->player,36,36))) {
             e->active=false;
             emit_particles(game,e->x+14,e->y+14,3,12);
@@ -168,7 +198,7 @@ void shooter_game_update(shooter_game_t *game)
                     if(game->combo>game->max_combo)game->max_combo=game->combo;
                     game->combo_timer=90;++game->kills;
                     uint32_t multiplier=1U+(uint32_t)game->combo/4U;
-                    game->score+=(uint32_t)(15U+e->kind*20U)*multiplier;
+                    game->score+=(uint32_t)(15U+e->kind*20U+(e->elite?100U:0U))*multiplier;
                     emit_particles(game,e->x+14,e->y+14,e->kind,12U+e->kind*4U);
                 }
                 break;

@@ -7,3 +7,5 @@ Start with the [quickstart](docs/quickstart.EN.md), then choose the affected bui
 For a change, describe the trigger, resulting behavior, and target path. Add an independent correctness check when changing pixels, asset formats, or protocol output. Use `python3 tools/check_markdown_links.py`, `git diff --check`, and the relevant tests; [AGENTS.md](AGENTS.md) maps change types to checks. Record device measurements separately from Host timings. Do not include generated `build/`, `managed_components/`, `sdkconfig`, or local `docs/debug/` files.
 
 New source files should carry an SPDX identifier and follow the existing C/Python formatting in their component. Do not copy another engine's implementation into this repository. Keep original algorithm and data-layout decisions reviewable in the PR or commit description.
+
+Keep usage contracts separate from development history. Store plans, candidate captures and review snapshots in the [development records (Chinese)](docs/development/README.CN.md); keep them in Git but exclude them from component packages.

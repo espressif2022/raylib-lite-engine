@@ -268,15 +268,15 @@ bool tomb_in_move_zone(int x, int y)
     return dx*dx+dy*dy<=TOMB_MOVE_R*TOMB_MOVE_R;
 }
 
-bool tomb_in_move_capture(int x, int y)
+bool tomb_in_move_capture(int x, int y, int view_width)
 {
     (void)y;
-    if(x<0||x>=TOMB_LOOK_MIN_X)return false;
+    if(x<0||x>=view_width/2)return false;
     return true;
 }
 
-bool tomb_in_jump_zone(int x, int y)
+bool tomb_in_jump_zone(int x, int y, int view_width)
 {
-    int dx=x-TOMB_JUMP_X, dy=y-TOMB_JUMP_Y;
+    int dx=x-(view_width-(TOMB_VIEW_WIDTH-TOMB_JUMP_X)), dy=y-TOMB_JUMP_Y;
     return dx*dx+dy*dy<=TOMB_JUMP_R*TOMB_JUMP_R;
 }

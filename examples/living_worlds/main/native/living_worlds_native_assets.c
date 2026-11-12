@@ -2,8 +2,16 @@
 #include "living_worlds_native_assets.h"
 
 #include <stdlib.h>
-#include "driver/jpeg_decode.h"
+#include <string.h>
+#include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "soc/soc_caps.h"
+#if SOC_JPEG_DECODE_SUPPORTED
+#include "driver/jpeg_decode.h"
+#else
+/* Targets without a JPEG engine use the TJpgDec decoder in ROM. */
+#include "esp32s3/rom/tjpgd.h"
+#endif
 #include "raylib_lite_2d.h"
 #include "raylib_lite_assets.h"
 #include "raylib_lite_example_board.h"
@@ -11,7 +19,9 @@
 static const char *TAG = "living_worlds_assets";
 
 struct living_worlds_native_assets {
+#if SOC_JPEG_DECODE_SUPPORTED
     jpeg_decoder_handle_t jpeg;
+#endif
     void *background_pixels;
 };
 
@@ -23,7 +33,7 @@ void raylib_lite_example_game_board_config(raylib_lite_example_board_config_t *c
     *config = (raylib_lite_example_board_config_t) {
         .touch_points = 1,
         .enable_imu = false,
-        .drawbuf_lines = 40,
+        .drawbuf_lines = 34,
         .drawbuf_count = 2,
     };
 }
@@ -47,6 +57,7 @@ raylib_lite_result_t living_worlds_native_assets_open(
     *out_assets = NULL;
     living_worlds_native_assets_t *assets = calloc(1, sizeof(*assets));
     if (!assets) return RAYLIB_LITE_NO_MEMORY;
+#if SOC_JPEG_DECODE_SUPPORTED
     const jpeg_decode_engine_cfg_t config = {
         .intr_priority = 0,
         .timeout_ms = 250,
@@ -56,24 +67,19 @@ raylib_lite_result_t living_worlds_native_assets_open(
         free(assets);
         return from_esp_error(error);
     }
+#endif
     *out_assets = assets;
     return RAYLIB_LITE_OK;
 }
 
-static raylib_lite_result_t decode_background(living_worlds_native_assets_t *assets,
-    const char *name, raylib_lite_atlas_t *out, void **out_pixels)
+#if SOC_JPEG_DECODE_SUPPORTED
+static raylib_lite_result_t decode_jpeg(living_worlds_native_assets_t *assets,
+    const raylib_lite_asset_view_t *view, void **out_pixels,
+    unsigned *out_width, unsigned *out_height)
 {
-    raylib_lite_asset_view_t source = {0};
-    raylib_lite_result_t result = raylib_lite_asset_open(name, &source);
-    if (result != RAYLIB_LITE_OK) return result;
-
     jpeg_decode_picture_info_t info = {0};
-    const size_t stream_size = source.size;
-    esp_err_t error = jpeg_decoder_get_info(source.data, stream_size, &info);
-    if (error != ESP_OK) {
-        raylib_lite_asset_release(&source);
-        return from_esp_error(error);
-    }
+    esp_err_t error = jpeg_decoder_get_info(view->data, view->size, &info);
+    if (error != ESP_OK) return from_esp_error(error);
     const size_t padded_width = (info.width + 15U) & ~15U;
     const size_t padded_height = (info.height + 15U) & ~15U;
     const size_t required = padded_width * padded_height * 2U;
@@ -83,7 +89,6 @@ static raylib_lite_result_t decode_background(living_worlds_native_assets_t *ass
     };
     void *pixels = jpeg_alloc_decoder_mem(required, &memory, &allocated);
     if (!pixels || allocated < required) {
-        raylib_lite_asset_release(&source);
         free(pixels);
         return RAYLIB_LITE_NO_MEMORY;
     }
@@ -93,15 +98,96 @@ static raylib_lite_result_t decode_background(living_worlds_native_assets_t *ass
         .conv_std = JPEG_YUV_RGB_CONV_STD_BT601,
     };
     uint32_t output_size = 0;
-    error = jpeg_decoder_process(assets->jpeg, &config, source.data, stream_size,
+    error = jpeg_decoder_process(assets->jpeg, &config, view->data, view->size,
                                  pixels, allocated, &output_size);
-    raylib_lite_asset_release(&source);
     if (error != ESP_OK) {
         free(pixels);
         return from_esp_error(error);
     }
+    *out_pixels = pixels;
+    *out_width = info.width;
+    *out_height = info.height;
+    return RAYLIB_LITE_OK;
+}
+#else
+typedef struct {
+    const uint8_t *data;
+    size_t size, offset;
+    uint16_t *pixels;
+    unsigned width;
+} tjpgd_session_t;
+
+static UINT tjpgd_input(JDEC *decoder, BYTE *buffer, UINT count)
+{
+    tjpgd_session_t *session = decoder->device;
+    size_t left = session->size - session->offset;
+    if (count > left) count = (UINT)left;
+    if (buffer) memcpy(buffer, session->data + session->offset, count);
+    session->offset += count;
+    return count;
+}
+
+static UINT tjpgd_output(JDEC *decoder, void *bitmap, JRECT *rect)
+{
+    tjpgd_session_t *session = decoder->device;
+    const uint8_t *rgb = bitmap;
+    for (unsigned y = rect->top; y <= rect->bottom; ++y) {
+        uint16_t *dst = session->pixels + (size_t)y * session->width + rect->left;
+        for (unsigned x = rect->left; x <= rect->right; ++x, rgb += 3)
+            *dst++ = (uint16_t)(((rgb[0] & 0xf8U) << 8) | ((rgb[1] & 0xfcU) << 3) | (rgb[2] >> 3));
+    }
+    return 1;
+}
+
+static raylib_lite_result_t decode_jpeg(living_worlds_native_assets_t *assets,
+    const raylib_lite_asset_view_t *view, void **out_pixels,
+    unsigned *out_width, unsigned *out_height)
+{
+    (void)assets;
+    enum { TJPGD_WORK_BYTES = 4096 };
+    void *work = heap_caps_malloc(TJPGD_WORK_BYTES, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!work) return RAYLIB_LITE_NO_MEMORY;
+    tjpgd_session_t session = {.data = view->data, .size = view->size};
+    JDEC decoder;
+    JRESULT status = jd_prepare(&decoder, tjpgd_input, work, TJPGD_WORK_BYTES, &session);
+    if (status != JDR_OK) {
+        heap_caps_free(work);
+        return RAYLIB_LITE_PLATFORM_ERROR;
+    }
+    session.width = decoder.width;
+    session.pixels = heap_caps_malloc((size_t)decoder.width * decoder.height * 2U,
+                                      MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!session.pixels) {
+        heap_caps_free(work);
+        return RAYLIB_LITE_NO_MEMORY;
+    }
+    status = jd_decomp(&decoder, tjpgd_output, 0);
+    heap_caps_free(work);
+    if (status != JDR_OK) {
+        heap_caps_free(session.pixels);
+        return RAYLIB_LITE_PLATFORM_ERROR;
+    }
+    *out_pixels = session.pixels;
+    *out_width = decoder.width;
+    *out_height = decoder.height;
+    return RAYLIB_LITE_OK;
+}
+#endif
+
+static raylib_lite_result_t decode_background(living_worlds_native_assets_t *assets,
+    const char *name, raylib_lite_atlas_t *out, void **out_pixels)
+{
+    raylib_lite_asset_view_t source = {0};
+    raylib_lite_result_t result = raylib_lite_asset_open(name, &source);
+    if (result != RAYLIB_LITE_OK) return result;
+    const size_t stream_size = source.size;
+    void *pixels = NULL;
+    unsigned width = 0, height = 0;
+    result = decode_jpeg(assets, &source, &pixels, &width, &height);
+    raylib_lite_asset_release(&source);
+    if (result != RAYLIB_LITE_OK) return result;
     Texture2D texture = raylib_lite_2d_register_rgb565(
-        pixels, (int)info.width, (int)info.height);
+        pixels, (int)width, (int)height);
     if (!texture.id) {
         free(pixels);
         return RAYLIB_LITE_NO_MEMORY;
@@ -109,8 +195,7 @@ static raylib_lite_result_t decode_background(living_worlds_native_assets_t *ass
     *out_pixels = pixels;
     *out = (raylib_lite_atlas_t){.texture = texture};
     ESP_LOGI(TAG, "JPEG %s: %ux%u, %u bytes -> %u bytes RGB565", name,
-             (unsigned)info.width, (unsigned)info.height,
-             (unsigned)stream_size, (unsigned)output_size);
+             width, height, (unsigned)stream_size, width * height * 2U);
     return RAYLIB_LITE_OK;
 }
 
@@ -168,6 +253,8 @@ void living_worlds_native_assets_close(living_worlds_native_assets_t *assets)
 {
     if (!assets) return;
     free(assets->background_pixels);
+#if SOC_JPEG_DECODE_SUPPORTED
     if (assets->jpeg) jpeg_del_decoder_engine(assets->jpeg);
+#endif
     free(assets);
 }

@@ -122,6 +122,49 @@ void raylib_lite_tilemap_draw_layer(raylib_lite_tilemap_t map,
     }
 }
 
+static float floor_px(float v)
+{
+    int i = (int)v;
+    return (float)(i - (v < (float)i));
+}
+
+void raylib_lite_tilemap_draw_layer_scaled(raylib_lite_tilemap_t map,
+    uint32_t layer, raylib_lite_renderer_rect_t viewport,
+    raylib_lite_renderer_vec2_t origin, float scale)
+{
+    if (scale > .999f && scale < 1.001f) {
+        raylib_lite_tilemap_draw_layer(map, layer, viewport, origin);
+        return;
+    }
+    if (!map || !map->used || layer >= map->header->layers || scale <= 0) return;
+    const int tw = map->header->tile_width, th = map->header->tile_height;
+    int x0 = (int)viewport.x / tw, y0 = (int)viewport.y / th;
+    int x1 = (int)(viewport.x + viewport.width + tw - 1) / tw;
+    int y1 = (int)(viewport.y + viewport.height + th - 1) / th;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > map->header->width) x1 = map->header->width;
+    if (y1 > map->header->height) y1 = map->header->height;
+    const uint16_t *tiles = map->layers +
+        (size_t)layer * map->header->width * map->header->height;
+    for (int y = y0; y < y1; ++y) {
+        /* Snap both edges so neighbouring tiles share them without seams. */
+        float top = floor_px(origin.y + (float)((y - y0) * th) * scale);
+        float bottom = floor_px(origin.y + (float)((y - y0 + 1) * th) * scale);
+        for (int x = x0; x < x1; ++x) {
+            uint16_t id = tiles[(size_t)y * map->header->width + x];
+            if (!id) continue;
+            float left = floor_px(origin.x + (float)((x - x0) * tw) * scale);
+            float right = floor_px(origin.x + (float)((x - x0 + 1) * tw) * scale);
+            raylib_lite_renderer_draw_texture_pro(map->atlas.texture,
+                (raylib_lite_renderer_rect_t){(float)((id - 1U) * tw), 0, (float)tw, (float)th},
+                (raylib_lite_renderer_rect_t){left, top, right - left, bottom - top},
+                (raylib_lite_renderer_vec2_t){0, 0}, 0,
+                (raylib_lite_renderer_color_t){255, 255, 255, 255});
+        }
+    }
+}
+
 bool raylib_lite_tilemap_is_blocked(raylib_lite_tilemap_t map, int x, int y)
 {
     if (!map || x < 0 || y < 0 || x >= map->header->width ||

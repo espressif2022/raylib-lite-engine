@@ -28,8 +28,8 @@ typedef struct {
     int max_files;
     uint16_t checksum;
     bool mmap_enable;
-    /* In-memory MMAP blob from an ELF bundle. When set, mount parses this
-     * image instead of a flash partition. */
+    /* In-memory MMAP image, such as assets embedded in the application.
+     * When set, mount parses this image instead of a flash partition. */
     const uint8_t *image;
     size_t image_size;
 } raylib_lite_asset_store_config_t;

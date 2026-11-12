@@ -30,6 +30,17 @@ implementations in `main/native/` and use generic Board or Engine interfaces.
 Host runs asset preparation/generation scripts and packs `game_assets.json`.
 The module descriptor supplies the tick rate; `game.sim.json` lists shared sources.
 
+The reference games split `main/` into four layers. Each layer depends only on the layers before it:
+
+| Layer | Example (Neon Rift Rally) | Owns | Must not |
+| --- | --- | --- | --- |
+| Model | `rally_game.[ch]` | State, rules, fixed-step update, numbered feedback events | Draw, play audio, or include Engine/Raylib headers |
+| View | `rally_view.[ch]`, `rally_view_motion.c` | Drawing, HUD, and visual-only motion state such as eased cameras and callout timers | Change model state |
+| Feedback | `rally_feedback.[ch]` | Consumes each model event once and maps it to sound clips, music, and haptic pulses | Decide gameplay; it reads the model only |
+| Module | `game_module.c` | Input mapping, pause, save, lifecycle, and wiring of the other layers | Contain rules or drawing code |
+
+Models compile with a Host C compiler alone, which keeps rule tests fast. Feedback modules are tested against a stub audio header (see `examples/<game>/tests/test_*_feedback.py`). When a model has no event counters, the feedback layer can compare a snapshot of its counters between ticks instead, as the shooter does. `tests/test_platform_dependency_boundaries.py` checks that game sources stay independent of concrete boards.
+
 ## 2. Validate on Host
 
 With a C compiler and Pillow available, run from the engine root. MTX2 conversion and some asset generators also require NumPy:
@@ -42,6 +53,14 @@ python3 tools/game_cli.py test examples/<name> --frames 300 --json
 ```
 
 The browser preview supports input, pause, single stepping, screenshots, and recording. Use `--scenario <json>` for deterministic input replay and `--state-output <path>` to save state. Replay `frame` numbers must be nonnegative and nondecreasing. Native C rendering writes RGB565 pixels; the browser displays them. See the [Host simulator reference](../host/README.md) for more options.
+
+Panels differ in size (ESP-Mosaico 480x480, ESP32-S3-BOX-3 320x240). Lay out with
+[`raylib_lite_design_view.h`](../examples/common_components/examples_common/include/raylib_lite_design_view.h):
+the short side is 480 design units, 480x480 draws with no camera, and longer panels
+widen the span or centre a fixed field. Convert pointers with
+`raylib_lite_design_point()` or `raylib_lite_design_field_point()`, then define
+`raylib_lite_game_adaptive_surface()` to return true so native builds use the
+panel size. Check other sizes on Host with `--size 320x240`.
 
 ## 3. Validate on device
 

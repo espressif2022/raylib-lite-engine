@@ -20,7 +20,7 @@
 #define TOMB_JUMP_X 398
 #define TOMB_JUMP_Y 392
 #define TOMB_JUMP_R 56
-#define TOMB_LOOK_MIN_X 240
+#define TOMB_VIEW_WIDTH 480
 
 typedef struct {
     float x, y, z;
@@ -53,5 +53,6 @@ void tomb_set_jump(tomb_game_t *game, bool jump);
 void tomb_update(tomb_game_t *game);
 uint32_t tomb_state_hash(const tomb_game_t *game);
 bool tomb_in_move_zone(int x, int y);
-bool tomb_in_move_capture(int x, int y);
-bool tomb_in_jump_zone(int x, int y);
+/* Touch zones in design units; `view_width` anchors the right-hand controls. */
+bool tomb_in_move_capture(int x, int y, int view_width);
+bool tomb_in_jump_zone(int x, int y, int view_width);

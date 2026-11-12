@@ -65,10 +65,12 @@ typedef struct {
     tower_projectile_t projectiles[TOWER_MAX_PROJECTILES];
     tower_slot_t towers[TOWER_PAD_COUNT];
     uint32_t tick, rng, score, kills, shots;
+    uint32_t synergy_hits;
     uint16_t credits, wave, wave_spawned, wave_total;
     uint16_t spawn_cooldown, intermission;
     uint16_t feedback_value;
     uint8_t base_hp, selected_type, feedback, feedback_ticks;
+    int8_t selected_pad;
     bool pointer_down;
 } tower_game_t;
 

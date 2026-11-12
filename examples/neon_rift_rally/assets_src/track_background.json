@@ -1,8 +1,24 @@
 {
-  "image": "track_canyon.png",
+  "image": "rally_panoramas.png",
   "columns": 1,
-  "rows": 1,
-  "output_cell": 480,
+  "rows": 3,
+  "output_cell": 224,
   "alpha_mode": "opaque",
-  "frames": [{"name": "track_canyon", "pivot_x": 0, "pivot_y": 0}]
+  "frames": [
+    {
+      "name": "track_neon_sky",
+      "pivot_x": 0,
+      "pivot_y": 0
+    },
+    {
+      "name": "track_sunset_sky",
+      "pivot_x": 0,
+      "pivot_y": 0
+    },
+    {
+      "name": "track_polar_sky",
+      "pivot_x": 0,
+      "pivot_y": 0
+    }
+  ]
 }

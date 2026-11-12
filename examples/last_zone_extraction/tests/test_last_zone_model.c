@@ -42,6 +42,32 @@ static void assert_mission_reachable(last_zone_game_t *game)
     }
 }
 
+/* Layout 0, upper corridor: a still player at x 10.5 with a sentry 4 cells
+ * east, an ally 8 cells away (radio range) and a third hostile far off. */
+static void stage_sentries(last_zone_game_t *game)
+{
+    game->layout = 0;
+    last_zone_reset(game);
+    last_zone_confirm(game);
+    for (int i = 3; i < LAST_ZONE_ENEMIES; ++i) game->enemies[i].active = false;
+    static const float xy[3][2] = {{14.5f, 2.5f}, {16.5f, 5.5f}, {3.5f, 20.5f}};
+    for (int i = 0; i < 3; ++i) {
+        last_zone_enemy_t *enemy = &game->enemies[i];
+        enemy->x = xy[i][0];
+        enemy->y = xy[i][1];
+        enemy->home_x = enemy->patrol_x = (int8_t)enemy->x;
+        enemy->home_y = enemy->patrol_y = (int8_t)enemy->y;
+        enemy->patrol_wait = 255;
+        enemy->facing = 0.0f;
+        enemy->active = true;
+    }
+    game->x = 10.5f;
+    game->y = 2.5f;
+    game->angle = 0.0f;
+    last_zone_set_motion(game, 0, 0, 0);
+    last_zone_set_sprint(game, false);
+}
+
 int main(void)
 {
     {
@@ -207,6 +233,60 @@ int main(void)
     for (int i = 0; i < 8; ++i) last_zone_update(&game);
     assert(game.enemies[0].ai_state != LAST_ZONE_ENEMY_PATROL);
     assert(game.spotted);
+
+    /* Patrols see a cone: a still player behind them stays unseen, one in
+     * front builds suspicion before the alert. */
+    stage_sentries(&game);
+    game.enemies[0].facing = 0.0f;
+    for (int i = 0; i < 60; ++i) last_zone_update(&game);
+    assert(game.enemies[0].ai_state == LAST_ZONE_ENEMY_PATROL);
+    assert(game.enemies[0].suspicion == 0);
+    game.enemies[0].facing = 3.1415927f;
+    for (int i = 0; i < 5; ++i) last_zone_update(&game);
+    assert(game.enemies[0].ai_state == LAST_ZONE_ENEMY_PATROL);
+    assert(game.enemies[0].suspicion > 0);
+    for (int i = 0; i < 12; ++i) last_zone_update(&game);
+    assert(game.enemies[0].ai_state == LAST_ZONE_ENEMY_ALERT);
+    assert(game.enemies[0].radio_timer > 0);
+
+    /* The spotter radios nearby patrols unless it is silenced first. */
+    bool radio = false;
+    for (int i = 0; i < LAST_ZONE_RADIO_TICKS + 2 && !radio; ++i) {
+        last_zone_update(&game);
+        radio = game.last_radio;
+    }
+    assert(radio && game.radio_flash > 0);
+    assert(game.enemies[1].ai_state == LAST_ZONE_ENEMY_SEARCH);
+
+    stage_sentries(&game);
+    game.enemies[0].facing = 3.1415927f;
+    for (int i = 0; i < 20; ++i) last_zone_update(&game);
+    assert(game.enemies[0].radio_timer > 0);
+    game.enemies[0].hp = 1;
+    game.fire_cooldown = 0;
+    uint16_t score = game.score;
+    assert(last_zone_fire(&game) == NEON_FIRE_KILL);
+    assert(game.call_cut_flash > 0 && game.score == score + 175U);
+    for (int i = 0; i < LAST_ZONE_RADIO_TICKS + 2; ++i) {
+        last_zone_update(&game);
+        assert(!game.last_radio);
+    }
+    assert(game.enemies[1].ai_state == LAST_ZONE_ENEMY_PATROL);
+
+    /* Enemy fire is a roll: a long exchange has both hits and misses. */
+    stage_sentries(&game);
+    game.hp = 200;
+    game.enemies[0].ai_state = LAST_ZONE_ENEMY_ENGAGE;
+    game.enemies[0].search_timer = 150;
+    unsigned misses = 0;
+    for (int i = 0; i < 900; ++i) {
+        game.enemies[0].x = 15.5f;
+        game.enemies[0].y = 2.5f;
+        last_zone_update(&game);
+        if (game.last_miss) ++misses;
+    }
+    assert(misses > 0 && game.damage_taken > 0);
+    assert(game.phase == LAST_ZONE_PHASE_PLAYING);
 
     game.layout = 4;
     game.phase = LAST_ZONE_PHASE_WON;

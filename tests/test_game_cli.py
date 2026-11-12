@@ -74,13 +74,37 @@ class GameCliTests(unittest.TestCase):
                 self.assertIn("esp-mosaico", games[name]["boards"])
                 self.assertEqual(Path(games[name]["path"]), ENGINE / "examples" / name)
 
-    def test_box3_listing_excludes_s31_only_jpeg_game(self) -> None:
+    def test_box3_listing_includes_every_reference_game(self) -> None:
         payload = json.loads(subprocess.check_output([
             sys.executable, str(CLI), "list", "--json", "--target", "esp32-s3-box-3",
         ], cwd=ENGINE))
         games = {game["name"] for game in payload["games"]}
-        self.assertIn("sky_hop", games)
-        self.assertNotIn("living_worlds", games)
+        self.assertLessEqual({"raylib_shooter", "tower_defense", "sky_hop", "living_worlds",
+                              "last_zone_extraction", "tomb_raycast", "neon_rift_rally"}, games)
+
+    def test_native_boards_restricts_board_listing(self) -> None:
+        import tempfile
+        spec = importlib.util.spec_from_file_location("raylib_lite_game_cli", CLI)
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for board in ("esp-mosaico", "esp32-s3-box-3"):
+                (root / "examples/boards" / board).mkdir(parents=True)
+                (root / "examples/boards" / board / "CMakeLists.txt").write_text("")
+                (root / "examples/boards" / board / "idf_component.yml").write_text("")
+            game = root / "examples/only_s31"
+            (game / "main").mkdir(parents=True)
+            (game / "game.sim.json").write_text(json.dumps(
+                {"schema": "raylib-lite-game-sim/v1", "native_boards": ["esp-mosaico"]}))
+            (game / "CMakeLists.txt").write_text(
+                'include("../common_components/examples_common/project.cmake")')
+            (game / "main/CMakeLists.txt").write_text("REQUIRES ${RAYLIB_LITE_BOARD}")
+            (game / "main/idf_component.yml").write_text("espressif2022/raylib-lite-engine: '*'")
+            with mock.patch.object(module, "ENGINE_ROOT", root):
+                games = {item["name"]: item["boards"] for item in module.engine_games()}
+        self.assertEqual(games["only_s31"], ["esp-mosaico"])
 
     def test_create_accepts_listed_games_and_rejects_unknown_templates(self) -> None:
         for template in ("sky-hop", "sky_hop"):

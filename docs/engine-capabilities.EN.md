@@ -9,7 +9,7 @@ Raylib Lite Engine is one ESP-IDF component: `raylib-lite-engine`. Public neutra
 | Fixed-step game lifecycle | `raylib_lite_game_app_run` | [game app](../include/raylib_lite/raylib_lite_game_app.h) |
 | Runner input and runtime counters | `raylib_lite_input_*`, `raylib_lite_runtime_stats_*` | [input](../include/raylib_lite/raylib_lite_input.h), [stats](../include/raylib_lite/raylib_lite_runtime_stats.h) |
 | Touch/button action mapping | `raylib_lite_action_*` | [action](../include/raylib_lite/raylib_lite_action.h) |
-| Neutral raster/rendering | `raylib_lite_renderer_*` | [renderer](../include/raylib_lite/raylib_lite_renderer.h), [raster contract](raster-kernels.EN.md) |
+| Neutral raster/rendering | `raylib_lite_renderer_*` | [drawing](../include/raylib_lite/raylib_lite_renderer_draw.h), [raster contract](raster-kernels.EN.md) |
 | Raylib-shaped graphics/input names | `InitWindow`, `Draw*`, etc. | [Raylib compatibility](../compat/raylib/include/raylib_lite_raylib.h) |
 | Raylib-shaped 2D texture helpers | `raylib_lite_2d_*` | [2D compatibility](../compat/raylib/include/raylib_lite_2d.h) |
 | Tile map lookup/drawing | `raylib_lite_tilemap_*` | [tilemap](../include/raylib_lite/raylib_lite_tilemap.h) |
@@ -33,7 +33,8 @@ Raylib Lite Engine is one ESP-IDF component: `raylib-lite-engine`. Public neutra
 | `src/save` | version/CRC/migration/debounce core | NVS calls |
 | `src/scene`, `src/ui`, `src/fx` | reusable scene stack, retained UI, tweens/particles | game-specific policy |
 | `src/idf` | ESP clock, mmap-assets and NVS adapters | portable Engine policy |
-| `src/arch/esp32s31` | S31-specific RGB565 acceleration | Board/BSP behavior |
+| `src/arch/esp32s31` | S31 RGB565 PIE copy and fill, enabled in the engine | Board/BSP behavior |
+| `src/arch/esp32s3` | S3 RGB565 PIE copy and fill, render benchmark only | Board/BSP behavior |
 
 ## Public API rules
 
@@ -51,3 +52,5 @@ For lifecycle, framebuffer ownership and queue concurrency requirements, see the
 The component-root `Kconfig` uses `RAYLIB_LITE_*` Engine configuration names. Board-specific ESP-Mosaico options use the `ESP_MOSAICO_*` namespace. Shared native-example launcher/Board/feedback/game-module glue is owned by the application-side `examples/common_components/examples_common` IDF component and is excluded from Engine implementation sources. Release assembly bundles a separate copy inside each native game example; it is not an Engine public API.
 
 Runtime asset services consume a read-only mmap partition, a resident image alias, a bounded read backing, or explicitly registered memory. Host simulation reads generated assets and does not mount device flash.
+
+Renderer drawing, instrumentation and optional diagnostics have separate public headers: `raylib_lite_renderer_draw.h`, `raylib_lite_renderer_stats.h`, and `raylib_lite_renderer_benchmark.h`. The original `raylib_lite_renderer.h` remains a source-compatible umbrella. Legacy phase labels and function names remain available; this header separation does not change behavior or imply device performance gains.

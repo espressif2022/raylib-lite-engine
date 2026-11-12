@@ -1,135 +1,63 @@
 # Neon Rift Rally
 
-`Neon Rift Rally` is a third-person neon motorcycle racing game for the
-Mosaico Raylib Lite engine. It combines a procedural curved track and layered
-panorama with three rider poses, six deterministic rivals,
-ranking, collision/near-miss scoring, integrity, three-lap results, persistent
-records, synthesized audio, and event-driven haptics.
+[简体中文](README.CN.md) · [Examples](../README.md)
 
-《Neon Rift Rally》是第三人称霓虹摩托竞速游戏。赛道、车道线和路边物件按游戏进度
-投影；骑手按转向切换左倾、直行、右倾姿态。碰撞会减速、扣耐久，并触发画面、音效和
-事件反馈。Host 与真机共用游戏模型和视图源码。
+Neon Rift Rally is a third-person neon motorcycle racer. Each of three courses runs a three-lap race against six rivals using sprint, defend and chase strategies. Use drafting, nitro and drifts to fight for position.
 
-## Controls / 操作
+![Neon Rift Rally](docs/screenshot.png)
 
-- Host keyboard: `A`/`D` steer, `W` throttle, `S` brake, `Space` nitro,
-  `Shift` drift.
-- Native board: acceleration is automatic. Tilt the board left/right to steer;
-  keep it level during the opening countdown so the IMU can calibrate. A
-  deliberate tilt beyond the deadzone changes lanes. A left-side touch drag
-  overrides tilt steering; a second finger can hold the lower-right nitro
-  area. Host pointer steering also requests throttle.
-- IMU steering uses the calibrated gravity-vector roll angle, with an
-  approximately 6-degree deadzone and finer response near center. Return the
-  board to its calibrated pose to release steering. Obvious acceleration
-  spikes are rejected; sustained steering still moves toward the road edge.
-- Touch steering starts neutral at the initial contact. Drag horizontally
-  from that point; resting a finger on the left edge does not apply full lock.
-- `P` pauses/resumes in the Host shell. `Enter`/action `4` restarts the run;
-  tapping the finished race also starts a fresh run. The runner reset control
-  performs the same restart and clears transient touch state.
-- During the countdown, action `8`/`9` (or a tap beside the course name on
-  the left/right) selects the previous/next course. Selection resets the countdown.
+The image is a Host RGB565 frame on Neon Loop: a slipstream banner, speedometer, nitro button and rolling score.
 
-The three course cards are `Neon Loop / NEON GRID`, `Sunset Sprint / SUNSET
-EMBER`, and `Polar Rift / AURORA ICE`. Each uses a distinct closed route and
-color palette, with independent best records.
+## Play and controls
 
-The module uses action codes `0`, `1`, `2`, `5`, `6`, and `7` for left, right,
-throttle, brake, nitro, and drift; action `3` toggles pause and action `4`
-restarts. Replays can therefore describe the same controls without knowing the
-rendering implementation.
+### Device
 
-The shared IMU input uses the Board adapter's X-axis acceleration. The game
-filters a 0.12 g deadzone and recenters when samples stop; touch and action
-steering take priority. Check the physical left/right sign on the target board
-before accepting this control as device-ready.
+- Hold the device level during the countdown so the IMU can calibrate its center.
+- Tilt the device left or right to steer; tilting left moves left and shows the left-lean pose.
+- Dragging on the left side temporarily takes over steering; a second finger can hold the nitro area at the bottom right.
+- During the countdown, tap either side of the course name to change course.
+- Throttle is automatic; after the race, tap the result screen to restart.
+- Above speed 18, holding a hard turn for about 0.27 s starts a drift; straightening out cashes it in as a short boost. Leaving the track, a collision or being airborne cancels the charge. Brief corrections do not start a drift.
 
-Each completed lap records its fixed-step duration. Host metadata exposes
-`last_lap_ticks`, `best_lap_ticks`, and `best_race_ticks` for replay/evaluation;
-native firmware stores the two best values in NVS under the
-`neon_rift_rally/record` key. Host runs intentionally keep records in memory so
-replays remain isolated and deterministic.
+### Host
 
-The countdown metadata exposes a short start instruction (`select_course`,
-`throttle_ready`, `hold_drift`, or `nitro_go`). A finished race reports a
-`gold`, `silver`, or `bronze` rating/trophy from the final position; a failed
-run reports `dnf` with no trophy.
+- `A`/`D`: steer; `W`: throttle; `S`: brake.
+- `Space`: nitro; `Shift`: drift.
+- `P`: pause or resume; `Enter`: restart.
+- Mouse drags on the left and the bottom-right nitro area follow the device touch rules.
 
-## Host simulation / Host 仿真
+## Race systems
 
-```bash
-python3 tools/game_cli.py sim examples/neon_rift_rally
-python3 tools/game_cli.py sim examples/neon_rift_rally --headless --frames 120
-examples/neon_rift_rally/tests/run_host_tests.sh
-```
+- The bike has five lean poses (hard left, light left, center, light right, hard right) and passes through center when reversing.
+- The six riders (VOLT, NOVA, JADE, BLAZE, ORCHID, FROST) have limited launch acceleration and a tighter starting grid. They slow behind an occupied lane and change lanes smoothly to overtake when there is room. Sprinters are faster on straights, defenders block the player's lane when the player is just behind and not closing fast, and chasers close toward the player's lane.
+- Every race rolls new personalities from a seed: skill, cornering, aggression and nitro reserve differ per rider, so the order and the fights change between races. Riders take the inside line through bends, check their mirror before merging, slipstream each other, and fire nitro on straights, after being passed or on the final lap. Weak cornerers sometimes slide wide in a bend, which opens a gap. Riders far behind catch up a little so the pack stays in reach.
+- One rider per race is the rival: more skilled, more aggressive and with a full nitro tank. It pushes hard when it falls behind the player. A diamond and its name mark it on the road; a HUD panel under the position shows its place and gap, and the results screen says whether you beat it.
+- A rider on nitro shows a flame, a sliding rider wobbles and throws sparks, and every bike has a tail light. Nearby boosts and slides pop up as banners ("NOVA BOOSTS", "VOLT SLIPS GO!"); rival boosts have their own sound cue.
+- Rival bikes and roadside sprites scale and sort by actual camera depth, grow continuously as they approach and clip naturally as they leave; helmets and back panels help tell riders apart.
+- Neon Loop (harbor), Sunset Sprint (canyon) and Polar Rift (snow) have their own vistas and roadside objects; corner signs flip by direction. Ground shadows, drift sparks and a field of view that widens slightly with speed provide driving feedback.
+- The harbor course follows a closed hand-authored spline through the port, a warehouse corner and a bridge. Continuous rails, evenly spaced lamp posts, warehouse fronts and bridge trusses share road coordinates; crests can hide objects behind them. Vistas on all three courses are limited to the top 184 rows and curbs are narrower, leaving room for the road and near scenery.
+- Canyon sections are framed by continuous rock walls, low barriers and grouped pillars; snow sections use snowbanks, roadside fences and posts. Snow corners are gentler so the wide road does not overlap itself in tight turns.
+- Following a rider closely and aligned builds draft; a full meter grants a short speed bonus.
+- The HUD shows position with hull integrity (top left), lap and lap progress with checkpoint ticks (top center), a rolling score with the combo timer (top right), a segmented speedometer (bottom left) and a nitro button whose ring of pips shows the charge (bottom right, over the nitro touch zone). A slipstream bar appears while drafting.
+- Overtakes, being overtaken, slipstream, near misses, drift boosts, checkpoints and the final lap pop up as short labelled banners. Speed lines stream from the horizon at high speed, and nitro adds colored streaks and edge glow.
+- During the countdown each digit has a beep and GO has its own cue. Every race event has a distinct cue: overtake, overtaken, near miss, slipstream, nitro, drift, jump, landing, checkpoint, lap, finish, failure, off track and collision. Each also has a matching haptic pattern.
+- Each course has its own synthwave loop with a built-in engine bed: Neon Loop in A minor, Sunset Sprint in D major and Polar Rift in E minor with a bell arpeggio. The volume rises with speed and nitro and ducks while paused.
+- The results screen shows a gold, silver or bronze badge, the rival result, race time and score.
 
-The Host runner compiles `game.sim.json` and the
-`main/rally_game.c`/`main/rally_view.c` sources into one shared module. Audio
-is regenerated deterministically with `assets_src/generate_audio.py`.
+## Host preview
 
-The two-finger regression replay is `tests/two_finger_drive.json`; run both the
-model and Host pointer checks with `tests/run_host_tests.sh`.
-
-## Native project / 真机工程
-
-The example root is a direct ESP-IDF project using the same native structure as
-Last Zone and Tomb Raycast. The selected Board automatically fetches pinned dependencies. Run
-`idf.py build` from this directory with the supported ESP-IDF environment active. `main/CMakeLists.txt` embeds the generated assets directory. The
-current firmware embeds nine compact `.sound` resources. Semantic events
-map to cues and haptics as follows: nitro, drift, jump, landing, checkpoint,
-lap, finish, and off-track. Missing audio assets are tolerated at runtime, so
-the model and event serial remain usable on products without audio.
-
-Build from the repository root:
+From the repository root:
 
 ```sh
-idf.py --preview -C examples/neon_rift_rally -B /tmp/neon-rift-rally-native -DIDF_TARGET=esp32s31 build
+python3 tools/game_cli.py sim examples/neon_rift_rally
 ```
 
-The example supports Host and standalone native firmware. See the [build guide](../../docs/build-matrix.EN.md) for Board selection and Vibe integration.
+## Implementation
 
-## Interface contract for the gameplay/view implementation
+Host and device share the 30 Hz fixed-step model, procedural corners and RGB565 view. The game uses fixed-capacity state, a single bike-pose texture and event-driven feedback; the device stores only the best lap and race times for each of the three courses.
 
-`main/game_module.c` intentionally assumes this small C API; the model/view
-implementation is left separate so it can be tested and iterated independently:
-
-```c
-void rally_reset(rally_game_t *game);
-void rally_set_controls(rally_game_t *game, float throttle, float brake,
-                        float steer, bool drift, bool nitro);
-void rally_update(rally_game_t *game);
-uint32_t rally_state_hash(const rally_game_t *game);
-int rally_view_render(const rally_game_t *game, raylib_lite_atlas_t rally_art);
-```
-
-The deterministic model owns track-local motion, jumping, checkpoints, laps,
-nitro and semantic event flags. The renderer samples the exact same procedural
-track function, so collision and perspective geometry cannot drift apart.
-
-For repeatable device measurements, record the firmware hash, display
-configuration, fixed input sequence, and raw logs alongside each result.
-The current build has no board FPS capture, so Host render time is not a device
-frame-rate result. After an authorized flash, replay the same steering, nitro,
-collision, and course-selection sequence on the target board. Capture startup,
-input, present, shutdown, and a 60-second frame log with:
-
-```bash
-python3 tools/capture_game_perf.py artifacts/neon-rift-rally/raw.log \
-  --port <UART_SERIAL_PORT> --seconds 60
-python3 tools/analyze_game_perf.py --label neon-rift-rally \
-  artifacts/neon-rift-rally/raw.log
-```
-
-Check the full-frame distribution and dropped presents against the 30 Hz
-33.3 ms frame budget, then inspect the same moments on the display. Record
-rendering, waiting for buffers, and presentation separately.
-
-The [Host profiling report](performance/host-optimization.md) records the
-fixed-state quality comparison, phase measurements and renderer optimizations.
-The [steering tuning report](performance/steering-tuning.md) records the IMU
-pulse, repeated swing and return-to-center checks.
+`rally_feedback.[ch]` owns all audio and haptics and is tested against a stubbed audio backend; `game_module.c` only forwards events. `assets_src/generate_audio.py` synthesizes the 16 cues and three course loops with numpy (19 clips, within the default 20-clip mixer budget). The generated WAVs are not tracked in git.
 
 ## Native build
 
-See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.
+See [build paths](../../docs/build-matrix.EN.md) for targets and Board selection. Development records such as steering tuning, Host measurements and two-board comparisons live in the repository under `docs/development/neon-rift-rally/` and are not shipped in the release package. See the [game development guide](../../docs/game-development.EN.md) for tests, replay and device acceptance.

@@ -17,6 +17,7 @@ typedef struct {
     uint8_t touch_points;
     bool enable_imu;
     uint16_t imu_sample_ms;
+    /* 0 selects the shared SPI profile; explicit values must be 34 / 2. */
     uint16_t drawbuf_lines;
     uint8_t drawbuf_count;
     /* Game-owned logical surface; Boards may scale it to the physical LCD. */
@@ -27,6 +28,8 @@ typedef struct {
 esp_err_t raylib_lite_example_board_create(
     const raylib_lite_example_board_config_t *config,
     raylib_lite_example_board_t **out_board);
+/* Native panel size. Adaptive games use it as their logical surface. */
+void raylib_lite_example_board_panel_size(uint16_t *width, uint16_t *height);
 const raylib_lite_platform_t *raylib_lite_example_board_services(
     raylib_lite_example_board_t *board);
 raylib_lite_input_queue_t *raylib_lite_example_board_input(

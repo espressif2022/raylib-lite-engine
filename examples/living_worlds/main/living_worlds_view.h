@@ -13,3 +13,5 @@ typedef struct {
 
 void living_worlds_view_render(const living_world_t *world,
                             const living_worlds_atlases_t *atlases);
+/* Reads the panel size into the shared design view; render also calls it. */
+void living_worlds_view_sync_screen(void);

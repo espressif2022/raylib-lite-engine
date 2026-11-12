@@ -6,6 +6,7 @@
 #if !defined(RAYLIB_LITE_GAME_NATIVE)
 #include "host_asset_runtime.h"
 #endif
+#include "raylib_lite_design_view.h"
 #include "raylib_lite_raylib.h"
 #if defined(RAYLIB_LITE_GAME_NATIVE)
 #include "native_feedback.h"
@@ -113,6 +114,9 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         return;
     }
     if(event->type!=RAYLIB_LITE_GAME_INPUT_POINTER)return;
+    const raylib_lite_design_view_t view=raylib_lite_design_view((float)TOMB_VIEW_WIDTH);
+    const Vector2 point=raylib_lite_design_point(view,(float)event->x,(float)event->y);
+    const int x=(int)point.x,y=(int)point.y,view_width=(int)view.width;
     int track=event->track_id;
     if(!event->pressed){
         if(track==state->joystick_track){state->joystick_track=-1;state->move_forward=state->move_strafe=0;}
@@ -120,19 +124,19 @@ static void input(void *value, const raylib_lite_game_input_v1_t *event)
         if(track==state->jump_track){state->jump_track=-1;tomb_set_jump(&state->game,false);}
         return;
     }
-    if(track==state->joystick_track)update_joystick(state,event->x,event->y);
+    if(track==state->joystick_track)update_joystick(state,x,y);
     else if(track==state->look_track){
-        tomb_set_look(&state->game,(float)(event->x-state->look_x)*0.008f,
-                      (float)(event->y-state->look_y)*-0.005f);
-        state->look_x=event->x;state->look_y=event->y;
+        tomb_set_look(&state->game,(float)(x-state->look_x)*0.008f,
+                      (float)(y-state->look_y)*-0.005f);
+        state->look_x=x;state->look_y=y;
     }else if(track==state->jump_track){
         return;
-    }else if(tomb_in_jump_zone(event->x,event->y)&&state->jump_track<0){
+    }else if(tomb_in_jump_zone(x,y,view_width)&&state->jump_track<0){
         state->jump_track=track;tomb_set_jump(&state->game,true);
-    }else if(tomb_in_move_capture(event->x,event->y)&&state->joystick_track<0)
-        begin_joystick(state,track,event->x,event->y);
-    else if(event->x>=TOMB_LOOK_MIN_X&&state->look_track<0){
-        state->look_track=track;state->look_x=event->x;state->look_y=event->y;
+    }else if(tomb_in_move_capture(x,y,view_width)&&state->joystick_track<0)
+        begin_joystick(state,track,x,y);
+    else if(x>=view_width/2&&state->look_track<0){
+        state->look_track=track;state->look_x=x;state->look_y=y;
     }
 }
 
@@ -215,5 +219,7 @@ static const raylib_lite_game_module_v1_t s_module={
     .descriptor={TOMB_RAYCAST_ABI,"tomb_raycast","Tomb Raycast",480,480,30,2},
     .state_size=sizeof(tomb_module_t),.initialize=initialize,.shutdown=shutdown,
     .input=input,.update=update,.render=render,.state_hash=state_hash,.state_json=state_json};
+
+bool raylib_lite_game_adaptive_surface(void) { return true; }
 
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void){return &s_module;}

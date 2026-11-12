@@ -16,6 +16,13 @@ class ColumnTests(unittest.TestCase):
             temp = Path(directory)
             pixels = struct.pack('<64H', *[(i * 997 + 123) & 65535 for i in range(64)])
             (temp / 'test.atlas').write_bytes(struct.pack('<4sHHHHII', b'MSA1', 8, 8, 0, 0, 128, 0) + pixels)
+            (temp / 'alpha.atlas').write_bytes(struct.pack('<4sHHHHII', b'MSA1', 8, 8, 0, 0, 128, 64) + pixels + bytes((i*37)&255 for i in range(64)))
+            all_pixels = struct.pack('<65536H', *range(65536))
+            for masked in (False, True):
+                (temp / f'white-{int(masked)}.atlas').write_bytes(
+                    struct.pack('<4sHHHHII', b'MSA1', 256, 256, 0, 0,
+                                len(all_pixels), 65536 if masked else 0) +
+                    all_pixels + (bytes(range(256))*256 if masked else b''))
             light_lut = struct.pack('<4096H', *[
                 (level * 257 + index * 997 + 31) & 65535
                 for level in range(16) for index in range(256)])

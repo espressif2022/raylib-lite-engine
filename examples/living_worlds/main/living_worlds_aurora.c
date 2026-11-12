@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "living_worlds_aurora.h"
+#include "living_screen.h"
 #include <math.h>
 #include <stdbool.h>
 #include <string.h>
@@ -77,7 +78,7 @@ void living_aurora_reset(living_aurora_t *aurora)
     aurora->next_meteor=26;
     aurora->next_shower=150;
     for(unsigned i=0;i<aurora->mote_count;++i)
-        aurora_spawn_mote(aurora,&aurora->motes[i],aurora_range(aurora,0,480),
+        aurora_spawn_mote(aurora,&aurora->motes[i],aurora_range(aurora,-LIVING_VIEW_OX,480+LIVING_VIEW_OX),
                           aurora_range(aurora,5,475),aurora_range(aurora,3.2f,90.0f));
     for(unsigned i=0;i<aurora->glint_count;++i){
         float z=aurora_range(aurora,62.0f,108.0f);
@@ -182,8 +183,8 @@ void living_aurora_update(living_aurora_t *aurora)
         mote->y+=(mote->vy+aurora->flow_y*.03f)*AURORA_DT;
         float sx=240.0f+mote->x*AURORA_FOCAL/mote->z;
         float sy=240.0f-mote->y*AURORA_FOCAL/mote->z;
-        if(sy<-12.0f||sy>492.0f||sx<-15.0f||sx>495.0f)
-            aurora_spawn_mote(aurora,mote,aurora_range(aurora,3,477),
+        if(sy<-12.0f||sy>492.0f||sx<-15.0f-LIVING_VIEW_OX||sx>495.0f+LIVING_VIEW_OX)
+            aurora_spawn_mote(aurora,mote,aurora_range(aurora,3-LIVING_VIEW_OX,477+LIVING_VIEW_OX),
                               mote->vy>0?490.0f:-8.0f,mote->z);
     }
 }
@@ -270,7 +271,7 @@ static void draw_aurora_light_field(const living_aurora_t *aurora,
         float right=fmaxf(fmaxf(mesh[a].x,mesh[b].x),fmaxf(mesh[c].x,mesh[d].x));
         float top=fminf(fminf(mesh[a].y,mesh[b].y),fminf(mesh[c].y,mesh[d].y));
         float bottom=fmaxf(fmaxf(mesh[a].y,mesh[b].y),fmaxf(mesh[c].y,mesh[d].y));
-        if(right<0||left>=480||bottom<0||top>=480)continue;
+        if(right<0||left>=LIVING_VIEW_W||bottom<0||top>=480)continue;
         if((right-left)*(bottom-top)<1.5f)continue;
         if(living_cover_quad(mesh[a],mesh[b],mesh[c],mesh[d]))continue;
         int slot=band_n[band]++;
@@ -285,7 +286,7 @@ static void draw_aurora_light_field(const living_aurora_t *aurora,
             raylib_lite_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+1],tv[iy],0.f};
             raylib_lite_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+1],0.f};
             raylib_lite_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+1],tv[iy+1],0.f};
-            raylib_lite_2d_draw_textured_quad(space.texture,va,vb,vc,vd,256);
+            living_draw_quad(space.texture,va,vb,vc,vd,256);
         }
     }
     (void)aurora;

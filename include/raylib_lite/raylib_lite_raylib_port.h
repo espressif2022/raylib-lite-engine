@@ -11,6 +11,8 @@ extern "C" {
 #endif
 
 void raylib_lite_raylib_port_set_clock(const raylib_lite_clock_t *clock);
+/* Returns 0 when no clock is installed. */
+uint64_t raylib_lite_raylib_port_now_us(void);
 raylib_lite_result_t raylib_lite_raylib_port_init_backend(
     const raylib_lite_video_backend_t *backend);
 void raylib_lite_raylib_port_deinit(void);
@@ -29,6 +31,8 @@ raylib_lite_result_t raylib_lite_raylib_port_flush(uint32_t timeout_ms);
 raylib_lite_result_t raylib_lite_raylib_port_copy_latest(
     uint16_t *out_pixels, size_t pixel_capacity);
 void raylib_lite_raylib_port_get_dimensions(uint16_t *width, uint16_t *height);
+/* Backend sample_row_step reduced to a usable power of two; 1 = every row. */
+uint16_t raylib_lite_raylib_port_sample_row_step(void);
 
 #ifdef __cplusplus
 }

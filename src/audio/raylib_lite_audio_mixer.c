@@ -357,23 +357,35 @@ raylib_lite_result_t raylib_lite_audio_mixer_mix(
 {
     if (!mixer || (!out_frames && frame_count)) return RAYLIB_LITE_INVALID_ARGUMENT;
     mixer_lock(mixer);
+    /* Clips cannot change while the lock is held: resolve the playing voices
+     * once per call instead of once per frame. */
+    uint16_t playing = 0;
+    for (uint16_t i = 0; i < mixer->config.max_sfx_voices; ++i) {
+        if (voice_clip(mixer, &mixer->voices[i])) ++playing;
+    }
+    mixer_clip_t *music_clip = voice_clip(mixer, &mixer->music);
+    const bool scale_master = mixer->master_volume < 1.0f;
+    const int master = (int)(mixer->master_volume * 256.0f + 0.5f);
     for (size_t frame = 0; frame < frame_count; ++frame) {
         int64_t mixed = 0;
-        for (uint16_t i = 0; i < mixer->config.max_sfx_voices; ++i) {
+        for (uint16_t i = 0; playing && i < mixer->config.max_sfx_voices; ++i) {
             mixer_voice_t *voice = &mixer->voices[i];
-            mixer_clip_t *clip = voice_clip(mixer, voice);
+            if (!voice->active || voice->clip_slot >= mixer->config.max_clips) continue;
+            mixer_clip_t *clip = &mixer->clips[voice->clip_slot];
             int16_t sample;
-            if (clip && raylib_lite_audio_decode_next(&voice->decoder,
-                                                       &clip->encoded, &sample)) {
-                mixed += (int64_t)(sample * clip->volume);
+            /* |sample * volume| <= 32768: the int32 conversion truncates
+             * exactly like int64 and needs no soft-float helper. */
+            if (raylib_lite_audio_decode_next(&voice->decoder, &clip->encoded, &sample)) {
+                mixed += (int32_t)(sample * clip->volume);
                 if (voice->decoder.cursor >= clip->encoded.frames) {
                     voice->active = false;
+                    --playing;
                 }
-            } else if (clip) {
+            } else {
                 voice->active = false;
+                --playing;
             }
         }
-        mixer_clip_t *music_clip = voice_clip(mixer, &mixer->music);
         if (music_clip) {
             int16_t sample;
             if (!raylib_lite_audio_decode_next(&mixer->music.decoder,
@@ -385,13 +397,10 @@ raylib_lite_result_t raylib_lite_audio_mixer_mix(
                     sample = 0;
                 }
             }
-            mixed += (int64_t)(sample * mixer->music_volume *
+            mixed += (int32_t)(sample * mixer->music_volume *
                                music_clip->volume);
         }
-        if (mixer->master_volume < 1.0f) {
-            int master = (int)(mixer->master_volume * 256.0f + 0.5f);
-            mixed = mixed * master / 256;
-        }
+        if (scale_master) mixed = mixed * master / 256;
         if (mixed > 32767) mixed = 32767;
         if (mixed < -32768) mixed = -32768;
         out_frames[frame] = (int16_t)mixed;

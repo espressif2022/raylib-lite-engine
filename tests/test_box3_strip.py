@@ -26,11 +26,12 @@ static uint16_t pixel(uint32_t x, uint32_t y)
 
 int main(int argc, char **argv)
 {
-    if (argc != 5) return 2;
+    if (argc != 6) return 2;
     uint16_t width = (uint16_t)strtoul(argv[1], NULL, 10);
     uint16_t height = (uint16_t)strtoul(argv[2], NULL, 10);
     uint16_t rows = (uint16_t)strtoul(argv[3], NULL, 10);
     bool swap = strtoul(argv[4], NULL, 10) != 0;
+    bool view_only = strtoul(argv[5], NULL, 10) != 0;
     if (!width || !height || !rows) return 3;
 
     box3_viewport_t viewport;
@@ -44,12 +45,31 @@ int main(int argc, char **argv)
         for (uint32_t x = 0; x < width; ++x)
             frame[y * width + x] = pixel(x, y);
 
-    for (uint32_t top = 0; top < 240; top += rows) {
-        uint16_t count = (uint16_t)((240 - top) < rows ? (240 - top) : rows);
-        box3_fill_strip_pixels(&viewport, frame, strip,
-                               (uint16_t)top, count, swap);
-        if (fwrite(strip, sizeof(uint16_t), (size_t)320 * count, stdout) !=
-                (size_t)320 * count) return 6;
+    if (view_only) {
+        /* Viewport strips land on a zeroed panel, as after a full frame. */
+        uint16_t *panel = calloc((size_t)320 * 240, sizeof(uint16_t));
+        if (!panel) return 7;
+        for (uint32_t top = 0; top < viewport.view_height; top += rows) {
+            uint32_t left = viewport.view_height - top;
+            uint16_t count = (uint16_t)(left < rows ? left : rows);
+            box3_fill_view_pixels(&viewport, frame, strip,
+                                  (uint16_t)top, count, swap);
+            for (uint32_t r = 0; r < count; ++r)
+                for (uint32_t x = 0; x < viewport.view_width; ++x)
+                    panel[(viewport.view_y + top + r) * 320 + viewport.view_x + x] =
+                        strip[r * viewport.view_width + x];
+        }
+        if (fwrite(panel, sizeof(uint16_t), (size_t)320 * 240, stdout) !=
+                (size_t)320 * 240) return 6;
+        free(panel);
+    } else {
+        for (uint32_t top = 0; top < 240; top += rows) {
+            uint16_t count = (uint16_t)((240 - top) < rows ? (240 - top) : rows);
+            box3_fill_strip_pixels(&viewport, frame, strip,
+                                   (uint16_t)top, count, swap);
+            if (fwrite(strip, sizeof(uint16_t), (size_t)320 * count, stdout) !=
+                    (size_t)320 * count) return 6;
+        }
     }
     free(strip);
     free(frame);
@@ -95,6 +115,8 @@ class Box3StripOracleTests(unittest.TestCase):
         presenter = (BOARD / "box3_video.c").read_text()
         self.assertIn("box3_fill_strip_pixels(&view,", presenter,
                       "Host oracle must exercise the actual production extractor")
+        self.assertIn("box3_fill_view_pixels(&view,", presenter,
+                      "Host oracle must exercise the viewport-only extractor")
         fixtures = (
             # Exact map, letterbox sides/top, down/upscale, odd aspect ratios.
             (480, 480, 8, False),
@@ -120,14 +142,15 @@ class Box3StripOracleTests(unittest.TestCase):
                  "-pedantic", "-I", str(BOARD), str(source), "-o", str(binary)],
                 check=True, capture_output=True, text=True)
             for width, height, strip_rows, swap in fixtures:
-                with self.subTest(width=width, height=height,
-                                  rows=strip_rows, swap=swap):
-                    output = subprocess.run(
-                        [str(binary), str(width), str(height),
-                         str(strip_rows), str(int(swap))],
-                        check=True, capture_output=True).stdout
-                    self.assertEqual(len(output), LCD_WIDTH * LCD_HEIGHT * 2)
-                    self.assertEqual(output, oracle_frame(width, height, swap))
+                for view_only in (False, True):
+                    with self.subTest(width=width, height=height, rows=strip_rows,
+                                      swap=swap, view_only=view_only):
+                        output = subprocess.run(
+                            [str(binary), str(width), str(height),
+                             str(strip_rows), str(int(swap)), str(int(view_only))],
+                            check=True, capture_output=True).stdout
+                        self.assertEqual(len(output), LCD_WIDTH * LCD_HEIGHT * 2)
+                        self.assertEqual(output, oracle_frame(width, height, swap))
 
 
 if __name__ == "__main__":

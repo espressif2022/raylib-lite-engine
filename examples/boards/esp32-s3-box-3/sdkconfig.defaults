@@ -10,5 +10,14 @@ CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../boards/esp32-s3-box-3/partitions.csv"
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
 CONFIG_FREERTOS_HZ=1000
 
+# Frame rendering is PSRAM-bandwidth bound: optimize for speed, use the
+# largest caches with 64-byte lines, and execute code and read embedded
+# assets from octal PSRAM instead of QIO flash.
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+CONFIG_SPIRAM_XIP_FROM_PSRAM=y
+
 # Keep the game main task on CPU1 across native and Iris builds.
 CONFIG_ESP_MAIN_TASK_AFFINITY_CPU1=y

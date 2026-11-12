@@ -49,6 +49,18 @@ typedef enum {
     LAST_ZONE_ENEMY_SEARCH,
 } last_zone_enemy_state_t;
 
+/* Riflemen hold cover, flankers circle outside the player's view and heavies
+ * press forward without flinching. */
+typedef enum {
+    LAST_ZONE_ROLE_RIFLE = 0,
+    LAST_ZONE_ROLE_FLANK,
+    LAST_ZONE_ROLE_HEAVY,
+} last_zone_enemy_role_t;
+
+#define LAST_ZONE_SUSPICION_ALERT 30
+#define LAST_ZONE_RADIO_TICKS 36
+#define LAST_ZONE_RADIO_RANGE 7.0f
+
 typedef enum {
     NEON_FIRE_NONE = 0,
     NEON_FIRE_SHOT,
@@ -70,7 +82,10 @@ typedef struct {
     uint8_t ai_state,alert_timer,search_timer,aim_timer,attack_cooldown,attack_flash;
     int8_t nav_dx,nav_dy,hold_x,hold_y;
     float last_seen_x,last_seen_y;
-    bool active,elite;
+    float facing; /* radians; patrol sight is a cone around it */
+    uint8_t role,suspicion,patrol_wait,stagger,retreat_timer,radio_timer;
+    int8_t home_x,home_y,patrol_x,patrol_y;
+    bool active,elite,radioed;
 } last_zone_enemy_t;
 
 typedef struct {
@@ -92,13 +107,14 @@ typedef struct {
     uint16_t cells_reached,score,shots_fired,shots_hit,kills;
     uint8_t fire_cooldown,hit_flash,hit_marker,kill_flash,hp,armor,hurt_cooldown,ammo;
     uint8_t pickup_flash,door_flash,dry_flash,layout,damage_taken,enemy_shot_lock;
-    uint8_t unlocked,breath_hold,alert_flash;
+    uint8_t unlocked,breath_hold,alert_flash,radio_flash,miss_flash,call_cut_flash;
+    float miss_angle; /* bearing of the last enemy round that missed */
     int16_t radar_x,radar_y;
     float damage_angle;
     last_zone_phase_t phase;
     bool left, right, forward, backward, fire_held, fire_pressed, fire_released, best_updated;
     bool last_pickup,last_alert,sprinting,sprint_held,holding_breath;
-    bool spotted,barrel_used,armor_hit,last_blast;
+    bool spotted,barrel_used,armor_hit,last_blast,last_radio,last_miss;
     uint8_t sfx,sfx_hold,step_beat,step_ticks;
     uint32_t sfx_serial;
     last_zone_fire_result_t last_fire;

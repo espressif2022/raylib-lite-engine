@@ -2,7 +2,7 @@
 
 [English](board-porting.EN.md) · [构建路径](build-matrix.CN.md)
 
-仓库已有 [ESP32-S3-BOX-3 Board Manager Adapter](../examples/boards/esp32-s3-box-3/README.md)，并完成初步实机验证：`raylib_shooter` 能启动并运行，TT21100 X 轴触摸方向正确；`neon_rift_rally` 通过 ES8311 24 kHz 单声道 PCM 初始化、非静音数据写入与游戏运行验证。音频仍需人工试听，其他 Game 尚未逐一验收。Game 与通用光栅器保持板卡无关；Iris/Recovery 产品集成由 `esp-mosaico-vibe` 维护；不要修改共享游戏模型来适配面板或触摸驱动。
+仓库已有 [ESP32-S3-BOX-3 Board Manager Adapter](../examples/boards/esp32-s3-box-3/README.md)，并完成初步实机验证：`raylib_shooter` 能启动并运行，TT21100 X 轴触摸方向正确；`neon_rift_rally` 通过 ES8311 24 kHz 单声道 PCM 初始化、非静音数据写入与游戏运行验证。六个发布游戏在 BOX-3 上无输入运行 70 秒均能启动并上屏，显示错误为 0；触摸游玩、喇叭试听和最重场景仍需逐个验收。Game 与通用光栅器保持板卡无关；Iris/Recovery 产品集成由 `esp-mosaico-vibe` 维护；不要修改共享游戏模型来适配面板或触摸驱动。
 
 两个示例 Board 均使用 ESP Board Manager。[ESP-Mosaico](../examples/boards/esp-mosaico/README.md) 的 YAML 硬件配置位于 `examples/boards/esp-mosaico/bmgr/esp_mosaico`，像 BOX-3 一样由标准 `idf.py bmgr` 生成每个 Game 的组件；原有 `esp_display_present` 条带后端保留，与硬件初始化分离。BOX-3 额外使用官方板包和 amend 配置。
 

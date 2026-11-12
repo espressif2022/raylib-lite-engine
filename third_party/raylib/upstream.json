@@ -1,0 +1,30 @@
+{
+  "schema": "raylib-lite-upstream-1",
+  "component": {
+    "name": "georgik/raylib",
+    "version": "6.0.0~2",
+    "repository": "https://github.com/georgik/esp-idf-component-raylib",
+    "commit": "5276634372de7bb46e6a93376db15dc4384bd2f2",
+    "path": "raylib"
+  },
+  "local_files": [
+    "src/config.h"
+  ],
+  "files": {
+    "LICENSE": "882a5a819cf562aa3583aae3af3f2211dda15c63de9fc8cc4b399a2f9e78d799",
+    "src/external/qoi.h": "7de6fca1a285b1c20d38f2723dec8b774eb9f144edb9710800a95feeea09375a",
+    "src/external/rlsw.h": "c878af1036f0f20ad716be61f0f2269f33626fc101fd4ef36dd8c664b49836e9",
+    "src/external/rprand.h": "ed59fe484f25a64c1a8fbefedce7d6809c1418a7ae657f3c97ec4ecff65679f2",
+    "src/external/stb_image.h": "594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3",
+    "src/external/stb_image_resize2.h": "173e654634f6ccaad98f603e686ea212eec1fe8ea6d2a5e5e8056efa10ae3880",
+    "src/raylib.h": "047e7255f93f8c34039cab906ad76136706b5c7b4c5b5b065d84141963ee9b6b",
+    "src/raymath.h": "2b8b88f5b3f748e3cf8bdbfb8b7da23a76c755dc40f9c6e455bfc09b3669d028",
+    "src/rcamera.h": "d5b02c7d2a523f88c7f4248047be5292a085c9e47a71b460c43575e218f96293",
+    "src/rcore.c": "502c3656661d07aa117a1f4b97dbfdd4a9b12cda6ee8eb4ab7afd31b657b5dd2",
+    "src/rgestures.h": "a5ec0b887dac651f4ee751d3d10a84271978a57d73ac7d8f03a1c1f4aa61aaca",
+    "src/rlgl.h": "1c9b802c219971dbf2ba9725fb8cea3f14616c039891810a2d31aa442aea4be3",
+    "src/rshapes.c": "1dc7e4bca33f7083d11dcdf21c8973bf08fa3b9321bce7c10d4232ca0456bb0e",
+    "src/rtext.c": "a98a5b0b62128ac76fa493aed59a7f283cb7a9de0c8c86a8da73ac84984f36b3",
+    "src/rtextures.c": "90e41879349d58a779c101dbf78e5b5cf8d46241590268a74e6156ad33312e4c"
+  }
+}

@@ -15,7 +15,19 @@ static const char *const SOUND_PATHS[LAST_ZONE_SOUND_COUNT] = {
     [LAST_ZONE_SOUND_STEP_R] = "step_r.sound",
     [LAST_ZONE_SOUND_EXPLODE] = "explode.sound",
     [LAST_ZONE_SOUND_EXTRACT] = "extract.sound",
+    [LAST_ZONE_SOUND_DOOR] = "door.sound",
+    [LAST_ZONE_SOUND_DEATH] = "death.sound",
+    [LAST_ZONE_SOUND_DEPLOY] = "deploy.sound",
+    [LAST_ZONE_SOUND_WHIZZ] = "whizz.sound",
+    [LAST_ZONE_SOUND_RADIO] = "radio.sound",
 };
+
+static const char *const MUSIC_PATHS[LAST_ZONE_MUSIC_COUNT] = {
+    [LAST_ZONE_MUSIC_STEALTH] = "music.sound",
+    [LAST_ZONE_MUSIC_COMBAT] = "music_combat.sound",
+};
+
+#define LAST_ZONE_COMBAT_HOLD_TICKS 150U
 
 static void pulse(const last_zone_feedback_t *feedback, uint8_t strength,
                   uint16_t duration_ms)
@@ -63,12 +75,12 @@ static void load_audio(last_zone_feedback_t *feedback)
             feedback->backend->missing_asset)
             feedback->backend->missing_asset(SOUND_PATHS[i]);
     }
-    feedback->music = raylib_lite_game_audio_load_music("music.sound");
-    if (feedback->music.frameCount) {
-        raylib_lite_game_audio_set_music_volume(feedback->music, .10f);
-        raylib_lite_game_audio_play_music(feedback->music);
-    } else if (feedback->backend && feedback->backend->missing_asset)
-        feedback->backend->missing_asset("music.sound");
+    for (unsigned i = 0; i < LAST_ZONE_MUSIC_COUNT; ++i) {
+        feedback->music[i] = raylib_lite_game_audio_load_music(MUSIC_PATHS[i]);
+        if (!feedback->music[i].frameCount && feedback->backend &&
+            feedback->backend->missing_asset)
+            feedback->backend->missing_asset(MUSIC_PATHS[i]);
+    }
 }
 
 void last_zone_feedback_reset(last_zone_feedback_t *feedback,
@@ -85,7 +97,7 @@ void last_zone_feedback_init(last_zone_feedback_t *feedback,
                              const last_zone_game_t *game,
                              const last_zone_feedback_backend_t *backend)
 {
-    *feedback = (last_zone_feedback_t){.backend = backend};
+    *feedback = (last_zone_feedback_t){.backend = backend, .playing_track = -1};
     last_zone_feedback_reset(feedback, game);
     raylib_lite_game_audio_init();
     feedback->audio_initialized = true;
@@ -93,14 +105,40 @@ void last_zone_feedback_init(last_zone_feedback_t *feedback,
     load_audio(feedback);
 }
 
+static bool under_contact(const last_zone_game_t *game)
+{
+    for (int i = 0; i < LAST_ZONE_ENEMIES; ++i) {
+        const last_zone_enemy_t *enemy = &game->enemies[i];
+        if (enemy->active && (enemy->ai_state == LAST_ZONE_ENEMY_ALERT ||
+                              enemy->ai_state == LAST_ZONE_ENEMY_ENGAGE))
+            return true;
+    }
+    return false;
+}
+
 void last_zone_feedback_music(last_zone_feedback_t *feedback,
-                              last_zone_phase_t phase)
+                              const last_zone_game_t *game, bool paused)
 {
     load_audio(feedback);
-    if (!feedback->music.frameCount) return;
-    raylib_lite_game_audio_set_music_volume(feedback->music,
-                               phase == LAST_ZONE_PHASE_PLAYING ? .14f : .10f);
-    raylib_lite_game_audio_update_music(feedback->music);
+    const bool playing = game->phase == LAST_ZONE_PHASE_PLAYING;
+    if (playing && under_contact(game)) feedback->combat_hold = LAST_ZONE_COMBAT_HOLD_TICKS;
+    else if (!playing) feedback->combat_hold = 0;
+    else if (feedback->combat_hold && !paused) --feedback->combat_hold;
+    const int8_t track = feedback->combat_hold ? LAST_ZONE_MUSIC_COMBAT
+                                               : LAST_ZONE_MUSIC_STEALTH;
+    if (track != feedback->playing_track) {
+        if (feedback->playing_track >= 0 &&
+            feedback->music[feedback->playing_track].frameCount)
+            raylib_lite_game_audio_stop_music(feedback->music[feedback->playing_track]);
+        if (feedback->music[track].frameCount)
+            raylib_lite_game_audio_play_music(feedback->music[track]);
+        feedback->playing_track = track;
+    }
+    if (!feedback->music[track].frameCount) return;
+    float volume = paused ? .04f : !playing ? .08f :
+                   track == LAST_ZONE_MUSIC_COMBAT ? .20f : .15f;
+    raylib_lite_game_audio_set_music_volume(feedback->music[track], volume);
+    raylib_lite_game_audio_update_music(feedback->music[track]);
 }
 
 static void combat_feedback(last_zone_feedback_t *feedback,
@@ -123,7 +161,7 @@ static void combat_feedback(last_zone_feedback_t *feedback,
         pattern(feedback, 72, 22, 58, 18, 28);
         break;
     case NEON_FIRE_DOOR:
-        play(feedback, LAST_ZONE_SOUND_CONFIRM);
+        play(feedback, LAST_ZONE_SOUND_DOOR);
         pulse(feedback, 58, 40);
         break;
     case NEON_FIRE_DRY:
@@ -140,6 +178,14 @@ static void combat_feedback(last_zone_feedback_t *feedback,
     if (game->last_pickup) {
         play(feedback, LAST_ZONE_SOUND_PICKUP);
         pulse(feedback, 36, 24);
+    }
+    if (game->last_miss) {
+        play(feedback, LAST_ZONE_SOUND_WHIZZ);
+        pulse(feedback, 20, 12);
+    }
+    if (game->last_radio) {
+        play(feedback, LAST_ZONE_SOUND_RADIO);
+        pulse(feedback, 24, 14);
     }
     if (game->last_alert && !playing(feedback, LAST_ZONE_SOUND_RIFLE) &&
         !playing(feedback, LAST_ZONE_SOUND_ALERT))
@@ -213,12 +259,21 @@ void last_zone_feedback_events(last_zone_feedback_t *feedback,
         play(feedback, LAST_ZONE_SOUND_EXTRACT);
         pattern(feedback, 60, 28, 40, 18, 22);
     }
+    if (feedback->previous_phase == LAST_ZONE_PHASE_START &&
+        game->phase == LAST_ZONE_PHASE_PLAYING) {
+        play(feedback, LAST_ZONE_SOUND_DEPLOY);
+        pulse(feedback, 26, 18);
+    }
     if (game->last_alert) pulse(feedback, 30, 16);
     combat_feedback(feedback, game);
     if (game->hp < feedback->previous_hp) {
-        play(feedback, LAST_ZONE_SOUND_HURT);
-        if (game->hp) pattern(feedback, 82, 35, 55, 25, 45);
-        else pattern(feedback, 96, 90, 70, 35, 120);
+        if (game->hp) {
+            play(feedback, LAST_ZONE_SOUND_HURT);
+            pattern(feedback, 82, 35, 55, 25, 45);
+        } else {
+            play(feedback, LAST_ZONE_SOUND_DEATH);
+            pattern(feedback, 96, 90, 70, 35, 120);
+        }
     }
     if (game->armor < feedback->previous_armor) {
         play(feedback, LAST_ZONE_SOUND_IMPACT);
@@ -243,11 +298,14 @@ void last_zone_feedback_close(last_zone_feedback_t *feedback)
     if (feedback->backend && feedback->backend->stop)
         feedback->backend->stop();
     if (!feedback->audio_initialized) return;
-    if (feedback->music.frameCount) {
-        raylib_lite_game_audio_stop_music(feedback->music);
-        raylib_lite_game_audio_unload_music(feedback->music);
-        feedback->music = (Music){0};
+    for (unsigned i = 0; i < LAST_ZONE_MUSIC_COUNT; ++i) {
+        if (!feedback->music[i].frameCount) continue;
+        if ((int)i == feedback->playing_track)
+            raylib_lite_game_audio_stop_music(feedback->music[i]);
+        raylib_lite_game_audio_unload_music(feedback->music[i]);
+        feedback->music[i] = (Music){0};
     }
+    feedback->playing_track = -1;
     for (unsigned i = 0; i < LAST_ZONE_SOUND_COUNT; ++i) {
         if (!feedback->sounds[i].frameCount) continue;
         raylib_lite_game_audio_unload_sound(feedback->sounds[i]);

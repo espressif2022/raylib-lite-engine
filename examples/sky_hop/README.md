@@ -1,46 +1,52 @@
 # Sky Hop
 
-Sky Hop is a four-level scrolling platform game. Level data is kept in the
-host-testable gameplay model: progress, score, and remaining lives carry into
-the next level, while completing level 4 finishes the run.
+[简体中文](README.CN.md) · [Examples](../README.md)
 
-原创横版平台跳跃 Demo，用于验证 Raylib Lite Engine 的玩法与设备接口。
+Sky Hop is a four-level side-scrolling platformer. Collect coins, stomp patrolling enemies, bounce on springs and reach the flag at the end of each level; lives, score and coin-chain bonuses carry across levels, and clearing the fourth level finishes the run.
 
-## 操作
+The four levels each have their own weather and palette: Sunny Meadow (birds), Storm Ridge (rain and lightning), Frost Peaks (snow) and Ember Crag (drifting embers).
 
-- 点击标题卡开始。
-- 屏幕底部左侧 `<` 向左移动，中间 `>` 向右移动，右侧 `JUMP` 跳跃。
-- 点击右上角暂停按钮暂停/继续；Button、Joystick 和 IMU 事件会映射到相同 Action。
-- 收集金币、踩掉紫色巡逻怪，并抵达关卡最右侧。
+![Sky Hop](docs/screenshot.png)
 
-本版本使用平台 `Camera2D` 世界坐标渲染，加入场景滑入 Tween、固定容量粒子、
-暂停场景与 NVS 最高分存档。游戏更新模型仍可脱离 ESP-IDF 在 Host 上测试。
+The image is a Host RGB565 frame of the first level with its level banner.
 
-当前同时嵌入一份只读 Atlas/音频作为资源分区不可用时的恢复兜底。正常情况下仍
-优先读取 `game_assets` 分区；确认分区可用后可取消整包嵌入，以恢复约 300 KiB
-应用空间。
+## Play and controls
 
-## Host 运行
+### Device
 
-```bash
-# Host 仿真：本仓库根目录，主机 C 编译器 + Pillow
+- Tap the title card to start.
+- The two arrow buttons at the bottom move left and right, and the `JUMP` button jumps; a short press gives a hop, a long press a full jump.
+- Movement and jump can be held together. The top-right button pauses and resumes.
+- Button, joystick and IMU input map to the same game actions.
+- Stomping enemies without touching the ground chains the reward: 250, 500, 1000, then 2000 points. After a hit the hero blinks and is briefly invulnerable.
+- The HUD shows hearts, collected coins, score, best score, the level name and a progress bar. Short tips appear at the start of the first level.
+- Every event has its own chiptune cue and haptic pattern: jump, landing, coin, stomp, spring, checkpoint, hurt, level clear, game over and start. Levels 1 and 3 play the day theme, levels 2 and 4 the night theme, and music ducks while paused.
+
+### Host
+
+- `A`/`D` or arrow keys: move.
+- `Space`: jump.
+- `Enter`: start or go to the next level.
+- `P`: pause or resume.
+
+## Host preview
+
+From the repository root:
+
+```sh
 python3 tools/game_cli.py sim examples/sky_hop
-python3 tools/game_cli.py sim examples/sky_hop --headless --frames 300
 ```
 
-本目录提供独立 ESP-IDF native 工程，需显式配置板级依赖后构建。产品固件的
-板级策略和 app glue 由外部产品仓库维护。
+Host and device share the gameplay model, Camera2D world view and RGB565 drawing code; audio, physical input and LCD output still need device verification.
 
-浏览器模拟器地址为 `http://127.0.0.1:8460/`。键盘使用 `A/D` 或方向键移动、
-空格跳跃、`P` 暂停、回车开始/进入下一关；触屏设备可同时按住底部移动键和跳跃键。
-模拟器直接编译并调用设备相同的 `platform_game.c`，所以关卡、碰撞、分数和状态切换
-不需要在网页端重复实现。Host 与设备共享 RGB565 view，浏览器直接显示 C 渲染结果；音频、LCD 时序和
-物理输入仍需真机验证。
+To preview a later level on Host, set `SKY_HOP_SIM_LEVEL` to 1–4, for example `SKY_HOP_SIM_LEVEL=3 python3 tools/game_cli.py sim examples/sky_hop`. Native builds ignore it.
 
-开发与回放流程见[游戏开发指南](../../docs/game-development.CN.md)，
-性能比较应固定输入、场景、构建和板卡配置，并保留原始日志；
-通用方法见[可复用设计方法](../../docs/reference-designs.CN.md)。
+## Implementation
+
+The gameplay model (`platform_game.[ch]`) reports what happened each tick as an event bitmask. The view (`sky_hop_view.[ch]`) turns those events into particles, score popups, squash and stretch and screen shake; the feedback module (`sky_hop_feedback.[ch]`) turns them into sound and haptics. `game_module.c` only wires input and lifecycle. All objects have fixed capacity. The best score is kept only for the current session and is not saved.
+
+`assets_src/generate_audio.py` synthesizes every effect and both music loops with numpy; the generated WAVs are not tracked in git. Native firmware embeds the packed assets in the application image.
 
 ## Native build
 
-See the [build guide](../../docs/build-matrix.EN.md). Raw repository examples need the full checkout; assembled Registry examples include their shared components.
+See [build paths](../../docs/build-matrix.EN.md) for targets, Board selection and standalone examples, and the [game development guide](../../docs/game-development.EN.md) for Host tests, fixed replay and device acceptance.

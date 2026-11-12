@@ -1,5 +1,6 @@
 {
   "schema": "mosaico-game-assets/v1",
+  "limit_bytes": 2097152,
   "atlases": [
     {"config": "enemy.json", "source": "enemy_run.png", "output": "enemy.atlas"},
     {"config": "weapon.json", "source": "weapon.png", "output": "weapon.atlas"},
@@ -11,7 +12,7 @@
   "wall_atlases": [
     {"config": "walls.json", "source": "tactical_materials.png", "output": "walls.wall"}
   ],
-    "sounds": [
+  "sounds": [
     {"source": "rifle.wav"},
     {"source": "impact.wav"},
     {"source": "confirm.wav"},
@@ -23,6 +24,12 @@
     {"source": "step_r.wav"},
     {"source": "explode.wav"},
     {"source": "extract.wav"},
-    {"source": "music.wav"}
+    {"source": "door.wav"},
+    {"source": "death.wav"},
+    {"source": "deploy.wav"},
+    {"source": "whizz.wav"},
+    {"source": "radio.wav"},
+    {"source": "music.wav"},
+    {"source": "music_combat.wav"}
   ]
 }

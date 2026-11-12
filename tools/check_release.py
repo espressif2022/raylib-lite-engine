@@ -10,7 +10,9 @@ import zipfile
 import re
 from urllib.parse import unquote, urlsplit
 import yaml
-from prepare_release import validate
+from prepare_release import validate, DEVELOPMENT_DOCS
+from audit_raylib import check_frozen, check_upstream
+from api_catalog import check_catalog
 
 
 def check(root):
@@ -21,10 +23,13 @@ def check(root):
               for p in component.rglob("*") if p.is_file()}
     if expected != actual:
         raise ValueError("Staged file inventory or hashes changed after assembly")
+    check_upstream(component)
+    check_frozen(component)
+    check_catalog(component, repository_evidence=False)
     forbidden = {"build", "managed_components", "host", "tests", ".git", ".agents", ".aws", ".codex", ".codex-runs"}
     for name in actual:
         parts = Path(name).parts
-        if name.endswith(".patch") or any(p in forbidden or p.endswith("_dev") or (p.startswith("build") and p in parts[:-1]) for p in parts):
+        if name.startswith(DEVELOPMENT_DOCS) or name.endswith(".patch") or any(p in forbidden or p.endswith("_dev") or (p.startswith("build") and p in parts[:-1]) for p in parts):
             raise ValueError(f"Unexpected release file: {name}")
     validate(component)
     for document in component.rglob("*.md"):
@@ -50,7 +55,7 @@ def check(root):
             continue
         files = {name: hashlib.sha256(data).hexdigest() for name, data in contents.items()}
         for name in files:
-            if name.endswith(".patch") or any(p.endswith("_dev") or p in forbidden for p in Path(name).parts):
+            if name.startswith(DEVELOPMENT_DOCS) or name.endswith(".patch") or any(p.endswith("_dev") or p in forbidden for p in Path(name).parts):
                 raise ValueError(f"Unexpected archive file: {name}")
         # Compare the component archive with staged sources. Generated
         # checksum/metadata files are allowed in addition to those sources.

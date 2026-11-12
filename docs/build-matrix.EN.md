@@ -15,7 +15,7 @@ The default [ESP-Mosaico Board](../examples/boards/esp-mosaico/README.md) also u
 
 A game owns portable model/view/module source. Its `main/idf_component.yml` declares `espressif2022/raylib-lite-engine: ^0.1.0`; in this repository only, `override_path` points that versioned dependency at the current checkout. The Game's Application CMake layer selects the application-side Board component and registers it together with `examples_common`. No top-level Game CMake file includes an Engine-repository helper or discovers the Engine through `EXTRA_COMPONENT_DIRS`.
 
-`game.sim.json` and the Board build compile the same `main/game_module.c`. Board-neutral shared example glue is owned by the [`examples/common_components/examples_common`](../examples/common_components/examples_common/) IDF component: the generic native launcher, abstract Board contract, haptic helper, and shared game-module bridge. Concrete Board code remains under `examples/boards/<board>/`. A Game may isolate device-only implementation in its own `main/native/` directory; that code remains owned by the Game `main` component and may use board-neutral ESP-IDF / Engine services plus the example-Board contract, but it must not include a concrete Board API. Living Worlds keeps its ESP-IDF JPEG decoder in `examples/living_worlds/main/native/` while the generic native asset helper owns embedding; Host and native continue to use the same `game_module.c`. These remain example/application layers rather than Engine public APIs.
+`game.sim.json` and the Board build compile the same `main/game_module.c`. Board-neutral shared example glue is owned by the [`examples/common_components/examples_common`](../examples/common_components/examples_common/) IDF component: the generic native launcher, abstract Board contract, haptic helper, and shared game-module bridge. Concrete Board code remains under `examples/boards/<board>/`. A Game may isolate device-only implementation in its own `main/native/` directory; that code remains owned by the Game `main` component and may use board-neutral ESP-IDF / Engine services plus the example-Board contract, but it must not include a concrete Board API. Living Worlds keeps its JPEG decoding (S31 hardware engine, ESP32-S3 ROM TJpgDec) in `examples/living_worlds/main/native/` while the generic native asset helper owns embedding; Host and native continue to use the same `game_module.c`. These remain example/application layers rather than Engine public APIs.
 
 Discover support with:
 
@@ -31,10 +31,11 @@ The following reference games passed Host tests and native ESP-Mosaico builds. D
 - `sky_hop`
 - `living_worlds`
 - `last_zone_extraction`
-- `tomb_raycast`
 - `neon_rift_rally`
 
-A second selectable Board, [`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md), uses `espressif/esp_board_manager` with a physical 320x240 LCD. Games retain their logical resolution; the Board adapter scales the display and maps touch coordinates back. Every Game must generate its Board Manager configuration with the required `bmgr_amend` profile, which removes the conflicting GPIO47 owner and controls optional device initialization. From the repository root, enter the Game directory before running BMGR (shown for `raylib_shooter`):
+`tomb_raycast` is an internal preview: it builds from the checkout on both Boards but is not part of the released set.
+
+A second selectable Board, [`esp32-s3-box-3`](../examples/boards/esp32-s3-box-3/README.md), uses `espressif/esp_board_manager` with a physical 320x240 LCD. Released Games lay out for the panel and run at 320x240 one-to-one; a Game that does not opt in through `raylib_lite_game_adaptive_surface()` keeps its logical resolution, which the Board adapter letterboxes, mapping touch coordinates back. Every Game must generate its Board Manager configuration with the required `bmgr_amend` profile, which removes the conflicting GPIO47 owner and controls optional device initialization. From the repository root, enter the Game directory before running BMGR (shown for `raylib_shooter`):
 
 ```sh
 cd examples/raylib_shooter
@@ -42,7 +43,7 @@ idf.py bmgr -c ../boards -b esp32_s3_box_3 -a ../boards/esp32-s3-box-3/bmgr_amen
 IDF_TARGET=esp32s3 idf.py -B /tmp/rle-box3-shooter build
 ```
 
-BOX-3 selects `examples/boards/esp32-s3-box-3/partitions.csv` by default: a 15 MiB factory app partition on the standard 16 MB Flash device. `raylib_shooter` has passed initial real-device rendering and TT21100 touch-direction checks; `neon_rift_rally` has demonstrated ES8311 initialization and non-silent PCM submission. Audible speaker output and other Games still need acceptance. **Selectable does not mean every Game has passed device acceptance.**
+BOX-3 selects `examples/boards/esp32-s3-box-3/partitions.csv` by default: a 15 MiB factory app partition on the standard 16 MB Flash device. `raylib_shooter` has passed initial real-device rendering and TT21100 touch-direction checks; `neon_rift_rally` has demonstrated ES8311 initialization and non-silent PCM submission. All six released Games start and present without display errors on BOX-3 (no-input 70-second runs); touch play, audible speaker output and heaviest scenes still need per-Game acceptance. **Selectable does not mean every Game has passed device acceptance.**
 
 ## Native firmware
 

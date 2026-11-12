@@ -10,12 +10,16 @@
 #include "living_worlds_aurora_draw.h"
 #include "living_worlds_ocean_draw.h"
 #include "living_worlds_volume.h"
+#include "living_screen.h"
+#include "raylib_lite_design_view.h"
 
 #define PANORAMA_WIDTH 1600.0f
 #define PANORAMA_HEIGHT 800.0f
 #define VIEW_WIDTH 500.0f
 #define VIEW_HEIGHT 520.0f
 #define VIEW_FOV_DEG (360.0f*VIEW_WIDTH/PANORAMA_WIDTH)
+
+static raylib_lite_design_view_t s_view={1.0f,480.0f,480.0f};
 
 static float signed_angle(float angle)
 {
@@ -26,7 +30,17 @@ static float signed_angle(float angle)
 
 static float world_to_screen_x(float longitude,float camera_yaw)
 {
-    return 240.0f+signed_angle(longitude-camera_yaw)*(480.0f/VIEW_FOV_DEG);
+    return LIVING_VIEW_CX+signed_angle(longitude-camera_yaw)*(480.0f/VIEW_FOV_DEG);
+}
+
+/* Longitude at the left edge of the view; yaw is the edge of the authored
+ * 480 span, which widened views keep centred. */
+static float view_left_yaw(float yaw)
+{
+    if(LIVING_VIEW_OX<=0.0f)return yaw;
+    float left=yaw-LIVING_VIEW_OX*(VIEW_FOV_DEG/480.0f);
+    while(left<0.0f)left+=360.0f;
+    return left;
 }
 
 static int effect_count(const living_world_t *world,int calm,int living,int vivid)
@@ -41,7 +55,7 @@ static void draw_panorama_band(raylib_lite_atlas_t panorama,float source_x,float
     float panorama_width=(float)panorama.texture.width;
     float first=panorama_width-source_x;
     if(first>source_width)first=source_width;
-    float first_dest=first*(480.0f/source_width);
+    float first_dest=first*(LIVING_VIEW_W/source_width);
     DrawTexturePro(panorama.texture,
                    (Rectangle){source_x,source_y,first,source_height},
                    (Rectangle){0,dest_y,first_dest,dest_height},
@@ -52,7 +66,7 @@ static void draw_panorama_band(raylib_lite_atlas_t panorama,float source_x,float
                        (Rectangle){0,source_y,second,source_height},
                        /* DrawTexturePro truncates the fractional destination
                         * width. Extend the wrapped half to cover pixel 479. */
-                       (Rectangle){first_dest,dest_y,481-first_dest,dest_height},
+                       (Rectangle){first_dest,dest_y,LIVING_VIEW_W+1-first_dest,dest_height},
                        (Vector2){0,0},0,WHITE);
     }
 }
@@ -61,9 +75,9 @@ static void draw_panorama(const living_world_t *world,raylib_lite_atlas_t panora
 {
     float panorama_width=(float)panorama.texture.width;
     float panorama_height=(float)panorama.texture.height;
-    float view_width=panorama_width*(VIEW_WIDTH/PANORAMA_WIDTH);
+    float view_width=panorama_width*(VIEW_WIDTH/PANORAMA_WIDTH)*(LIVING_VIEW_W/480.0f);
     float view_height=panorama_height*(VIEW_HEIGHT/PANORAMA_HEIGHT);
-    float source_x=world->yaw*(panorama_width/360.0f);
+    float source_x=view_left_yaw(world->yaw)*(panorama_width/360.0f);
     /* Keep equal angular density on both axes. The previous 150-degree vertical
        view compressed cliffs and valleys into a flat postcard. */
     float neutral_y=(panorama_height-view_height)*.5f;
@@ -126,7 +140,7 @@ static bool sunrise_project(const sunrise_camera_t *camera,float u,float v,
     float view_z=dx*camera->m[6]+dy*camera->m[7]+dz*camera->m[8];
     if(view_z<.2f)return false;
     float inv=focal/view_z;
-    out->x=240.0f+inv*(dx*camera->m[0]+dz*camera->m[2]);
+    out->x=LIVING_VIEW_CX+inv*(dx*camera->m[0]+dz*camera->m[2]);
     out->y=240.0f-inv*(dx*camera->m[3]+dy*camera->m[4]+dz*camera->m[5]);
     return true;
 }
@@ -139,7 +153,7 @@ static bool sunrise_project_xyz(const sunrise_camera_t *camera,float x,float y,
     float view_z=dx*camera->m[6]+dy*camera->m[7]+dz*camera->m[8];
     if(view_z<.2f)return false;
     float inv=focal/view_z;
-    out->x=240.0f+inv*(dx*camera->m[0]+dz*camera->m[2]);
+    out->x=LIVING_VIEW_CX+inv*(dx*camera->m[0]+dz*camera->m[2]);
     out->y=240.0f-inv*(dx*camera->m[3]+dy*camera->m[4]+dz*camera->m[5]);
     return true;
 }
@@ -217,7 +231,7 @@ static void draw_sunrise_orbit(const living_world_t *world,raylib_lite_atlas_t s
         float right=fmaxf(fmaxf(p0.x,p1.x),fmaxf(p2.x,p3.x));
         float top=fminf(fminf(p0.y,p1.y),fminf(p2.y,p3.y));
         float bottom=fmaxf(fmaxf(p0.y,p1.y),fmaxf(p2.y,p3.y));
-        if(right<0||left>=480||bottom<0||top>=480)continue;
+        if(right<0||left>=LIVING_VIEW_W||bottom<0||top>=480)continue;
         if((right-left)*(bottom-top)<1.5f)continue;
         if(living_cover_quad(p0,p1,p2,p3))continue;
         int slot=band_n[band]++;
@@ -232,7 +246,7 @@ static void draw_sunrise_orbit(const living_world_t *world,raylib_lite_atlas_t s
             raylib_lite_textured_vertex_t vb={mesh[b].x,mesh[b].y,tu[ix+1],tv[iy],0.f};
             raylib_lite_textured_vertex_t vc={mesh[c].x,mesh[c].y,tu[ix],tv[iy+1],0.f};
             raylib_lite_textured_vertex_t vd={mesh[d].x,mesh[d].y,tu[ix+1],tv[iy+1],0.f};
-            raylib_lite_2d_draw_textured_quad(sunrise.texture,va,vb,vc,vd,256);
+            living_draw_quad(sunrise.texture,va,vb,vc,vd,256);
         }
     }
 }
@@ -302,7 +316,7 @@ static void draw_sunrise_volume_part(const sunrise_camera_t *camera,
         float max_x=fmaxf(pa.x,fmaxf(pb.x,pc.x));
         float min_y=fminf(pa.y,fminf(pb.y,pc.y));
         float max_y=fmaxf(pa.y,fmaxf(pb.y,pc.y));
-        if(max_x<0||min_x>=480||max_y<0||min_y>=480)continue;
+        if(max_x<0||min_x>=LIVING_VIEW_W||max_y<0||min_y>=480)continue;
         int local_side_patch=part==2&&(i==110||i==111);
         if(cover_only){
             living_cover_add_triangle(pa,pb,pc);
@@ -329,7 +343,7 @@ static void draw_sunrise_volume_part(const sunrise_camera_t *camera,
         raylib_lite_textured_vertex_t va={pa.x,pa.y,au,av,0.f};
         raylib_lite_textured_vertex_t vb={pb.x,pb.y,bu,bv,0.f};
         raylib_lite_textured_vertex_t vc={pc.x,pc.y,cu,cv,0.f};
-        raylib_lite_2d_draw_textured_triangle(atlas.texture,va,vb,vc,faces[i].light);
+        living_draw_triangle(atlas.texture,va,vb,vc,faces[i].light);
     }
 }
 
@@ -357,7 +371,7 @@ static void draw_sunrise_ridge_patch(const sunrise_camera_t *camera,
                                       42.0f,source_v[ring+1],0.f};
         raylib_lite_textured_vertex_t d={screen[ring+1][1].x,screen[ring+1][1].y,
                                       220.0f,source_v[ring+1],0.f};
-        raylib_lite_2d_draw_textured_quad(side.texture,a,b,c,d,248U);
+        living_draw_quad(side.texture,a,b,c,d,248U);
     }
 }
 
@@ -394,7 +408,7 @@ static Vector2 rainforest_flow_project(const living_world_t *world,
     float longitude=source.x;
     while(longitude<0.0f)longitude+=360.0f;
     while(longitude>=360.0f)longitude-=360.0f;
-    float delta=longitude-world->yaw;
+    float delta=longitude-view_left_yaw(world->yaw);
     /* Keep points just left of the viewport at a small negative X. Mapping
        them to almost 360 degrees makes a seam-crossing waterfall quad span
        the whole screen. */
@@ -405,7 +419,7 @@ static Vector2 rainforest_flow_project(const living_world_t *world,
 
 static int rainforest_on_screen(Vector2 p)
 {
-    return p.x>-16.0f&&p.x<496.0f&&p.y>8.0f&&p.y<412.0f;
+    return p.x>-16.0f&&p.x<LIVING_VIEW_W+16.0f&&p.y>8.0f&&p.y<412.0f;
 }
 
 static Vector2 rainforest_unproject(const living_world_t *world,
@@ -418,7 +432,7 @@ static Vector2 rainforest_unproject(const living_world_t *world,
     float denominator=view_height+pitch_pixels*.75f;
     if(denominator<.001f)return (Vector2){0,0};
     float source_v=(y/480.0f*denominator+neutral_y+pitch_pixels*.65f)/height;
-    float lon=world->yaw+(x/480.0f)*VIEW_FOV_DEG;
+    float lon=view_left_yaw(world->yaw)+(x/480.0f)*VIEW_FOV_DEG;
     while(lon<0.0f)lon+=360.0f;
     while(lon>=360.0f)lon-=360.0f;
     return (Vector2){lon,source_v};
@@ -609,7 +623,7 @@ static int rainforest_falls_quad_visible(raylib_lite_textured_vertex_t a,
     float min_y=fminf(fminf(a.y,b.y),fminf(c.y,d.y));
     float max_y=fmaxf(fmaxf(a.y,b.y),fmaxf(c.y,d.y));
     return isfinite(min_x)&&isfinite(max_x)&&isfinite(min_y)&&isfinite(max_y)&&
-        max_x>=0.0f&&min_x<480.0f&&max_y>=0.0f&&min_y<420.0f&&
+        max_x>=0.0f&&min_x<LIVING_VIEW_W&&max_y>=0.0f&&min_y<420.0f&&
         max_x-min_x<=120.0f;
 }
 
@@ -646,7 +660,7 @@ static void draw_rainforest_falls_layer(const living_world_t *world,
                 slices,count,cut,l1,layer->u0,
                 cut<p1?RF_FALLS_PERIOD:v1-base);
             if(rainforest_falls_quad_visible(a,b,c,d))
-                raylib_lite_2d_draw_textured_quad(falls.texture,a,b,c,d,256U);
+                living_draw_quad(falls.texture,a,b,c,d,256U);
             if(cut<p1){
                 raylib_lite_textured_vertex_t e=rainforest_falls_vertex(world,rainforest,
                     slices,count,cut,l0,layer->u0,0.0f);
@@ -657,7 +671,7 @@ static void draw_rainforest_falls_layer(const living_world_t *world,
                 raylib_lite_textured_vertex_t h=rainforest_falls_vertex(world,rainforest,
                     slices,count,p1,l1,layer->u0,v1-seam);
                 if(rainforest_falls_quad_visible(e,f,g,h))
-                    raylib_lite_2d_draw_textured_quad(falls.texture,e,f,g,h,256U);
+                    living_draw_quad(falls.texture,e,f,g,h,256U);
             }
         }
     }
@@ -715,13 +729,13 @@ static void draw_rainforest_flow_mesh(const living_world_t *world,
             float max_x=fmaxf(fmaxf(a.x,b.x),fmaxf(c.x,d.x));
             float min_y=fminf(fminf(a.y,b.y),fminf(c.y,d.y));
             float max_y=fmaxf(fmaxf(a.y,b.y),fmaxf(c.y,d.y));
-            if(max_x<0.0f||min_x>=480.0f||max_y<0.0f||min_y>=420.0f||
+            if(max_x<0.0f||min_x>=LIVING_VIEW_W||max_y<0.0f||min_y>=420.0f||
                max_x-min_x>120.0f)continue;
             /* Travelling troughs darken a little; crests keep full photo
                brightness so the shaded path runs on a minority of quads. */
             float wave=sinf((p0+style->phase)*23.0f-time*style->rate*6.2831853f*1.7f);
             unsigned light=wave<-.35f?(unsigned)(256.0f-26.0f*style->crest-10.0f):256U;
-            raylib_lite_2d_draw_textured_quad(rainforest.texture,a,b,c,d,light);
+            living_draw_quad(rainforest.texture,a,b,c,d,light);
         }
     }
 }
@@ -902,7 +916,7 @@ static void draw_rainforest_rain(const living_world_t *world,
     for(int i=0;i<n;++i){
         uint32_t seed=rainforest_rain_hash(0x9e3779b9u*(uint32_t)(i+1));
         float near=.06f+(float)(seed&1023U)*(1.0f/1100.0f);
-        float x=(float)((seed>>10)%520)-20.0f+
+        float x=(float)((seed>>10)%(uint32_t)(520.0f+2.0f*LIVING_VIEW_OX))-20.0f-LIVING_VIEW_OX+
                 sinf((float)world->tick*.017f+(float)i)*near*2.2f;
         float speed=5.5f+near*15.5f;
         float length=8.0f+near*31.0f;
@@ -918,7 +932,7 @@ static void draw_rainforest_rain(const living_world_t *world,
             else
                 DrawLine((int)x,(int)y,(int)tip_x,(int)tip_y,rain);
         }
-        if(!can_hit||tip_x<-8.0f||tip_x>488.0f)continue;
+        if(!can_hit||tip_x<-8.0f||tip_x>LIVING_VIEW_W+8.0f)continue;
         /* Sparse leaf/rock impacts: a two-frame crown, only outside traced
            water polygons.  This makes rain contact the jungle without
            painting persistent decorations onto the panorama. */
@@ -986,7 +1000,7 @@ static void draw_rainforest_fx(const living_world_t *world,
         float lon=base_lon[i]+sinf(phase*.35f)*9.0f;
         int x=(int)world_to_screen_x(lon,world->yaw);
         int y=(int)(base_y[i]+sinf(phase)*15.0f-world->pitch*4.1f);
-        if(x<-12||x>492||y<5||y>450)continue;
+        if(x<-12||x>(int)LIVING_VIEW_W+12||y<5||y>450)continue;
         int wing=1+(int)(fabsf(sinf(phase*4.2f))*2.0f);
         Color blue=(Color){22,107,187,205};
         DrawLine(x,y,x-wing-1,y-wing,blue);DrawLine(x,y,x+wing+1,y-wing,blue);
@@ -998,7 +1012,7 @@ static void draw_rainforest_fx(const living_world_t *world,
     float bird_lon=205.0f+bird_phase*.5f;
     int bx=(int)world_to_screen_x(fmodf(bird_lon,360.0f),world->yaw);
     int by=92+(int)(sinf(world->tick*.08f)*8.0f)-(int)(world->pitch*3.7f);
-    if(bx>-24&&bx<504){
+    if(bx>-24&&bx<(int)LIVING_VIEW_W+24){
         DrawCircle(bx,by,5,(Color){20,27,21,235});
         DrawLine(bx-3,by,bx-13,by-5,(Color){18,25,20,220});
         DrawLine(bx+4,by-1,bx+12,by-2,(Color){207,128,37,230});
@@ -1011,7 +1025,7 @@ static void draw_rainforest_fx(const living_world_t *world,
         float lon=fmodf(19.0f+i*79.0f+sinf(phase)*2.4f,360.0f);
         int x=(int)world_to_screen_x(lon,world->yaw);
         int y=88+(i*53)%270+(int)(sinf(phase*.7f)*10.0f)-(int)(world->pitch*3.9f);
-        if(x>2&&x<478)DrawCircle(x,y,1,(Color){221,231,172,(unsigned char)(70+i%3*30)});
+        if(x>2&&x<(int)LIVING_VIEW_W-2)DrawCircle(x,y,1,(Color){221,231,172,(unsigned char)(70+i%3*30)});
     }
     draw_rainforest_rain(world,rainforest);
 }
@@ -1035,7 +1049,7 @@ static void draw_aurora_fx(const living_world_t *world)
         float lon=fmodf(7.0f+i*47.3f,360.0f);
         int x=(int)world_to_screen_x(lon,world->yaw);
         int y=(i*73+17)%208+10-(int)(world->pitch*.65f);
-        if(x<2||x>478)continue;
+        if(x<2||x>(int)LIVING_VIEW_W-2)continue;
         unsigned char a=(unsigned char)(75+55*sinf(world->tick*.045f+i*1.7f));
         DrawCircle(x,y,(i%5==0)?2:1,(Color){220,255,246,a});
     }
@@ -1044,7 +1058,7 @@ static void draw_aurora_fx(const living_world_t *world)
         float lon=fmodf(48.0f+i*119.0f+sinf(phase)*7.0f,360.0f);
         int x=(int)world_to_screen_x(lon,world->yaw);
         int y=54+i*37+(int)(cosf(phase*.7f)*18.0f)-(int)(world->pitch*.8f);
-        if(x<-45||x>520)continue;
+        if(x<-45||x>(int)LIVING_VIEW_W+40)continue;
         DrawLine(x,y,x-42,y+24,(Color){210,238,255,(unsigned char)(155-i*25)});
         DrawLine(x-1,y,x-29,y+16,(Color){255,255,255,210});
     }
@@ -1111,7 +1125,7 @@ static void draw_dandelion_seed_3d(const sunrise_camera_t *camera,
     Vector2 root,base,husk;
     if(!sunrise_seed_project(camera,seed,&rotation,0,0,0,&root)||
        !sunrise_seed_project(camera,seed,&rotation,.005f,-rad*1.5f,0,&base))return;
-    if(root.x<-40||root.x>520||root.y<18||root.y>508)return;
+    if(root.x<-40||root.x>LIVING_VIEW_W+40||root.y<18||root.y>508)return;
     float dx=root.x-base.x,dy=root.y-base.y;
     float apparent=sqrtf(dx*dx+dy*dy);
     if(apparent<2.2f)return;
@@ -1166,52 +1180,67 @@ static void draw_sunrise_fx(const living_world_t *world)
     float t=world->tick*.028f;
     float orbit_x=world->yaw/14.0f;
     float orbit_y=world->pitch/8.0f;
+    const int ox=(int)LIVING_VIEW_OX,width=(int)LIVING_VIEW_W;
     for(int i=0;i<5;++i){
-        int x=45+i*96+(int)(sinf(t*.35f+i)*24.0f-orbit_x*13.0f);
+        int x=ox+45+i*96+(int)(sinf(t*.35f+i)*24.0f-orbit_x*13.0f);
         int y=82+i*13+(int)(sinf(t+i)*7.0f-orbit_y*4.0f);
-        if(x<-10||x>490)continue;
+        if(x<-10||x>width+10)continue;
         DrawLine(x-8,y+3,x,y,(Color){51,49,44,180});DrawLine(x,y,x+8,y+3,(Color){51,49,44,180});
     }
     int pollen=effect_count(world,14,30,48);
     for(int i=0;i<pollen;++i){
         uint32_t h=sunrise_particle_hash((uint32_t)i+0xa3419U);
-        int x=(int)(h&127U)-32+(int)fmodf(world->tick*(.12f+(h%7U)*.018f),560.0f)-
+        int x=(int)(h&127U)-32+(int)fmodf(world->tick*(.12f+(h%7U)*.018f),560.0f+2.0f*ox)-
               (int)(orbit_x*(10.0f+(h&7U)));
         int y=128+(int)((h>>9)%290U)+(int)(sinf(t*.45f+(h&255U))*(5.0f+(h&3U)))-
               (int)(orbit_y*4.0f);
-        if(x>1&&x<479)DrawCircle(x,y,1,(Color){255,219,157,(unsigned char)(45+(h&31U))});
+        if(x>1&&x<width-1)DrawCircle(x,y,1,(Color){255,219,157,(unsigned char)(45+(h&31U))});
     }
     int grass=effect_count(world,5,9,14);
     for(int i=0;i<grass;++i){
-        int x=18+i*52-(int)(orbit_x*31.0f);
+        int x=ox+18+i*52-(int)(orbit_x*31.0f);
         int py=(int)(-orbit_y*14.0f);
         int bend=(int)(sinf(t*.7f+i*.8f)*5.0f);
-        if(x>-8&&x<488)DrawLine(x,461+py,x+bend,438+py-(i%3)*5,(Color){77,83,48,120});
+        if(x>-8&&x<width+8)DrawLine(x,461+py,x+bend,438+py-(i%3)*5,(Color){77,83,48,120});
     }
     /* Rooted flower heads already live in the photographed cliff texture.
        Keeping them there avoids the synthetic wire-wheel silhouettes. */
 }
+
+static int hud_font(int size){return raylib_lite_design_font(s_view,size);}
 
 static void draw_scene_button(int x,const char *label,bool selected)
 {
     Color fill=selected?(Color){224,248,239,220}:(Color){3,21,31,155};
     Color text=selected?(Color){8,43,49,255}:(Color){218,242,237,230};
     DrawCircle(x,441,18,fill);DrawRectangle(x,423,54,36,fill);DrawCircle(x+54,441,18,fill);
-    DrawText(label,x+8,435,10,text);
+    if(raylib_lite_design_view_native(s_view))DrawText(label,x+8,435,10,text);
+    else DrawText(label,x+27-MeasureText(label,hud_font(10))/2,431,hud_font(10),text);
 }
 
 static void draw_overlay(const living_world_t *world)
 {
-    DrawRectangle(16,16,448,39,(Color){0,22,36,145});
-    DrawText("LIVING WORLDS",29,27,14,(Color){218,250,242,255});
+    /* The HUD keeps its 480 layout centred in widened views. */
+    const int ox=(int)LIVING_VIEW_OX;
+    DrawRectangle(16+ox,16,448,39,(Color){0,22,36,145});
+    DrawText("LIVING WORLDS",29+ox,27,hud_font(14),(Color){218,250,242,255});
     const char *fx=world->effects_level==0?"FX CALM":
                    (world->effects_level==2?"FX VIVID":"FX LIVING");
-    DrawText(fx,260,31,8,(Color){156,220,211,230});
-    DrawText(TextFormat("%03d DEG",(int)world->yaw),376,28,12,(Color){131,226,221,255});
-    draw_scene_button(25,"AURORA",world->scene==LIVING_SCENE_AURORA);
-    draw_scene_button(137,"OCEAN",world->scene==LIVING_SCENE_OCEAN);
-    draw_scene_button(249,"SUNRISE",world->scene==LIVING_SCENE_SUNRISE);
-    draw_scene_button(361,"JUNGLE",world->scene==LIVING_SCENE_RAINFOREST);
+    if(raylib_lite_design_view_native(s_view))
+        DrawText(fx,260,31,8,(Color){156,220,211,230});
+    DrawText(TextFormat("%03d DEG",(int)world->yaw),376+ox,28,hud_font(12),
+             (Color){131,226,221,255});
+    draw_scene_button(25+ox,"AURORA",world->scene==LIVING_SCENE_AURORA);
+    draw_scene_button(137+ox,"OCEAN",world->scene==LIVING_SCENE_OCEAN);
+    draw_scene_button(249+ox,"SUNRISE",world->scene==LIVING_SCENE_SUNRISE);
+    draw_scene_button(361+ox,"JUNGLE",world->scene==LIVING_SCENE_RAINFOREST);
+}
+
+void living_worlds_view_sync_screen(void)
+{
+    s_view=raylib_lite_design_view(480.0f);
+    living_view_width=s_view.width;
+    living_view_scale=s_view.scale;
 }
 
 void living_worlds_view_render(const living_world_t *world,
@@ -1219,6 +1248,8 @@ void living_worlds_view_render(const living_world_t *world,
 {
     if(!world||!atlases)return;
     BeginDrawing();
+    living_worlds_view_sync_screen();
+    raylib_lite_design_begin(s_view);
     if(world->scene==LIVING_SCENE_AURORA){
         living_aurora_draw(&world->aurora,world->yaw,world->pitch,world->effects_level,
             atlases->aurora,atlases->aurora_ice_front,atlases->aurora_ice_side,
@@ -1245,5 +1276,6 @@ void living_worlds_view_render(const living_world_t *world,
             atlases->ocean_right_side,atlases->ocean_right_rear);
     }
     draw_overlay(world);
+    raylib_lite_design_end(s_view);
     EndDrawing();
 }

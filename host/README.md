@@ -64,6 +64,7 @@ python3 tools/game_cli.py sim examples/<name> --headless \
 | `--listen` / `--port` | 默认 `127.0.0.1:8460`；局域网用 `0.0.0.0` |
 | `--scenario` / `--replay` | 回放 JSON；`frame` 非负且不递减 |
 | `--state-output` | 把最后一帧状态写成 JSON |
+| `--size WxH` | 换一个画面尺寸运行（如 `320x240`），等同 `RAYLIB_LITE_HOST_SIZE=WxH` |
 
 浏览器预览监视 `main/*.[ch]`、`game.sim.json` 和 `assets_src`，改完会重编。
 headless 把最后一帧写到 `examples/<name>/build-host/frame.png`。

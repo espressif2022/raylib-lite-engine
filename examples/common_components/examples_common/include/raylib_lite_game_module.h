@@ -57,3 +57,7 @@ typedef struct {
 } raylib_lite_game_module_v1_t;
 
 const raylib_lite_game_module_v1_t *raylib_lite_game_module_v1(void);
+
+/* Optional. A game returning true lays out for any surface size, so native
+ * glue opens the panel's own size instead of descriptor.width x height. */
+bool raylib_lite_game_adaptive_surface(void);

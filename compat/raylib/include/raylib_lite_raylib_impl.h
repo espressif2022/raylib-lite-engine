@@ -23,9 +23,19 @@ int raylib_lite_raylib_get_screen_height(void);
 int raylib_lite_raylib_get_render_width(void);
 int raylib_lite_raylib_get_render_height(void);
 void raylib_lite_raylib_set_target_fps(int fps);
+int raylib_lite_raylib_get_target_fps(void);
+/* GetFrameTime() is the fixed logic step and GetTime() counts logic ticks, so
+ * replays stay deterministic. GetFPS() is the measured presented-frame rate. */
 float raylib_lite_raylib_get_frame_time(void);
 double raylib_lite_raylib_get_time(void);
 int raylib_lite_raylib_get_fps(void);
+
+/* While a runtime is attached it ends every logic tick through
+ * raylib_lite_raylib_end_logic_tick(); EndDrawing() then leaves input edges
+ * alone. Without a runtime, each EndDrawing() ends one tick at target FPS. */
+void raylib_lite_raylib_attach_runtime(uint32_t logic_hz);
+void raylib_lite_raylib_detach_runtime(void);
+void raylib_lite_raylib_end_logic_tick(void);
 
 bool raylib_lite_raylib_is_key_pressed(int key);
 bool raylib_lite_raylib_is_key_down(int key);

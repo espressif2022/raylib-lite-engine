@@ -22,6 +22,18 @@ class ReleasePackagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             release = Path(folder) / "release"
             stage = assemble(release)
+            self.assertEqual((stage / "third_party/raylib/src/rcore.c").read_bytes(),
+                             (ROOT / "third_party/raylib/src/rcore.c").read_bytes())
+            self.assertTrue((stage / "third_party/raylib/upstream.json").is_file())
+            self.assertTrue((stage / "compat/raylib/frozen-mappings.json").is_file())
+            self.assertFalse((stage / "docs/development").exists())
+            self.assertTrue((stage / "docs/custom-api.CN.md").is_file())
+            self.assertEqual((stage / "compat/api/catalog.json").read_bytes(),
+                             (ROOT / "compat/api/catalog.json").read_bytes())
+            from tools.api_catalog import check_catalog
+            check_catalog(stage, repository_evidence=False)
+            self.assertEqual((stage / "src/renderer/raylib_lite_primitives_internal.h").read_bytes(),
+                             (ROOT / "src/renderer/raylib_lite_primitives_internal.h").read_bytes())
             self.assertEqual({p.name for p in (stage / "examples").iterdir()}, {*GAMES, "minimal"})
             for game in GAMES:
                 example = stage / "examples" / game
@@ -85,6 +97,22 @@ class ReleasePackagingTests(unittest.TestCase):
                 'raylib_lite_native_embed_assets("${CMAKE_CURRENT_SOURCE_DIR}/game")\n')
             subprocess.run(["cmake", "-S", str(project), "-B", str(project / "build")], check=True, capture_output=True)
             subprocess.run(["cmake", "--build", str(project / "build")], check=True, capture_output=True)
+
+    def test_development_docs_are_rejected_even_with_matching_inventory(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as folder:
+            release = Path(folder) / 'release'
+            stage = assemble(release)
+            leaked = stage / 'docs/development/accidental.md'
+            leaked.parent.mkdir(parents=True)
+            leaked.write_text('Unpublished development notes')
+            manifest = release / 'release-manifest.json'
+            record = json.loads(manifest.read_text())
+            record['files'].append({'file': str(leaked.relative_to(stage)),
+                                    'sha256': hashlib.sha256(leaked.read_bytes()).hexdigest()})
+            manifest.write_text(json.dumps(record))
+            with self.assertRaisesRegex(ValueError, 'Unexpected release file: docs/development'):
+                check(release)
 
     def test_existing_output_and_source_are_preserved(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -29,6 +29,17 @@ Host 入口用项目根目录的 `game.sim.json` 列出要编译的源码：
 Host 会运行 `assets_src/prepare_*.py`、`generate_*.py`，并按 `game_assets.json` 打包资源。
 模块描述符提供逻辑节拍，`game.sim.json` 列出共享源码。
 
+参考游戏的 `main/` 分为四层，每层只依赖前面的层：
+
+| 层 | 示例（Neon Rift Rally） | 负责 | 不做 |
+| --- | --- | --- | --- |
+| 模型 | `rally_game.[ch]` | 状态、规则、固定步长更新、带序号的反馈事件 | 绘制、播放声音，或包含 Engine/Raylib 头文件 |
+| 视图 | `rally_view.[ch]`、`rally_view_motion.c` | 绘制、HUD，以及只影响画面的运动状态（相机缓动、提示计时等） | 修改模型状态 |
+| 反馈 | `rally_feedback.[ch]` | 对每个模型事件只消费一次，映射为音效、音乐和触觉脉冲 | 决定玩法；只读取模型 |
+| 模块 | `game_module.c` | 输入映射、暂停、存档、生命周期，并把以上各层接起来 | 写规则或绘制代码 |
+
+模型只需主机 C 编译器即可编译，规则测试因此很快。反馈层用桩音频头文件测试（见 `examples/<game>/tests/test_*_feedback.py`）。模型没有事件计数时，反馈层可以逐 tick 比较计数快照，射击游戏即采用此方式。`tests/test_platform_dependency_boundaries.py` 检查游戏源码不依赖具体板卡。
+
 ## 2. 在 Host 验证
 
 主机准备 C 编译器与 Pillow；MTX2 转换及部分资源生成脚本还需要 NumPy。在仓库根目录运行：
@@ -41,6 +52,13 @@ python3 tools/game_cli.py test examples/<name> --frames 300 --json
 ```
 
 浏览器预览支持输入、暂停、单步、截图和录制；`--scenario <json>` 可回放固定输入，`--state-output <path>` 可保存状态。回放事件的 `frame` 序号必须非负且不递减。Host 写入 RGB565 像素，浏览器只展示结果。更多选项见 [Host 仿真说明](../host/README.md)。
+
+各面板尺寸不同（ESP-Mosaico 480×480，ESP32-S3-BOX-3 320×240）。布局使用
+[`raylib_lite_design_view.h`](../examples/common_components/examples_common/include/raylib_lite_design_view.h)：
+短边为 480 个设计单位，480×480 不启用相机，更长的面板加宽视野或居中固定区域。触摸坐标用
+`raylib_lite_design_point()` 或 `raylib_lite_design_field_point()` 换算，再定义
+`raylib_lite_game_adaptive_surface()` 返回 true，让原生构建使用面板尺寸。在 Host 上用
+`--size 320x240` 检查其他尺寸。
 
 ## 3. 在设备验证
 

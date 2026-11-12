@@ -1,6 +1,6 @@
 # Raylib Lite Engine
 
-[English](README.md) · [开发文档](docs/README.CN.md)
+[English](README.md) · [使用文档](docs/README.CN.md)
 
 面向 ESP-IDF 的轻量游戏运行时与 RGB565 软件渲染引擎，提供固定步长更新、输入处理、资源加载、音频混合，以及场景和 UI 工具。游戏可在 PC Host 上开发和回放，再构建为设备原生固件。
 
@@ -19,7 +19,7 @@
 
 ```yaml
 dependencies:
-  idf: ">=6.2"
+  idf: ">=6.1"
   espressif2022/raylib-lite-engine: "^0.1.0"
 ```
 
@@ -36,13 +36,13 @@ python3 tools/game_cli.py sim examples/sky_hop
 
 浏览器打开 `http://127.0.0.1:8460/`。新建游戏及回放测试见[快速入门](docs/quickstart.CN.md)和[游戏开发指南](docs/game-development.CN.md)。
 
-仓库提供七个参考游戏和一个渲染基准工程，见[示例列表（English）](examples/README.md)。ESP-Mosaico 原生游戏使用共享 Board 适配层，自动获取板级依赖；构建和安装步骤见[构建指南](docs/build-matrix.CN.md)。
+仓库提供六个发布的参考游戏、一个内测游戏（Tomb Raycast）和一个渲染基准工程，见[示例列表（English）](examples/README.md)。ESP-Mosaico 原生游戏使用共享 Board 适配层，自动获取板级依赖；构建和安装步骤见[构建指南](docs/build-matrix.CN.md)。
 
 当前 Host 覆盖游戏模块、绘制、输入回放和特效；尚未链接场景、UI、存档和音频模块。
 
 ## 文档
 
-- [开发文档索引](docs/README.CN.md)：资源、输入、音频、绘制和板卡移植。
+- [使用与接口文档索引](docs/README.CN.md)：资源、输入、音频、绘制和板卡移植。
 - [组件发布（English）](docs/releasing.md)：组装可独立使用的例程并发布组件。
 - [更新记录](CHANGELOG.md)。
 - [贡献指南](CONTRIBUTING.CN.md)。
@@ -50,3 +50,5 @@ python3 tools/game_cli.py sim examples/sky_hop
 ## 许可
 
 源码采用 [Apache-2.0](LICENSE) 许可；外部依赖见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，例程素材来源见[素材记录](release/asset_provenance.json)。
+
+Raylib Lite Engine 是独立项目，不是 raylib 官方项目，与 raylib 及其作者 Ramon Santamaria（@raysan5）没有隶属或背书关系；随附的 raylib 源码保持其 zlib/libpng 许可。

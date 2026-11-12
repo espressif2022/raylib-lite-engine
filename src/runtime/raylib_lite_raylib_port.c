@@ -45,6 +45,8 @@ void raylib_lite_raylib_port_set_clock(const raylib_lite_clock_t *clock)
     s_port.clock = clock ? *clock : (raylib_lite_clock_t){0};
 }
 
+uint64_t raylib_lite_raylib_port_now_us(void) { return port_now_us(); }
+
 static void clear_frame(raylib_lite_frame_t *frame)
 {
     memset(frame, 0, sizeof(*frame));
@@ -204,4 +206,11 @@ void raylib_lite_raylib_port_get_dimensions(uint16_t *width, uint16_t *height)
 {
     if (width) *width = s_port.initialized ? s_port.info.width : 0;
     if (height) *height = s_port.initialized ? s_port.info.height : 0;
+}
+
+uint16_t raylib_lite_raylib_port_sample_row_step(void)
+{
+    uint16_t step = s_port.initialized ? s_port.info.sample_row_step : 1;
+    /* Only powers of two can be skipped with a row mask. */
+    return step > 1 && !(step & (step - 1)) ? step : 1;
 }

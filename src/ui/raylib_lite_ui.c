@@ -74,8 +74,9 @@ bool raylib_lite_ui_pointer(raylib_lite_ui_t *ui, int32_t track_id,
 
     for (size_t i = 0; i < ui->count; ++i) {
         raylib_lite_ui_node_t *node = &ui->nodes[i];
-        if (node->type != RAYLIB_LITE_UI_BUTTON || !node->visible) continue;
+        if (node->type != RAYLIB_LITE_UI_BUTTON) continue;
         node->pressed = false;
+        if (!node->visible) continue;
         for (size_t p = 0; p < RAYLIB_LITE_UI_POINTER_CAPACITY; ++p) {
             if (ui->pointers[p].active &&
                     hit(node->bounds, ui->pointers[p].x, ui->pointers[p].y)) {
@@ -90,10 +91,17 @@ bool raylib_lite_ui_pointer(raylib_lite_ui_t *ui, int32_t track_id,
 bool raylib_lite_ui_action(raylib_lite_ui_t *ui, int direction, bool confirm)
 {
     if (!ui) return false;
-    if (direction) {
+    if (direction && ui->count) {
+        /* Direction is a sign, not a raw index offset. Normalize before
+         * addition so extreme values cannot overflow or produce a negative
+         * remainder. Reverse navigation starts just after the final node. */
+        int step = direction > 0 ? 1 : -1;
         int focused = ui->focused;
+        if (focused < 0 || focused >= (int)ui->count) {
+            focused = step > 0 ? -1 : 0;
+        }
         for (size_t i = 0; i < ui->count; ++i) {
-            focused = (focused + direction + (int)ui->count) % (int)ui->count;
+            focused = (focused + step + (int)ui->count) % (int)ui->count;
             if (ui->nodes[focused].visible &&
                     ui->nodes[focused].type == RAYLIB_LITE_UI_BUTTON) {
                 ui->focused = focused;
@@ -101,12 +109,17 @@ bool raylib_lite_ui_action(raylib_lite_ui_t *ui, int direction, bool confirm)
             }
         }
     }
-    if (confirm && ui->focused >= 0) {
+    if (ui->focused < 0 || ui->focused >= (int)ui->count ||
+            !ui->nodes[ui->focused].visible ||
+            ui->nodes[ui->focused].type != RAYLIB_LITE_UI_BUTTON) {
+        ui->focused = -1;
+        return false;
+    }
+    if (confirm) {
         raylib_lite_ui_node_t *node = &ui->nodes[ui->focused];
         if (node->click) node->click(node->id, node->context);
-        return true;
     }
-    return ui->focused >= 0;
+    return true;
 }
 
 void raylib_lite_ui_draw(raylib_lite_ui_t *ui, int font_size)

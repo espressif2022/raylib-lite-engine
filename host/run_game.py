@@ -195,8 +195,7 @@ class GenericHostRuntime:
                     ENGINE_ROOT / "include/raylib_lite",
                     ENGINE_ROOT / "compat/raylib/include",
                     project / "main", project / "assets/generated",
-                    project / "managed_components/georgik__raylib/include",
-                    project / "managed_components/georgik__raylib/raylib/src"]
+                    ENGINE_ROOT / "third_party/raylib/src"]
         command = [_host_compiler(), "-shared", "-O3", "-funroll-loops", "-std=c11", "-Wall",
                    "-Wextra", "-Werror", "-DRAYLIB_LITE_HOST_SIMULATION=1",
                    *(str(path) for path in sources)]
@@ -640,7 +639,10 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8460)
     parser.add_argument("--replay", type=Path)
     parser.add_argument("--state-output", type=Path)
+    parser.add_argument("--size", help="render surface WxH, e.g. 320x240")
     args = parser.parse_args()
+    if args.size:
+        os.environ["RAYLIB_LITE_HOST_SIZE"] = args.size
     manifest = args.project / "game.sim.json"
     if not manifest.is_file():
         parser.error(f"game simulator manifest not found: {manifest}")
