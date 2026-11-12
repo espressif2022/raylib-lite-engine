@@ -10,6 +10,11 @@ config RAYLIB_LITE_MAX_TEXTURES
     range 1 32
     default 12
 
+config RAYLIB_LITE_MAX_ASSETS
+    int "Maximum embedded or mounted asset files"
+    range 8 256
+    default 32
+
 config RAYLIB_LITE_RASTER_PROFILE
     bool "Time triangle setup and raster stages"
     default n
