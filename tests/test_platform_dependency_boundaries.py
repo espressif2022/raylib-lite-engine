@@ -514,7 +514,8 @@ int main(void) {{ return RAYLIB_LITE_WALL_MODE; }}
 
         board_manifest = (board_component / "idf_component.yml").read_text()
         self.assertIn('version: "0.1.0"', board_manifest)
-        self.assertIn('espressif2022/raylib-lite-engine: "^0.1.0"', board_manifest)
+        engine_version = (ENGINE / "VERSION").read_text().strip()
+        self.assertIn(f'espressif2022/raylib-lite-engine: "^{engine_version}"', board_manifest)
         self.assertIn("espressif/esp_board_manager:", board_manifest)
         self.assertNotIn("esp-mosaico-bsp", board_manifest)
         self.assertNotIn("esp_iris:", board_manifest)

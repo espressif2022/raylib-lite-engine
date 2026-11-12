@@ -20,7 +20,7 @@
 ```yaml
 dependencies:
   idf: ">=6.1"
-  espressif2022/raylib-lite-engine: "^0.1.0"
+  espressif2022/raylib-lite-engine: "^0.1.1"
 ```
 
 从[最小例程（English）](release/minimal/README.md)开始接入自己的应用，接口说明见[API 契约（English）](API.md)。

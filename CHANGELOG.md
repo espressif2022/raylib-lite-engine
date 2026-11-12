@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.1.1 - 2026-11-12
+
+- Added configurable embedded and backing-store asset capacity through
+  `CONFIG_RAYLIB_LITE_MAX_ASSETS` (8–256, default 32). Games with more assets
+  can raise the limit without changing engine sources.
+- Added upstream raylib 6.0 software rendering over the Engine video, clock
+  and input contracts, with frozen compatibility mappings and pixel comparisons.
+
 - Released games adapt to the panel size. A new example header,
   `raylib_lite_design_view.h`, keeps the short side at 480 design units and
   maps them to the panel with a Camera2D (no camera at 480x480, so those frames

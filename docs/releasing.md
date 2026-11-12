@@ -59,7 +59,7 @@ into a separate test project with its namespaced component directory:
 
 ```sh
 python3 tools/prepare_release_consumer.py \
-  --archive /tmp/raylib-release-candidate/archives/raylib-lite-engine_0.1.0.tgz \
+  --archive /tmp/raylib-release-candidate/archives/raylib-lite-engine_0.1.1.tgz \
   --example minimal --output /tmp/raylib-minimal-consumer
 idf.py -C /tmp/raylib-minimal-consumer -B /tmp/raylib-minimal-build \
   -DIDF_TARGET=esp32s3 build
@@ -95,7 +95,7 @@ Repeat a changed game locally when checking a candidate outside CI.
 ## Release version and upload
 
 `VERSION`, root `idf_component.yml`, and example Engine constraints must agree.
-Current release candidate is `0.1.0`; no release tag is created by preparation.
+Current release candidate is `0.1.1`; no release tag is created by preparation.
 If that version is already published, select a new unused version and update the
 constraints before upload. Registry versions are immutable; do not reuse a version.
 The changelog records the namespace migration from historical `mosaico_*` APIs.

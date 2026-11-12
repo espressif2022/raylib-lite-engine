@@ -20,7 +20,7 @@ Once the component is published, add it to your application's `main/idf_componen
 ```yaml
 dependencies:
   idf: ">=6.1"
-  espressif2022/raylib-lite-engine: "^0.1.0"
+  espressif2022/raylib-lite-engine: "^0.1.1"
 ```
 
 Start with the [minimal example](release/minimal/README.md) to integrate your own application. See the [API contract](API.md) for interface details.
