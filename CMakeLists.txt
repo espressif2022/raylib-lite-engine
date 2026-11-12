@@ -84,6 +84,10 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
     PLATFORM_CUSTOM
     SW_COLOR_BUFFER_BITS=16
     SW_DEPTH_BUFFER_BITS=16)
+if(CONFIG_RAYLIB_LITE_MAX_ASSETS)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE
+        RAYLIB_LITE_MAX_ASSETS=${CONFIG_RAYLIB_LITE_MAX_ASSETS})
+endif()
 
 set_property(SOURCE ${_upstream_raylib_sources} APPEND PROPERTY COMPILE_OPTIONS
     "-I${_upstream_raylib_dir}/src/external"
