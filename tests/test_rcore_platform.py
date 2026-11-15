@@ -9,10 +9,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 RAYLIB = ROOT / "third_party/raylib"
-DEFINES = ["-DPLATFORM_CUSTOM", "-DGRAPHICS_API_OPENGL_SOFTWARE",
-           "-DSW_COLOR_BUFFER_BITS=16", "-DSW_DEPTH_BUFFER_BITS=16"]
+DEFINES = ["-DPLATFORM_CUSTOM", "-DGRAPHICS_API_OPENGL_SOFTWARE"]
 INCLUDES = [RAYLIB / "src", RAYLIB / "src/external",
-            ROOT / "include/raylib_lite"]
+            ROOT / "include/raylib_lite", ROOT / "src/rcore"]
 
 
 class RcorePlatformTests(unittest.TestCase):
@@ -22,8 +21,12 @@ class RcorePlatformTests(unittest.TestCase):
         includes = [arg for path in INCLUDES for arg in ("-I", str(path))]
         with tempfile.TemporaryDirectory() as directory:
             objects = []
-            upstream = [RAYLIB / "src" / name for name in ("rshapes.c", "rtextures.c", "rtext.c")]
-            for source in upstream + [ROOT / "src/rcore/raylib_lite_rcore.c"]:
+            upstream = [
+                RAYLIB / "src/rshapes.c", RAYLIB / "src/rtext.c",
+                ROOT / "src/rcore/raylib_lite_rcore.c",
+                ROOT / "src/rcore/raylib_lite_rtextures.c",
+            ]
+            for source in upstream:
                 obj = str(Path(directory) / (source.stem + ".o"))
                 subprocess.run([cc, "-std=gnu99", "-O1", "-w", *DEFINES, *flags, *includes,
                                 "-c", str(source), "-o", obj], check=True)

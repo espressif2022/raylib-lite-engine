@@ -49,8 +49,11 @@ CloseWindow();
 平台层的行为：
 
 - **上屏**：rlsw 的 RGB565 颜色缓冲按行逆序拷贝进 acquire 到的帧，再 present。每帧只拷贝一次，支持带 stride 的帧。显示忙或出错时只丢弃这一帧，可以通过 `raylib_lite_rcore_last_present_result()` 查询结果。
-- **时间**：`GetTime()`、`GetFrameTime()` 使用 Board 时钟。上游的 `WaitTime()` 在 ESP 上不会睡眠，所以 `SetTargetFPS()` 的节奏由平台层用时钟睡眠实现；没有设置目标帧率时，每 8 帧让出 1 ms，保证空闲任务和看门狗能运行。
-- **输入**：`RAYLIB_LITE_INPUT_BUTTON` 的 0 到 4 默认映射为 `KEY_LEFT`、`KEY_RIGHT`、`KEY_SPACE`、`KEY_P`、`KEY_ENTER`，可以通过 `button_keys` 自定义。触摸写入 raylib 的触摸状态，第一个触摸点同时作为鼠标左键。同一帧内的按下加松开会延后一帧释放，保证 `IsKeyPressed()` 能观察到。
+- **时间**由 Board 时钟提供。`EndDrawing()` 按 `SetTargetFPS()` 等待剩余时间，连续 8 帧未等待时让出 1 ms。`WaitTime()` 使用同一个时钟。
+- **输入**支持平台传入的字符、滚轮和手柄事件。Board 按钮 0 到 4 默认映射到左、右、空格、P 和回车，可通过 `button_keys` 自定义。首触点同时作为鼠标左键，触点事件也传入 raylib 手势识别。按下和松开同帧发生时，松开延至下一帧。发送 ESC 或 `SetExitKey()` 指定的按键后，`WindowShouldClose()` 返回真。`KEY_NULL` 禁用退出键。
+- **资源**可通过 `open_asset` 和 `release_asset` 接入打包资源。`FileExists()`、`LoadFileData()` 和 `LoadFileText()` 在 `assets/` 下查该资源表，去掉路径开头的 `./`。提供者借出字节，raylib 加载时取得自己的副本。
+- **绘制**使用左上角坐标裁剪。离屏纹理使用不透明 RGB565，回贴时按 raylib 的惯例传负源高度。支持 alpha、加法、乘色、直接加减色和预乘 alpha，屏幕与纹理均可读回。截图用 `.qoi` 后缀写入应用可写路径。
+- **音频**可由应用链接 `examples_audio`，标准 `LoadSound()`、`LoadMusicStream()` 等入口读取打包 `.sound` 并由 Board worker 混音。暂停保留播放游标，恢复继续播放。`Music.looping` 在开始播放时生效。
 - **限制**：平台层和 `raylib_lite_raylib_*` 兼容层共用同一个显示端口，同一进程只能使用其中之一。`config.h` 的模块和格式选择与 georgik 一致（PNG/QOI、FNT 字体，不含 TTF、rmodels、raudio），但 `MAX_KEYBOARD_KEYS` 恢复为上游默认的 512，否则方向键和回车无法使用。
 
 `compat/raylib/include/raylib_lite_raylib.h` 用 `#define` 把部分 raylib 名字改指向本仓库实现。这一层**已冻结**：
@@ -80,7 +83,7 @@ CloseWindow();
 | `BeginDrawing` `EndDrawing` | 契约 | 获取和提交后端拥有的 RGB565 帧；提交失败通过 `raylib_lite_raylib_get_last_present_result()` 查询 |
 | `SetTargetFPS` | 契约 | 运行器的渲染节奏；不在 `EndDrawing` 中阻塞等待 |
 | `GetFrameTime` `GetTime` | 契约 | 固定逻辑步长与逻辑 tick 计时，保证回放确定性；不随显示丢帧变化 |
-| `GetFPS` | 等价 | 实测的成功提交帧率，每秒更新一次；第一个统计窗口结束前返回 0 |
+| `GetFPS` | 契约 | 以成功提交的帧计数，在首个约一秒的统计窗口结束前返回 0。上游按帧时间估算循环帧率 |
 | `IsKeyPressed` `IsKeyDown` `IsKeyReleased` `IsKeyUp` | 契约 | 按键由 Board 注入；挂载运行器时，边沿在逻辑 tick 结束时消费 |
 | `IsMouseButtonPressed` `IsMouseButtonDown` `IsMouseButtonReleased` `IsMouseButtonUp` | 差异 | 只支持左键，来自第一个指针 |
 | `GetMouseX` `GetMouseY` `GetMousePosition` | 等价 | 第一个指针的坐标 |

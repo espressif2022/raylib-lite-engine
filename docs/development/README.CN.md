@@ -9,6 +9,7 @@
 | [项目开发历程](project-progress.CN.md) | 从起步到现在的阶段记录 |
 | [兼容层与核心收敛计划](compat-core-plan.CN.md) | 候选演进、v3 回退、v4 双板验收 |
 | [接口消费者与退役审查](api-management.CN.md) | 静态消费者矩阵、测试缺口与审查记录 |
+| [Raylib 通用接口适配矩阵](raylib-api-matrix.CN.md) | 原生与兼容路径的实现、行为差异和移植优先级 |
 | [Scene/UI 行为补证](scene-ui-contracts.CN.md) | 回归复现、修正和验证范围 |
 | [Renderer 公共头拆分](renderer-header-split-20261012.CN.md) | 绘制、统计与基准声明拆分及兼容验证 |
 | [Sky Hop 原生适配](sky-hop-rcore-20261012.CN.md) | S31 同板实测、性能不达标与兼容路径回退 |

@@ -29,6 +29,7 @@ class BoardAudioCodecTests(unittest.TestCase):
                         cc, "-std=c11", "-Wall", "-Wextra", "-Werror",
                         "-I", str(FAKES), "-I", str(AUDIO),
                         "-I", str(ROOT / "include/raylib_lite"),
+                        "-I", str((BOARDS / source).parent),
                         f"-D{macro}=1",
                         str(ROOT / "tests/test_board_audio_codec.c"),
                         str(BOARDS / source),

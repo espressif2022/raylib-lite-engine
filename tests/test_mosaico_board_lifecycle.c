@@ -13,6 +13,7 @@ static unsigned fail_presenter_create, fail_presenter_delete, fail_manager_deini
 static unsigned fail_touch_handle, touch_inits, tasks_created;
 static unsigned clock_seq, audio_seq, close_seq, delete_seq, deinit_seq;
 static bool manager_live;
+static bool motor_ready;
 static unsigned poll, release_attempts, accepted_releases, accepted_presses;
 static raylib_lite_example_board_t *worker_board;
 
@@ -32,13 +33,20 @@ void xTaskDelayUntil(TickType_t *w, TickType_t t) { (void)w; (void)t; }
 esp_err_t nvs_flash_init(void) { return ESP_OK; }
 esp_err_t mosaico_hardware_prepare(void) { return ESP_OK; }
 esp_err_t mosaico_hardware_release(void) { assert(!manager_live); return ESP_OK; }
-esp_err_t mosaico_hardware_haptic_set(uint8_t v) { return v <= 100 ? ESP_OK : ESP_ERR_INVALID_ARG; }
+esp_err_t mosaico_hardware_haptic_init(void)
+{ assert(manager_live); motor_ready = true; return ESP_OK; }
+esp_err_t mosaico_hardware_haptic_set(uint8_t strength)
+{
+    if (!motor_ready) return ESP_ERR_INVALID_STATE;
+    return strength <= 100 ? ESP_OK : ESP_ERR_INVALID_ARG;
+}
+void mosaico_hardware_haptic_deinit(void) { motor_ready = false; }
 esp_err_t mosaico_hardware_imu_read(void *i, float *x, float *y, float *z)
 { (void)i; *x = *y = *z = 0; return ESP_OK; }
 esp_err_t esp_board_manager_init(void) { assert(!manager_live); manager_live = true; return ESP_OK; }
 esp_err_t esp_board_manager_deinit(void)
 {
-    assert(manager_live);
+    assert(manager_live && !motor_ready);
     deinit_seq = ++clock_seq;
     if (fail_manager_deinit) { --fail_manager_deinit; return ESP_FAIL; }
     manager_live = false;
@@ -103,12 +111,15 @@ int main(void)
     for (unsigned max = 1; max <= 2; ++max) {
         cfg.touch_points = max;
         assert(raylib_lite_example_board_create(&cfg, &board) == ESP_OK && board);
+        assert(raylib_lite_example_board_haptic_init() == ESP_OK);
+        assert(raylib_lite_example_board_haptic_set(50) == ESP_OK);
         assert(raylib_lite_example_board_start_input(board) == ESP_OK);
         worker_board = board;
         poll = release_attempts = accepted_releases = accepted_presses = 0;
         touch_worker(board);
         assert(accepted_presses == 1 && release_attempts == 2 && accepted_releases == 1);
         assert(raylib_lite_example_board_destroy(board, 10) == ESP_OK);
+        assert(raylib_lite_example_board_haptic_set(50) == ESP_ERR_INVALID_STATE);
         assert(audio_seq < close_seq && close_seq < delete_seq && delete_seq < deinit_seq);
     }
     /* Partial-create failure retains the handle when manager cleanup fails. */

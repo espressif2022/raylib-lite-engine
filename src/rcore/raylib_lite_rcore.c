@@ -3,12 +3,36 @@
  * Upstream platform files are #included by rcore.c because they write CORE,
  * whose type is private to rcore.c; this file includes rcore.c for the same
  * reason. Build with PLATFORM_CUSTOM and GRAPHICS_API_OPENGL_SOFTWARE. */
+/* Keep upstream source intact. These entry points need the platform clock,
+ * the software framebuffer's coordinate conventions, or mounted assets. */
+#define BeginScissorMode raylib_lite_upstream_begin_scissor_mode
+#define ClearBackground raylib_lite_upstream_clear_background
+#define EndDrawing raylib_lite_upstream_end_drawing
+#define WaitTime raylib_lite_upstream_wait_time
+#define FileExists raylib_lite_upstream_file_exists
+#define LoadFileData raylib_lite_upstream_load_file_data
+#define LoadFileText raylib_lite_upstream_load_file_text
+#define BeginBlendMode raylib_lite_upstream_begin_blend_mode
+#define EndBlendMode raylib_lite_upstream_end_blend_mode
+#define TakeScreenshot raylib_lite_upstream_take_screenshot
 #include "rcore.c"
+#undef BeginScissorMode
+#undef ClearBackground
+#undef EndDrawing
+#undef WaitTime
+#undef FileExists
+#undef LoadFileData
+#undef LoadFileText
+#undef BeginBlendMode
+#undef EndBlendMode
+#undef TakeScreenshot
 
 #include <stdbool.h>
+#include <limits.h>
 #include <string.h>
 #include "raylib_lite_rcore.h"
 #include "raylib_lite_raylib_port.h"
+#include "raylib_lite_rcore_render.h"
 
 #if !defined(PLATFORM_CUSTOM) || !defined(GRAPHICS_API_OPENGL_SOFTWARE)
 #error "raylib_lite_rcore requires PLATFORM_CUSTOM and GRAPHICS_API_OPENGL_SOFTWARE"
@@ -47,6 +71,8 @@ raylib_lite_result_t raylib_lite_rcore_configure(const raylib_lite_rcore_config_
         return RAYLIB_LITE_INVALID_ARGUMENT;
     if (config->button_keys && !config->button_key_count)
         return RAYLIB_LITE_INVALID_ARGUMENT;
+    if (!!config->open_asset != !!config->release_asset)
+        return RAYLIB_LITE_INVALID_ARGUMENT;
     if (platform.port_ready) return RAYLIB_LITE_INVALID_STATE;
     platform.config = *config;
     platform.configured = true;
@@ -74,9 +100,79 @@ static uint64_t now_us(void)
     return platform.config.clock.monotonic_us(platform.config.clock.context);
 }
 
-static void sleep_us(uint64_t duration)
+void WaitTime(double seconds)
 {
-    platform.config.clock.sleep_for_us(platform.config.clock.context, duration);
+    if (!platform.configured || !(seconds > 0.0) ||
+        seconds >= (double)UINT64_MAX/1000000.0) return;
+    uint64_t us = (uint64_t)ceil(seconds*1000000.0);
+    platform.config.clock.sleep_for_us(platform.config.clock.context, us);
+}
+
+static const char *packed_asset_name(const char *path)
+{
+    if (!platform.configured || !platform.config.open_asset || !path) return NULL;
+    while (strncmp(path, "./", 2) == 0) path += 2;
+    return strncmp(path, "assets/", 7) == 0 ? path + 7 : NULL;
+}
+
+static bool open_packed_asset(const char *name, raylib_lite_asset_view_t *view)
+{
+    /* Keep lookup inside the mounted namespace, including when the provider
+     * resolves names against a Host directory. */
+    if (!name[0] || strpbrk(name, "\\:")) return false;
+    for (const char *part = name; ; )
+    {
+        size_t length = strcspn(part, "/");
+        if (length == 0 || (length == 1 && part[0] == '.') ||
+            (length == 2 && strncmp(part, "..", 2) == 0)) return false;
+        if (!part[length]) break;
+        part += length + 1;
+    }
+    return platform.config.open_asset(name, view) == RAYLIB_LITE_OK;
+}
+
+bool FileExists(const char *path)
+{
+    const char *name = packed_asset_name(path);
+    if (!name) return path && raylib_lite_upstream_file_exists(path);
+    raylib_lite_asset_view_t view = {0};
+    if (!open_packed_asset(name, &view)) return false;
+    platform.config.release_asset(&view);
+    return true;
+}
+
+static unsigned char *copy_packed_asset(const char *name, int *size)
+{
+    *size = 0;
+    raylib_lite_asset_view_t view = {0};
+    if (!open_packed_asset(name, &view)) return NULL;
+    unsigned char *data = NULL;
+    if (view.data && view.size > 0 && view.size < INT_MAX)
+    {
+        data = MemAlloc((unsigned int)view.size + 1);
+        if (data)
+        {
+            memcpy(data, view.data, view.size);
+            data[view.size] = 0;
+            *size = (int)view.size;
+        }
+    }
+    platform.config.release_asset(&view);
+    return data;
+}
+
+unsigned char *LoadFileData(const char *path, int *size)
+{
+    if (!size) return NULL;
+    const char *name = packed_asset_name(path);
+    return name ? copy_packed_asset(name, size) : raylib_lite_upstream_load_file_data(path, size);
+}
+
+char *LoadFileText(const char *path)
+{
+    int size;
+    const char *name = packed_asset_name(path);
+    return name ? (char *)copy_packed_asset(name, &size) : raylib_lite_upstream_load_file_text(path);
 }
 
 //----------------------------------------------------------------------------------
@@ -158,24 +254,6 @@ static void copy_color_buffer(uint16_t *dst, size_t stride, uint16_t width, uint
     }
 }
 
-/* WaitTime() only sleeps on desktop OSes, so pacing to SetTargetFPS() happens
- * here with the platform clock. Unpaced frames still yield periodically so
- * idle tasks and the task watchdog are serviced. */
-static void pace_frame(void)
-{
-    double elapsed = CORE.Time.update + (GetTime() - CORE.Time.previous);
-    if (CORE.Time.target > 0.0 && elapsed < CORE.Time.target)
-    {
-        sleep_us((uint64_t)((CORE.Time.target - elapsed)*1000000.0));
-        platform.unpaced_frames = 0;
-    }
-    else if (++platform.unpaced_frames >= OVERRUN_YIELD_EVERY)
-    {
-        sleep_us(OVERRUN_YIELD_US);
-        platform.unpaced_frames = 0;
-    }
-}
-
 void SwapScreenBuffer(void)
 {
     uint16_t *pixels = NULL;
@@ -189,7 +267,30 @@ void SwapScreenBuffer(void)
         copy_color_buffer(pixels, stride, width, height);
         platform.last_present = raylib_lite_raylib_port_present_frame();
     }
-    pace_frame();
+}
+
+void EndDrawing(void)
+{
+    if (!platform.port_ready) return;
+    rlDrawRenderBatchActive();
+    SwapScreenBuffer();
+    double elapsed = CORE.Time.update + (GetTime() - CORE.Time.previous);
+    if (CORE.Time.target > elapsed)
+    {
+        WaitTime(CORE.Time.target - elapsed);
+        platform.unpaced_frames = 0;
+    }
+    else if (++platform.unpaced_frames >= OVERRUN_YIELD_EVERY)
+    {
+        platform.config.clock.sleep_for_us(platform.config.clock.context, OVERRUN_YIELD_US);
+        platform.unpaced_frames = 0;
+    }
+    CORE.Time.current = GetTime();
+    CORE.Time.draw = CORE.Time.current - CORE.Time.previous;
+    CORE.Time.previous = CORE.Time.current;
+    CORE.Time.frame = CORE.Time.update + CORE.Time.draw;
+    PollInputEvents();
+    CORE.Time.frameCounter++;
 }
 
 //----------------------------------------------------------------------------------
@@ -242,10 +343,11 @@ static void apply_key(int key, bool pressed)
     if (pressed)
     {
         platform.key_release_pending[key] = false;
-        if (!CORE.Input.Keyboard.currentKeyState[key] &&
-            CORE.Input.Keyboard.keyPressedQueueCount < MAX_KEY_PRESSED_QUEUE)
+        if (!CORE.Input.Keyboard.currentKeyState[key])
         {
-            CORE.Input.Keyboard.keyPressedQueue[CORE.Input.Keyboard.keyPressedQueueCount++] = key;
+            if (key == CORE.Input.Keyboard.exitKey) CORE.Window.shouldClose = true;
+            if (CORE.Input.Keyboard.keyPressedQueueCount < MAX_KEY_PRESSED_QUEUE)
+                CORE.Input.Keyboard.keyPressedQueue[CORE.Input.Keyboard.keyPressedQueueCount++] = key;
         }
         CORE.Input.Keyboard.currentKeyState[key] = 1;
         platform.key_pressed_now[key] = true;
@@ -274,6 +376,8 @@ static void apply_touch(int32_t id, int32_t x, int32_t y, bool pressed)
     {
         if (CORE.Input.Touch.pointId[i] == id) { slot = i; break; }
     }
+    bool was_active = slot >= 0;
+    if (!pressed && !was_active) return;
     if (pressed)
     {
         if (slot < 0)
@@ -285,7 +389,23 @@ static void apply_touch(int32_t id, int32_t x, int32_t y, bool pressed)
         CORE.Input.Touch.position[slot] = (Vector2){ (float)x, (float)y };
         CORE.Input.Touch.currentTouchState[slot] = 1;
     }
-    else if (slot >= 0)
+#if SUPPORT_GESTURES_SYSTEM
+    GestureEvent gesture = {
+        .touchAction = !pressed ? TOUCH_ACTION_UP :
+            was_active ? TOUCH_ACTION_MOVE : TOUCH_ACTION_DOWN,
+        .pointCount = CORE.Input.Touch.pointCount,
+    };
+    for (int i = 0; i < gesture.pointCount; i++)
+    {
+        Vector2 pos = !pressed && i == slot
+            ? (Vector2){ (float)x, (float)y } : CORE.Input.Touch.position[i];
+        gesture.pointId[i] = CORE.Input.Touch.pointId[i];
+        gesture.position[i] = (Vector2){pos.x/CORE.Window.screen.width,
+                                        pos.y/CORE.Window.screen.height};
+    }
+    ProcessGestureEvent(gesture);
+#endif
+    if (!pressed)
     {
         int last = --CORE.Input.Touch.pointCount;
         CORE.Input.Touch.pointId[slot] = CORE.Input.Touch.pointId[last];
@@ -299,6 +419,58 @@ static void apply_touch(int32_t id, int32_t x, int32_t y, bool pressed)
     else apply_mouse(x, y, false);
 }
 
+static void apply_platform_input(const raylib_lite_input_event_t *event)
+{
+    int value = event->value;
+    int gamepad = event->x;
+    switch (event->type)
+    {
+        case RAYLIB_LITE_INPUT_BUTTON:
+            apply_key(button_key(value), event->pressed);
+            break;
+        case RAYLIB_LITE_INPUT_KEY:
+            if (value < 1 || value >= MAX_KEYBOARD_KEYS) break;
+            if (event->pressed && CORE.Input.Keyboard.currentKeyState[value])
+                CORE.Input.Keyboard.keyRepeatInFrame[value] = 1;
+            apply_key(value, event->pressed);
+            break;
+        case RAYLIB_LITE_INPUT_CHAR:
+            if (value > 0 && value <= 0x10ffff && (value < 0xd800 || value > 0xdfff) &&
+                CORE.Input.Keyboard.charPressedQueueCount < MAX_CHAR_PRESSED_QUEUE)
+                CORE.Input.Keyboard.charPressedQueue[CORE.Input.Keyboard.charPressedQueueCount++] = value;
+            break;
+        case RAYLIB_LITE_INPUT_WHEEL:
+            CORE.Input.Mouse.currentWheelMove.x += event->x;
+            CORE.Input.Mouse.currentWheelMove.y += event->y;
+            break;
+        case RAYLIB_LITE_INPUT_POINTER:
+            apply_mouse(event->x, event->y, event->pressed);
+            break;
+        case RAYLIB_LITE_INPUT_TOUCH:
+            apply_touch(value, event->x, event->y, event->pressed);
+            break;
+        case RAYLIB_LITE_INPUT_GAMEPAD_CONNECTION:
+            if (gamepad < 0 || gamepad >= MAX_GAMEPADS) break;
+            CORE.Input.Gamepad.ready[gamepad] = event->pressed;
+            CORE.Input.Gamepad.axisCount[gamepad] = event->pressed ? sw_clamp_int(value, 0, MAX_GAMEPAD_AXES) : 0;
+            memset(CORE.Input.Gamepad.axisState[gamepad], 0, sizeof(CORE.Input.Gamepad.axisState[gamepad]));
+            memset(CORE.Input.Gamepad.currentButtonState[gamepad], 0, sizeof(CORE.Input.Gamepad.currentButtonState[gamepad]));
+            break;
+        case RAYLIB_LITE_INPUT_GAMEPAD_AXIS:
+            if (IsGamepadAvailable(gamepad) && value >= 0 && value < CORE.Input.Gamepad.axisCount[gamepad])
+                CORE.Input.Gamepad.axisState[gamepad][value] = sw_clamp((float)event->y/32767.0f, -1.0f, 1.0f);
+            break;
+        case RAYLIB_LITE_INPUT_GAMEPAD_BUTTON:
+            if (!IsGamepadAvailable(gamepad) || value <= GAMEPAD_BUTTON_UNKNOWN || value >= MAX_GAMEPAD_BUTTONS) break;
+            if (event->pressed && !CORE.Input.Gamepad.currentButtonState[gamepad][value])
+                CORE.Input.Gamepad.lastButtonPressed = value;
+            CORE.Input.Gamepad.currentButtonState[gamepad][value] = event->pressed;
+            break;
+        default:
+            break;
+    }
+}
+
 void PollInputEvents(void)
 {
 #if SUPPORT_GESTURES_SYSTEM
@@ -309,6 +481,9 @@ void PollInputEvents(void)
     CORE.Input.Mouse.previousPosition = CORE.Input.Mouse.currentPosition;
     CORE.Input.Mouse.previousWheelMove = CORE.Input.Mouse.currentWheelMove;
     CORE.Input.Mouse.currentWheelMove = (Vector2){ 0.0f, 0.0f };
+    CORE.Input.Gamepad.lastButtonPressed = GAMEPAD_BUTTON_UNKNOWN;
+    memcpy(CORE.Input.Gamepad.previousButtonState, CORE.Input.Gamepad.currentButtonState,
+           sizeof(CORE.Input.Gamepad.previousButtonState));
     for (int i = 0; i < MAX_MOUSE_BUTTONS; i++)
         CORE.Input.Mouse.previousButtonState[i] = CORE.Input.Mouse.currentButtonState[i];
     for (int i = 0; i < MAX_TOUCH_POINTS; i++)
@@ -331,13 +506,7 @@ void PollInputEvents(void)
     raylib_lite_input_event_t event;
     while (platform.config.input && raylib_lite_input_poll(platform.config.input, &event))
     {
-        switch (event.type)
-        {
-            case RAYLIB_LITE_INPUT_BUTTON: apply_key(button_key(event.value), event.pressed); break;
-            case RAYLIB_LITE_INPUT_POINTER: apply_mouse(event.x, event.y, event.pressed); break;
-            case RAYLIB_LITE_INPUT_TOUCH: apply_touch(event.value, event.x, event.y, event.pressed); break;
-            default: break;
-        }
+        apply_platform_input(&event);
         if (platform.config.on_event) platform.config.on_event(platform.config.user, &event);
     }
 }
@@ -375,6 +544,9 @@ int InitPlatform(void)
     memset(platform.key_release_pending, 0, sizeof(platform.key_release_pending));
     platform.mouse_pressed_now = platform.mouse_release_pending = false;
     for (int i = 0; i < MAX_TOUCH_POINTS; i++) CORE.Input.Touch.pointId[i] = -1;
+#if SUPPORT_GESTURES_SYSTEM
+    GESTURES = (GesturesData){.Touch.firstId = -1, .enabledFlags = 0x3ff};
+#endif
 
     uint16_t width = 0, height = 0;
     raylib_lite_raylib_port_get_dimensions(&width, &height);
@@ -412,3 +584,6 @@ void ClosePlatform(void)
     platform.port_ready = false;
     platform.configured = false;
 }
+
+/* These operations need rlsw's current framebuffer and texture pool. */
+#include "raylib_lite_rcore_render.inc"

@@ -95,14 +95,18 @@
         "raylib_lite_audio_mixer_create",
         "raylib_lite_audio_mixer_destroy",
         "raylib_lite_audio_mixer_get_stats",
+        "raylib_lite_audio_mixer_is_music_playing",
         "raylib_lite_audio_mixer_is_sound_playing",
         "raylib_lite_audio_mixer_load",
         "raylib_lite_audio_mixer_mix",
         "raylib_lite_audio_mixer_play_music",
+        "raylib_lite_audio_mixer_play_music_with_loop",
         "raylib_lite_audio_mixer_play_sound",
         "raylib_lite_audio_mixer_set_master_volume",
         "raylib_lite_audio_mixer_set_music_clip_volume",
+        "raylib_lite_audio_mixer_set_music_paused",
         "raylib_lite_audio_mixer_set_music_volume",
+        "raylib_lite_audio_mixer_set_sound_paused",
         "raylib_lite_audio_mixer_set_sound_volume",
         "raylib_lite_audio_mixer_stop_music",
         "raylib_lite_audio_mixer_stop_music_clip",
@@ -678,14 +682,17 @@
         "raylib_lite_rcore_last_present_result"
       ],
       "implementation": [
-        "src/rcore/raylib_lite_rcore.c"
+        "src/rcore/raylib_lite_rcore.c",
+        "src/rcore/raylib_lite_rcore_render.inc",
+        "src/rcore/raylib_lite_rtextures.c"
       ],
-      "ownership": "configure 复制配置；video/clock/input/context 生命周期由调用者保证。",
+      "ownership": "configure 复制配置。调用者负责 video/clock/input/context 的生命周期。打包资源短暂借用，raylib 返回的文件数据由调用者释放。",
       "failure": "configure 返回 result；present BUSY/错误丢当前帧。",
       "cleanup": "CloseWindow 后再换配置；flush 后释放后台显示资源。",
       "boundary": "上游 rcore 平台路径，不能与兼容纹理句柄混用。",
       "tests": [
-        "tests/test_rcore_platform.py"
+        "tests/test_rcore_platform.py",
+        "tests/test_native_2d.py"
       ],
       "test_gaps": "关联测试证明部分行为，不代表每个入口或全部板端路径已覆盖；需要按消费者补证据。",
       "usage_role": "integration",
@@ -1098,7 +1105,7 @@
     "EndScissorMode": "契约",
     "Fade": "等价",
     "GetCollisionRec": "等价",
-    "GetFPS": "等价",
+    "GetFPS": "契约",
     "GetFrameTime": "契约",
     "GetMousePosition": "等价",
     "GetMouseX": "等价",

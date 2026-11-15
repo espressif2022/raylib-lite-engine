@@ -39,6 +39,7 @@ Run one module with `python3 -m unittest tests.<module> -v`.
 | --- | --- |
 | Raster pixel oracles | `test_columns`, `test_primitives`, `test_rgb565`, `test_raster_fixed` (scanline rounding and texture sampling), `test_mtx2` (block-texture decoder), `test_compat_text` (default-font pixels and layout), `test_sample_row_step` (skipped rows leave displayed rows identical), `test_renderer_core`, `test_tilemap` |
 | Benchmarks and measurement tools | `test_render_benchmark`, `test_wall_benchmark`, `test_render_perf_tools`, `test_frame_compare` (compat layer vs upstream raylib + rlsw full frames) |
+| Native raylib reference | `test_native_2d` runs the same game as the Board project with generated assets, scripted input, offscreen pixels, a PCM sink and QOI capture |
 | Raylib compatibility | `test_raylib_compat_policy` (every mapping registered), `test_raylib_compat_semantics` (time, input edges, helpers), `test_raylib_audit` (vendored sources and frozen names), `test_rcore_platform` (upstream raylib on the Raylib Lite platform), `test_audio_facade` |
 | Runtime and lifecycle | `test_runner`, `test_runtime_stats`, `test_game_action`, `test_game_app_first_frame`, `test_raylib_lite_video_port`, `test_game_save`, `test_game_assets`, `test_scene_ui_behavior` |
 | Audio service | `test_audio_mixer`, `test_audio_worker`, `test_audio_service_lifecycle`, `test_sound_packing` (packer format choice, decoded by the engine decoder) |

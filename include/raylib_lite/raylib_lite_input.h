@@ -19,6 +19,12 @@ typedef enum {
     RAYLIB_LITE_INPUT_IMU,
     RAYLIB_LITE_INPUT_ATTACHED,
     RAYLIB_LITE_INPUT_DETACHED,
+    RAYLIB_LITE_INPUT_KEY,            /* value: platform key code, pressed: key down */
+    RAYLIB_LITE_INPUT_CHAR,           /* value: Unicode code point */
+    RAYLIB_LITE_INPUT_WHEEL,          /* x/y: signed scroll steps */
+    RAYLIB_LITE_INPUT_GAMEPAD_CONNECTION, /* x: index, value: axis count, pressed: connected */
+    RAYLIB_LITE_INPUT_GAMEPAD_AXIS,   /* x: index, value: axis, y: -32767 to 32767 */
+    RAYLIB_LITE_INPUT_GAMEPAD_BUTTON, /* x: index, value: button code, pressed: down */
 } raylib_lite_input_type_t;
 
 typedef struct {

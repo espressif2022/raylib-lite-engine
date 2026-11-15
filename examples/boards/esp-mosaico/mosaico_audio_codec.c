@@ -2,6 +2,7 @@
 /* ESP-Mosaico ES8311 DAC via the official ESP Board Manager device. */
 #include "platform_esp_audio.h"
 
+#include "mosaico_hardware.h"
 #include "esp_board_manager_includes.h"
 #include "esp_codec_dev.h"
 #include "esp_log.h"
@@ -13,6 +14,48 @@ static dev_audio_codec_handles_t *s_dac;
 static bool s_dac_initialized;
 static bool s_codec_open;
 static bool s_nonzero_pcm_reported;
+
+int mosaico_i2s_tx_init(void *config, int size, void **out)
+{
+    if (!config || size != sizeof(periph_i2s_config_t) || !out)
+        return ESP_ERR_INVALID_ARG;
+    *out = NULL;
+    const periph_i2s_config_t *peripheral = config;
+    if (peripheral->mode != I2S_COMM_MODE_STD || peripheral->direction != I2S_DIR_TX)
+        return ESP_ERR_NOT_SUPPORTED;
+
+    i2s_chan_config_t channel = I2S_CHANNEL_DEFAULT_CONFIG(peripheral->port, peripheral->role);
+    channel.auto_clear = true;
+    i2s_chan_handle_t tx = NULL;
+    esp_err_t error = i2s_new_channel(&channel, &tx, NULL);
+    if (error != ESP_OK) return error;
+
+    error = i2s_channel_init_std_mode(tx, &peripheral->i2s_cfg.std);
+    if (error == ESP_OK) error = i2s_channel_enable(tx);
+    if (error != ESP_OK) {
+        esp_err_t cleanup = i2s_del_channel(tx);
+        if (cleanup != ESP_OK)
+            ESP_LOGE(MOSAICO_AUDIO_TAG, "I2S TX rollback failed: %s", esp_err_to_name(cleanup));
+        return error;
+    }
+    *out = tx;
+    return ESP_OK;
+}
+
+int mosaico_i2s_tx_deinit(void *handle)
+{
+    i2s_chan_handle_t tx = handle;
+    i2s_chan_info_t info = {0};
+    /* Codec close may have stopped TX. Keep using the driver state on retries
+     * after disable succeeds but channel deletion fails. */
+    esp_err_t error = i2s_channel_get_info(tx, &info);
+    if (error != ESP_OK) return error;
+    if (info.is_enabled) {
+        error = i2s_channel_disable(tx);
+        if (error != ESP_OK) return error;
+    }
+    return i2s_del_channel(tx);
+}
 
 static raylib_lite_result_t release_dac(void)
 {

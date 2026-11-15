@@ -1,7 +1,6 @@
 #pragma once
 #include "esp_codec_dev.h"
-typedef int esp_err_t;
-#define ESP_OK 0
+#include "esp_err.h"
 #define GPIO_NUM_NC -1
 #define I2S_SLOT_MODE_STEREO 2
 #define I2S_MCLK_MULTIPLE_256 256

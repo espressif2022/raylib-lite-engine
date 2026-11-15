@@ -26,7 +26,7 @@ class FrameCompareTests(unittest.TestCase):
             self.assertEqual([scene["name"] for scene in report["scenes"]],
                              ["primitives", "title", "raycast"])
             self.assertEqual(report["upstream"]["color_bytes"], 32 * 24 * 2)
-            self.assertEqual(report["upstream"]["depth_bytes"], 32 * 24 * 2)
+            self.assertEqual(report["upstream"]["depth_bytes"], 32 * 24 * 4)
             self.assertEqual(report["compat"]["color_bytes"], 0)
             self.assertEqual(report["compat"]["depth_bytes"], 0)
             self.assertGreater(report["upstream"]["heap_bytes"],

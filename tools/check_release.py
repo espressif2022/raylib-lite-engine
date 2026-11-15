@@ -74,6 +74,7 @@ def check(root):
             raise ValueError(f"Archive has no verified staged files: {archive}")
         archives.append({"file": archive.name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(), "members": len(files)})
     print(json.dumps({"version": record["version"], "files": len(actual), "games": record["games"],
+                      "reference_examples": record.get("reference_examples", []),
                       "assets": len(record["assets"]), "archives": archives}, indent=2))
 
 

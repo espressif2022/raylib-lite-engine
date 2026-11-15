@@ -36,8 +36,8 @@
 #define MAX_KEYBOARD_KEYS             512
 #define MAX_MOUSE_BUTTONS               4
 #define MAX_GAMEPADS                    1
-#define MAX_GAMEPAD_AXES                4
-#define MAX_GAMEPAD_BUTTONS            16
+#define MAX_GAMEPAD_AXES                6
+#define MAX_GAMEPAD_BUTTONS            32
 #define MAX_GAMEPAD_VIBRATION_TIME   2.0f
 #define MAX_TOUCH_POINTS                4
 #define MAX_KEY_PRESSED_QUEUE           8

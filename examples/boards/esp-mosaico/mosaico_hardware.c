@@ -8,6 +8,8 @@
 #include "esp_efuse.h"
 #include "esp_efuse_table.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "gen_board_device_custom.h"
 #include "soc/gpio_reg.h"
 #include "soc/soc.h"
@@ -20,6 +22,9 @@
 static const char *TAG = "mosaico_hardware";
 static bool s_v1_0;
 static bool s_power_owned;
+static StaticSemaphore_t s_motor_lock_buffer;
+static SemaphoreHandle_t s_motor_lock;
+static bool s_motor_ready;
 
 static esp_err_t configure_output(gpio_num_t pin, int level, gpio_mode_t mode)
 {
@@ -91,6 +96,10 @@ esp_err_t mosaico_hardware_prepare(void)
     for (esp_board_periph_entry_t *entry = g_esp_board_periph_handles; entry; entry = entry->next) {
         if (!strcmp(entry->type, "i2c")) entry->init = revision_i2c_init;
         if (!strcmp(entry->type, "spi")) entry->init = revision_spi_init;
+        if (!strcmp(entry->type, "i2s") && entry->role == ESP_BOARD_PERIPH_ROLE_MASTER) {
+            entry->init = mosaico_i2s_tx_init;
+            entry->deinit = mosaico_i2s_tx_deinit;
+        }
     }
     /* The generic custom-device deinit logs and discards errors in BM 0.7.x.
      * Use our actual deinit callbacks so ownership is retained on failure. */
@@ -146,13 +155,47 @@ static int board_power_deinit(void *handle)
 
 CUSTOM_DEVICE_IMPLEMENT(board_power, board_power_init, board_power_deinit);
 
-esp_err_t mosaico_hardware_haptic_set(uint8_t strength)
+static esp_err_t write_motor_duty(uint8_t strength)
 {
-    if (strength > 100) return ESP_ERR_INVALID_ARG;
     periph_ledc_handle_t *motor = NULL;
     ESP_RETURN_ON_ERROR(esp_board_manager_get_device_handle("vibration_motor", (void **)&motor),
                         TAG, "get motor handle failed");
     if (!motor) return ESP_ERR_INVALID_STATE;
-    return ledc_set_duty_and_update(motor->speed_mode, motor->channel,
-                                   strength * MOTOR_MAX_DUTY / 100U, 0);
+    /* The Board Manager configures a plain PWM channel. Serialize duty and
+     * update between the game task and timer callbacks on this channel. */
+    ESP_RETURN_ON_ERROR(ledc_set_duty(motor->speed_mode, motor->channel,
+                                     strength * MOTOR_MAX_DUTY / 100U),
+                        TAG, "set motor duty failed");
+    return ledc_update_duty(motor->speed_mode, motor->channel);
+}
+
+esp_err_t mosaico_hardware_haptic_init(void)
+{
+    if (!s_motor_lock) s_motor_lock = xSemaphoreCreateMutexStatic(&s_motor_lock_buffer);
+    if (!s_motor_lock) return ESP_ERR_NO_MEM;
+    xSemaphoreTake(s_motor_lock, portMAX_DELAY);
+    esp_err_t error = write_motor_duty(0);
+    s_motor_ready = error == ESP_OK;
+    xSemaphoreGive(s_motor_lock);
+    if (error == ESP_OK) ESP_LOGI(TAG, "Haptic PWM ready");
+    return error;
+}
+
+esp_err_t mosaico_hardware_haptic_set(uint8_t strength)
+{
+    if (strength > 100) return ESP_ERR_INVALID_ARG;
+    if (!s_motor_lock) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(s_motor_lock, portMAX_DELAY);
+    esp_err_t error = s_motor_ready ? write_motor_duty(strength) : ESP_ERR_INVALID_STATE;
+    xSemaphoreGive(s_motor_lock);
+    return error;
+}
+
+void mosaico_hardware_haptic_deinit(void)
+{
+    if (!s_motor_lock) return;
+    xSemaphoreTake(s_motor_lock, portMAX_DELAY);
+    if (s_motor_ready) (void)write_motor_duty(0);
+    s_motor_ready = false;
+    xSemaphoreGive(s_motor_lock);
 }

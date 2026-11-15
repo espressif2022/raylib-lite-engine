@@ -15,6 +15,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "raylib_lite_assets.h"
 #include "raylib_lite_clock.h"
 #include "raylib_lite_input.h"
 #include "raylib_lite_result.h"
@@ -39,6 +40,12 @@ typedef struct {
     /* Optional. Sees every polled event, including IMU and joystick. */
     void (*on_event)(void *user, const raylib_lite_input_event_t *event);
     void *user;
+
+    /* Optional read-only asset provider for raylib paths under assets/.
+     * Both callbacks must be set together. The path passed to open excludes
+     * the prefix. A successful open is always paired with release. */
+    raylib_lite_result_t (*open_asset)(const char *name, raylib_lite_asset_view_t *view);
+    void (*release_asset)(raylib_lite_asset_view_t *view);
 } raylib_lite_rcore_config_t;
 
 /* Must be called before InitWindow() and not again until CloseWindow(). The

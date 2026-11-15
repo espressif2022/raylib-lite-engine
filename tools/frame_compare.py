@@ -25,7 +25,6 @@ SCENE_TITLE = {
 }
 UPSTREAM_DEFINES = [
     "-DPLATFORM_CUSTOM", "-DGRAPHICS_API_OPENGL_SOFTWARE",
-    "-DSW_COLOR_BUFFER_BITS=16", "-DSW_DEPTH_BUFFER_BITS=16",
 ]
 
 
@@ -71,19 +70,27 @@ def compile_sources(cc, opt, sources, includes, defines, output):
     run_cc(command)
 
 
-def build(cc, opt, build_dir):
+def build_upstream(cc, opt, build_dir):
     build_dir.mkdir(parents=True, exist_ok=True)
     flags = shlex.split(os.environ.get("CFLAGS", ""))
     includes = ["-I", str(RAYLIB / "src"), "-I", str(RAYLIB / "src/external"),
                 "-I", str(ROOT / "include/raylib_lite")]
     objects = []
-    upstream = [RAYLIB / "src" / name for name in ("rshapes.c", "rtextures.c", "rtext.c")]
-    upstream.append(ROOT / "src/rcore/raylib_lite_rcore.c")
+    upstream = [
+        RAYLIB / "src/rshapes.c", RAYLIB / "src/rtext.c",
+        ROOT / "src/rcore/raylib_lite_rcore.c",
+        ROOT / "src/rcore/raylib_lite_rtextures.c",
+    ]
     for source in upstream:
         obj = build_dir / (source.stem + ".o")
         run_cc([cc, "-std=gnu99", opt, "-w", *UPSTREAM_DEFINES, *flags, *includes,
                 "-c", str(source), "-o", str(obj)])
         objects.append(obj)
+    return objects
+
+
+def build(cc, opt, build_dir):
+    objects = build_upstream(cc, opt, build_dir)
     compat_includes = [
         HERE, ROOT / "host/include", ROOT / "include/raylib_lite",
         ROOT / "compat/raylib/include",
@@ -100,6 +107,7 @@ def build(cc, opt, build_dir):
                     ["-DFRAME_COMPARE_COMPAT"], build_dir / "frame_compat")
     upstream_includes = [
         HERE, RAYLIB / "src", RAYLIB / "src/external", ROOT / "include/raylib_lite",
+        ROOT / "src/rcore",
     ]
     upstream_sources = [
         HERE / "run_upstream.c", HERE / "frame_scene.c", HERE / "frame_host.c",

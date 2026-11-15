@@ -17,6 +17,7 @@ IDF_TARGET=esp32s31 idf.py --preview -C examples/raylib_shooter -B /tmp/rle-shoo
 | [last_zone_extraction](last_zone_extraction/README.md) | DDA wall columns and campaign shooter | ✓ | ✓ | ✓ |
 | [neon_rift_rally](neon_rift_rally/README.md) | Racing, steering, procedural track and feedback | ✓ | ✓ | ✓ |
 | [tomb_raycast](tomb_raycast/README.md) | Internal preview: portal rooms and INDEX8 textured planes; not released | ✓ | ✓ | ✓ |
+| [Sprite Catch](native_2d/README.md) | Native raylib 2D porting reference | Dedicated Host runner | ✓ | ✓ |
 | [render_benchmark](render_benchmark/README.md) | Raster acceptance and optional display preview | Dedicated Host test | Dedicated device project | — |
 
 The six released reference games support Host and native ESP-Mosaico and ESP32-S3-BOX-3 builds. `python3 tools/game_cli.py list --json` reports each game's `host` flag and `boards[]`. ELF game builds, packaging and loading are currently unsupported. The Iris native adapter (`mosaico.py game build --target iris`), Gateway, flashing, and updates are maintained by `esp-mosaico-vibe`. `render_benchmark` uses its own Host/CMake and ESP-IDF entry points, not `game.sim.json`. `tomb_raycast` is an internal preview kept in the checkout as a raster workload; it builds on both Boards but is not assembled into the Registry package.
