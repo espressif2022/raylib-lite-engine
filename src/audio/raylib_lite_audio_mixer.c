@@ -15,6 +15,7 @@ typedef struct {
 
 typedef struct {
     bool active;
+    bool paused;
     uint16_t clip_slot;
     uint32_t clip_generation;
     uint32_t serial;
@@ -26,6 +27,7 @@ struct raylib_lite_audio_mixer {
     mixer_clip_t *clips;
     mixer_voice_t *voices;
     mixer_voice_t music;
+    bool music_loop;
     float music_volume;
     float master_volume;
     uint32_t serial;
@@ -84,6 +86,12 @@ static mixer_clip_t *voice_clip(raylib_lite_audio_mixer_t *mixer,
         return NULL;
     }
     return clip;
+}
+
+static bool voice_uses_clip(const mixer_voice_t *voice, raylib_lite_audio_clip_t clip)
+{
+    return voice->active && voice->clip_slot == clip.slot &&
+        voice->clip_generation == clip.generation;
 }
 
 raylib_lite_result_t raylib_lite_audio_mixer_create(
@@ -187,11 +195,9 @@ raylib_lite_result_t raylib_lite_audio_mixer_unload(
     if (!clip) { mixer_unlock(mixer); return RAYLIB_LITE_INVALID_ARGUMENT; }
     for (uint16_t i = 0; i < mixer->config.max_sfx_voices; ++i) {
         mixer_voice_t *voice = &mixer->voices[i];
-        if (voice->active && voice->clip_slot == handle.slot &&
-            voice->clip_generation == handle.generation) voice->active = false;
+        if (voice_uses_clip(voice, handle)) voice->active = false;
     }
-    if (mixer->music.active && mixer->music.clip_slot == handle.slot &&
-        mixer->music.clip_generation == handle.generation) mixer->music.active = false;
+    if (voice_uses_clip(&mixer->music, handle)) mixer->music.active = false;
     asset = clip->asset;
     clip->used = false;
     clip->generation = next_generation(clip->generation);
@@ -249,8 +255,7 @@ raylib_lite_result_t raylib_lite_audio_mixer_stop_sound(
     }
     for (uint16_t i = 0; i < mixer->config.max_sfx_voices; ++i) {
         mixer_voice_t *voice = &mixer->voices[i];
-        if (voice->active && voice->clip_slot == handle.slot &&
-            voice->clip_generation == handle.generation) voice->active = false;
+        if (voice_uses_clip(voice, handle)) voice->active = false;
     }
     mixer_unlock(mixer);
     return RAYLIB_LITE_OK;
@@ -265,12 +270,27 @@ bool raylib_lite_audio_mixer_is_sound_playing(
     if (find_clip(mixer, handle)) {
         for (uint16_t i = 0; i < mixer->config.max_sfx_voices; ++i) {
             mixer_voice_t *voice = &mixer->voices[i];
-            if (voice->active && voice->clip_slot == handle.slot &&
-                voice->clip_generation == handle.generation) { playing = true; break; }
+            if (voice_uses_clip(voice, handle) && !voice->paused) { playing = true; break; }
         }
     }
     mixer_unlock(mixer);
     return playing;
+}
+
+raylib_lite_result_t raylib_lite_audio_mixer_set_sound_paused(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t handle, bool paused)
+{
+    if (!mixer) return RAYLIB_LITE_INVALID_ARGUMENT;
+    mixer_lock(mixer);
+    mixer_clip_t *clip = find_clip(mixer, handle);
+    if (clip) {
+        for (uint16_t i = 0; i < mixer->config.max_sfx_voices; ++i) {
+            mixer_voice_t *voice = &mixer->voices[i];
+            if (voice_uses_clip(voice, handle)) voice->paused = paused;
+        }
+    }
+    mixer_unlock(mixer);
+    return clip ? RAYLIB_LITE_OK : RAYLIB_LITE_INVALID_ARGUMENT;
 }
 
 raylib_lite_result_t raylib_lite_audio_mixer_set_sound_volume(
@@ -288,10 +308,40 @@ raylib_lite_result_t raylib_lite_audio_mixer_set_sound_volume(
 raylib_lite_result_t raylib_lite_audio_mixer_play_music(
     raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t handle)
 {
+    return raylib_lite_audio_mixer_play_music_with_loop(mixer, handle, true);
+}
+
+raylib_lite_result_t raylib_lite_audio_mixer_play_music_with_loop(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t handle, bool loop)
+{
     if (!mixer) return RAYLIB_LITE_INVALID_ARGUMENT;
     mixer_lock(mixer);
     mixer_clip_t *clip = find_clip(mixer, handle);
-    if (clip) reset_voice(&mixer->music, handle.slot, clip);
+    if (clip) {
+        reset_voice(&mixer->music, handle.slot, clip);
+        mixer->music_loop = loop;
+    }
+    mixer_unlock(mixer);
+    return clip ? RAYLIB_LITE_OK : RAYLIB_LITE_INVALID_ARGUMENT;
+}
+
+bool raylib_lite_audio_mixer_is_music_playing(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t handle)
+{
+    if (!mixer) return false;
+    mixer_lock(mixer);
+    bool playing = voice_uses_clip(&mixer->music, handle) && !mixer->music.paused;
+    mixer_unlock(mixer);
+    return playing;
+}
+
+raylib_lite_result_t raylib_lite_audio_mixer_set_music_paused(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t handle, bool paused)
+{
+    if (!mixer) return RAYLIB_LITE_INVALID_ARGUMENT;
+    mixer_lock(mixer);
+    mixer_clip_t *clip = find_clip(mixer, handle);
+    if (clip && voice_uses_clip(&mixer->music, handle)) mixer->music.paused = paused;
     mixer_unlock(mixer);
     return clip ? RAYLIB_LITE_OK : RAYLIB_LITE_INVALID_ARGUMENT;
 }
@@ -305,8 +355,7 @@ raylib_lite_result_t raylib_lite_audio_mixer_stop_music_clip(
         mixer_unlock(mixer);
         return RAYLIB_LITE_INVALID_ARGUMENT;
     }
-    if (mixer->music.active && mixer->music.clip_slot == handle.slot &&
-            mixer->music.clip_generation == handle.generation) {
+    if (voice_uses_clip(&mixer->music, handle)) {
         mixer->music.active = false;
     }
     mixer_unlock(mixer);
@@ -361,16 +410,16 @@ raylib_lite_result_t raylib_lite_audio_mixer_mix(
      * once per call instead of once per frame. */
     uint16_t playing = 0;
     for (uint16_t i = 0; i < mixer->config.max_sfx_voices; ++i) {
-        if (voice_clip(mixer, &mixer->voices[i])) ++playing;
+        if (!mixer->voices[i].paused && voice_clip(mixer, &mixer->voices[i])) ++playing;
     }
-    mixer_clip_t *music_clip = voice_clip(mixer, &mixer->music);
+    mixer_clip_t *music_clip = mixer->music.paused ? NULL : voice_clip(mixer, &mixer->music);
     const bool scale_master = mixer->master_volume < 1.0f;
     const int master = (int)(mixer->master_volume * 256.0f + 0.5f);
     for (size_t frame = 0; frame < frame_count; ++frame) {
         int64_t mixed = 0;
         for (uint16_t i = 0; playing && i < mixer->config.max_sfx_voices; ++i) {
             mixer_voice_t *voice = &mixer->voices[i];
-            if (!voice->active || voice->clip_slot >= mixer->config.max_clips) continue;
+            if (!voice->active || voice->paused || voice->clip_slot >= mixer->config.max_clips) continue;
             mixer_clip_t *clip = &mixer->clips[voice->clip_slot];
             int16_t sample;
             /* |sample * volume| <= 32768: the int32 conversion truncates
@@ -399,6 +448,10 @@ raylib_lite_result_t raylib_lite_audio_mixer_mix(
             }
             mixed += (int32_t)(sample * mixer->music_volume *
                                music_clip->volume);
+            if (!mixer->music_loop && mixer->music.decoder.cursor >= music_clip->encoded.frames) {
+                mixer->music.active = false;
+                music_clip = NULL;
+            }
         }
         if (scale_master) mixed = mixed * master / 256;
         if (mixed > 32767) mixed = 32767;
@@ -411,7 +464,7 @@ raylib_lite_result_t raylib_lite_audio_mixer_mix(
         if (mixer->voices[i].active) ++active;
     }
     mixer->stats.active_sfx_voices = active;
-    mixer->stats.music_playing = mixer->music.active;
+    mixer->stats.music_playing = mixer->music.active && !mixer->music.paused;
     mixer_unlock(mixer);
     return RAYLIB_LITE_OK;
 }

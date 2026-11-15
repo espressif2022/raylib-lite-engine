@@ -12,7 +12,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from prepare_release import assemble, validate, GAMES
+from prepare_release import assemble, validate, GAMES, REFERENCE_EXAMPLES
 from check_release import check
 from prepare_release_consumer import prepare
 
@@ -34,8 +34,9 @@ class ReleasePackagingTests(unittest.TestCase):
             check_catalog(stage, repository_evidence=False)
             self.assertEqual((stage / "src/renderer/raylib_lite_primitives_internal.h").read_bytes(),
                              (ROOT / "src/renderer/raylib_lite_primitives_internal.h").read_bytes())
-            self.assertEqual({p.name for p in (stage / "examples").iterdir()}, {*GAMES, "minimal"})
-            for game in GAMES:
+            self.assertEqual({p.name for p in (stage / "examples").iterdir()},
+                             {*GAMES, *REFERENCE_EXAMPLES, "minimal"})
+            for game in (*GAMES, *REFERENCE_EXAMPLES):
                 example = stage / "examples" / game
                 self.assertTrue((example / "shared/boards/esp-mosaico/board.c").is_file())
                 self.assertTrue((example / "shared/boards/esp-mosaico/bmgr/esp_mosaico/board_info.yaml").is_file())
@@ -59,11 +60,26 @@ class ReleasePackagingTests(unittest.TestCase):
                     self.assertTrue(assets, game)
                 else:
                     self.assertEqual(assets, [], game)
+            reference = stage / "examples/native_2d"
+            self.assertTrue((reference / "main/reference_game.c").is_file())
+            self.assertTrue((reference / "assets_src/prepare_reference.py").is_file())
             with contextlib.redirect_stdout(io.StringIO()):
                 check(release)
             (stage / "examples/sky_hop/main/CMakeLists.txt").write_text('include("${CMAKE_CURRENT_LIST_DIR}/../../outside.cmake")')
             with self.assertRaisesRegex(ValueError, "external CMake"):
                 validate(stage)
+
+    def test_minimal_only_keeps_only_the_minimal_example(self):
+        with tempfile.TemporaryDirectory() as folder:
+            release = Path(folder) / "release"
+            subprocess.run([sys.executable, str(ROOT / "tools/prepare_release.py"),
+                            "--minimal-only", "--output", str(release)],
+                           check=True, capture_output=True)
+            examples = release / "component/examples"
+            self.assertEqual({path.name for path in examples.iterdir()}, {"minimal"})
+            manifest = json.loads((release / "release-manifest.json").read_text())
+            self.assertEqual(manifest["games"], [])
+            self.assertEqual(manifest["reference_examples"], [])
 
     def test_inventory_rejects_modified_staged_file(self):
         with tempfile.TemporaryDirectory() as folder:

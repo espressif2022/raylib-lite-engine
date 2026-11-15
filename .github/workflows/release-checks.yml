@@ -48,6 +48,12 @@ jobs:
           - example: minimal
             chip: esp32s3
             board: none
+          - example: native_2d
+            chip: esp32s31
+            board: esp-mosaico
+          - example: native_2d
+            chip: esp32s3
+            board: esp32-s3-box-3
           - example: sky_hop
             chip: esp32s31
             board: esp-mosaico

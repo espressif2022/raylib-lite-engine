@@ -13,6 +13,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 GAMES = ("sky_hop", "tower_defense", "raylib_shooter", "living_worlds",
          "last_zone_extraction", "neon_rift_rally")
+REFERENCE_EXAMPLES = ("native_2d",)
 CORE_FILES = {"CMakeLists.txt", "Kconfig", "idf_component.yml", "LICENSE", "VERSION",
               "README.md", "README.EN.md", "README.CN.md", "API.md", "CHANGELOG.md",
               "THIRD_PARTY_NOTICES.md"}
@@ -80,6 +81,8 @@ def check_cmake(path, example, failures):
 
 
 def assemble(destination, games=GAMES, root=ROOT):
+    games = tuple(games)
+    reference_examples = REFERENCE_EXAMPLES if games == GAMES else ()
     destination = destination.resolve()
     if destination == root.resolve() or destination in root.resolve().parents:
         raise ValueError("Destination must not replace the source checkout")
@@ -103,6 +106,7 @@ def assemble(destination, games=GAMES, root=ROOT):
     for game in games:
         if game not in GAMES:
             raise ValueError(f"Not a maintained release game: {game}")
+    for game in (*games, *reference_examples):
         example = stage / "examples" / game
         copy_files([name for name in names if "/tests/" not in name], f"examples/{game}/", example, root)
         copy_files(names, "examples/common_components/", example / "shared/common_components", root)
@@ -186,7 +190,8 @@ def assemble(destination, games=GAMES, root=ROOT):
             text = (root / name).read_text()
             if "espressif2022/raylib-lite-engine" in text and f'"^{version}"' not in text:
                 raise ValueError(f"Example Engine constraint does not match VERSION: {name}")
-    record = {"version": version, "games": list(games), "assets": inventory,
+    record = {"version": version, "games": list(games),
+              "reference_examples": list(reference_examples), "assets": inventory,
               "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
               "source_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=root, text=True)),
               "files": [{"file": str(p.relative_to(stage)), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}

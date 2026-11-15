@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "raylib.h"
 #include "raylib_lite_rcore.h"
+#include "raylib_lite_rcore_render.h"
 #include "frame_host.h"
 #include "frame_scene.h"
 
@@ -62,8 +63,10 @@ static int setup(frame_surface_t *surface, int width, int height, void **user,
 #ifdef ESP_PLATFORM
     frame_compare_color_psram = esp_ptr_external_ram(color) ? 1 : 0;
 #endif
-    *color_bytes = (long long)width * height * 2;
-    *depth_bytes = (long long)width * height * 2;
+    size_t allocated_color, allocated_depth;
+    raylib_lite_rcore_buffer_sizes(&allocated_color, &allocated_depth);
+    *color_bytes = (long long)allocated_color;
+    *depth_bytes = (long long)allocated_depth;
     state->texture = load_texture(state->texels, FRAME_TEXTURE_SIZE, FRAME_TEXTURE_SIZE);
     return state->texture.id ? 0 : -1;
 }

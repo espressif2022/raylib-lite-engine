@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+set(RAYLIB_LITE_EXAMPLE_CUSTOM_MAIN ON)
+include("${CMAKE_CURRENT_LIST_DIR}/../common_components/examples_common/project.cmake")
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+project(native_2d VERSION 1.0.0)

@@ -39,7 +39,7 @@ typedef struct Music {
 #define KEY_LEFT 263
 #define MOUSE_BUTTON_LEFT 0
 
-#define PIXELFORMAT_UNCOMPRESSED_R5G6B5 4
+#define PIXELFORMAT_UNCOMPRESSED_R5G6B5 3
 #define LIGHTGRAY  (Color){ 200, 200, 200, 255 }
 #define GRAY       (Color){ 130, 130, 130, 255 }
 #define DARKGRAY   (Color){ 80, 80, 80, 255 }

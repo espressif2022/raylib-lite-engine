@@ -2,9 +2,13 @@ set(_native_services)
 if(RAYLIB_LITE_NATIVE_SERVICE_COMPONENT)
     list(APPEND _native_services "${RAYLIB_LITE_NATIVE_SERVICE_COMPONENT}")
 endif()
+set(_launcher "native_module_main.c")
+if(RAYLIB_LITE_EXAMPLE_CUSTOM_MAIN)
+    set(_launcher)
+endif()
 idf_component_register(
     SRCS
-        "native_module_main.c"
+        ${_launcher}
         "native_feedback.c"
         "example_async_video.c"
     INCLUDE_DIRS

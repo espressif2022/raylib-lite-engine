@@ -18,6 +18,7 @@ class AudioFacadeTests(unittest.TestCase):
             audio = PORT
             subprocess.run([
                 cc, "-std=c11", "-Wall", "-Wextra", "-Werror",
+                f"-I{ENGINE / 'third_party/raylib/src'}",
                 f"-I{FAKES / 'audio'}",
                 f"-I{ENGINE / 'include/raylib_lite'}",
                 f"-I{ENGINE / 'compat/raylib/include'}",

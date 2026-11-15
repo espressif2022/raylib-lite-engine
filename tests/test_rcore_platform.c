@@ -7,6 +7,10 @@
 #include <string.h>
 #include "raylib.h"
 #include "raylib_lite_rcore.h"
+#include "raylib_lite_rcore_render.h"
+
+void raylib_lite_upstream_draw_texture_pro(Texture2D texture, Rectangle source, Rectangle dest,
+                                         Vector2 origin, float rotation, Color tint);
 
 #define W 16
 #define H 8
@@ -76,6 +80,23 @@ static uint16_t at(int x, int y) { return s.shown[y * STRIDE + x]; }
 static raylib_lite_input_event_t queue_storage[16];
 static raylib_lite_input_queue_t queue;
 static unsigned seen_events;
+static unsigned asset_opens, asset_releases;
+static const char packed_file[] = "sprite marker";
+
+static raylib_lite_result_t open_asset(const char *name, raylib_lite_asset_view_t *view)
+{
+    assert(strcmp(name, "nested/sprite.txt") == 0 || strcmp(name, "missing") == 0);
+    if (strcmp(name, "missing") == 0) return RAYLIB_LITE_NOT_FOUND;
+    ++asset_opens;
+    *view = (raylib_lite_asset_view_t){.data = (const uint8_t *)packed_file, .size = sizeof(packed_file) - 1};
+    return RAYLIB_LITE_OK;
+}
+
+static void release_asset(raylib_lite_asset_view_t *view)
+{
+    assert(view->data == (const uint8_t *)packed_file);
+    ++asset_releases;
+}
 
 static void on_event(void *user, const raylib_lite_input_event_t *event)
 {
@@ -151,6 +172,9 @@ static void time_and_pacing_use_platform_clock(void)
     double before = GetTime();
     s.now_us += 500000;
     assert(fabs(GetTime() - before - 0.5) < 1e-6);
+    s.slept_us = 0;
+    WaitTime(0.002);
+    assert(s.slept_us == 2000);
 
     SetTargetFPS(10);
     frame(BLACK);
@@ -181,6 +205,202 @@ static void busy_display_drops_frame_only(void)
     assert(s.presents == presents + 1);
 }
 
+static void reads_mounted_assets_without_exposing_other_paths(void)
+{
+    assert(FileExists("./assets/nested/sprite.txt"));
+    assert(!FileExists("assets/missing") && !FileExists("assets/../outside"));
+    int size = 0;
+    unsigned char *bytes = LoadFileData("assets/nested/sprite.txt", &size);
+    assert(bytes && size == sizeof(packed_file) - 1 && memcmp(bytes, packed_file, (size_t)size) == 0);
+    UnloadFileData(bytes);
+    char *text = LoadFileText("./assets/nested/sprite.txt");
+    assert(text && strcmp(text, packed_file) == 0);
+    UnloadFileText(text);
+    assert(asset_opens == 3 && asset_releases == asset_opens);
+}
+
+static void translated_input_and_exit_key(void)
+{
+    SetExitKey(KEY_NULL);
+    push(RAYLIB_LITE_INPUT_KEY, 0, 0, KEY_ESCAPE, true);
+    push(RAYLIB_LITE_INPUT_CHAR, 0, 0, 0x4e2d, false);
+    push(RAYLIB_LITE_INPUT_CHAR, 0, 0, 0xd800, false);
+    push(RAYLIB_LITE_INPUT_WHEEL, 1, -2, 0, false);
+    push(RAYLIB_LITE_INPUT_GAMEPAD_CONNECTION, 0, 0, 6, true);
+    push(RAYLIB_LITE_INPUT_GAMEPAD_AXIS, 0, -32767, GAMEPAD_AXIS_LEFT_X, false);
+    push(RAYLIB_LITE_INPUT_GAMEPAD_BUTTON, 0, 0, GAMEPAD_BUTTON_RIGHT_THUMB, true);
+    push(RAYLIB_LITE_INPUT_TOUCH, 3, 4, 7, true);
+    frame(BLACK);
+    assert(IsKeyPressed(KEY_ESCAPE) && !WindowShouldClose());
+    assert(GetCharPressed() == 0x4e2d && GetCharPressed() == 0);
+    const Vector2 wheel = GetMouseWheelMoveV();
+    assert(wheel.x == 1 && wheel.y == -2);
+    assert(IsGamepadAvailable(0) && GetGamepadAxisCount(0) == 6);
+    assert(GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) == -1.0f);
+    assert(IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_THUMB));
+    assert(GetGestureDetected() == GESTURE_TAP || GetGestureDetected() == GESTURE_DOUBLETAP);
+
+    push(RAYLIB_LITE_INPUT_KEY, 0, 0, KEY_ESCAPE, true);
+    push(RAYLIB_LITE_INPUT_GAMEPAD_BUTTON, 0, 0, GAMEPAD_BUTTON_RIGHT_THUMB, false);
+    frame(BLACK);
+    assert(IsKeyPressedRepeat(KEY_ESCAPE) && GetMouseWheelMove() == 0);
+    assert(IsGamepadButtonReleased(0, GAMEPAD_BUTTON_RIGHT_THUMB));
+
+    SetExitKey(KEY_ENTER);
+    push(RAYLIB_LITE_INPUT_GAMEPAD_CONNECTION, 0, 0, 0, false);
+    push(RAYLIB_LITE_INPUT_BUTTON, 0, 0, 4, true);
+    push(RAYLIB_LITE_INPUT_BUTTON, 0, 0, 4, false);
+    frame(BLACK);
+    assert(!IsGamepadAvailable(0) && GetGamepadAxisCount(0) == 0);
+    assert(IsKeyPressed(KEY_ENTER) && WindowShouldClose());
+}
+
+static void scissor_accepts_top_left_rectangles(void)
+{
+    BeginDrawing();
+    ClearBackground(BLACK);
+    BeginScissorMode(1, 1, 3, 2);
+    ClearBackground((Color){255, 0, 0, 255});
+    DrawRectangle(0, 0, W, 2, (Color){0, 255, 0, 255});
+    EndScissorMode();
+    BeginScissorMode(W + 1, 0, 4, H);
+    DrawRectangle(0, 0, W, H, WHITE);
+    ClearBackground(WHITE);
+    EndScissorMode();
+    EndDrawing();
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++)
+            assert(at(x, y) == (x >= 1 && x < 4 && y >= 1 && y < 3
+                ? (y == 1 ? 0x07e0 : 0xf800) : 0));
+}
+
+static void texture_modes_return_pixels_and_release_attachments(void)
+{
+    assert(!IsRenderTextureValid(LoadRenderTexture(-1, H)));
+    assert(!IsRenderTextureValid(LoadRenderTexture(INT32_MAX, INT32_MAX)));
+    for (int i = 0; i < 128; i++)
+    {
+        RenderTexture2D target = LoadRenderTexture(4, 4);
+        assert(IsRenderTextureValid(target));
+        BeginTextureMode(target);
+        ClearBackground((Color){0, 0, 255, 255});
+        BeginScissorMode(0, 0, 4, 2);
+        ClearBackground((Color){255, 0, 0, 255});
+        EndScissorMode();
+        EndTextureMode();
+
+        BeginDrawing();
+        ClearBackground(BLACK);
+        DrawTextureRec(target.texture, (Rectangle){0, 0, 4, -4}, (Vector2){0, 0}, WHITE);
+        EndDrawing();
+        assert(at(1, 0) == 0xf800 && at(1, 3) == 0x001f && at(5, 0) == 0);
+        UnloadRenderTexture(target);
+        assert(!IsRenderTextureValid(target));
+    }
+}
+
+static void blending_and_image_readback(void)
+{
+    const Color original[] = {{255, 0, 0, 255}, {0, 0, 255, 255}};
+    Texture2D texture = LoadTextureFromImage((Image){(void *)original, 1, 2, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8});
+    assert(IsTextureValid(texture));
+    Image read_texture = LoadImageFromTexture(texture);
+    assert(IsImageValid(read_texture) && GetImageColor(read_texture, 0, 0).r == 255 &&
+           GetImageColor(read_texture, 0, 1).b == 255);
+    UnloadImage(read_texture);
+    UnloadTexture(texture);
+    assert(!IsImageValid(LoadImageFromTexture(texture)));
+
+    Color bg = {64, 64, 64, 255};
+    Color fg = {96, 64, 32, 128};
+    BeginDrawing();
+    ClearBackground(bg);
+    DrawRectangle(0, 0, 2, 2, fg);
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawRectangle(2, 0, 2, 2, fg);
+    EndBlendMode();
+    DrawRectangle(4, 0, 2, 2, fg);
+    DrawRectangle(0, H - 1, 1, 1, (Color){255, 0, 0, 255});
+    EndDrawing();
+    assert(at(0, 0) == at(4, 0) && at(0, 0) != at(2, 0));
+    unsigned additive_green = (at(2, 0) >> 5) & 63;
+    assert(additive_green >= 23 && additive_green <= 24);
+    Image read_screen = LoadImageFromScreen();
+    assert(IsImageValid(read_screen));
+    assert(GetImageColor(read_screen, 0, H - 1).r == 255);
+    assert(GetImageColor(read_screen, 0, 0).r < 100);
+    int size = 0;
+    unsigned char *qoi = ExportImageToMemory(read_screen, ".qoi", &size);
+    assert(qoi && size > 0);
+    Image decoded = LoadImageFromMemory(".qoi", qoi, size);
+    assert(IsImageValid(decoded) && GetImageColor(decoded, 0, H - 1).r == 255);
+    UnloadImage(decoded);
+    MemFree(qoi);
+    UnloadImage(read_screen);
+}
+
+static void opaque_texture_scaling_matches_pixels(void)
+{
+    uint16_t pixels[] = {0xf800, 0x7bef, 0x0821, 0x001f, 0x0020, 0xffff, 0x39e7, 0x07e0};
+    Texture2D texture = LoadTextureFromImage(
+        (Image){ pixels, 4, 2, 1, PIXELFORMAT_UNCOMPRESSED_R5G6B5 });
+    assert(IsTextureValid(texture));
+    for (int scale = 1; scale <= 3; scale++)
+    {
+        Rectangle dest = {2, 1, 4*scale, 2*scale};
+        for (int flip = 0; flip <= 1; flip++)
+        {
+            Rectangle source = {0, 0, 4, flip ? -2 : 2};
+            BeginDrawing();
+            ClearBackground(BLACK);
+            assert(raylib_lite_rcore_blit_opaque(texture, source, dest));
+            EndDrawing();
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    uint16_t expected = 0;
+                    if (x >= 2 && x < 2 + 4*scale && y >= 1 && y < 1 + 2*scale)
+                    {
+                        int src_y = (y - 1)/scale;
+                        if (flip) src_y = 1 - src_y;
+                        expected = pixels[src_y*4 + (x - 2)/scale];
+                    }
+                    assert(at(x, y) == expected);
+                }
+            uint16_t result[STRIDE*H];
+            memcpy(result, s.shown, sizeof(result));
+
+            BeginDrawing();
+            ClearBackground(BLACK);
+            raylib_lite_upstream_draw_texture_pro(texture, source, dest, (Vector2){0}, 0, WHITE);
+            EndDrawing();
+            assert(memcmp(result, s.shown, sizeof(result)) == 0);
+
+            BeginDrawing();
+            ClearBackground(BLACK);
+            DrawTexturePro(texture, source, dest, (Vector2){0}, 0, WHITE);
+            EndDrawing();
+            assert(memcmp(result, s.shown, sizeof(result)) == 0);
+        }
+    }
+
+    Rectangle source = {0, 0, 4, 2}, dest = {0, 0, 8, 4};
+    BeginDrawing();
+    ClearBackground(BLACK);
+    BeginScissorMode(2, 0, 6, 4);
+    assert(!raylib_lite_rcore_blit_opaque(texture, source, dest));
+    DrawTexturePro(texture, source, dest, (Vector2){0}, 0, WHITE);
+    EndScissorMode();
+    EndDrawing();
+    assert(at(0, 0) == 0 && at(3, 0) == pixels[1]);
+
+    SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
+    BeginDrawing();
+    assert(!raylib_lite_rcore_blit_opaque(texture, source, dest));
+    EndDrawing();
+    UnloadTexture(texture);
+}
+
 int main(void)
 {
     SetTraceLogLevel(LOG_WARNING);
@@ -191,6 +411,7 @@ int main(void)
                    .discard = discard, .flush = flush },
         .clock = { .monotonic_us = monotonic_us, .sleep_for_us = sleep_for_us },
         .input = &queue, .on_event = on_event, .user = &queue,
+        .open_asset = open_asset, .release_asset = release_asset,
     };
     assert(raylib_lite_rcore_configure(NULL) == RAYLIB_LITE_INVALID_ARGUMENT);
     assert(raylib_lite_rcore_configure(&config) == RAYLIB_LITE_OK);
@@ -207,6 +428,12 @@ int main(void)
     time_and_pacing_use_platform_clock();
     unpaced_loop_still_yields();
     busy_display_drops_frame_only();
+    reads_mounted_assets_without_exposing_other_paths();
+    scissor_accepts_top_left_rectangles();
+    texture_modes_return_pixels_and_release_attachments();
+    blending_and_image_readback();
+    opaque_texture_scaling_matches_pixels();
+    translated_input_and_exit_key();
 
     assert(raylib_lite_rcore_flush(0) == RAYLIB_LITE_OK);
     CloseWindow();

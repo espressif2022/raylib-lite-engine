@@ -66,7 +66,7 @@ static esp_err_t to_esp(raylib_lite_result_t result)
 
 esp_err_t raylib_lite_example_board_haptic_init(void)
 {
-    return mosaico_hardware_haptic_set(0);
+    return mosaico_hardware_haptic_init();
 }
 
 esp_err_t raylib_lite_example_board_haptic_set(uint8_t strength)
@@ -465,6 +465,7 @@ esp_err_t raylib_lite_example_board_retry_cleanup(raylib_lite_example_board_t *p
     if (err != ESP_OK) {
         return err;
     }
+    mosaico_hardware_haptic_deinit();
     if (p->video) {
         raylib_lite_result_t rr = mosaico_video_close(p->video, timeout_ms);
         if (rr != RAYLIB_LITE_OK) {

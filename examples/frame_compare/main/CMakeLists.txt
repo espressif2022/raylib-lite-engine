@@ -17,17 +17,16 @@ if(FRAME_COMPARE_IMPL STREQUAL "upstream")
         "${FRAME_DIR}/run_upstream.c"
         "${ENGINE_ROOT}/src/runner/raylib_lite_input_queue.c"
         "${RAYLIB_DIR}/src/rshapes.c"
-        "${RAYLIB_DIR}/src/rtextures.c"
+        "${ENGINE_ROOT}/src/rcore/raylib_lite_rtextures.c"
         "${RAYLIB_DIR}/src/rtext.c"
         "${ENGINE_ROOT}/src/rcore/raylib_lite_rcore.c")
     list(APPEND FRAME_INCLUDES
         "${RAYLIB_DIR}/src"
-        "${RAYLIB_DIR}/src/external")
+        "${RAYLIB_DIR}/src/external"
+        "${ENGINE_ROOT}/src/rcore")
     list(APPEND FRAME_DEFINITIONS
         PLATFORM_CUSTOM
-        GRAPHICS_API_OPENGL_SOFTWARE
-        SW_COLOR_BUFFER_BITS=16
-        SW_DEPTH_BUFFER_BITS=16)
+        GRAPHICS_API_OPENGL_SOFTWARE)
 else()
     list(APPEND FRAME_SOURCES
         "${FRAME_DIR}/run_compat.c"
@@ -50,7 +49,7 @@ target_link_libraries(${COMPONENT_LIB} PRIVATE m)
 if(FRAME_COMPARE_IMPL STREQUAL "upstream")
     set(_upstream
         "${RAYLIB_DIR}/src/rshapes.c"
-        "${RAYLIB_DIR}/src/rtextures.c"
+        "${ENGINE_ROOT}/src/rcore/raylib_lite_rtextures.c"
         "${RAYLIB_DIR}/src/rtext.c"
         "${ENGINE_ROOT}/src/rcore/raylib_lite_rcore.c")
     set_property(SOURCE ${_upstream} APPEND PROPERTY COMPILE_OPTIONS

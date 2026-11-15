@@ -83,7 +83,7 @@ static void put16(uint8_t *p, uint16_t value)
 static void put32(uint8_t *p, uint32_t value)
 { p[0] = value; p[1] = value >> 8; p[2] = value >> 16; p[3] = value >> 24; }
 
-int main(void)
+static void exercise_compat_audio(void)
 {
     put32(sound_file, 0x314e534dU);
     put32(sound_file + 4, 24000);
@@ -167,6 +167,74 @@ int main(void)
     assert(IsAudioDeviceReady());
     CloseAudioDevice();
     assert(fake_destroy_count == 3);
+}
+
+#undef InitAudioDevice
+#undef CloseAudioDevice
+#undef IsAudioDeviceReady
+#undef LoadSound
+#undef UnloadSound
+#undef PlaySound
+#undef StopSound
+#undef IsSoundPlaying
+#undef LoadMusicStream
+#undef UnloadMusicStream
+#undef PlayMusicStream
+#undef StopMusicStream
+#undef SetMusicVolume
+
+static void exercise_native_audio(void)
+{
+    unsigned before = asset_releases;
+    InitAudioDevice();
+    assert(IsAudioDeviceReady());
+    Sound sound = LoadSound("assets/tone.sound");
+    Music music = LoadMusicStream("assets/music.sound");
+    assert(IsSoundValid(sound) && IsMusicValid(music));
+    int16_t output[2];
+    PlaySound(sound);
+    assert(IsSoundPlaying(sound));
+    assert(fake_pull(fake_pull_context, output, 1) == RAYLIB_LITE_OK && output[0] == 1000);
+    PauseSound(sound);
+    assert(!IsSoundPlaying(sound));
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK && output[0] == 0 && output[1] == 0);
+    ResumeSound(sound);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK && output[0] == 2000 && output[1] == 0);
+    assert(!IsSoundPlaying(sound));
+    PlaySound(sound);
+    PauseSound(sound);
+    StopSound(sound);
+    ResumeSound(sound);
+    assert(!IsSoundPlaying(sound));
+
+    SetMusicVolume(music, 1.0f);
+    music.looping = false;
+    PlayMusicStream(music);
+    assert(IsMusicStreamPlaying(music));
+    assert(fake_pull(fake_pull_context, output, 1) == RAYLIB_LITE_OK && output[0] == 1000);
+    PauseMusicStream(music);
+    assert(!IsMusicStreamPlaying(music));
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK && output[0] == 0 && output[1] == 0);
+    ResumeMusicStream(music);
+    assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK && output[0] == 2000 && output[1] == 0);
+    assert(!IsMusicStreamPlaying(music));
+
+    music.looping = true;
+    PlayMusicStream(music);
+    for (int i = 0; i < 2; i++)
+        assert(fake_pull(fake_pull_context, output, 2) == RAYLIB_LITE_OK && output[0] == 1000 && output[1] == 2000);
+    StopMusicStream(music);
+    UnloadMusicStream(music);
+    UnloadSound(sound);
+    assert(!IsSoundValid(sound) && !IsMusicValid(music));
+    CloseAudioDevice();
+    assert(!IsAudioDeviceReady() && asset_releases == before + 2);
+}
+
+int main(void)
+{
+    exercise_compat_audio();
+    exercise_native_audio();
     puts("audio facade: ok");
     return 0;
 }

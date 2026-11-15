@@ -51,7 +51,7 @@ set(_raylib_sources
 set(_upstream_raylib_dir "${RAYLIB_LITE_ENGINE_ROOT}/third_party/raylib")
 set(_upstream_raylib_sources
     "${_upstream_raylib_dir}/src/rshapes.c"
-    "${_upstream_raylib_dir}/src/rtextures.c"
+    "${RAYLIB_LITE_ENGINE_ROOT}/src/rcore/raylib_lite_rtextures.c"
     "${_upstream_raylib_dir}/src/rtext.c"
     "${RAYLIB_LITE_ENGINE_ROOT}/src/rcore/raylib_lite_rcore.c")
 list(APPEND _platform_sources "${RAYLIB_LITE_ENGINE_ROOT}/src/idf/raylib_lite_rcore_posix.c")
@@ -81,9 +81,7 @@ idf_component_register(
 target_compile_definitions(${COMPONENT_LIB} PUBLIC
     RAYLIB_LITE_DEFAULT_FPS=${CONFIG_RAYLIB_LITE_DEFAULT_FPS}
     GRAPHICS_API_OPENGL_SOFTWARE
-    PLATFORM_CUSTOM
-    SW_COLOR_BUFFER_BITS=16
-    SW_DEPTH_BUFFER_BITS=16)
+    PLATFORM_CUSTOM)
 if(CONFIG_RAYLIB_LITE_MAX_ASSETS)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE
         RAYLIB_LITE_MAX_ASSETS=${CONFIG_RAYLIB_LITE_MAX_ASSETS})

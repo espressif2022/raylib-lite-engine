@@ -86,12 +86,21 @@ raylib_lite_result_t raylib_lite_audio_mixer_stop_sound(
     raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip);
 bool raylib_lite_audio_mixer_is_sound_playing(
     raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip);
+/* Change the pause state of all live voices for this clip without rewinding. */
+raylib_lite_result_t raylib_lite_audio_mixer_set_sound_paused(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip, bool paused);
 raylib_lite_result_t raylib_lite_audio_mixer_set_sound_volume(
     raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip,
     float volume);
 
 raylib_lite_result_t raylib_lite_audio_mixer_play_music(
     raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip);
+raylib_lite_result_t raylib_lite_audio_mixer_play_music_with_loop(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip, bool loop);
+bool raylib_lite_audio_mixer_is_music_playing(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip);
+raylib_lite_result_t raylib_lite_audio_mixer_set_music_paused(
+    raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip, bool paused);
 /* Stop only if this clip still owns the singleton music voice. */
 raylib_lite_result_t raylib_lite_audio_mixer_stop_music_clip(
     raylib_lite_audio_mixer_t *mixer, raylib_lite_audio_clip_t clip);

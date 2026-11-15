@@ -9,6 +9,85 @@
 #include "esp_board_manager_includes.h"
 #include "bsp/esp_mosaico.h"
 
+#if defined(TEST_MOSAICO)
+#include "mosaico_hardware.h"
+
+static char mock_tx;
+static bool tx_allocated, tx_enabled, fail_i2s_init, fail_i2s_delete;
+static unsigned tx_disables;
+
+esp_err_t i2s_new_channel(const i2s_chan_config_t *config, i2s_chan_handle_t *tx,
+                          i2s_chan_handle_t *rx)
+{
+    assert(config->port == 0 && config->auto_clear && tx && !rx && !tx_allocated);
+    *tx = &mock_tx;
+    tx_allocated = true;
+    return ESP_OK;
+}
+
+esp_err_t i2s_channel_init_std_mode(i2s_chan_handle_t tx, const i2s_std_config_t *config)
+{
+    assert(tx == &mock_tx && tx_allocated && !tx_enabled && config);
+    return fail_i2s_init ? ESP_FAIL : ESP_OK;
+}
+
+esp_err_t i2s_channel_enable(i2s_chan_handle_t tx)
+{
+    assert(tx == &mock_tx && tx_allocated && !tx_enabled);
+    tx_enabled = true;
+    return ESP_OK;
+}
+
+esp_err_t i2s_channel_get_info(i2s_chan_handle_t tx, i2s_chan_info_t *info)
+{
+    assert(tx == &mock_tx && tx_allocated && info);
+    info->is_enabled = tx_enabled;
+    return ESP_OK;
+}
+
+esp_err_t i2s_channel_disable(i2s_chan_handle_t tx)
+{
+    assert(tx == &mock_tx && tx_allocated && tx_enabled);
+    ++tx_disables;
+    tx_enabled = false;
+    return ESP_OK;
+}
+
+esp_err_t i2s_del_channel(i2s_chan_handle_t tx)
+{
+    assert(tx == &mock_tx && tx_allocated && !tx_enabled);
+    if (fail_i2s_delete) return ESP_FAIL;
+    tx_allocated = false;
+    return ESP_OK;
+}
+
+static void test_mosaico_i2s_shutdown(void)
+{
+    periph_i2s_config_t config = {
+        .port = 0, .role = I2S_ROLE_MASTER, .mode = I2S_COMM_MODE_STD,
+        .direction = I2S_DIR_TX,
+    };
+    void *handle = NULL;
+
+    assert(mosaico_i2s_tx_init(&config, sizeof(config), &handle) == ESP_OK);
+    assert(i2s_channel_disable(handle) == ESP_OK);  /* Codec close already stopped TX. */
+    assert(mosaico_i2s_tx_deinit(handle) == ESP_OK);
+    assert(tx_disables == 1 && !tx_allocated);
+
+    assert(mosaico_i2s_tx_init(&config, sizeof(config), &handle) == ESP_OK);
+    fail_i2s_delete = true;
+    assert(mosaico_i2s_tx_deinit(handle) == ESP_FAIL);
+    assert(tx_disables == 2 && tx_allocated && !tx_enabled);
+    fail_i2s_delete = false;
+    assert(mosaico_i2s_tx_deinit(handle) == ESP_OK);
+    assert(tx_disables == 2 && !tx_allocated);
+
+    fail_i2s_init = true;
+    assert(mosaico_i2s_tx_init(&config, sizeof(config), &handle) == ESP_FAIL);
+    assert(!handle && !tx_allocated && tx_disables == 2);
+}
+#endif
+
 static char mock_codec_object;
 static dev_audio_codec_handles_t mock_dac;
 static unsigned codec_open_calls, codec_close_calls, codec_volume_calls;
@@ -88,6 +167,10 @@ esp_err_t esp_board_manager_deinit_device_by_name(const char *name)
 
 int main(void)
 {
+#if defined(TEST_MOSAICO)
+    test_mosaico_i2s_shutdown();
+#endif
+
     raylib_lite_audio_backend_t backend = platform_esp_audio_board_backend();
     raylib_lite_audio_format_t format = RAYLIB_LITE_AUDIO_FORMAT_DEFAULT();
     assert(backend.start && backend.stop && backend.write);

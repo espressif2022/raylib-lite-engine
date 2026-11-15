@@ -292,6 +292,71 @@ void raylib_lite_game_audio_set_master_volume(float volume)
     if (s_mixer) raylib_lite_audio_mixer_set_master_volume(s_mixer, volume);
 }
 
+/* Optional native raylib audio symbols supplied by this application-side
+ * component. The Engine and its frozen macros keep their existing linkage. */
+void InitAudioDevice(void) { raylib_lite_game_audio_init(); }
+void CloseAudioDevice(void) { raylib_lite_game_audio_close(); }
+bool IsAudioDeviceReady(void) { return raylib_lite_game_audio_ready(); }
+void SetMasterVolume(float volume) { raylib_lite_game_audio_set_master_volume(volume); }
+float GetMasterVolume(void) { return s_master_volume; }
+
+static const char *packed_audio_name(const char *path)
+{
+    if (!path) return NULL;
+    while (strncmp(path, "./", 2) == 0) path += 2;
+    if (strncmp(path, "assets/", 7) == 0) path += 7;
+    if (!path[0] || strpbrk(path, "/\\:") || strcmp(path, ".") == 0 ||
+        strcmp(path, "..") == 0) return NULL;
+    return path;
+}
+
+Sound LoadSound(const char *fileName)
+{
+    return raylib_lite_game_audio_load_sound(packed_audio_name(fileName));
+}
+bool IsSoundValid(Sound sound) { return sound_ticket(sound) != NULL; }
+void UnloadSound(Sound sound) { raylib_lite_game_audio_unload_sound(sound); }
+void PlaySound(Sound sound) { raylib_lite_game_audio_play_sound(sound); }
+void StopSound(Sound sound) { raylib_lite_game_audio_stop_sound(sound); }
+bool IsSoundPlaying(Sound sound) { return raylib_lite_game_audio_is_sound_playing(sound); }
+void SetSoundVolume(Sound sound, float volume) { raylib_lite_game_audio_set_sound_volume(sound, volume); }
+
+static void set_sound_paused(Sound sound, bool paused)
+{
+    audio_ticket_t *ticket = sound_ticket(sound);
+    if (ticket) (void)raylib_lite_audio_mixer_set_sound_paused(s_mixer, ticket->clip, paused);
+}
+void PauseSound(Sound sound) { set_sound_paused(sound, true); }
+void ResumeSound(Sound sound) { set_sound_paused(sound, false); }
+
+Music LoadMusicStream(const char *fileName)
+{
+    return raylib_lite_game_audio_load_music(packed_audio_name(fileName));
+}
+bool IsMusicValid(Music music) { return music_ticket(music) != NULL; }
+void UnloadMusicStream(Music music) { raylib_lite_game_audio_unload_music(music); }
+void PlayMusicStream(Music music)
+{
+    audio_ticket_t *ticket = music_ticket(music);
+    if (ticket) (void)raylib_lite_audio_mixer_play_music_with_loop(s_mixer, ticket->clip, music.looping);
+}
+void StopMusicStream(Music music) { raylib_lite_game_audio_stop_music(music); }
+void UpdateMusicStream(Music music) { raylib_lite_game_audio_update_music(music); }
+void SetMusicVolume(Music music, float volume) { raylib_lite_game_audio_set_music_volume(music, volume); }
+bool IsMusicStreamPlaying(Music music)
+{
+    audio_ticket_t *ticket = music_ticket(music);
+    return ticket && raylib_lite_audio_mixer_is_music_playing(s_mixer, ticket->clip);
+}
+
+static void set_music_paused(Music music, bool paused)
+{
+    audio_ticket_t *ticket = music_ticket(music);
+    if (ticket) (void)raylib_lite_audio_mixer_set_music_paused(s_mixer, ticket->clip, paused);
+}
+void PauseMusicStream(Music music) { set_music_paused(music, true); }
+void ResumeMusicStream(Music music) { set_music_paused(music, false); }
+
 void raylib_lite_game_audio_get_stats(raylib_lite_game_audio_stats_t *stats)
 {
     if (!stats) return;
